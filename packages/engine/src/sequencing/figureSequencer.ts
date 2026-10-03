@@ -7,9 +7,9 @@
  * growth), a rotation `drift`, and a canon `source` (another Figure part's
  * cells, late and transposed).
  *
- * This file is the field set, its defaults, the check every constructor
- * and live edit runs, and the performer (windsor#485); the normaliser is
- * `song/figureNormalise.ts`. The schedule and the drift (windsor#486) are
+ * This file is the field set, its defaults and the performer (windsor#485);
+ * the check every constructor and live edit runs is `figureConfigCheck.ts`,
+ * the normaliser `song/figureNormalise.ts`. The schedule and the drift (windsor#486) are
  * `figureLine.ts`.
  *
  * **The performer.** `FigureSequencer` hears its region gate at every local
@@ -43,10 +43,14 @@
  * resolved cell at `step − offset`: the leader's `cellAt` over the leader's
  * own cells, so a chain resolves one level and a negative step reads the
  * line cyclically. The step is the follower's own, counted from its own
- * region's entry; the leader's clock, regions and edit history play no
- * part: the leader's current schedule and drift run from the follower's
- * bar 0, so a live drift edit on the leader moves the follower at once, as
- * if it had always been in force, and the leader's re-entry moves nothing. The
+ * region's entry; the leader's clock and edit history play no part: the
+ * leader's current schedule and drift run from the follower's bar 0, so a
+ * live drift edit on the leader moves the follower at once, as if it had
+ * always been in force, and the leader's re-entry moves nothing. The
+ * leader's regions decide only which of its lines is read (windsor#508):
+ * the resolver is asked at the follower's local tick of the step it reads,
+ * and the player answers with the leader's generator for the region it
+ * plays at that transport tick (`PartBinding.figureAt`). The
  * follower's `cells`, `length`, `schedule` and `drift` are ignored; its
  * divisor, gate, register, `skipChance` and stream are its own. The note is
  * the leader's cell over the chord at the follower's onset, at the
@@ -62,33 +66,26 @@ import {
   ACCENT_VELOCITY_DEFAULT,
   ARP_GATE_DEFAULT,
   ARP_REGISTER_OCTAVE_DEFAULT,
-  FIGURE_DRIFT_STEPS_MAX,
-  FIGURE_SCHEDULE_BARS_MAX,
-  FIGURE_TONE_MAX,
-  FIGURE_TRANSPOSE_MAX,
   GRID_DEFAULT_STEP_COUNT,
-  GRID_STEPS_MAX,
-  GRID_STEP_OCTAVE_MAX,
   MIDI_NOTE_MAX,
-  MUSIC_SLOT_MAX,
-  REGISTER_OCTAVE_MAX,
-  REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
 import { figureNote } from '../harmony/figureTones';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
 import { playArpCell, type ArpCellOutcome } from './arpCellPlay';
 import { rollOutcome } from './arpeggiator';
 import type { ArpStep } from './arpSteps';
-import { FigureLine } from './figureLine';
+import { assertFigureConfig } from './figureConfigCheck';
+import { FigureLine, type FigureLinePosition } from './figureLine';
 import { streamRng, type Rng } from './generatorSeed';
-import { assertRatchet } from './gridSequencer';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import { withSeqOverrides, type PartTickEvent, type PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
-import { DIVISORS, TICKS_PER_BAR, isNoteDivisor, type Unsubscribe } from './scheduler';
-import { assertStepModLanes, type StepModLane } from './stepModLanes';
+import { DIVISORS, TICKS_PER_BAR, type Unsubscribe } from './scheduler';
+import type { StepModLane } from './stepModLanes';
+
+export { assertFigureConfig } from './figureConfigCheck';
 
 export interface FigureNoteCell {
   readonly kind: 'note';
@@ -154,8 +151,12 @@ export interface FigureSequencerConfig {
   source?: FigureSource;
 }
 
-/** Finds the live Figure on a slot, which a canon reads at each onset; null when the slot holds none. */
-export type FigureResolver = (slot: number) => FigureSequencer | null;
+/**
+ * Finds the live Figure on a slot at a tick, which a canon reads at each
+ * onset; null when the slot holds none. A generator asks at its own local
+ * tick, and its part's binding maps that to the transport's (windsor#508).
+ */
+export type FigureResolver = (slot: number, tick: number) => FigureSequencer | null;
 
 const NO_FIGURE: FigureResolver = () => null;
 
@@ -192,90 +193,6 @@ export const DEFAULT_FIGURE_CONFIG: FigureSequencerConfig = {
   lanes: [],
   seed: 0,
 };
-
-const isIntIn = (value: number, min: number, max: number): boolean =>
-  Number.isInteger(value) && value >= min && value <= max;
-
-const isUnit = (value: number): boolean => value >= 0 && value <= 1;
-
-function assertCell(cell: FigureCell, index: number): void {
-  if (cell.kind !== 'note') return;
-  const at = `cells[${index}]`;
-  if (!isIntIn(cell.tone, -FIGURE_TONE_MAX, FIGURE_TONE_MAX)) {
-    throw new RangeError(`${at}.tone must be an integer within ±${FIGURE_TONE_MAX}`);
-  }
-  if (!isIntIn(cell.octave, -GRID_STEP_OCTAVE_MAX, GRID_STEP_OCTAVE_MAX)) {
-    throw new RangeError(`${at}.octave must be an integer within ±${GRID_STEP_OCTAVE_MAX}`);
-  }
-  if (cell.velocity !== undefined && !isUnit(cell.velocity)) {
-    throw new RangeError(`${at}.velocity must be in [0, 1], got ${cell.velocity}`);
-  }
-  assertRatchet(cell.ratchet, at);
-}
-
-/** The schedule, drift and source, each when present. */
-function assertProcesses(config: FigureSequencerConfig): void {
-  const cells = config.cells.length;
-  config.schedule?.forEach((stage, i) => {
-    if (!isIntIn(stage.length, 1, cells) || !isIntIn(stage.bars, 1, FIGURE_SCHEDULE_BARS_MAX)) {
-      throw new RangeError(
-        `schedule[${i}] must be a length 1..${cells} for 1..${FIGURE_SCHEDULE_BARS_MAX} bars`,
-      );
-    }
-  });
-  const { drift, source } = config;
-  if (
-    drift &&
-    !(
-      isIntIn(drift.steps, -FIGURE_DRIFT_STEPS_MAX, FIGURE_DRIFT_STEPS_MAX) &&
-      isIntIn(drift.everyBars, 1, FIGURE_SCHEDULE_BARS_MAX)
-    )
-  ) {
-    throw new RangeError(
-      `drift must be ±${FIGURE_DRIFT_STEPS_MAX} steps every 1..${FIGURE_SCHEDULE_BARS_MAX} bars`,
-    );
-  }
-  if (
-    source &&
-    !(
-      isIntIn(source.slot, 0, MUSIC_SLOT_MAX) &&
-      isIntIn(source.offset, -GRID_STEPS_MAX, GRID_STEPS_MAX) &&
-      isIntIn(source.transpose, -FIGURE_TRANSPOSE_MAX, FIGURE_TRANSPOSE_MAX)
-    )
-  ) {
-    throw new RangeError(
-      `source must be a slot 0..${MUSIC_SLOT_MAX}, an offset within ±${GRID_STEPS_MAX} and a transpose within ±${FIGURE_TRANSPOSE_MAX}`,
-    );
-  }
-}
-
-/** Every constructor and `reconfigure` check; the player runs it inside `plan`. */
-export function assertFigureConfig(config: FigureSequencerConfig): void {
-  if (!isNoteDivisor(config.divisor)) {
-    throw new RangeError(`divisor must divide the bar, got ${config.divisor}`);
-  }
-  const cells = config.cells.length;
-  if (cells < 1 || cells > GRID_STEPS_MAX) {
-    throw new RangeError(`cells must hold 1..${GRID_STEPS_MAX} entries, got ${cells}`);
-  }
-  config.cells.forEach(assertCell);
-  if (!isIntIn(config.length, 1, cells)) {
-    throw new RangeError(`length must be 1..${cells}, got ${config.length}`);
-  }
-  if (!(config.gate > 0 && config.gate <= 1)) {
-    throw new RangeError(`gate must be in (0, 1], got ${config.gate}`);
-  }
-  const { octave } = config.register;
-  if (!isIntIn(octave, REGISTER_OCTAVE_MIN, REGISTER_OCTAVE_MAX)) {
-    throw new RangeError(`register.octave must be ${REGISTER_OCTAVE_MIN}..${REGISTER_OCTAVE_MAX}`);
-  }
-  for (const key of ['skipChance', 'accentVelocity', 'accentMod'] as const) {
-    if (!isUnit(config[key])) throw new RangeError(`${key} must be in [0, 1], got ${config[key]}`);
-  }
-  if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
-  assertStepModLanes(config.lanes);
-  assertProcesses(config);
-}
 
 /** What a Figure voices its cells with: the key's root note at a register. */
 export type FigurePitchSource = Pick<ScaleSampler, 'rootNote'>;
@@ -410,6 +327,23 @@ export class FigureSequencer {
     return this.lineCell(localStep, Math.max(0, this.barOf(localStep)), this.canonLine);
   }
 
+  /**
+   * The stage and the rotation local step `localStep` sounds under
+   * (windsor#508): this part's line's, or a canon's its leader's as
+   * `cellAt` reads them; null for a canon with no leader.
+   */
+  positionAt(localStep: number): FigureLinePosition | null {
+    const { source, divisor } = this.current;
+    if (!source) return this.line.positionAt(this.barOf(localStep));
+    const leader = this.figureOf(source.slot, localStep * divisor);
+    return leader ? leader.canonPositionAt(localStep - source.offset) : null;
+  }
+
+  /** The stage and the rotation `cellAt` reads a follower's local step under. */
+  canonPositionAt(localStep: number): FigureLinePosition {
+    return this.canonLine.positionAt(Math.max(0, this.barOf(localStep)));
+  }
+
   attach(source: PartTickSource): Unsubscribe {
     return source.subscribe(1, (event) => this.handleTick(event));
   }
@@ -488,12 +422,12 @@ export class FigureSequencer {
    * with a source its leader's at `step − offset`, the leader looked up now.
    */
   private read(step: number, bar = this.barOf(step)): ReadCell {
-    const { source, cells } = this.current;
+    const { source, cells, divisor } = this.current;
     if (!source) {
       const index = this.lineCell(step, bar);
       return { index, cell: cells[index] ?? REST };
     }
-    const leader = this.figureOf(source.slot);
+    const leader = this.figureOf(source.slot, step * divisor);
     if (!leader) return NO_CELL;
     const index = leader.cellAt(step - source.offset);
     return { index, cell: leader.config.cells[index] ?? REST };

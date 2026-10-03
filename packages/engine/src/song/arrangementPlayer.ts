@@ -39,9 +39,12 @@
  * validation changes nothing and is reported, never half-applied.
  *
  * A Figure's canon (windsor#487) finds its leader by slot through the
- * bindings in force at each onset: the leader part's base generator when it
- * is a Figure, so a leader's live edit, rebuild or kind change is read on
- * the follower's next step, and a slot without a Figure leaves it silent.
+ * bindings in force at each onset: the leader part's generator for the
+ * region it plays at the follower's transport tick, or the region before
+ * its gap (`PartBinding.figureAt`, windsor#508), when it is a Figure. A
+ * leader's live edit, its own region pattern included, rebuild or kind
+ * change is read on the follower's next step, and a slot without a Figure
+ * leaves it silent.
  *
  * A part's sequencer lanes (windsor#488) ride on its gate: a part plays the
  * lanes its `automation` carries until `setLanes` hands it others (the live
@@ -418,7 +421,7 @@ export class ArrangementPlayer {
     return PartBinding.create(this.transport, part, config, sampler, {
       note: (event) => this.pitched(slot, event),
       onset: (event, spec) => this.percussion(slot, spec, event),
-      figureOf: (leader) => this.built.bindings.get(leader)?.figure() ?? null,
+      figureOf: (leader, tick) => this.built.bindings.get(leader)?.figureAt(tick) ?? null,
     });
   }
 

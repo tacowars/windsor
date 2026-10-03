@@ -58,7 +58,10 @@ export interface PartOutput {
   note(event: NoteEvent): void;
   /** A Euclidean onset, with the spec that played it (its `note` and `hold`). */
   onset(event: OnsetEvent, spec: SequencerSpec): void;
-  /** The live Figure on a slot, which a Figure's canon reads (windsor#487); absent finds none. */
+  /**
+   * The Figure a slot plays at a transport tick, which a Figure's canon
+   * reads (windsor#487, windsor#508); absent finds none.
+   */
   figureOf?: FigureResolver;
 }
 
@@ -80,6 +83,14 @@ export interface RegionStep {
    * own length; `step` is `localStep mod steps`. Absent for every other kind.
    */
   readonly localStep?: number;
+  /**
+   * A Figure's schedule stage at the step, its index in the schedule or -1
+   * without one, and the rotation counter it plays under (windsor#508): the
+   * epoch the engine used, a live edit's included. A canon's are its
+   * leader's as it reads them. Absent for every other kind.
+   */
+  readonly stage?: number;
+  readonly rotation?: number;
 }
 
 /** What `PartBinding.plan` hands the player: validated and built, committed later. */
@@ -123,6 +134,12 @@ export class PartBinding {
   private activeIndex: number | null = null;
   /** The song meter's bar in ticks, which a Figure counts its schedule and drift in (windsor#486). */
   private barTicks: number;
+  /**
+   * The transport tick a generator's local tick 0 falls on: the live
+   * region's entry, or a playhead query's for the length of the query. A
+   * canon's local tick plus it is the tick its leader is resolved at.
+   */
+  private origin = 0;
 
   /** The part's binding, or null for a kind that builds no generator. Builds and validates; subscribes nothing until `attach`. */
   static create(
@@ -146,7 +163,7 @@ export class PartBinding {
   ) {
     this.barTicks = ticksPerBar(config.meter);
     this.gate = new RegionGate(source, config, {
-      onEnter: (index) => this.enter(index),
+      onEnter: (index, entryTick) => this.enter(index, entryTick),
       onLeave: (tick, time) => this.leave(tick, time),
     });
     const base = this.build(part.sequencer, sampler);
@@ -222,8 +239,8 @@ export class PartBinding {
   stepAt(tick: number): number {
     const state = this.gate.stateAt(tick);
     if (!state.live) return -1;
-    const bound = this.byRegion[state.index] ?? this.base;
-    return generatorStepAt(bound.generator, state.localTick);
+    const { generator } = this.byRegion[state.index] ?? this.base;
+    return this.readAt(state.entryTick, () => generatorStepAt(generator, state.localTick));
   }
 
   /**
@@ -239,11 +256,28 @@ export class PartBinding {
     const state = this.gate.stateAt(tick);
     const live = state.live && state.index === index;
     const { generator } = bound;
-    const step = live
-      ? generatorStepAt(generator, local)
-      : this.ghostStepAt(generator, index, local);
-    if (!(generator instanceof EuclideanSequencer)) return { step, live };
-    return { step, live, localStep: Math.floor(local / generator.config.divisor) };
+    return this.readAt(tick - local, () => {
+      const step = live
+        ? generatorStepAt(generator, local)
+        : this.ghostStepAt(generator, index, local);
+      if (generator instanceof EuclideanSequencer) {
+        return { step, live, localStep: Math.floor(local / generator.config.divisor) };
+      }
+      if (!(generator instanceof FigureSequencer)) return { step, live };
+      const position = generator.positionAt(Math.floor(local / generator.config.divisor));
+      return position ? { step, live, ...position } : { step, live };
+    });
+  }
+
+  /** `read` with a generator's local tick 0 on transport tick `origin`: a playhead query's region. */
+  private readAt<T>(origin: number, read: () => T): T {
+    const live = this.origin;
+    this.origin = origin;
+    try {
+      return read();
+    } finally {
+      this.origin = live;
+    }
   }
 
   /**
@@ -260,10 +294,31 @@ export class PartBinding {
     return generator.entryStepAt(Math.floor(local / generator.config.divisor), chord);
   }
 
-  /** The base generator when it is a Figure, the line a canon of this part reads (windsor#487); null otherwise. */
-  figure(): FigureSequencer | null {
-    const { generator } = this.base;
+  /**
+   * The Figure a canon of this part reads at transport tick `tick`
+   * (windsor#487, windsor#508): the generator of the region that holds the
+   * tick, so a region's own pattern (every console edit) is what a follower
+   * hears; in a gap, the generator of the region before it, the last to
+   * start on the song's cycle; the base with no regions. Null for another
+   * kind.
+   */
+  figureAt(tick: number): FigureSequencer | null {
+    const { generator } = this.byRegion[this.lastStartedAt(tick)] ?? this.base;
     return generator instanceof FigureSequencer ? generator : null;
+  }
+
+  /** The region that started last on or before `tick` on the song's cycle; -1 with none. */
+  private lastStartedAt(tick: number): number {
+    let last = -1;
+    let since = Infinity;
+    for (let index = 0; index < this.byRegion.length; index++) {
+      const phase = this.gate.phaseAt(index, tick);
+      if (phase !== null && phase < since) {
+        since = phase;
+        last = index;
+      }
+    }
+    return last;
   }
 
   /**
@@ -335,11 +390,12 @@ export class PartBinding {
     return { restart, commit };
   }
 
-  /** The generator region `index` plays, which the gate restarts on entry. */
-  private enter(index: number): void {
+  /** The generator region `index` plays, which the gate restarts on entry at transport tick `entryTick`. */
+  private enter(index: number, entryTick: number): void {
     const bound = this.byRegion[index] ?? this.base;
     this.active = bound;
     this.activeIndex = index;
+    this.origin = entryTick;
     bound.generator.enter(index);
   }
 
@@ -371,7 +427,9 @@ export class PartBinding {
   }
 
   private build(spec: SequencerSpec, sampler: ScaleSampler): Bound {
-    const generator = buildGenerator(spec, sampler, this.barTicks, this.output.figureOf);
+    const generator = buildGenerator(spec, sampler, this.barTicks, (slot, localTick) =>
+      this.leaderAt(slot, localTick),
+    );
     if (!generator) throw new Error(`a ${spec.kind} spec builds no generator`);
     const bound: Bound = { generator, spec, unsubscribe: null };
     if (generator instanceof EuclideanSequencer) {
@@ -380,6 +438,11 @@ export class PartBinding {
       generator.onNote = (event): void => this.output.note(event);
     }
     return bound;
+  }
+
+  /** A canon's leader at its local tick `localTick`, resolved at the transport tick it falls on. */
+  private leaderAt(slot: number, localTick: number): FigureSequencer | null {
+    return this.output.figureOf?.(slot, this.origin + localTick) ?? null;
   }
 
   /** The generator hears the gate's ticks only in the regions it plays. */
