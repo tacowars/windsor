@@ -455,7 +455,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
       <button type="button" class="ib danger" title="Delete this region" aria-label="Delete region">${ICON_DELETE}</button></div>`;
     const tabs = `<div class="tabs" role="tablist">${['cells', 'process'].map((p) => `<button type="button" class="tab" role="tab" data-page="${p}" aria-selected="${state.page === p}">${p}</button>`).join('')}<span class="meas" id="summary">${summary(pos)}</span></div>`;
     const page = state.page === 'cells' ? controls() + strip(pos) : processPage(pos);
-    const width = state.page === 'process' && cellsWidth ? ` style="width:${cellsWidth}px"` : '';
+    const width = state.page === 'process' && cellsWidth && !state.folded ? ` style="width:${cellsWidth}px"` : '';
     document.getElementById('rack').innerHTML = `<div class="dev${state.folded ? ' folded' : ''}"${width}>${rail}<div class="dev-body">${tabs}<div class="page">${page}</div></div></div>`;
     document.getElementById('pane-title').textContent = `${f.part} — Figure`;
     document.getElementById('pane-note').textContent = `figure · 1/16 · ${f.cells.length} cells · 1 region`;
