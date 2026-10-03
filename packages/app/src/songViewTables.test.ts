@@ -3,8 +3,6 @@
  * px at the table's scale, the ruler's labels, and one tone, summary and
  * cycle length per kind the engine declares.
  */
-/// <reference types="node" />
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,6 +18,7 @@ import {
   hitStep,
   ticksPerBar,
 } from '@windsor/engine';
+import { cssRule, cssValue } from './consoleStylesheet';
 import { snapTick, splitRegion } from './regionModel';
 import {
   CYCLE_TICKS,
@@ -136,18 +135,14 @@ describe('a block at the widest zoom-out (minPxPerBar)', () => {
   });
 
   it('draws a narrow block without the padding the CSS gives a full one', () => {
-    const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
-    const rule = (selector: string): string =>
-      new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
-    const values = (body: string, prop: string): string[] =>
-      (new RegExp(`\\n\\s*${prop}: ([^;]*);`).exec(body)?.[1] ?? '').split(/\s+/);
+    const values = (body: string, prop: string): string[] => cssValue(body, prop).split(/\s+/);
     for (const block of ['.reg', '.hblk']) {
-      const full = rule(block);
+      const full = cssRule(block);
       // `padding: <vertical> <horizontal>`, `border: <width> solid <colour>`.
       const padding = parseFloat(values(full, 'padding')[1] ?? '');
       const border = parseFloat(values(full, 'border')[0] ?? '');
       expect(2 * padding + 2 * border, block).toBe(NARROW_BLOCK_PX);
-      expect(rule(`${block}.narrow`), block).toMatch(/padding: 0;/);
+      expect(cssRule(`${block}.narrow`), block).toMatch(/padding: 0;/);
     }
     expect(MIN_BLOCK_PX).toBeLessThan(NARROW_BLOCK_PX);
     expect(isNarrowBlock(blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar).widthPx)).toBe(false);
@@ -257,22 +252,17 @@ describe('the tick under a drawn block (windsor#21)', () => {
 });
 
 describe('the mixer column (windsor#157)', () => {
-  const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
-  const rule = (selector: string): string =>
-    new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
-
   it('puts the timeline past the names, the mixer and the gap after each', () => {
     expect(timelineLeftCss(2.5)).toBe(
       'calc(var(--names) + var(--mixer) + 2 * var(--gap) + var(--bar) * 2.5)',
     );
-    expect(rule('.lanes')).toMatch(
+    expect(cssRule('.lanes')).toMatch(
       /grid-template-columns: var\(--names\) var\(--mixer\) calc\(var\(--bars\) \* var\(--bar\)\);/,
     );
   });
 
   it('makes the part rows 40 px, leaves the Harmony lane at 40 px, and fits the compact knob', () => {
-    const height = (selector: string): number =>
-      parseFloat(/\n\s*height: ([^;]*);/.exec(rule(selector))?.[1] ?? '');
+    const height = (selector: string): number => parseFloat(cssValue(cssRule(selector), 'height'));
     expect(height('.lane')).toBe(40);
     expect(height('.lane.lane-harm')).toBe(40);
     expect(knobGeometry({ compact: true }).size).toBeLessThan(height('.lane'));
@@ -288,16 +278,17 @@ describe('the mixer column (windsor#157)', () => {
   });
 
   it('sizes the expanded base as the CSS grid does: its fixed tracks, the gaps between them and the padding', () => {
-    const expanded = rule('.mix-cell.expanded');
-    const template = /grid-template-columns: ([^;]*);/.exec(expanded)?.[1] ?? '';
+    const expanded = cssRule('.mix-cell.expanded');
+    const template = cssValue(expanded, 'grid-template-columns');
     // The px tracks: the gutter, Output, M, S and the lights; the knobs' are
     // fractions, and each knob column carries its own gap (mixerKnobColumnPx),
     // so the base holds one gap fewer than it has fixed tracks.
     const tracks = [...template.matchAll(/(\d+)px/g)].map((m) => Number(m[1]));
     const fixed = tracks.reduce((a, b) => a + b, 0);
     const gaps = tracks.length - 1;
-    const gap = parseFloat(/column-gap: ([^;]*);/.exec(expanded)?.[1] ?? '');
-    const padX = parseFloat(/padding: 0 ([^;]*);/.exec(rule('.mix-cell'))?.[1] ?? '');
+    const gap = parseFloat(cssValue(expanded, 'column-gap'));
+    // `padding: 0 <horizontal>`.
+    const padX = parseFloat(cssValue(cssRule('.mix-cell'), 'padding').split(/\s+/)[1] ?? '');
     expect(fixed + gaps * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
   });
 });

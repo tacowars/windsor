@@ -12,6 +12,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { CONSOLE_CSS } from './consoleStylesheet';
+
 const SRC = new URL('./', import.meta.url);
 const read = (relative: string): string => readFileSync(new URL(relative, SRC), 'utf8');
 
@@ -49,7 +51,7 @@ describe('the console drives the engine, never a graph of its own', () => {
 
 describe('the stylesheet', () => {
   it('balances its braces', () => {
-    expect(braceBalance(read('console.css'))).toBe(0);
+    expect(braceBalance(CONSOLE_CSS)).toBe(0);
   });
 
   it('negative: a rule missing its closing brace is caught', () => {

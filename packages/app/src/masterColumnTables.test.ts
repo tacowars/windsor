@@ -4,8 +4,6 @@
  * once here and once in `console.css`. This pins the copy, the way
  * `consoleColors.test.ts` pins the palette.
  */
-/// <reference types="node" />
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,8 +12,7 @@ import {
   MASTER_COLUMN_WIDTH_PX,
   MASTER_STACK_MAX_WIDTH_PX,
 } from './masterColumnTables';
-
-const STYLESHEET = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
+import { CONSOLE_CSS as STYLESHEET } from './consoleStylesheet';
 
 describe('the master column’s layout', () => {
   it('stacks at the table’s width in the stylesheet', () => {
