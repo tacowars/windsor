@@ -56,6 +56,7 @@ import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
+import type { PartTickEvent } from './regionGate';
 import type { ScaleSampler } from './scaleSampler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 import {
@@ -254,17 +255,19 @@ export class GridSequencer {
     return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
   }
 
-  /** One step. Returns the events it emitted; an empty array is a tie. */
-  handleTick(event: TickEvent): NoteEvent[] {
+  /**
+   * One step. Returns the events it emitted; an empty array is a tie. The
+   * skip chance is the part's lane's on this tick where one plays (windsor#488).
+   */
+  handleTick(event: TickEvent & Pick<PartTickEvent, 'overrides'>): NoteEvent[] {
     const index = this.stepAt(event.step);
     const step = this.current.steps[index];
     if (!step || step.kind === 'tie') return [];
     if (step.kind === 'rest') return this.restStep(event);
     // One draw per note step, whatever the rest of the line does, so an edit
     // to a rest never moves the skip pattern of the notes around it.
-    if (this.current.skipChance > 0 && this.rng() < this.current.skipChance) {
-      return this.restStep(event);
-    }
+    const skipChance = event.overrides?.skipChance ?? this.current.skipChance;
+    if (skipChance > 0 && this.rng() < skipChance) return this.restStep(event);
     return this.noteStep(event, step, index);
   }
 

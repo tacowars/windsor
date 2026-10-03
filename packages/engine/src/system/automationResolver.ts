@@ -32,7 +32,8 @@ export function automationResolver(
   return (slot, target) => {
     const strip = stripOf(slot);
     const parsed = parseTargetId(target);
-    if (!strip || !parsed) return undefined;
+    // A sequencer lane (windsor#488) is the region gate's: it has no handle here.
+    if (!strip || !parsed || parsed.kind === 'seq') return undefined;
     if (parsed.kind === 'strip') return found(strip.automation(parsed.field), catalogRow(target));
     if (parsed.kind === 'voice') {
       const row = catalogRow(target);

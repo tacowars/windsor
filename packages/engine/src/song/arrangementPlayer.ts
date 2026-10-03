@@ -43,6 +43,14 @@
  * is a Figure, so a leader's live edit, rebuild or kind change is read on
  * the follower's next step, and a slot without a Figure leaves it silent.
  *
+ * A part's sequencer lanes (windsor#488) ride on its gate: a part plays the
+ * lanes its `automation` carries until `setLanes` hands it others (the live
+ * system's, which keeps lane edits out of the arrangement), and its gate
+ * gets the reader of those its kind offers (`partGateConfig.ts`), which
+ * every generator reads on its onset. A lane edit reaches the gate on the
+ * next tick and restarts nothing; a part without such a lane gives its gate
+ * no reader.
+ *
  * The loop (windsor#15) is the clock's: the player hands it the song's
  * `TickLoop` at build and on every partial, and the counter jumps back from
  * the loop's end to its start. The player follows the tick, and on any jump
@@ -51,6 +59,7 @@
  * stream. A loop over the whole song jumps nothing and is today's wrap.
  */
 import type { Arrangement, ArrangementPartial, MusicPart, SequencerSpec } from './arrangement';
+import type { AutomationLane } from '../automation/automationLane';
 import { mergeArrangement } from './arrangement';
 import type { OnsetEvent } from '../sequencing/euclideanSequencer';
 import type { NoteEvent, NoteRoll } from '../sequencing/noteEvent';
@@ -69,7 +78,6 @@ import type { TickEvent, TickSource, Unsubscribe } from '../sequencing/scheduler
 import { meterBeats } from '../sequencing/meter';
 import { isLoopJump } from '../sequencing/scheduler';
 import { playableSwing } from '../sequencing/swing';
-import type { RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
 import { euclidNoteOn } from './partNoteOn';
 import { PLAIN_HIT, pitchedRollShape, playPitched } from './pitchedRoll';
@@ -79,6 +87,7 @@ import { fitTimelines } from './timelineNormalise';
 import { withFittedLoop } from './songLoop';
 import { setSongClock, songTicksOf, withClockFields, type SongClock } from './songClock';
 import { PartBinding, type BindingChange, type RegionStep } from './partBinding';
+import { partGateConfig } from './partGateConfig';
 
 export type { RegionStep } from './partBinding';
 
@@ -190,21 +199,13 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-/** What a part's gate reads: its regions over the song's length, harmony and meter. */
-function gateConfig(arrangement: Arrangement, part: MusicPart): RegionGateConfig {
-  return {
-    regions: part.regions,
-    songTicks: songTicksOf(arrangement),
-    harmony: arrangement.harmony,
-    meter: arrangement.transport.meter,
-  };
-}
-
 export class ArrangementPlayer {
   private current: Arrangement;
   private bySlot = new Map<number, MusicPart>();
   private built: Built;
   private readonly counters = new Map<number, number>();
+  /** The lanes `setLanes` handed each part, by slot, in place of its `automation` (windsor#488). */
+  private readonly lanes = new Map<number, readonly AutomationLane[]>();
   private readonly announced = new Set<number>();
   /** The last transport tick seen, to spot the loop's jump back; null after a rewind. */
   private lastTick: number | null = null;
@@ -284,6 +285,19 @@ export class ArrangementPlayer {
   }
 
   /**
+   * The part on `slot` plays `lanes` from the next tick (windsor#488): its
+   * gate reads the sequencer lanes among them its kind offers, and a lane
+   * turned off or gone hands the config's value back. Nothing restarts; the
+   * other lanes are the automation player's. A slot the song lacks is ignored.
+   */
+  setLanes(slot: number, lanes: readonly AutomationLane[]): void {
+    const part = this.bySlot.get(slot);
+    if (!part || this.lanes.get(slot) === lanes) return;
+    this.lanes.set(slot, lanes);
+    this.built.bindings.get(slot)?.reconfigureGate(partGateConfig(this.current, part, lanes));
+  }
+
+  /**
    * Merge a partial over the arrangement and commit it (refinement decision
    * 3). A `patches` partial (#435) is staged into the preset table first, so
    * a preset switch and the patch it names can arrive together; the
@@ -320,7 +334,8 @@ export class ArrangementPlayer {
     for (const change of plan.changes) change.commit();
     // Regions, song length and harmony are live on every gate (#705): the next tick reads them.
     for (const part of merged.parts) {
-      this.built.bindings.get(part.slot)?.reconfigureGate(gateConfig(merged, part));
+      const config = partGateConfig(merged, part, this.lanes.get(part.slot));
+      this.built.bindings.get(part.slot)?.reconfigureGate(config);
     }
     return { ok: true, ignored };
   }
@@ -374,6 +389,7 @@ export class ArrangementPlayer {
     binding?.dispose();
     this.counters.delete(slot);
     this.announced.delete(slot);
+    this.lanes.delete(slot);
     this.parts.get(slot)?.allNotesOff();
     this.parts.remove?.(slot);
   }
@@ -398,7 +414,8 @@ export class ArrangementPlayer {
     sampler: ScaleSampler,
   ): PartBinding | null {
     const { slot } = part;
-    return PartBinding.create(this.transport, part, gateConfig(arrangement, part), sampler, {
+    const config = partGateConfig(arrangement, part, this.lanes.get(slot));
+    return PartBinding.create(this.transport, part, config, sampler, {
       note: (event) => this.pitched(slot, event),
       onset: (event, spec) => this.percussion(slot, spec, event),
       figureOf: (leader) => this.built.bindings.get(leader)?.figure() ?? null,

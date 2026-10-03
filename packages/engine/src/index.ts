@@ -107,6 +107,7 @@ export type {
   AutomationTargetRow,
   InsertTargetId,
   ParsedTarget,
+  SeqTargetId,
   StripTargetId,
   VoiceTargetId,
 } from './automation/automationLane';
@@ -125,6 +126,7 @@ export type { VoiceAutomationRow, VoiceSection } from './automation/automationTa
 export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
 export type { InsertFieldRow, InsertSpecOf } from './automation/automationInsertTables';
 export { automatableInsertFields } from './automation/automationInsertFields';
+export { SEQ_AUTOMATION_FIELDS, SEQ_AUTOMATION_ROWS } from './automation/automationSeqTables';
 export {
   STRIP_TARGET_IDS,
   VOICE_AUTOMATION_ROWS,
@@ -134,6 +136,8 @@ export {
   insertTargetRow,
   parseTargetId,
   requireCatalogRow,
+  seqTargetId,
+  seqTargetIds,
   targetKind,
   targetRow,
   voicePathOf,
@@ -457,6 +461,8 @@ export type {
   PartTickSource,
   RegionGateConfig,
   RegionGateHooks,
+  SeqField,
+  SeqOverrides,
 } from './sequencing/regionGate';
 export { chordAt, chordIdentity, eventBounds } from './harmony/harmonyTimeline';
 export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';

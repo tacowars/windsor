@@ -43,8 +43,11 @@ export interface KnobAutomation {
   readonly value: number;
 }
 
-/** Each kind's colour, as `LANE_KIND_COLOR` holds it. */
-export type KnobLockColors = Readonly<Record<AutomationTargetKind, string>>;
+/**
+ * The colours of the kinds a knob locks under, as `LANE_KIND_COLOR` holds
+ * them. A sequencer lane (windsor#488) locks no knob yet (windsor#491).
+ */
+export type KnobLockColors = Readonly<Record<Exclude<AutomationTargetKind, 'seq'>, string>>;
 
 /**
  * The song tick a knob reads its lane at: the transport's `position`, which

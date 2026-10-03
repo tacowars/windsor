@@ -26,6 +26,7 @@ import {
 } from '../automation/automationTargets';
 import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
+import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import { mergeArrangement, type Arrangement } from './arrangement';
 import {
   makeArrangement,
@@ -175,6 +176,44 @@ describe('the target', () => {
     expect(corrections).toEqual([
       `parts[1].automation[${FM_LANES_MAX}]: a part has at most ${FM_LANES_MAX} voice lanes — lane dropped`,
     ]);
+  });
+});
+
+describe('sequencer lanes (windsor#488)', () => {
+  it("keeps the seq. lanes a part's kind offers and drops the rest, reported, on every normalise", () => {
+    const { kick, arp, drone } = FULL_SLOT;
+    const flat = (target: string): Record<string, unknown> => lane(target, [point(0, 0.5)]);
+    const lanesBySlot: Record<number, unknown[]> = {
+      [kick]: [flat('seq.gate')],
+      [hat]: [flat('seq.gate'), flat('seq.density')],
+      [arp]: [flat('seq.density'), flat('seq.skipChance')],
+      [drone]: [flat('seq.gate')],
+    };
+    const document = {
+      ...FULL_DOCUMENT,
+      parts: FULL_DOCUMENT.parts.map((part) => ({
+        ...part,
+        ...(part.slot === hat && { sequencer: { ...DEFAULT_BASS_CONFIG, kind: 'bass' } }),
+        automation: lanesBySlot[part.slot],
+      })),
+    };
+    const result = makeArrangement(document);
+    const targets = (doc: ArrangementDocument, slot: number): string[] | undefined =>
+      doc.parts.find((part) => part.slot === slot)!.automation?.map((l) => l.target);
+    expect(targets(result.document, kick)).toBeUndefined();
+    expect(targets(result.document, hat)).toEqual(['seq.gate', 'seq.density']);
+    expect(targets(result.document, arp)).toEqual(['seq.skipChance']);
+    expect(targets(result.document, drone)).toBeUndefined();
+    expect(result.corrections).toEqual([
+      'parts[0].automation[0].target: a euclidean part has no seq.gate lane — lane dropped',
+      'parts[2].automation[0].target: a grid part has no seq.density lane — lane dropped',
+      'parts[3].automation[0].target: a chord part has no seq.gate lane — lane dropped',
+    ]);
+    // A kind change deletes the lanes the new kind does not offer, as an insert deletion does.
+    const { merged: rekinded } = mergeArrangement(result.document as unknown as Arrangement, {
+      parts: { [arp]: { sequencer: { kind: 'chord' } } },
+    });
+    expect(targets(makeArrangement(rekinded).document, arp)).toBeUndefined();
   });
 });
 

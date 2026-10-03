@@ -6,7 +6,9 @@
  *
  * - **The target.** A lane whose target does not parse, names an insert id
  *   the part's strip does not hold, or names a field that insert's kind does
- *   not automate, is dropped. A field the kind automates but the insert's
+ *   not automate, is dropped. So is a sequencer lane (`seq.`, windsor#488)
+ *   on a field the part's sequencer kind does not offer
+ *   (`SEQ_AUTOMATION_FIELDS`). A field the kind automates but the insert's
  *   current settings leave unread (Tape's `wear` while split) is kept, so
  *   switching the setting back brings the lane back to life.
  * - **Duplicates.** Of two surviving lanes on one target, the first wins.
@@ -28,10 +30,12 @@
  * end is unchanged. A longer song changes nothing: the last value holds.
  * `fitTimelines` fits a part's lanes the same way.
  *
- * Deleting an insert deletes its lanes (decision 14), because normalising
- * runs after every merge. `automationNormalise.test.ts` pins each case.
+ * Deleting an insert deletes its lanes (decision 14), and changing a part's
+ * kind deletes the sequencer lanes the new kind does not offer, because
+ * normalising runs after every merge. `automationNormalise.test.ts` pins each case.
  */
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
+import { SEQ_AUTOMATION_FIELDS } from '../automation/automationSeqTables';
 import type {
   AutomationLane,
   AutomationPoint,
@@ -47,7 +51,7 @@ import {
 } from '../automation/automationTargets';
 import { valueAt } from '../automation/automationEvaluate';
 import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
-import type { MusicPart } from './arrangement';
+import type { MusicPart, SequencerKind } from './arrangement';
 import type { DocumentPart } from './arrangementDocument';
 import { type FieldNormaliser, isRecord, show } from './arrangementFields';
 
@@ -57,6 +61,12 @@ export interface AutomationContext {
   readonly songTicks: number;
   /** The part's normalised inserts, each with its id: an insert lane needs one of them. */
   readonly inserts: readonly InsertSpec[];
+  /**
+   * The part's sequencer kind: a `seq.` lane needs a field it offers. Absent,
+   * every sequencer lane the catalog holds is kept (the live automation,
+   * which passes them by).
+   */
+  readonly kind?: SequencerKind;
   readonly path: string;
   readonly n: FieldNormaliser;
 }
@@ -122,7 +132,7 @@ function normaliseLane(
   const { n } = context;
   const o = n.section(raw, path);
   n.dropUnknown(o, LANE_KEYS, path);
-  const target = laneTarget(o.target, `${path}.target`, kindOf, n);
+  const target = laneTarget(o.target, `${path}.target`, { kindOf, kind: context.kind }, n);
   if (!target) return undefined;
   const points = normalisePoints(o.points, target.row, { ...context, path: `${path}.points` });
   if (points.length === 0) {
@@ -132,11 +142,17 @@ function normaliseLane(
   return { target: target.id, on: n.bool(o.on, true, `${path}.on`), points };
 }
 
+/** What a lane's target is checked against: the part's inserts and its sequencer kind. */
+interface PartTargets {
+  readonly kindOf: InsertKindOf;
+  readonly kind: SequencerKind | undefined;
+}
+
 /** The lane's target and its row, or undefined (reported) when the part has no such target. */
 function laneTarget(
   raw: unknown,
   path: string,
-  kindOf: InsertKindOf,
+  part: PartTargets,
   n: FieldNormaliser,
 ): { id: AutomationTargetId; row: AutomationTargetRow } | undefined {
   const parsed = typeof raw === 'string' ? parseTargetId(raw) : undefined;
@@ -145,7 +161,13 @@ function laneTarget(
     return undefined;
   }
   const id = raw as AutomationTargetId;
+  const offered = part.kind === undefined ? undefined : (SEQ_AUTOMATION_FIELDS[part.kind] ?? []);
+  if (parsed.kind === 'seq' && offered && !offered.includes(parsed.field)) {
+    n.correction(`${path}: a ${part.kind} part has no ${raw} lane — lane dropped`);
+    return undefined;
+  }
   if (parsed.kind !== 'insert') return { id, row: requireCatalogRow(raw) };
+  const { kindOf } = part;
   const kind = kindOf(parsed.insertId);
   if (kind === undefined) {
     n.correction(`${path}: the strip has no insert "${parsed.insertId}" — lane dropped`);

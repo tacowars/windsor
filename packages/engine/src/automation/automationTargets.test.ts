@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INSERT_KIND_NAMES } from '../inserts/insertRegistry';
 import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import type { ParsedTarget } from './automationLane';
 import {
   STRIP_TARGET_IDS,
@@ -17,7 +18,8 @@ import {
 const INSERT_IDS = INSERT_KIND_NAMES.flatMap((kind) =>
   INSERT_AUTOMATION_FIELDS[kind].map((row) => `insert.k3x9a0q2.${row.target}`),
 );
-const EVERY_ID = [...STRIP_TARGET_IDS, ...VOICE_TARGET_IDS, ...INSERT_IDS];
+const SEQ_IDS = SEQ_AUTOMATION_ROWS.map((row) => row.target);
+const EVERY_ID = [...STRIP_TARGET_IDS, ...VOICE_TARGET_IDS, ...INSERT_IDS, ...SEQ_IDS];
 
 describe('parseTargetId and formatTargetId', () => {
   it('round-trip every id', () => {
@@ -31,6 +33,7 @@ describe('parseTargetId and formatTargetId', () => {
   it('take each family apart', () => {
     expect(parseTargetId('strip.send.b')).toEqual({ kind: 'strip', field: 'send.b' });
     expect(parseTargetId('voice.ops.2.width')).toEqual({ kind: 'voice', path: 'ops.2.width' });
+    expect(parseTargetId('seq.skipChance')).toEqual({ kind: 'seq', field: 'skipChance' });
     expect(parseTargetId('insert.ab12cd34.bands.3.freq')).toEqual({
       kind: 'insert',
       insertId: 'ab12cd34',
@@ -52,6 +55,7 @@ describe('parseTargetId and formatTargetId', () => {
       'insert.ab12cd34.enabled',
       'insert.ab12cd34.bands.8.freq',
       'master.level',
+      'seq.divisor',
       'strip',
     ]) {
       expect(parseTargetId(id), id).toBeUndefined();
@@ -153,6 +157,7 @@ describe('targetKind', () => {
     expect(targetKind('strip.level')).toBe('strip');
     expect(targetKind('insert.ab12cd34.mix')).toBe('insert');
     expect(targetKind('voice.lfo2.rate')).toBe('voice');
+    expect(targetKind('seq.gate')).toBe('seq');
   });
 });
 

@@ -135,11 +135,16 @@ export const AUTOMATION_SPLIT_FIT: AutomationSplitFit = {
   refineIterations: 30,
 };
 
-/** Each kind's colour (decision 3): the mixer teal, the inserts violet, the voice amber. */
+/**
+ * Each kind's colour (decision 3): the mixer teal, the inserts violet, the
+ * voice amber. The sequencer's (windsor#488) is the voice's as a stand-in
+ * until its lanes are drawn (windsor#491).
+ */
 export const LANE_KIND_COLOR: Readonly<Record<AutomationTargetKind, string>> = {
   strip: 'var(--modulator)',
   insert: 'var(--return)',
   voice: 'var(--carrier)',
+  seq: 'var(--carrier)',
 };
 
 /** The picker's group for the strip's targets, and the kind line under a strip lane's name. */
