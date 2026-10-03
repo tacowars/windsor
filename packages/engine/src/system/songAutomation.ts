@@ -25,6 +25,9 @@
  *   the chain still waiting out its fade: an undo that restores an insert and
  *   its lane together keeps the lane. Until its stage exists the lane finds
  *   no target and is inert (`automationResolver.ts`).
+ * - **Sequencer lanes** (windsor#488). The automation player passes `seq.`
+ *   lanes by; after every partial each part's lanes go to the arrangement
+ *   player too (`SeqLaneSink`), whose gates read them on the tick.
  * - **Rebuild.** A structural insert edit re-wires the chain only once its
  *   fade has landed; the strip's `insertsRebuilt` hook then restarts that
  *   part's lanes from now, on the stages as they now stand (windsor#345).
@@ -43,6 +46,11 @@ import type {
 import { normaliseAutomation, withFittedAutomation } from '../song/automationNormalise';
 import type { PartStrip } from '../mixer/channelStrip';
 import { automationResolver } from './automationResolver';
+
+/** Where a part's lanes go for its region gate to read: the `ArrangementPlayer`. */
+export interface SeqLaneSink {
+  setLanes(slot: number, lanes: readonly AutomationLane[]): void;
+}
 
 export class SongAutomation {
   private playerValue: AutomationPlayer | null = null;
@@ -81,9 +89,14 @@ export class SongAutomation {
 
   /**
    * A partial that has landed; `clock` reads the merged bars and meter when
-   * either changed, the song's length (windsor#429).
+   * either changed, the song's length (windsor#429). Every part's lanes then
+   * go to `gates`, so its sequencer lanes play as these do.
    */
-  apply(partial: DocumentPartial, clock: () => Pick<Transport, 'bars' | 'meter'>): void {
+  apply(
+    partial: DocumentPartial,
+    clock: () => Pick<Transport, 'bars' | 'meter'>,
+    gates?: SeqLaneSink,
+  ): void {
     const player = this.playerValue;
     if (!player) return;
     const parts = isRecord(partial.parts) ? Object.entries(partial.parts) : [];
@@ -105,6 +118,7 @@ export class SongAutomation {
         this.reinsert(player, slot);
       }
     }
+    for (const slot of player.slots()) gates?.setLanes(slot, player.lanesOf(slot));
   }
 
   /** Restart one part's lanes from now: their targets' params changed. */

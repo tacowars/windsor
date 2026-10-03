@@ -233,6 +233,15 @@ describe('lanes off and gone', () => {
     }
   });
 
+  it("passes a sequencer lane by: it is the region gate's, never the resolver's (windsor#488)", () => {
+    const rig = automationRig();
+    rig.player.setLanes(RIG_SLOT, [lane('seq.gate', [point(0, 0.25), point(96, 1)]), FADE]);
+    rig.run(96);
+    expect(rig.calls('seq.gate')).toEqual([]);
+    expect(rig.handle('seq.gate').engaged).toBe(false);
+    expect(rig.handle('strip.level').engaged).toBe(true);
+  });
+
   it('forgets a removed part without touching its params', () => {
     const rig = automationRig();
     rig.player.setLanes(RIG_SLOT, [FADE]);

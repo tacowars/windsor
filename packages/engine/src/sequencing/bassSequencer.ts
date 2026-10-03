@@ -75,7 +75,7 @@ import { rollOutcome } from './arpeggiator';
 import { arpNote, assertCell, defaultArpSteps, type ArpNoteStep, type ArpStep } from './arpSteps';
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
-import type { PartTickEvent, PartTickSource } from './regionGate';
+import { withSeqOverrides, type PartTickEvent, type PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
@@ -242,11 +242,6 @@ export class BassSequencer {
     return this.held;
   }
 
-  /** Ticks a gated note sounds for, never less than one; at gate 1 it ties instead. */
-  get durationTicks(): number {
-    return Math.max(1, Math.round(this.current.gate * this.current.divisor));
-  }
-
   /** The loop length — `config.length`, never more than the steps written. */
   get length(): number {
     return this.current.length;
@@ -296,16 +291,21 @@ export class BassSequencer {
     return events;
   }
 
-  /** A step: a rest releases, a tie holds on, a note draws its chance and its pitch, then plays. */
+  /**
+   * A step: a rest releases, a tie holds on, a note draws its chance and its
+   * pitch, then plays. The gate and density are the part's lanes' on this
+   * tick where one plays (windsor#488), the config's where none does.
+   */
   private onset(event: PartTickEvent, localStep: number): NoteEvent[] {
+    const config = withSeqOverrides(this.current, event.overrides);
     const index = this.stepAt(localStep);
-    const step = this.current.steps[index] ?? PLAIN_STEP;
+    const step = config.steps[index] ?? PLAIN_STEP;
     if (step.kind === 'rest') return this.drop(event.tick, event.time);
-    if (step.kind === 'tie') return this.sustain(event.tick, index);
-    if (!(this.rng() < this.current.density)) return this.drop(event.tick, event.time);
+    if (step.kind === 'tie') return this.sustain(event.tick, index, config);
+    if (!(this.rng() < config.density)) return this.drop(event.tick, event.time);
     const pitch = this.pitch(event.chord);
     const note = shiftOctave(pitch.note, step.octave);
-    return this.strike(event, step, index, { note, degree: pitch.degree });
+    return this.strike(event, step, index, { note, degree: pitch.degree }, config);
   }
 
   /**
@@ -318,13 +318,14 @@ export class BassSequencer {
     step: BassNoteStep,
     index: number,
     pitch: BassPitch,
+    config: BassSequencerConfig,
   ): NoteEvent[] {
     const hits = step.ratchet ?? 1;
     const slide = step.slide && this.held !== null;
-    const ties = slide || (this.current.gate >= 1 && hits === 1);
-    if (ties && this.held === pitch.note) return this.sustain(event.tick, index);
+    const ties = slide || (config.gate >= 1 && hits === 1);
+    if (ties && this.held === pitch.note) return this.sustain(event.tick, index, config);
     const on: NoteOnEvent = { kind: 'noteOn', tick: event.tick, time: event.time, ...pitch };
-    const { accentVelocity, accentMod, lanes } = this.current;
+    const { accentVelocity, accentMod, lanes } = config;
     if (step.accent) on.accent = { velocity: accentVelocity, mod: accentMod };
     if (slide) on.slide = true;
     const stepMod = stepModAt(lanes, index);
@@ -335,22 +336,25 @@ export class BassSequencer {
     const plain: ArpCellOutcome = {
       events,
       held: pitch.note,
-      releaseTick: this.releaseAt(event.tick, index),
+      releaseTick: this.releaseAt(event.tick, index, config),
     };
-    return this.settle(hits > 1 ? rollOutcome(plain, hits, this.current, event) : plain);
+    return this.settle(hits > 1 ? rollOutcome(plain, hits, config, event) : plain);
   }
 
   /** A tie, or a slide to the pitch held: nothing new sounds, and the held note's gate moves to this step. */
-  private sustain(tick: number, index: number): NoteEvent[] {
-    if (this.held !== null) this.offTick = this.releaseAt(tick, index);
+  private sustain(tick: number, index: number, config: BassSequencerConfig): NoteEvent[] {
+    if (this.held !== null) this.offTick = this.releaseAt(tick, index, config);
     return [];
   }
 
-  /** Where a note sounding from step `index` at `tick` ends; null runs it to the next onset. */
-  private releaseAt(tick: number, index: number): number | null {
-    if (this.current.gate >= 1) return null;
-    if (holdsToNext(this.current.steps, index, this.length)) return null;
-    return tick + this.durationTicks;
+  /**
+   * Where a note sounding from step `index` at `tick` ends, `gate` of the
+   * step and never less than a tick; null runs it to the next onset.
+   */
+  private releaseAt(tick: number, index: number, config: BassSequencerConfig): number | null {
+    if (config.gate >= 1) return null;
+    if (holdsToNext(config.steps, index, this.length)) return null;
+    return tick + Math.max(1, Math.round(config.gate * config.divisor));
   }
 
   /** Keep what a step leaves sounding, and hand back what it emitted. */

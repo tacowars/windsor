@@ -200,6 +200,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const automation = normaliseAutomation(o.automation, {
       songTicks: ticks,
       inserts: strip.inserts,
+      kind: sequencerKindOf(o.sequencer),
       path: `${path}.automation`,
       n: this,
     });

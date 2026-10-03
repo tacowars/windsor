@@ -85,7 +85,7 @@ import { assertRatchet } from './gridSequencer';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
-import type { PartTickEvent, PartTickSource } from './regionGate';
+import { withSeqOverrides, type PartTickEvent, type PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, isNoteDivisor, type Unsubscribe } from './scheduler';
 import { assertStepModLanes, type StepModLane } from './stepModLanes';
@@ -339,14 +339,12 @@ export class FigureSequencer {
   /** The last local tick heard since the entry; null before the first. Its bar is read in the current meter. */
   private heardTick: number | null = null;
 
-  /** Where a canon finds its leader, by slot, at every onset. */
-  private readonly figureOf: FigureResolver;
-
   constructor(
     pitch: FigurePitchSource,
     config: FigureSequencerConfig,
     barTicks = TICKS_PER_BAR,
-    figureOf: FigureResolver = NO_FIGURE,
+    /** Where a canon finds its leader, by slot, at every onset. */
+    private readonly figureOf: FigureResolver = NO_FIGURE,
   ) {
     assertFigureConfig(config);
     this.pitch = pitch;
@@ -355,7 +353,6 @@ export class FigureSequencer {
     this.line = new FigureLine(config);
     this.canonLine = new FigureLine(config);
     this.barTicks = barTicks;
-    this.figureOf = figureOf;
   }
 
   get config(): FigureSequencerConfig {
@@ -436,8 +433,10 @@ export class FigureSequencer {
     return events;
   }
 
+  /** One onset, at the gate and skip chance the part's lanes hold on this tick (windsor#488). */
   private onset(event: PartTickEvent, step: number): NoteEvent[] {
-    const { skipChance } = this.current;
+    const config = withSeqOverrides(this.current, event.overrides);
+    const { skipChance } = config;
     const { index, cell: written } = this.read(step, event.bar);
     // One draw per note cell, whatever it plays, so neither a rest nor the chord moves the stream.
     const skipped = written.kind === 'note' && skipChance > 0 && this.rng() < skipChance;
@@ -455,14 +454,14 @@ export class FigureSequencer {
         held: this.held,
         holdsOn: holdsInto(this.read(step + 1).cell),
       },
-      this.current,
+      config,
     );
     // A tie holds the voice to the next non-tie onset, as the Grid's does, whatever the gate.
     if (cell.kind === 'tie') return this.settle({ ...outcome, releaseTick: null });
     if (cell.kind !== 'note' || written.kind !== 'note') return this.settle(outcome);
     markVelocity(outcome, written.velocity);
     const hits = cell.ratchet ?? 1;
-    return this.settle(hits > 1 ? rollOutcome(outcome, hits, this.current, event) : outcome);
+    return this.settle(hits > 1 ? rollOutcome(outcome, hits, config, event) : outcome);
   }
 
   /** The cell as it plays: a note at its pitch over `chord`, or a rest when skipped, silent or dropped. */

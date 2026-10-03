@@ -190,8 +190,8 @@ const clampTo = (row: AutomationTargetRow, value: number): number =>
   Math.min(row.max, Math.max(row.min, value));
 
 /**
- * The parameter's value now (decision 4): from the strip, the insert's spec
- * or the part's patch, clamped to the row. A send the strip does not name is
+ * The parameter's value now (decision 4): from the strip, the insert's spec,
+ * the part's sequencer (windsor#488) or its patch, clamped to the row. A send the strip does not name is
  * silent; anything else unread is the row's minimum.
  */
 export function currentValue(
@@ -209,6 +209,8 @@ export function currentValue(
       section === 'send' ? (part.strip.sends[bus ?? ''] ?? 0) : getPath(part.strip, section ?? '');
   } else if (parsed.kind === 'insert') {
     raw = getPath(insertOf(part, parsed.insertId), parsed.field);
+  } else if (parsed.kind === 'seq') {
+    raw = getPath(part.sequencer, parsed.field);
   } else {
     raw = getPath(patch, parsed.path);
   }
