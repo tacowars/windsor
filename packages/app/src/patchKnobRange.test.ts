@@ -10,27 +10,24 @@ import {
   STRIP_AUTOMATION_ROWS,
   VOICE_AUTOMATION_ROWS,
   catalogRow,
+  requireCatalogRow,
   voiceTargetId,
-  type AutomationTargetRow,
 } from '@windsor/engine';
 import { knobRangeOf, voiceKnobRange } from './patchKnobRange';
 import { allPatchKnobs } from './patchKnobTables';
 
-const voiceRow = (target: string): AutomationTargetRow =>
-  VOICE_AUTOMATION_ROWS.find((row) => row.target === target)!;
-
 describe('knobRangeOf', () => {
   it('reads a linear row as a linear knob over its bounds', () => {
-    expect(knobRangeOf(voiceRow('voice.filter.envAmount'))).toEqual({ min: -6, max: 6 });
+    expect(knobRangeOf(requireCatalogRow('voice.filter.envAmount'))).toEqual({ min: -6, max: 6 });
   });
 
   it('reads any other scale as a log knob, octaves and log alike', () => {
-    expect(knobRangeOf(voiceRow('voice.filter.cutoff'))).toEqual({
+    expect(knobRangeOf(requireCatalogRow('voice.filter.cutoff'))).toEqual({
       min: 30,
       max: 18000,
       curve: 'log',
     });
-    expect(knobRangeOf(voiceRow('voice.filter.resonance'))).toEqual({
+    expect(knobRangeOf(requireCatalogRow('voice.filter.resonance'))).toEqual({
       min: 0.5,
       max: 12,
       curve: 'log',
@@ -38,7 +35,7 @@ describe('knobRangeOf', () => {
   });
 
   it("takes a zero-end row's floor as the log knob's floor", () => {
-    expect(knobRangeOf(voiceRow('voice.ops.2.env.decayTime'))).toEqual({
+    expect(knobRangeOf(requireCatalogRow('voice.ops.2.env.decayTime'))).toEqual({
       min: 0,
       max: 20,
       curve: 'log',
@@ -53,7 +50,7 @@ describe('knobRangeOf', () => {
 
 describe('voiceKnobRange', () => {
   it("is the catalog row's range at the path", () => {
-    expect(voiceKnobRange('lfo2.rate')).toEqual(knobRangeOf(voiceRow('voice.lfo2.rate')));
+    expect(voiceKnobRange('lfo2.rate')).toEqual(knobRangeOf(requireCatalogRow('voice.lfo2.rate')));
   });
 });
 

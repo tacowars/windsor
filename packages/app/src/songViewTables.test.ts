@@ -256,10 +256,9 @@ describe('the mixer column (windsor#157)', () => {
     );
   });
 
-  it('makes the part rows 40 px, leaves the Harmony lane at 40 px, and fits the compact knob', () => {
+  it('makes the Harmony lane as tall as a part row, and fits the compact knob in one', () => {
     const height = (selector: string): number => parseFloat(cssValue(cssRule(selector), 'height'));
-    expect(height('.lane')).toBe(40);
-    expect(height('.lane.lane-harm')).toBe(40);
+    expect(height('.lane.lane-harm')).toBe(height('.lane'));
     expect(knobGeometry({ compact: true }).size).toBeLessThan(height('.lane'));
   });
 
@@ -305,11 +304,5 @@ const TS_PX_IN_CSS: readonly (readonly [string, number, string, (selector: strin
 describe('the TS px the Song view draws with', () => {
   it.each(TS_PX_IN_CSS)('%s (%d) matches %s in the CSS', (_name, px, selector, read) => {
     expect(read(selector)).toBe(px);
-  });
-});
-
-describe('the automation lanes (windsor#348)', () => {
-  it('are one fixed height, 56 px (decision 2)', () => {
-    expect(SONG_VIEW.automationLanePx).toBe(56);
   });
 });

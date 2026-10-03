@@ -13,21 +13,19 @@
 import { describe, expect, it } from 'vitest';
 
 import { peakNear, transfer } from '../__fixtures__/powerSpectrum';
+import { voiceLaneOffset } from '../__fixtures__/voiceLaneOffset';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
-import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch } from '../patch/patch';
 import type { Patch } from '../patch/patch';
 import { FORMANT_VOWELS } from '../worklet/fm/formantTables';
 import { voiceSlotParamName } from './audioPart';
-import { voiceOffset } from './voiceAutomation';
 
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
 const BLOCK = 128;
 const SLOTS = 8;
 const VOWEL = 'filter.vowel';
-const ROW = requireCatalogRow(voiceTargetId(VOWEL));
 const [A, E, , O, U] = FORMANT_VOWELS.map((v) => v.hz);
 
 interface SectionLike {
@@ -54,7 +52,7 @@ function noisePatch(vowel: number, mode: number = FILTER_MODE.FORMANT): Patch {
 }
 
 /** The offset the main thread sends for a lane at `value` over `patch`. */
-const offsetFor = (patch: Patch, value: number): number => voiceOffset(patch, VOWEL, ROW, value);
+const offsetFor = (patch: Patch, value: number): number => voiceLaneOffset(patch, VOWEL, value);
 
 interface Run {
   patch: Patch;
