@@ -25,6 +25,47 @@ export class PortedProcessor {
   };
 }
 
+/**
+ * A processor base with a test door onto its port: `inbox(message)` arrives
+ * as the port's `onmessage`, and `outbox()` is everything the processor
+ * posted, cloned as the real port clones (a load report is one reused
+ * object). `deliverTo` is read as each processor is constructed; a post also
+ * goes to the callback it returned then, if any.
+ */
+export function inboxProcessor<M = unknown>(
+  deliverTo: () => ((message: M) => void) | null = () => null,
+): new () => { inbox(message: unknown): void; outbox(): M[] } {
+  return class InboxProcessor {
+    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
+    readonly #posted: M[] = [];
+
+    constructor() {
+      const onPost = deliverTo();
+      this.port = {
+        postMessage: (m: unknown) => {
+          const copy = structuredClone(m) as M;
+          this.#posted.push(copy);
+          onPost?.(copy);
+        },
+        onmessage: null,
+      };
+    }
+
+    inbox(message: unknown): void {
+      this.port.onmessage?.({ data: message });
+    }
+
+    outbox(): M[] {
+      return this.#posted;
+    }
+  };
+}
+
+/** Each parameter's first value: what a processor's `parameterData` option takes. */
+export function firstValues(params: Record<string, Float32Array>): Record<string, number> {
+  return Object.fromEntries(Object.entries(params).map(([key, value]) => [key, value[0]!]));
+}
+
 export interface GeneratedProcessorOptions {
   /** The bundle's file name in `worklet/generated/`, such as `delay-processor.js`. */
   file: string;

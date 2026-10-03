@@ -2,7 +2,7 @@
 import { DEFAULT_ADVANCED_DRIVE } from '../inserts/advancedDriveSpec';
 import type { AdvancedDriveSpec } from '../inserts/advancedDriveSpec';
 import { advancedDriveParameters } from '../inserts/advancedDriveParameters';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 export function advancedDriveParams(
   spec: Partial<AdvancedDriveSpec> = {},
   bpm = 120,
@@ -30,8 +30,6 @@ export function loadAdvancedDrive(
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [key, value[0]]),
-    ),
+    parameterData: firstValues(params),
   });
 }
