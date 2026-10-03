@@ -29,6 +29,8 @@ describe('◀ ▶ over the filtered order', () => {
     expect(plucks(song)).toEqual(order);
     const own = stepListing(library.entries, song).find((entry) => entry.id === 'song-own');
     expect(own?.source).toBe('document');
+    const copy = stepListing(library.entries, song).find((entry) => entry.id === picked);
+    expect(copy?.source).toBe('document');
   });
 
   it('enters a filter that hides the current patch at its first or last entry', () => {
@@ -46,6 +48,23 @@ describe('◀ ▶ over the filtered order', () => {
   it('with none, loads nothing', () => {
     expect(stepPatch([], 'a', 1)).toBeNull();
     expect(stepPatch([], 'a', -1)).toBeNull();
+  });
+});
+
+describe('a song’s copy of a library patch', () => {
+  const song = (): Record<string, Patch> => ({
+    kick: { ...library.entries.kick!.patch, name: 'Song Kick' },
+  });
+
+  it('lists once, with the song’s name, as this song’s', () => {
+    const rows = stepListing(library.entries, song()).filter((entry) => entry.id === 'kick');
+    expect(rows).toEqual([expect.objectContaining({ name: 'Song Kick', source: 'document' })]);
+  });
+
+  it('shows under the “this song” source filter', () => {
+    const filter = { query: '', category: '', tag: '', source: 'document' };
+    const ids = filterPresets(stepListing(library.entries, song()), filter).map((e) => e.id);
+    expect(ids).toEqual(['kick']);
   });
 });
 

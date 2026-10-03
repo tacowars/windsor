@@ -5808,7 +5808,10 @@ dialog.song-dlg {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 300px;
+  /* Eight rows before it scrolls, as the approved mockup shows; the 2px is
+     the list's own top and bottom border (border-box). */
+  --patch-pop-row-h: 29px;
+  max-height: calc(8 * var(--patch-pop-row-h) + 2px);
   overflow-y: auto;
   background: var(--inset);
   border: 1px solid var(--line);
@@ -5817,7 +5820,10 @@ dialog.song-dlg {
 .patch-pop-row {
   display: flex;
   gap: 10px;
-  padding: 5px 9px;
+  box-sizing: border-box;
+  height: var(--patch-pop-row-h);
+  align-items: center;
+  padding: 0 9px;
   font-size: 12.5px;
   border-bottom: 1px solid #1a2023;
   cursor: pointer;

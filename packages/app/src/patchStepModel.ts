@@ -15,8 +15,11 @@ export type StepDirection = 1 | -1;
  * The listing ◀ ▶ walk and the popover lists. A pick copies the patch into
  * the song, and `listLibrary` lists a song's patches first under "this song",
  * so over that listing every step would move the patch it loaded and the
- * walk would jump. Here a song's copy of a library patch lists where the
- * library has it; only the song's own patches list as the song's.
+ * walk would jump. Here the order comes from ids alone: a song's copy of a
+ * library patch keeps the library's place, and only the song's own patches
+ * list first. Each row is still `listLibrary`'s, so a song's copy shows the
+ * song's name and lists as the song's (invariant 3), and the "this song"
+ * filter finds it.
  */
 export function stepListing(
   entries: LibraryEntries,
@@ -26,7 +29,8 @@ export function stepListing(
   const songOwn = Object.fromEntries(
     Object.entries(documentPatches).filter(([id]) => !Object.hasOwn(entries, id)),
   );
-  return listLibrary(entries, songOwn, userIds);
+  const rows = new Map(listLibrary(entries, documentPatches, userIds).map((row) => [row.id, row]));
+  return listLibrary(entries, songOwn, userIds).flatMap((row) => rows.get(row.id) ?? []);
 }
 
 /**

@@ -11,7 +11,6 @@
  */
 import type { PresetListing } from '@windsor/engine';
 import { el } from './dom';
-import { PATCH_SOURCE_LABELS } from './patchLibrary';
 import { filteredListing, filterSelects, patchFilter } from './presetBrowser';
 import { moveHighlight } from './patchStepModel';
 
@@ -27,13 +26,20 @@ export interface PopoverRequest {
 
 const isMac = (): boolean => /Mac|iP(hone|ad|od)/.test(navigator.platform);
 
+/** A result row's source, capitalised as the approved mockup shows it. */
+const ROW_SOURCE_LABELS: Readonly<Record<PresetListing['source'], string>> = {
+  document: 'This song',
+  library: 'Library',
+  'built-in': 'Built-in',
+};
+
 function resultRow(entry: PresetListing): HTMLElement {
   const row = el('li', 'patch-pop-row');
   row.setAttribute('role', 'option');
   row.dataset.id = entry.id;
   row.append(
     el('span', 'patch-pop-name', entry.name),
-    el('span', 'patch-pop-detail', `${entry.category} · ${PATCH_SOURCE_LABELS[entry.source]}`),
+    el('span', 'patch-pop-detail', `${entry.category} · ${ROW_SOURCE_LABELS[entry.source]}`),
   );
   return row;
 }
