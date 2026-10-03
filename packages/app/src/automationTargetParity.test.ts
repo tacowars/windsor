@@ -1,8 +1,8 @@
 /**
  * The sequencer lane rows held to their knobs (windsor#491): every field a
  * kind offers a lane is a knob on that kind's device, under the row's label,
- * whose range holds the row's, so a locked knob can show every value the
- * lane reaches. (The Gate lane stops at 0.05, above the knob's 0.01.)
+ * whose range is the row's (windsor#514), so a locked knob shows every value
+ * the lane reaches and the lane reaches every value the knob does.
  */
 import { describe, expect, it } from 'vitest';
 import { SEQ_AUTOMATION_FIELDS, requireCatalogRow, seqTargetId } from '@windsor/engine';
@@ -29,11 +29,11 @@ describe('the sequencer lane rows and their knobs', () => {
     (fields ?? []).map((field) => [kind as SequencerKind, field] as const),
   );
 
-  it.each(offered)('%s offers %s, a knob under the row’s label that spans it', (kind, field) => {
+  it.each(offered)('%s offers %s, a knob under the row’s label with its range', (kind, field) => {
     const row = requireCatalogRow(seqTargetId(field));
     const knob = KNOBS_OF[kind]?.find((e) => e.kind === 'driver' && e.f === field);
     expect(knob?.label, `${kind} ${field}`).toBe(row.label);
-    expect(knob?.o.min ?? Infinity).toBeLessThanOrEqual(row.min);
-    expect(knob?.o.max ?? -Infinity).toBeGreaterThanOrEqual(row.max);
+    expect(knob?.o.min).toBe(row.min);
+    expect(knob?.o.max).toBe(row.max);
   });
 });
