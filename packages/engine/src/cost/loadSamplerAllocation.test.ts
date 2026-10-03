@@ -42,6 +42,7 @@
  * own allocation test reads its whole trace, as `inserts/eqAllocation.test.ts`
  * does the EQ's.
  */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {

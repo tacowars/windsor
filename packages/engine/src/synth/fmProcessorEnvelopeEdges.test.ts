@@ -12,6 +12,7 @@
  * reaches at its knot `m` is heard at sample `m - 1`, as the old ramp's
  * block-end level was heard at the block's last sample.
  */
+// reads-by-path: packages/engine/src/worklet/fm/**
 import { readdirSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';

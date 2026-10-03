@@ -27,6 +27,7 @@
  * processor through that module's default export instead (the EQ's toggling,
  * `eqToggleScenario.ts`).
  */
+// reads-by-path: packages/engine/src/worklet/generated/**, packages/engine/src/__fixtures__/**
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';

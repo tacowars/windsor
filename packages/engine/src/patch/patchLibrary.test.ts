@@ -4,6 +4,7 @@
  * migrated bank was proved once, in PR #567, by a test #583 retired; this file
  * is the standing contract.
  */
+// reads-by-path: packages/engine/src/patches/**
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

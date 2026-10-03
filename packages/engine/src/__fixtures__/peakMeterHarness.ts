@@ -8,6 +8,7 @@
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

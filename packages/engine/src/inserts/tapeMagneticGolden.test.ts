@@ -29,6 +29,7 @@
  * sample would read about 4 MB; the tolerance is 16 KiB. No field the bundle
  * writes may change its representation (`__fixtures__/generalizationTrace.ts`).
  */
+// reads-by-path: packages/engine/src/__fixtures__/**, .nvmrc, packages/engine/src/worklet/tape/tapeOversample.ts
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

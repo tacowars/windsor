@@ -1,4 +1,5 @@
 /** The shipped compressor worklet, evaluated with only its browser globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { COMPRESSOR_DEFAULTS } from '../inserts/compressorConstants';
 import type { CompressorSpec } from '../inserts/compressorSpec';

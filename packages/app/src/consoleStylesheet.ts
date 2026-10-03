@@ -9,6 +9,7 @@
  * Imported only by tests; the app never reads its own stylesheet.
  */
 /// <reference types="node" />
+// reads-by-path: packages/app/src/*.css
 import { readFileSync } from 'node:fs';
 
 /** The whole of `console.css`. */

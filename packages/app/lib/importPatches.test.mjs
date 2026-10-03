@@ -9,6 +9,7 @@
  * clean import. Only a file that claims to be a patch — `format` or `patch` —
  * and is then refused is a failure.
  */
+// reads-by-path: none (reads only the temporary files it writes)
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

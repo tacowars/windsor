@@ -5,6 +5,7 @@
  * separate strip row exists; the Arrangement tab no longer draws a transport
  * section of its own (#708 decision 3).
  */
+// reads-by-path: packages/app/{index.html,src/*.ts}
 import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

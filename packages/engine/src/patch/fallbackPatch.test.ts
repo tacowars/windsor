@@ -3,6 +3,7 @@
  * decision 3): that id has a file, and engine code spells no preset id
  * anywhere else, so the console's Delete guard (#563) can trust it.
  */
+// reads-by-path: packages/engine/src/**/*.ts, packages/engine/src/patches/**
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';

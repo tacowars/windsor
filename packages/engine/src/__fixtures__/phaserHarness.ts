@@ -1,4 +1,5 @@
 /** Runs the actual shipped phaser processor with only browser globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { PHASER_DEFAULTS } from '../inserts/phaserConstants';
 import type { PhaserSpec } from '../inserts/phaserSpec';

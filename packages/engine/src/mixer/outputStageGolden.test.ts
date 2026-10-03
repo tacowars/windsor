@@ -13,6 +13,7 @@
  * as the FM table is (`worklet/CLAUDE.md` rule 4): the filter and the curves
  * are built with `Math`, which V8 may round differently in another major.
  */
+// reads-by-path: packages/engine/src/__fixtures__/**, .nvmrc
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

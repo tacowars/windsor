@@ -1,4 +1,5 @@
 /* global URL */
+// reads-by-path: packages/engine/src/patches/**, packages/engine/src/__fixtures__/**
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

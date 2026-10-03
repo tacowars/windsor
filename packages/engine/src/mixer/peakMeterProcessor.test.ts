@@ -1,4 +1,5 @@
 /** The actual generated meter, exercised without a browser (#666). */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import type { PeakReport } from './peakMeterConstants';
