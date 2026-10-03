@@ -9,7 +9,7 @@
 import type { OutputStageReport } from '../mixer/outputStageConstants';
 import { OUTPUT_STAGE_MODES } from '../mixer/outputStageConstants';
 import type { OutputStageMode } from '../mixer/outputStageConstants';
-import { generatedProcessor } from './generatedProcessor';
+import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 
 export const BLOCK = 128;
 
@@ -44,30 +44,13 @@ export function loadOutputStage(sampleRate = 48000): LoadedStage {
   const cached = scripts.get(sampleRate);
   if (cached) return cached;
   let deliver: ((report: OutputStageReport) => void) | null = null;
-  class AudioWorkletProcessorShim {
-    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
-    private readonly posted: OutputStageReport[] = [];
-    constructor() {
-      const onPost = deliver;
-      this.port = {
-        postMessage: (m: unknown) => {
-          const copy = structuredClone(m) as OutputStageReport;
-          this.posted.push(copy);
-          onPost?.(copy);
-        },
-        onmessage: null,
-      };
-    }
-    inbox(message: unknown): void {
-      this.port.onmessage?.({ data: message });
-    }
-    outbox(): OutputStageReport[] {
-      return this.posted;
-    }
-  }
   const { Processor: ctor } = generatedProcessor<
     (new () => StageProcessorLike) & { parameterDescriptors: StageDescriptor[] }
-  >({ file: 'output-stage-processor.js', sampleRate, base: AudioWorkletProcessorShim });
+  >({
+    file: 'output-stage-processor.js',
+    sampleRate,
+    base: inboxProcessor<OutputStageReport>(() => deliver),
+  });
   const loaded: LoadedStage = {
     descriptors: ctor.parameterDescriptors,
     create(onPost) {

@@ -1,7 +1,7 @@
 /** Runs the actual shipped phaser processor with only browser globals shimmed. */
 import { PHASER_DEFAULTS } from '../inserts/phaserConstants';
 import type { PhaserSpec } from '../inserts/phaserSpec';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 
 export function phaserParams(spec: Partial<PhaserSpec> = {}): Record<string, Float32Array> {
   return Object.fromEntries(
@@ -27,8 +27,6 @@ export function loadPhaser(rate = 48000, params = phaserParams()): PhaserProcess
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [key, value[0]]),
-    ),
+    parameterData: firstValues(params),
   });
 }

@@ -1,6 +1,7 @@
 /**
  * Runs a probe over an esbuild bundle in a Node of its own, for the heap-delta
- * allocation tests (worklet rule 2; windsor#503). The entry is bundled as an
+ * allocation tests (worklet rule 2; windsor#503). `runV8Child`, the run
+ * itself, is shared with `workletAllocation.ts`. The entry is bundled as an
  * IIFE under `globalName` and written as `bundleName` beside the probe in a
  * temporary directory. The child runs with `--expose-gc`, a 64 MB young
  * generation, so nothing is collected before it is counted, and
@@ -60,13 +61,45 @@ export function v8Probe<T>(options: V8ProbeOptions): V8ProbeResult<T> {
     minify: false,
     tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
   });
-  const dir = mkdtempSync(join(tmpdir(), `${bundleName.replace(/\.js$/, '')}-`));
+  return runV8Child<T>({
+    script: { source: probe },
+    files: { [bundleName]: bundled.outputFiles[0]!.text },
+    args: (dir, out) => [join(dir, bundleName), out, ...args],
+    traceScript: bundleName,
+    prefix: `${bundleName.replace(/\.js$/, '')}-`,
+  });
+}
+
+export interface V8ChildOptions {
+  /** The child's script: a path, or CommonJS source written as `probe.cjs` in the temporary directory. */
+  script: { path: string } | { source: string };
+  /** Files written into the temporary directory before the child starts, by name. */
+  files?: Readonly<Record<string, string>>;
+  /** The child's arguments after the script, given the temporary directory and the file it writes its JSON to. */
+  args(dir: string, out: string): readonly string[];
+  /** V8 flags the child takes beside the fixed ones. */
+  flags?: readonly string[];
+  /** The script name the generalisation trace is filtered by. */
+  traceScript: string;
+  /** The temporary directory's name prefix. */
+  prefix: string;
+}
+
+/**
+ * Run a script in a Node of its own with the fixed flags and a temporary
+ * directory, and read back the JSON it wrote and the representation changes
+ * its trace shows in `traceScript`. Throws with the child's stderr if it
+ * exits non-zero.
+ */
+export function runV8Child<T>(options: V8ChildOptions): V8ProbeResult<T> {
+  const { script, files = {}, args, flags = [], traceScript, prefix } = options;
+  const dir = mkdtempSync(join(tmpdir(), prefix));
   try {
-    const files = { bundle: join(dir, bundleName), probe: join(dir, 'probe.cjs') };
-    writeFileSync(files.bundle, bundled.outputFiles[0]!.text);
-    writeFileSync(files.probe, probe);
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+    const scriptPath = 'path' in script ? script.path : join(dir, 'probe.cjs');
+    if ('source' in script) writeFileSync(scriptPath, script.source);
     const out = join(dir, 'result.json');
-    const child = spawnSync(process.execPath, [...FLAGS, files.probe, files.bundle, out, ...args], {
+    const child = spawnSync(process.execPath, [...FLAGS, ...flags, scriptPath, ...args(dir, out)], {
       encoding: 'utf8',
       maxBuffer: MAX_BUFFER,
     });
@@ -75,7 +108,7 @@ export function v8Probe<T>(options: V8ProbeOptions): V8ProbeResult<T> {
     }
     return {
       result: JSON.parse(readFileSync(out, 'utf8')) as T,
-      changes: representationChanges(child.stdout, bundleName),
+      changes: representationChanges(child.stdout, traceScript),
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });

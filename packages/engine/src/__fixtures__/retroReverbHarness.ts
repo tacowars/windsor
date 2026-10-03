@@ -1,7 +1,7 @@
 /** Runs the actual shipped retro processor with only browser globals shimmed. */
 import { RETRO_REVERB_DEFAULTS, RETRO_REVERB_MODES } from '../inserts/retroReverbConstants';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 
 export function retroParams(spec: Partial<RetroReverbSpec> = {}): Record<string, Float32Array> {
   return Object.fromEntries(
@@ -28,8 +28,6 @@ export function loadRetro(rate = 48000, params = retroParams()): RetroProcessorL
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [key, value[0]]),
-    ),
+    parameterData: firstValues(params),
   });
 }

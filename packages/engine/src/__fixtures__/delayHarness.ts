@@ -2,7 +2,7 @@
 import { DELAY_MODE_IDS } from '../inserts/delayConstants';
 import { DEFAULT_DELAY, delayMilliseconds } from '../inserts/delaySpec';
 import type { DelaySpec } from '../inserts/delaySpec';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 
 export function delayParams(
   partial: Partial<DelaySpec> = {},
@@ -35,8 +35,6 @@ export function loadDelay(rate = 48000, params = delayParams()): DelayProcessorL
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [key, value[0]]),
-    ),
+    parameterData: firstValues(params),
   });
 }

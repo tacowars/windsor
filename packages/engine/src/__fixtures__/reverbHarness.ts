@@ -10,7 +10,7 @@
  * Node-only, by design: excluded from the engine's tsc build (see
  * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
-import { generatedProcessor } from './generatedProcessor';
+import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 
 const SAMPLE_RATE = 48000;
 const BLOCK = 128;
@@ -63,34 +63,13 @@ export interface LoadedReverb {
 export function loadReverb(): LoadedReverb {
   // The real scope gives every processor a port; the plate uses it for the
   // audio-load sampler (#445), so the stand-in has to have one too.
-  class AudioWorkletProcessorShim {
-    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
-    private readonly posted: unknown[] = [];
-
-    constructor() {
-      // Cloned, as the real port clones: the load report is one reused object.
-      this.port = {
-        postMessage: (m: unknown) => this.posted.push(structuredClone(m)),
-        onmessage: null,
-      };
-    }
-
-    inbox(message: unknown): void {
-      this.port.onmessage?.({ data: message });
-    }
-
-    outbox(): unknown[] {
-      return this.posted;
-    }
-  }
-
   const { Processor, exports: topology } = generatedProcessor<
     { new (options: unknown): ReverbProcessorLike; parameterDescriptors: ParameterDescriptor[] },
     ReverbTopology
   >({
     file: 'reverb-processor.js',
     sampleRate: SAMPLE_RATE,
-    base: AudioWorkletProcessorShim,
+    base: inboxProcessor(),
     epilogue: `return {
       maxSize: MAX_SIZE,
       tankDelays: TANK_DELAYS,

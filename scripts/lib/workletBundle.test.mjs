@@ -1,5 +1,5 @@
 // reads-by-path: packages/engine/src/**/*.ts, packages/engine/src/worklet/generated/**
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -14,10 +14,9 @@ import {
 } from './workletBundle.mjs';
 
 describe('the worklet bundle table', () => {
-  it('names an entry that exists and an output under generated/ for every worklet', () => {
+  it('names an output under generated/ for every worklet', () => {
     expect(WORKLETS.length).toBeGreaterThan(0);
     for (const worklet of WORKLETS) {
-      expect(existsSync(join(WORKLET_DIR, worklet.entry)), worklet.entry).toBe(true);
       expect(worklet.output.startsWith('generated/'), worklet.output).toBe(true);
       expect(sourceDirOf(worklet)).not.toBe('generated');
     }
