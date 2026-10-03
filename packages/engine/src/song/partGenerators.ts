@@ -27,7 +27,11 @@ import { Arpeggiator } from '../sequencing/arpeggiator';
 import { BassSequencer, assertBassConfig } from '../sequencing/bassSequencer';
 import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
 import { EuclideanSequencer, assertEuclideanConfig } from '../sequencing/euclideanSequencer';
-import { FigureSequencer, assertFigureConfig } from '../sequencing/figureSequencer';
+import {
+  FigureSequencer,
+  assertFigureConfig,
+  type FigureResolver,
+} from '../sequencing/figureSequencer';
 import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
@@ -71,12 +75,14 @@ export const buildsNoGenerator = (kind: SequencerKind): boolean => kind === 'non
 /**
  * The generator a spec builds — a part's `sequencer`, or one region's
  * pattern (`regionPattern`, windsor#74) — or null for `none`. A Figure
- * counts its schedule and drift in bars of `barTicks`, the song meter's bar.
+ * counts its schedule and drift in bars of `barTicks`, the song meter's bar,
+ * and a canon finds its leader through `figureOf` (windsor#487).
  */
 export function buildGenerator(
   spec: SequencerSpec,
   sampler: ScaleSampler,
   barTicks = TICKS_PER_BAR,
+  figureOf?: FigureResolver,
 ): Generator | null {
   const driver: unknown = driverOf(spec);
   switch (spec.kind) {
@@ -91,7 +97,7 @@ export function buildGenerator(
     case 'bass':
       return new BassSequencer(sampler, driver as BassDriver);
     case 'figure':
-      return new FigureSequencer(sampler, driver as FigureDriver, barTicks);
+      return new FigureSequencer(sampler, driver as FigureDriver, barTicks, figureOf);
     default:
       return null;
   }

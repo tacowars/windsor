@@ -14,6 +14,7 @@ import { ARRANGEMENT_VERSION } from '../audioConstants';
 export type CurrentDocumentFile =
   | 'dangling-preset'
   | 'dangling-return'
+  | 'figure-canon'
   | 'figure-listen'
   | 'figure-part'
   | 'figure-process'
