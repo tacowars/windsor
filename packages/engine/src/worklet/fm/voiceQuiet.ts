@@ -33,7 +33,10 @@ const ST_IN_FLIGHT = -1;
  * the envelope's stage. An event that splits the block makes the voice's
  * end-state reads mid-block, so every one of them reads this and never the
  * envelope's `state` or `finished`. The knot state decides, not the level:
- * a flat attack sits at 0 until its rise.
+ * a flat attack sits at 0 until its rise. An edge that rounds to the
+ * block's end is no knot, so its stage reads from the block's start: the
+ * end-of-voice reads also need the ramp under `DORMANT_AMP`, and a held End
+ * level's fade waits for the quantum's end, past the edge (windsor#323).
  */
 function heardStage(voice: Voice, i: number): number {
   if (voice.ampBreak[i] !== 0) return ST_IN_FLIGHT;
@@ -109,6 +112,7 @@ function voiceFinished(voice: Voice): boolean {
  * the part fades it out with `steal` rather than waiting on it or cutting
  * it (windsor#7). Reads the envelopes' end levels, not the amplitude ramps;
  * a hit still on its way to that level is not faded early (windsor#301).
+ * `settle` reads it at the quantum's end alone (windsor#323).
  */
 function voiceHoldsEndLevel(voice: Voice): boolean {
   const carriers = voice.alg.carriers;

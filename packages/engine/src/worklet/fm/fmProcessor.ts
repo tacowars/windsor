@@ -525,7 +525,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
           done += chunk;
         }
 
-        v.settle();
+        // A held End level fades from the quantum's end alone (windsor#323).
+        v.settle(cursor + seg === n);
       }
 
       cursor += seg;
