@@ -1,17 +1,19 @@
 /**
  * The Figure device's Play columns (windsor#490, the mockup's; the Arp's
  * order with the Grid's Length and Rotate): Rate, Seed with Reseed beside
- * it, and Randomize; Octave, Length and Rotate; Vel, Acc vel and Acc mod;
- * Gate and Skip. Every control writes the selected region's pattern through
+ * it, Randomize and Reverse; Octave, Length and Rotate; Vel, Acc vel and
+ * Acc mod; Gate and Skip. Every control writes the selected region's pattern through
  * `changePattern`, the seed the part's and Vel the part's velocity.
  *
  * Length grows the cells (and the lanes) with root notes and never cuts
  * them; Rotate applies the turn since its last value, so the document holds
  * the turned cells, their velocities, ratchets and lane values with them,
- * and no offset; Randomize rerolls the line's cells over the chord's tones.
- * Length and Randomize replace what Rotate turned, so they rebase it. With
- * a source those three act on cells the part does not play, so the device
- * greys them (`.figure-own`).
+ * and no offset; Randomize rerolls the line's cells over the chord's tones;
+ * Reverse mirrors them, lanes with them (windsor#548). Length, Randomize and
+ * Reverse replace what Rotate turned, so they rebase it. With a source those
+ * four act on cells the part does not play, so the device greys them
+ * (`.figure-own`) and `holdOwnControls` takes them out of reach: the buttons
+ * disabled, the knobs inert, so neither Tab nor a key edits the hidden cells.
  */
 import type { FigureSpec } from '@windsor/engine';
 import { DEFAULT_FIGURE_CONFIG } from '@windsor/engine';
@@ -23,7 +25,7 @@ import type { AppCtx } from './context';
 import { divisorOptions } from './divisorLabels';
 import { el, select } from './dom';
 import { FIGURE_KNOB_COLUMNS, FIGURE_SUMMARY_STACK } from './figureConstants';
-import { cellsForLength, randomFigureCells, rotateFigure } from './figureModel';
+import { cellsForLength, randomFigureCells, reverseFigure, rotateFigure } from './figureModel';
 import { GRID_TURN_REBASED } from './gridModel';
 import { octaveKnob } from './harmonyTables';
 import { type KnobElement, makeKnob } from './knob';
@@ -130,6 +132,18 @@ function randomizeButton(target: FigureTarget, rotor: Rotor): HTMLElement {
   return button;
 }
 
+/** Reverse mirrors the line in place, lanes with it (windsor#548), and rebases Rotate as Randomize does. */
+function reverseButton(target: FigureTarget, rotor: Rotor): HTMLElement {
+  const button = el('button', 'btn seq-btn figure-own', 'Reverse') as HTMLButtonElement;
+  button.type = 'button';
+  button.title = 'Mirror the line: every cell and lane value, last to first';
+  button.onclick = (): void => {
+    rebase(rotor);
+    write(target, reverseFigure(spec(target)));
+  };
+  return button;
+}
+
 /** The pattern's register octave: where the chord's tones are voiced. */
 function octave(target: FigureTarget): HTMLElement {
   return makeKnob({
@@ -177,6 +191,18 @@ function rotateKnob(target: FigureTarget, rotor: Rotor): KnobElement {
   return knob;
 }
 
+/**
+ * Disable the own-cell controls while the line is borrowed, as the strip
+ * disables a borrowed column's cells (`figureCells.ts`), and enable them
+ * again on Own cells. The greying is CSS; this keeps Tab and the keys off them.
+ */
+export function holdOwnControls(root: HTMLElement, borrowed: boolean): void {
+  for (const node of root.querySelectorAll<HTMLElement>('.figure-own')) {
+    if (node instanceof HTMLButtonElement) node.disabled = borrowed;
+    else node.inert = borrowed;
+  }
+}
+
 /** The Play columns, with no section label: the page tabs name the page. */
 export function figureControls(target: FigureTarget): HTMLElement {
   const { ctx, slot, region } = target;
@@ -191,6 +217,7 @@ export function figureControls(target: FigureTarget): HTMLElement {
       rateField(target),
       seedField(target),
       randomizeButton(target, rotor),
+      reverseButton(target, rotor),
     ]),
     column('k3', [octave(target), lengthKnob(target, rotor), rotateKnob(target, rotor)]),
     ...FIGURE_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),

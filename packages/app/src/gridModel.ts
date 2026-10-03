@@ -122,8 +122,33 @@ export function rotateLanes(
   return lanes.map((lane) => ({ ...lane, values: rotateSteps(lane.values, by, length) }));
 }
 
+/**
+ * Reverse (windsor#548): the first `count` steps mirrored, step `i` taking
+ * whatever step `count-1-i` held, and the steps from `count` on left where
+ * they are, as Rotate leaves them. Nothing is reinterpreted: a tie, a slide
+ * or an accent stays on the step it was written on and moves with it.
+ * `count` is held to the list, so a short list mirrors over what it has.
+ */
+export function reverseSteps<T>(steps: readonly T[], count: number): T[] {
+  const n = Math.max(0, Math.min(Math.trunc(count), steps.length));
+  return [...steps.slice(0, n).reverse(), ...steps.slice(n)];
+}
+
+/** The modulation lanes mirrored with the steps: a lane value belongs to its step, as Rotate carries it. */
+export function reverseLanes(lanes: readonly StepModLane[], count: number): StepModLane[] {
+  return lanes.map((lane) => ({ ...lane, values: reverseSteps(lane.values, count) }));
+}
+
 /** The pattern Rotate turns: the loop length, its steps and their lanes. */
 type GridTurnable = Pick<GridSpec, 'length' | 'steps' | 'lanes'>;
+
+/** The Grid's Reverse: the loop's steps and their lane values mirrored, as Rotate turns them. */
+export function reverseGrid(spec: GridTurnable): { steps: GridStep[]; lanes: StepModLane[] } {
+  return {
+    steps: reverseSteps(spec.steps, spec.length),
+    lanes: reverseLanes(spec.lanes, spec.length),
+  };
+}
 
 /** The Rotate knob after a move: its new value, and the write the move makes (null when nothing turns). */
 export interface GridTurn {

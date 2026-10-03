@@ -1,17 +1,17 @@
 /**
  * The Basslead strip without the DOM (windsor#371, record
- * `2026-10-01-sequencer-rack-devices` decision 9): what Length, Rotate and
+ * `2026-10-01-sequencer-rack-devices` decision 9): what Length, Rotate, Reverse and
  * Randomize write, the Steps label, and how a step's slide meets the note
  * before it, for the lanes. A step is the Arp's cell (`BassStep` is
  * `ArpStep`), so the cell edits are the Arp's and the Grid's
- * (`arpStepCells.ts`), and Rotate and Randomize are the Arp's over the
+ * (`arpStepCells.ts`), and Rotate, Reverse and Randomize are the Arp's over the
  * loop. Every function returns new values for `ctx.change`, where arrays
  * replace wholesale. Nothing here writes a pitch: the pitch mode picks it.
  */
 import type { BassSpec, BassStep, StepModLane } from '@windsor/engine';
 import { GRID_STEPS_MAX, TICKS_PER_BAR, bassNote } from '@windsor/engine';
 import type { ArpRandomTable } from './arpGridConstants';
-import { randomArpCells, rotateArp } from './arpGridModel';
+import { randomArpCells, reverseArp, rotateArp } from './arpGridModel';
 import { BASS_BARS_DECIMALS, BASS_RANDOM } from './bassGridConstants';
 import type { Draw } from './gridModel';
 import { NO_SLIDE, type StepSlide, lanesForSteps } from './stepModLaneModel';
@@ -51,6 +51,15 @@ export function rotateBass(
   by: number,
 ): { steps: BassStep[]; lanes: StepModLane[] } {
   return rotateArp(spec, by, spec.length);
+}
+
+/**
+ * Reverse (windsor#548): the loop's steps mirrored, each whole with its
+ * ratchet and its lane values, over the span Rotate turns; the steps past
+ * the loop stay where they are.
+ */
+export function reverseBass(spec: BassStrip): { steps: BassStep[]; lanes: StepModLane[] } {
+  return reverseArp(spec, spec.length);
 }
 
 /** The Rotate knob after a move: its new value, and the write the move makes (null when nothing turns). */

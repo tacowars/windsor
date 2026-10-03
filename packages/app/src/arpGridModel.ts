@@ -35,7 +35,14 @@ import {
   scaleOffsets,
 } from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
-import { type Draw, cycleKind, rotateLanes, rotateSteps } from './gridModel';
+import {
+  type Draw,
+  cycleKind,
+  reverseLanes,
+  reverseSteps,
+  rotateLanes,
+  rotateSteps,
+} from './gridModel';
 import { NO_SLIDE, type StepSlide } from './stepModLaneModel';
 
 /** What the shown count reads of the arp: the fields `arpNoteList` and the cycle rule take. */
@@ -112,6 +119,19 @@ export function rotateArp(
 ): { steps: ArpStep[]; lanes: StepModLane[] } {
   if (count < 1) return { steps: [...spec.steps], lanes: [...spec.lanes] };
   return { steps: rotateSteps(spec.steps, by, count), lanes: rotateLanes(spec.lanes, by, count) };
+}
+
+/**
+ * The cells and lanes after Reverse (windsor#548): the first `count`, the
+ * cells Rotate turns, mirrored, each cell whole with its ratchet and its
+ * lane values; the rest where they were. With no chord the count is 0 and
+ * nothing moves.
+ */
+export function reverseArp(
+  spec: Pick<ArpSpec, 'steps' | 'lanes'>,
+  count: number,
+): { steps: ArpStep[]; lanes: StepModLane[] } {
+  return { steps: reverseSteps(spec.steps, count), lanes: reverseLanes(spec.lanes, count) };
 }
 
 /**

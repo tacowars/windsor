@@ -1,6 +1,6 @@
 /**
  * The Grid device's controls (#603; in columns since windsor#368, decision
- * 5, as the insert rack lays its pages out): Step and Randomize; Octave,
+ * 5, as the insert rack lays its pages out): Step, Randomize and Reverse; Octave,
  * Length and Rotate; Vel, Acc vel and Acc mod; Skip. Every knob writes the
  * selected region's pattern through `changePattern` (windsor#76), Vel
  * aside, which is the part's.
@@ -10,7 +10,7 @@ import { scaleOffsets } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { GRID_KNOB_COLUMNS } from './gridDeviceTables';
-import { GRID_TURN_REBASED, randomSteps, stepsForLength, turnGrid } from './gridModel';
+import { GRID_TURN_REBASED, randomSteps, reverseGrid, stepsForLength, turnGrid } from './gridModel';
 import { octaveKnob } from './harmonyTables';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
@@ -36,8 +36,8 @@ function octave(strip: GridStrip): HTMLElement {
 }
 
 /**
- * Rotate's offset from the pattern it last turned, and its knob. Length
- * and Randomize replace that pattern, so they rebase the offset
+ * Rotate's offset from the pattern it last turned, and its knob. Length,
+ * Randomize and Reverse replace that pattern, so they rebase the offset
  * (`turnGrid`) and redraw the knob at zero.
  */
 interface GridRotor {
@@ -108,6 +108,20 @@ function randomizeButton(strip: GridStrip, rotor: GridRotor): HTMLElement {
   return button;
 }
 
+/** Reverse mirrors the loop in place, lanes with it (windsor#548), and rebases Rotate as Randomize does. */
+function reverseButton(strip: GridStrip, rotor: GridRotor): HTMLElement {
+  const button = el('button', 'btn seq-btn', 'Reverse') as HTMLButtonElement;
+  button.type = 'button';
+  button.title = 'Mirror the steps: every cell and lane value, last to first';
+  button.onclick = (): void => {
+    const spec = strip.spec();
+    if (!spec) return;
+    rebase(rotor);
+    if (changePattern(strip.ctx, strip.slot, strip.region, reverseGrid(spec))) strip.repaint();
+  };
+  return button;
+}
+
 function column(className: string, nodes: readonly HTMLElement[]): HTMLElement {
   const col = el('div', `seq-col ${className}`);
   col.append(...nodes);
@@ -124,7 +138,11 @@ export function gridControls(strip: GridStrip): HTMLElement {
   const rotor: GridRotor = { turned: GRID_TURN_REBASED, knob: null };
   const body = el('div', 'seq-sec-body');
   body.append(
-    column('wide', [divisorPicker(ctx, slot, region), randomizeButton(strip, rotor)]),
+    column('wide', [
+      divisorPicker(ctx, slot, region),
+      randomizeButton(strip, rotor),
+      reverseButton(strip, rotor),
+    ]),
     column('k3', [octave(strip), lengthKnob(strip, rotor), rotateKnob(strip, rotor)]),
     ...GRID_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),
   );
