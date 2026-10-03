@@ -9,13 +9,10 @@
  * runner shares the heap.
  */
 // reads-by-path: packages/engine/src/worklet/generated/**, packages/engine/src/__fixtures__/**
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect } from 'vitest';
-import { representationChanges } from './generalizationTrace';
+import { runV8Child } from './v8Probe';
 import type { ProbeConfig, ProbeResult } from './workletAllocationProbe';
 
 const PROBE = fileURLToPath(new URL('./workletAllocationProbe.ts', import.meta.url));
@@ -65,31 +62,14 @@ export interface ProbeRun extends ProbeResult {
  * such as `SYNCHRONOUS_TIERING`.
  */
 export function runAllocationProbe(config: ProbeConfig, flags: readonly string[] = []): ProbeRun {
-  const dir = mkdtempSync(join(tmpdir(), 'worklet-allocation-'));
-  try {
-    const resultFile = join(dir, 'result.json');
-    const child = spawnSync(
-      process.execPath,
-      [
-        '--expose-gc',
-        '--min-semi-space-size=64',
-        '--max-semi-space-size=64',
-        ...SETTLED_HEAP,
-        '--trace-generalization',
-        '--no-warnings',
-        ...flags,
-        PROBE,
-        JSON.stringify(config),
-        resultFile,
-      ],
-      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-    );
-    expect(child.status, child.stderr).toBe(0);
-    const result = JSON.parse(readFileSync(resultFile, 'utf8')) as ProbeResult;
-    return { ...result, changes: representationChanges(child.stdout, basename(config.bundle)) };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const { result, changes } = runV8Child<ProbeResult>({
+    script: { path: PROBE },
+    args: (_dir, out) => [JSON.stringify(config), out],
+    flags: [...SETTLED_HEAP, ...flags],
+    traceScript: basename(config.bundle),
+    prefix: 'worklet-allocation-',
+  });
+  return { ...result, changes };
 }
 
 /**

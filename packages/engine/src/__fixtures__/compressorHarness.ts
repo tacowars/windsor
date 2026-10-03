@@ -2,7 +2,7 @@
 import { COMPRESSOR_DEFAULTS } from '../inserts/compressorConstants';
 import type { CompressorSpec } from '../inserts/compressorSpec';
 import type { CompressorDsp, CompressorParams } from '../inserts/compressorDsp';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 
 export function compressorParams(spec: Partial<CompressorSpec> = {}): CompressorParams {
   return Object.fromEntries(
@@ -22,6 +22,6 @@ export function loadCompressor(rate = 48000, params = compressorParams()): Compr
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, v[0]])),
+    parameterData: firstValues(params),
   });
 }

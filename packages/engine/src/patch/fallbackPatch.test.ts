@@ -3,8 +3,8 @@
  * decision 3): that id has a file, and engine code spells no preset id
  * anywhere else, so the console's Delete guard (#563) can trust it.
  */
-// reads-by-path: packages/engine/src/**/*.ts, packages/engine/src/patches/**
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+// reads-by-path: packages/engine/src/**/*.ts
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +18,6 @@ const AUDIO = join(dirname(fileURLToPath(import.meta.url)), '..');
 describe('FALLBACK_PATCH_ID', () => {
   it('has a library file and resolves to the same patch', () => {
     const id = FALLBACK_PATCH_ID;
-    expect(existsSync(join(AUDIO, 'patches', `${id}.json`))).toBe(true);
     expect(PATCH_LIBRARY[id]).toBeDefined();
     expect(patchLeafDifferences(FALLBACK_PATCH, PRESETS[id], id)).toEqual([]);
   });

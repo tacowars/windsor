@@ -2,7 +2,7 @@
 import { TAPE_DEFAULTS, TAPE_TYPES } from '../inserts/tapeConstants';
 import { tapeCoreParams } from '../inserts/tapeInsert';
 import { DEFAULT_TAPE, type TapeSpec } from '../inserts/tapeSpec';
-import { generatedProcessor } from './generatedProcessor';
+import { firstValues, generatedProcessor } from './generatedProcessor';
 
 /** The processor's parameters for `spec`, as the insert writes them: `core` as its four (windsor#291). */
 export function tapeParams(spec: Partial<TapeSpec> = {}): Record<string, Float32Array> {
@@ -33,8 +33,6 @@ export function loadTape(rate = 48000, params = tapeParams()): TapeProcessorLike
     sampleRate: rate,
   });
   return new Processor({
-    parameterData: Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [key, value[0]]),
-    ),
+    parameterData: firstValues(params),
   });
 }

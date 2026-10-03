@@ -9,7 +9,7 @@
  * Node-only, by design: excluded from the engine's tsc build.
  */
 import type { PeakReport } from '../mixer/peakMeterConstants';
-import { generatedProcessor } from './generatedProcessor';
+import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 import type { ReverbProcessorLike } from './reverbHarness';
 
 export interface LoadedPeakMeter {
@@ -23,31 +23,10 @@ export function loadPeakMeter(sampleRate = 48000): LoadedPeakMeter {
   const cached = scripts.get(sampleRate);
   if (cached) return cached;
   let deliver: ((report: PeakReport) => void) | null = null;
-  class AudioWorkletProcessorShim {
-    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
-    private readonly posted: PeakReport[] = [];
-    constructor() {
-      const onPost = deliver;
-      this.port = {
-        postMessage: (m: unknown) => {
-          const copy = structuredClone(m) as PeakReport;
-          this.posted.push(copy);
-          onPost?.(copy);
-        },
-        onmessage: null,
-      };
-    }
-    inbox(message: unknown): void {
-      this.port.onmessage?.({ data: message });
-    }
-    outbox(): PeakReport[] {
-      return this.posted;
-    }
-  }
   const { Processor: ctor } = generatedProcessor<new () => ReverbProcessorLike>({
     file: 'peak-meter-processor.js',
     sampleRate,
-    base: AudioWorkletProcessorShim,
+    base: inboxProcessor<PeakReport>(() => deliver),
   });
   const loaded: LoadedPeakMeter = {
     create(onPost) {

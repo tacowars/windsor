@@ -9,7 +9,7 @@
  * Node-only, by design: excluded from the engine's tsc build (see
  * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
-import { generatedProcessor } from './generatedProcessor';
+import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 
 const SAMPLE_RATE = 48000;
 const BLOCK = 128;
@@ -135,36 +135,14 @@ interface WorkletHandle {
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
-// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (65 of 60, #225 decision 4; #620 added the envelope handle)
 export function loadProcessor(): LoadedProcessor {
-  class AudioWorkletProcessorShim {
-    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
-    private readonly posted: unknown[] = [];
-
-    constructor() {
-      // Cloned, as the real port clones: the load report is one reused object.
-      this.port = {
-        postMessage: (m: unknown) => this.posted.push(structuredClone(m)),
-        onmessage: null,
-      };
-    }
-
-    inbox(message: unknown): void {
-      this.port.onmessage?.({ data: message });
-    }
-
-    outbox(): unknown[] {
-      return this.posted;
-    }
-  }
-
   const { Processor, exports: handle } = generatedProcessor<
     new (options: { processorOptions: unknown }) => ProcessorLike,
     WorkletHandle
   >({
     file: 'fm-processor.js',
     sampleRate: SAMPLE_RATE,
-    base: AudioWorkletProcessorShim,
+    base: inboxProcessor(),
     prologue: 'let currentFrame = 0;',
     epilogue: `return {
       setFrame: (f) => { currentFrame = f; },
