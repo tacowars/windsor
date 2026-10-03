@@ -2,7 +2,8 @@
  * The Song view's automation lanes, as data (windsor#348; record
  * `2026-10-01-song-automation-lanes` decision 13): the curve's drawing
  * tunables, the lane toolbar's tools and Snap choices and the gestures'
- * px (windsor#349, Shape from windsor#350), the colour of each kind of target, the picker's voice groups,
+ * px (windsor#349, Shape from windsor#350), the colour of each kind of target, the picker's voice groups
+ * and its Sequencer group,
  * the readout's number rules and the reasons an insert field is inactive.
  * The rules over them are `songAutomationModel.ts`; the DOM is
  * `songAutomationLane.ts`. The lane's height is the Song view's
@@ -137,18 +138,20 @@ export const AUTOMATION_SPLIT_FIT: AutomationSplitFit = {
 
 /**
  * Each kind's colour (decision 3): the mixer teal, the inserts violet, the
- * voice amber. The sequencer's (windsor#488) is the voice's as a stand-in
- * until its lanes are drawn (windsor#491).
+ * voice amber, the sequencer rose (windsor#491).
  */
 export const LANE_KIND_COLOR: Readonly<Record<AutomationTargetKind, string>> = {
   strip: 'var(--modulator)',
   insert: 'var(--return)',
   voice: 'var(--carrier)',
-  seq: 'var(--carrier)',
+  seq: 'var(--seq)',
 };
 
 /** The picker's group for the strip's targets, and the kind line under a strip lane's name. */
 export const MIXER_GROUP_LABEL = 'Mixer';
+
+/** The picker's group for the sequencer's targets (windsor#491), after the voice's, and its lanes' kind line. */
+export const SEQ_GROUP_LABEL = 'Sequencer';
 
 /** The picker's group label for an insert, from the insert's label. */
 export const insertGroupLabel = (insertLabel: string): string => `Insert · ${insertLabel}`;

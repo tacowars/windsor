@@ -16,6 +16,8 @@
   --modulator: #5fa8a0;
   /* The return buses, the insert targets' automation lanes (windsor#348), and the Euclid card's pitch lane (windsor#356). */
   --return: #9c7bd0;
+  /* The sequencer targets' automation lanes and the knobs they lock (windsor#491). */
+  --seq: #cc7a9c;
   --hot: #d2643c;
 
   --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;

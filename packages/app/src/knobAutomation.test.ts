@@ -13,6 +13,8 @@ import {
   AUTOMATION_TAPE_ID,
 } from '@windsor/engine/__fixtures__/automationSong';
 import {
+  DEFAULT_CHORD_CONFIG,
+  DEFAULT_GRID_CONFIG,
   TICKS_PER_BAR,
   VOICE_AUTOMATION_ROWS,
   VOICE_TARGET_IDS,
@@ -28,8 +30,10 @@ import {
   catalogKnobAutomation,
   insertKnobAutomation,
   knobSongTick,
+  isSeqField,
   lockedKnobNotice,
   sameKnobAutomation,
+  seqKnobAutomation,
   voiceKnobAutomation,
   voiceKnobTarget,
   type KnobLockColors,
@@ -37,7 +41,7 @@ import {
 import { LANE_KIND_COLOR } from './songAutomationTables';
 
 const BAR = TICKS_PER_BAR;
-const COLORS: KnobLockColors = { strip: 'teal', insert: 'violet', voice: 'amber' };
+const COLORS: KnobLockColors = { strip: 'teal', insert: 'violet', voice: 'amber', seq: 'rose' };
 
 /** The hat part with `lanes` in place of its own. */
 const withLanes = (lanes: readonly AutomationLane[]): DocumentPart => ({
@@ -167,6 +171,47 @@ describe('a patch knob', () => {
     const hat = partAt(AUTOMATION_DOCUMENT, AUTOMATION_PART.slot);
     expect(voiceKnobAutomation(hat, 'filter.cutoff', 0)).not.toBeNull();
     expect(voiceKnobAutomation(sharing, 'filter.cutoff', 0)).toBeNull();
+  });
+});
+
+describe('a sequencer knob (windsor#491)', () => {
+  const skip: AutomationLane = {
+    target: 'seq.skipChance',
+    on: true,
+    points: [
+      { tick: 0, value: 0.25, bend: 0 },
+      { tick: 2 * BAR, value: 0.75, bend: 0 },
+    ],
+  };
+  const grid: DocumentPart = {
+    ...AUTOMATION_PART,
+    sequencer: { kind: 'grid', ...DEFAULT_GRID_CONFIG },
+    automation: [skip],
+  };
+
+  it('locks on its field while the part’s kind offers it, in the sequencer colour', () => {
+    expect(seqKnobAutomation(grid, 'skipChance', 0, COLORS)).toEqual({
+      color: 'rose',
+      value: 0.25,
+    });
+    expect(seqKnobAutomation(grid, 'skipChance', BAR)?.value).toBeCloseTo(0.5);
+    expect(seqKnobAutomation(grid, 'skipChance', 0)?.color).toBe(LANE_KIND_COLOR.seq);
+  });
+
+  it('is free while its lane is off, and under a kind that offers the field none', () => {
+    const off = { ...grid, automation: [{ ...skip, on: false }] };
+    expect(seqKnobAutomation(off, 'skipChance', 0)).toBeNull();
+    const chord: DocumentPart = { ...grid, sequencer: { kind: 'chord', ...DEFAULT_CHORD_CONFIG } };
+    expect(seqKnobAutomation(chord, 'skipChance', 0)).toBeNull();
+    expect(seqKnobAutomation(grid, 'gate', 0)).toBeNull();
+  });
+
+  it('knows the three sequencer fields and no others', () => {
+    expect(['gate', 'skipChance', 'density', 'accentVelocity'].filter(isSeqField)).toEqual([
+      'gate',
+      'skipChance',
+      'density',
+    ]);
   });
 });
 

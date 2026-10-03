@@ -11,6 +11,10 @@
  * (windsor#75): the optional `region` names it, and `partEdits.ts`'s
  * `patternOf` / `changePattern` do the read and the full-copy write. With no
  * region named, the field is the part's `sequencer`.
+ *
+ * A Gate, Skip or Density knob locks under the part's sequencer lane on its
+ * field (windsor#491, `knobAutomation.ts`'s `seqKnobAutomation`), whichever
+ * card draws it.
  */
 import type {
   ArrangementDocument,
@@ -24,6 +28,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, seg, select } from './dom';
 import { makeKnob } from './knob';
+import { isSeqField, knobSongTick, seqKnobAutomation } from './knobAutomation';
 import { changePattern, patternOf } from './partEdits';
 import { divisorOptions } from './divisorLabels';
 import { DENSITY_DEFAULTS, DENSITY_KNOBS } from './sequencerKnobTables';
@@ -43,7 +48,10 @@ export const driverOf = (
 const fieldOf = (spec: SequencerSpec | undefined, field: SequencerField): unknown =>
   spec === undefined ? undefined : Reflect.get(spec, field);
 
-/** A knob writing one sequencer field (note, hold, gate …) of region `region`'s pattern. */
+/**
+ * A knob writing one sequencer field (note, hold, gate …) of region `region`'s
+ * pattern, locked while a lane on the part holds the field.
+ */
 export function driverKnob(
   ctx: AppCtx,
   slot: number,
@@ -51,12 +59,23 @@ export function driverKnob(
   color: string,
   region?: number,
 ): HTMLElement {
+  const field = entry.f;
   return makeKnob({
     ...entry.o,
     label: entry.label,
     color,
-    get: () => Number(fieldOf(driverOf(ctx.model.doc, slot, region), entry.f) ?? entry.o.def),
-    set: (v) => void changePattern(ctx, slot, region, { [entry.f]: v }),
+    get: () => Number(fieldOf(driverOf(ctx.model.doc, slot, region), field) ?? entry.o.def),
+    set: (v) => void changePattern(ctx, slot, region, { [field]: v }),
+    ...(isSeqField(field)
+      ? {
+          automation: () =>
+            seqKnobAutomation(
+              partAt(ctx.model.doc, slot),
+              field,
+              knobSongTick(ctx.model.doc, ctx.transport.position()),
+            ),
+        }
+      : {}),
   });
 }
 
