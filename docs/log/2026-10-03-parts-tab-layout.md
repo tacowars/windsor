@@ -99,11 +99,13 @@ out of scope.
 - **Knobs:** the operator rows keep today's knob, a 38 px dial, so a row is
   87 px tall against the mockup's 72 px. tacowars approved it as built
   (PR #531).
-- **Chip lights:** the strip's activity dot became the Song mixer's two
-  lights on every chip, fed by one engine node that meters every part
-  (windsor#540, then windsor#528). It costs about 3.3 % of the audio budget
-  at 16 parts (`docs/research/2026-10-03-always-on-part-meters/`).
-- **Keyboard:** windsor#537 does the keyboard pass for the bar, the ⋯ menu,
+- **Chip lights, not yet built:** as merged, each chip has one activity
+  dot that lights only on the Song tab. tacowars has chosen to replace it
+  with the Song mixer's two lights on every chip, on every tab, fed by one
+  engine node that meters every part: windsor#540, then windsor#528. The
+  research measured that node at about 3.3 % of the audio budget at 16 parts
+  (`docs/research/2026-10-03-always-on-part-meters/`).
+- **Keyboard, in progress:** windsor#537 does the keyboard pass for the bar, the ⋯ menu,
   the popover and the browser, instead of more fix rounds on PR #532.
 - **The patch browser's facet badges** show each facet's own count, whether
   or not it is selected.
