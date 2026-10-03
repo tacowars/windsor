@@ -1,7 +1,7 @@
 /**
  * The Figure device's cell rules without the DOM (windsor#490, epic
  * windsor#483; record `2026-10-03-figure-sequencer`): what a cell's click,
- * its tone picker, its Vel drag and its flags do; how Length, Rotate and
+ * its tone picker, its Vel drag and its flags do; how Length, Rotate, Reverse and
  * Randomize change the line; and what a cell's tone reads over a chord.
  * Every function returns a new value for `changePattern`, where an array
  * replaces wholesale. The octave, accent and slide edits are
@@ -34,7 +34,14 @@ import {
   FIGURE_VEL,
   type FigureRandomTable,
 } from './figureConstants';
-import { type Draw, cycleKind, rotateLanes, rotateSteps } from './gridModel';
+import {
+  type Draw,
+  cycleKind,
+  reverseLanes,
+  reverseSteps,
+  rotateLanes,
+  rotateSteps,
+} from './gridModel';
 
 /** The degree an interval within the octave names at stack position `position`. */
 function degreeOf(semitones: number, position: number): number {
@@ -170,6 +177,18 @@ export function rotateFigure(
   return {
     cells: rotateSteps(spec.cells, by, spec.length),
     lanes: rotateLanes(spec.lanes, by, spec.length),
+  };
+}
+
+/**
+ * Reverse (windsor#548): the line's first `length` cells mirrored, each
+ * whole with its tone, octave, velocity, flags and ratchet, and each lane's
+ * values with them; the cells past the line stay where they are.
+ */
+export function reverseFigure(spec: FigureTurnable): { cells: FigureCell[]; lanes: StepModLane[] } {
+  return {
+    cells: reverseSteps(spec.cells, spec.length),
+    lanes: reverseLanes(spec.lanes, spec.length),
   };
 }
 

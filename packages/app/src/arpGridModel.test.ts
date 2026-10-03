@@ -27,6 +27,7 @@ import {
   arpSlideAt,
   nextArpKind,
   randomArpCells,
+  reverseArp,
   rotateArp,
 } from './arpGridModel';
 import { ARP_RANDOM } from './arpGridConstants';
@@ -190,6 +191,18 @@ describe('Rotate over the shown cells (decision 4)', () => {
     const there = rotateArp({ steps, lanes: [lane] }, -4, 10);
     expect(rotateArp(there, 4, 10)).toEqual({ steps, lanes: [lane] });
     expect(rotateArp({ steps, lanes: [lane] }, 3, 0)).toEqual({ steps, lanes: [lane] });
+  });
+
+  it('Reverse mirrors the shown cells and their lane values, and nothing with no chord (windsor#548)', () => {
+    const rolled = steps.map((cell, i) => (i === 1 ? arpNote({ ratchet: 3 }) : cell));
+    const reversed = reverseArp({ steps: rolled, lanes: [lane] }, 6);
+    expect(reversed.steps.slice(0, 6)).toEqual(rolled.slice(0, 6).reverse());
+    expect(reversed.steps[4]).toEqual(arpNote({ ratchet: 3 }));
+    expect(reversed.steps.slice(6)).toEqual(rolled.slice(6));
+    expect(reversed.lanes[0]?.values.slice(0, 6)).toEqual([0.05, 0.04, 0.03, 0.02, 0.01, 0]);
+    expect(reversed.lanes[0]?.values.slice(6)).toEqual(lane.values.slice(6));
+    expect(reverseArp(reversed, 6)).toEqual({ steps: rolled, lanes: [lane] });
+    expect(reverseArp({ steps, lanes: [lane] }, 0)).toEqual({ steps, lanes: [lane] });
   });
 
   it("is the grid's Rotate knob, ±16", () => {

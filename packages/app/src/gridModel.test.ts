@@ -11,6 +11,9 @@ import {
   foldedView,
   keySignature,
   randomSteps,
+  reverseGrid,
+  reverseLanes,
+  reverseSteps,
   rotateLanes,
   rotateSteps,
   setDegree,
@@ -134,6 +137,38 @@ describe('lanes turn with the steps (windsor#31)', () => {
       { param: 'filter.cutoff', values: [0.4, 0.1, 0.2, 0.3, 0.9] },
     ]);
     expect(rotateLanes(lanes, -1, 4)[0]!.values).toEqual([0.2, 0.3, 0.4, 0.1, 0.9]);
+  });
+});
+
+describe('Reverse mirrors the span (windsor#548)', () => {
+  const lane = (values: number[]) => ({ param: 'filter.cutoff' as const, values });
+
+  it('mirrors the first n, leaves the rest, keeps an odd middle, and undoes itself', () => {
+    const list = ['a', 'b', 'c', 'd', 'e', 'X', 'Y'];
+    expect(reverseSteps(list, 5)).toEqual(['e', 'd', 'c', 'b', 'a', 'X', 'Y']);
+    expect(reverseSteps(reverseSteps(list, 5), 5)).toEqual(list);
+    expect(reverseSteps(list, 4)).toEqual(['d', 'c', 'b', 'a', 'e', 'X', 'Y']);
+    // A span of 1 or 0 moves nothing; a span past the list mirrors what it has.
+    expect(reverseSteps(list, 1)).toEqual(list);
+    expect(reverseSteps(list, 0)).toEqual(list);
+    expect(reverseSteps(['a', 'b'], 4)).toEqual(['b', 'a']);
+    expect(reverseLanes([lane([0.1, 0.2])], 4)).toEqual([lane([0.2, 0.1])]);
+  });
+
+  it('moves each step whole, ties and rests as steps, lanes with them, and needs no lanes', () => {
+    const steps: GridStep[] = [
+      gridNote(2, { octave: 1, accent: true, slide: false, ratchet: 3 }),
+      TIE,
+      gridNote(4, { octave: -1, slide: true }),
+      REST,
+      gridNote(6),
+    ];
+    const spec = { length: 4, steps, lanes: [lane([0.1, 0.2, 0.3, 0.4, 0.9])] };
+    const reversed = reverseGrid(spec);
+    expect(reversed.steps).toEqual([REST, steps[2], TIE, steps[0], steps[4]]);
+    expect(reversed.lanes).toEqual([lane([0.4, 0.3, 0.2, 0.1, 0.9])]);
+    expect(reverseGrid({ ...spec, ...reversed })).toEqual({ steps, lanes: spec.lanes });
+    expect(reverseGrid({ ...spec, lanes: [] }).lanes).toEqual([]);
   });
 });
 

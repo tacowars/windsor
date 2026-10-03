@@ -4,8 +4,8 @@
  * one column per cell of the arp's cycle, each a note, tie or rest with its
  * octave shift, accent, slide and ratchet held at the top of the strip, the
  * modulation lanes under them, their names, × and readout in a column at the
- * left with **+ Lane** in its corner, the Rotate knob, the Randomize button
- * and a playhead. `arpCard.ts` places the pieces.
+ * left with **+ Lane** in its corner, the Rotate knob, the Randomize and
+ * Reverse buttons and a playhead. `arpCard.ts` places the pieces.
  *
  * The strip shows `arpListCount` cells (`arpGridModel.ts`): one cycle of the
  * style over the chord the card reads, so the device grows and shrinks with
@@ -33,6 +33,7 @@ import {
   arpShownList,
   arpSlideAt,
   randomArpCells,
+  reverseArp,
   rotateArp,
 } from './arpGridModel';
 import { arpStepCells } from './arpStepCells';
@@ -40,8 +41,8 @@ import { regionChord } from './chordRegionChord';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import { withStep } from './gridModel';
-import { makeKnob } from './knob';
+import { GRID_TURN_REBASED, withStep } from './gridModel';
+import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { regionPlayheadAt } from './regionPlayhead';
 import { ARP_ROTATE_KNOB } from './sequencerKnobTables';
@@ -79,11 +80,27 @@ interface ArpStrip extends Strip<ArpSpec> {
   count: number;
 }
 
-/** The pieces `arpCard.ts` places: Rotate and Randomize in the controls, the Cycle section. */
+/** The pieces `arpCard.ts` places: Rotate, Randomize and Reverse in the controls, the Cycle section. */
 export interface ArpGridParts {
   rotate: HTMLElement;
   randomize: HTMLElement;
+  reverse: HTMLElement;
   section: HTMLElement;
+}
+
+/**
+ * Rotate's offset from the cells it last turned, and its knob, as the
+ * Grid's: Reverse replaces those cells, so it rebases the offset and
+ * redraws the knob at zero (windsor#548).
+ */
+interface ArpRotor {
+  turned: number;
+  knob: KnobElement | null;
+}
+
+function rebase(rotor: ArpRotor): void {
+  rotor.turned = GRID_TURN_REBASED;
+  rotor.knob?.refresh();
 }
 
 /** The notes the arp walks over the chord the card reads now; empty with no spec or chord. */
@@ -158,23 +175,24 @@ function watch(strip: ArpStrip): void {
 }
 
 /** Rotate applies the turn since its last value to the shown cells, so the document holds no offset. */
-function rotateKnob(strip: ArpStrip): HTMLElement {
-  let turned = 0;
-  return makeKnob({
+function rotateKnob(strip: ArpStrip, rotor: ArpRotor): HTMLElement {
+  const knob = makeKnob({
     ...ARP_ROTATE_KNOB,
     color: PITCH_COLOR,
-    get: () => turned,
+    get: () => rotor.turned,
     set: (v) => {
       const target = Math.round(v);
-      const by = target - turned;
+      const by = target - rotor.turned;
       if (by === 0) return;
-      turned = target;
+      rotor.turned = target;
       const spec = strip.spec();
       if (!spec) return;
       const rotated = rotateArp(spec, by, countOf(strip));
       if (changePattern(strip.ctx, strip.slot, strip.region, rotated)) strip.repaint();
     },
   });
+  rotor.knob = knob;
+  return knob;
 }
 
 function randomizeButton(strip: ArpStrip): HTMLElement {
@@ -183,6 +201,21 @@ function randomizeButton(strip: ArpStrip): HTMLElement {
   button.title = 'The shown cells: accent, slide, an octave now and then, a tie or rest, a ratchet';
   button.onclick = (): void =>
     commitSteps(strip, (spec) => randomArpCells(spec.steps, countOf(strip), Math.random));
+  return button;
+}
+
+/** Reverse mirrors the shown cells, the span Rotate turns, lanes with them (windsor#548). */
+function reverseButton(strip: ArpStrip, rotor: ArpRotor): HTMLElement {
+  const button = el('button', 'btn seq-btn', 'Reverse') as HTMLButtonElement;
+  button.type = 'button';
+  button.title = 'Mirror the shown cells: every cell and lane value, last to first';
+  button.onclick = (): void => {
+    const spec = strip.spec();
+    if (!spec) return;
+    rebase(rotor);
+    const reversed = reverseArp(spec, countOf(strip));
+    if (changePattern(strip.ctx, strip.slot, strip.region, reversed)) strip.repaint();
+  };
   return button;
 }
 
@@ -262,5 +295,11 @@ export function arpGrid(ctx: AppCtx, slot: number, region: number | undefined): 
   const section = cycleSection(strip);
   repaint(strip);
   watch(strip);
-  return { rotate: rotateKnob(strip), randomize: randomizeButton(strip), section };
+  const rotor: ArpRotor = { turned: GRID_TURN_REBASED, knob: null };
+  return {
+    rotate: rotateKnob(strip, rotor),
+    randomize: randomizeButton(strip),
+    reverse: reverseButton(strip, rotor),
+    section,
+  };
 }

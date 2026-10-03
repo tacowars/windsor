@@ -25,6 +25,7 @@ import {
   bassSlideAt,
   bassStepsLabel,
   randomBassSteps,
+  reverseBass,
   rotateBass,
   turnBass,
 } from './bassGridModel';
@@ -110,6 +111,23 @@ describe('Length', () => {
     expect(longest.length).toBe(GRID_STEPS_MAX);
     expect(longest.steps).toHaveLength(GRID_STEPS_MAX);
     expect(longest.lanes[0]?.values).toHaveLength(GRID_STEPS_MAX);
+  });
+});
+
+describe('Reverse (windsor#548)', () => {
+  it('mirrors the loop’s steps, ratchets and lane values together, and leaves the steps past it', () => {
+    const steps = [
+      N({ ratchet: 2 }),
+      REST,
+      N({ octave: 1, slide: true }),
+      TIE,
+      N({ accent: true }),
+    ];
+    const spec = { steps, length: 4, lanes: [lane([0.1, 0.2, 0.3, 0.4, 0.5])] };
+    const reversed = reverseBass(spec);
+    expect(reversed.steps).toEqual([TIE, steps[2], REST, N({ ratchet: 2 }), steps[4]]);
+    expect(reversed.lanes).toEqual([lane([0.4, 0.3, 0.2, 0.1, 0.5])]);
+    expect(reverseBass({ ...spec, ...reversed })).toEqual({ steps, lanes: spec.lanes });
   });
 });
 

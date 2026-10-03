@@ -27,6 +27,7 @@ import {
   bassSlideAt,
   bassStepsLabel,
   randomBassSteps,
+  reverseBass,
   turnBass,
 } from './bassGridModel';
 import { PITCH_COLOR } from './consoleColors';
@@ -69,11 +70,12 @@ interface BassStripView extends Strip<BassSpec> {
   lanes: LaneHost;
 }
 
-/** The pieces `bassCard.ts` places: Length, Rotate and Randomize in the controls, the Steps section. */
+/** The pieces `bassCard.ts` places: Length, Rotate, Randomize and Reverse in the controls, the Steps section. */
 export interface BassGridParts {
   length: HTMLElement;
   rotate: HTMLElement;
   randomize: HTMLElement;
+  reverse: HTMLElement;
   section: HTMLElement;
 }
 
@@ -138,8 +140,8 @@ const write = (strip: Strip<BassSpec>, fields: Record<string, unknown>): void =>
 };
 
 /**
- * Rotate's offset from the pattern it last turned, and its knob. Length
- * and Randomize replace that pattern, so they rebase the offset
+ * Rotate's offset from the pattern it last turned, and its knob. Length,
+ * Randomize and Reverse replace that pattern, so they rebase the offset
  * (`turnBass`) and redraw the knob at zero.
  */
 interface BassRotor {
@@ -193,6 +195,20 @@ function randomizeButton(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement 
   button.onclick = (): void => {
     rebase(rotor);
     commitSteps(strip, (spec) => randomBassSteps(spec.steps, Math.random));
+  };
+  return button;
+}
+
+/** Reverse mirrors the loop in place, lanes with it (windsor#548), and rebases Rotate as Randomize does. */
+function reverseButton(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement {
+  const button = el('button', 'btn seq-btn', 'Reverse') as HTMLButtonElement;
+  button.type = 'button';
+  button.title = 'Mirror the steps: every cell and lane value, last to first';
+  button.onclick = (): void => {
+    const spec = strip.spec();
+    if (!spec) return;
+    rebase(rotor);
+    write(strip, { ...reverseBass(spec) });
   };
   return button;
 }
@@ -270,6 +286,7 @@ export function bassGrid(ctx: AppCtx, slot: number, region: number | undefined):
     length: lengthKnob(strip, rotor),
     rotate: rotateKnob(strip, rotor),
     randomize: randomizeButton(strip, rotor),
+    reverse: reverseButton(strip, rotor),
     section,
   };
 }
