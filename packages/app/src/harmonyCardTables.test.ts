@@ -3,10 +3,10 @@
  * device's height from the one table that owns it, every size the stylesheet
  * reads is an entry here, and the fixed rows fit the height.
  */
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { HARMONY_CARD_PX } from './harmonyCardTables';
+import { cssVarsRead } from './consoleStylesheet';
 import { SEQUENCER_DEVICE_PX } from './sequencerDeviceTables';
 
 const px = (prop: string): number => {
@@ -28,8 +28,7 @@ describe('the harmony card sizes', () => {
   });
 
   it('owns every --harmony-* size the stylesheet reads', () => {
-    const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
-    const read = new Set([...css.matchAll(/var\((--harmony-[a-z-]+)\)/g)].map((m) => m[1]));
+    const read = cssVarsRead('--harmony-');
     expect(read.size).toBeGreaterThan(0);
     for (const prop of read) expect(Object.keys(HARMONY_CARD_PX)).toContain(prop);
   });
