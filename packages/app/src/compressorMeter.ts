@@ -33,6 +33,9 @@ export function compressorMeter(ctx: AppCtx, slot: InsertTarget, index: number):
   const stop = (): void => {
     active?.setActive(false);
     active = undefined;
+    // A window cut short by a hidden tab or a replaced insert is dropped, so
+    // the first reading back is fresh rather than a stale partial mean.
+    readout = EMPTY_GR_WINDOW;
   };
   watchPlayhead({
     attached: () => {
