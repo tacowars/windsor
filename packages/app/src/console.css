@@ -4956,38 +4956,60 @@ input.field {
   color: var(--carrier);
 }
 
-/* ---------- operator bays ---------- */
+/* ---------- operator rows ---------- */
+/* windsor#523, record `2026-10-03-parts-tab-layout` decisions 6, 7 and 9 and
+   its mockup's layout B: four rows of today's knob cells at the mockup's
+   44 px. Every row's main group keeps one width — the Fixed knob takes the
+   Coarse/Fine/Ratio width, and a Noise operator in any row gives every row
+   the two colour columns — so each knob column lines up across A–D, and
+   only the envelope's width changes. There is no screen-width media query:
+   the body's flex wrap alone puts the Adv group beside the core or under it,
+   at any window size or zoom. */
 
-.bay-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-  gap: 12px;
+.op-rows {
+  --op-cell: 44px;
+  --op-readout: 56px;
+  --op-gap: 4px;
+  --op-core-gap: 14px;
+  --op-env: 560px;
+  --op-env-min: 140px;
+  --op-main: calc(7 * var(--op-cell) + var(--op-readout) + 7 * var(--op-gap));
+  --op-adsr: calc(4 * var(--op-cell) + 3 * var(--op-gap));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-
-.bay {
+.op-row {
+  display: grid;
+  grid-template-columns: 138px minmax(0, 1fr);
+  gap: 6px 12px;
+  align-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--op-color);
   border-radius: var(--r);
-  overflow: hidden;
+  padding: 7px 10px;
 }
-.bay-head {
+.op-id {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.op-id-head {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 11px;
-  background: var(--inset);
-  border-bottom: 1px solid var(--line);
-  border-left: 3px solid var(--op-color);
+  gap: 8px;
 }
-.bay-id {
+.op-letter {
   font-family: var(--f-panel);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--op-color);
   line-height: 1;
 }
-.bay-role {
+.op-role {
   font-family: var(--f-panel);
   font-size: 9px;
   font-weight: 600;
@@ -4998,6 +5020,111 @@ input.field {
   background: color-mix(in srgb, var(--op-color) 18%, transparent);
   color: var(--op-color);
 }
+.op-id-line {
+  display: flex;
+  gap: 4px;
+}
+.op-id .btn {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.op-id .btn[aria-pressed='true'] {
+  background: var(--op-color);
+  border-color: var(--op-color);
+}
+.op-adv-btn {
+  margin-left: auto;
+}
+.op-id select.field {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 4px;
+  font-size: 11.5px;
+}
+.op-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-width: 0;
+}
+.op-rows:has(.op-noise) {
+  --op-main: calc(9 * var(--op-cell) + var(--op-readout) + 9 * var(--op-gap));
+}
+/* The core's basis is its knobs plus a 560 px envelope, and it grows to fill
+   the row. The envelope is laid out from its 140 px floor, so the core wraps
+   it under the knobs only when the knobs and that floor don't fit, which
+   keeps it inside the row rather than over the row's edge. */
+.op-core {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--op-core-gap);
+  flex: 1 1 calc(var(--op-main) + var(--op-adsr) + 2 * var(--op-core-gap) + var(--op-env));
+  min-width: 0;
+}
+.op-group {
+  display: flex;
+  gap: var(--op-gap);
+  flex: none;
+  align-items: flex-end;
+}
+.op-row .knob {
+  width: var(--op-cell);
+}
+.op-row .knob-readout {
+  width: var(--op-readout);
+}
+.op-row .knob.op-fixed {
+  width: calc(2 * var(--op-cell) + var(--op-readout) + 2 * var(--op-gap));
+}
+.op-main {
+  min-width: var(--op-main);
+}
+.op-row .env-canvas {
+  width: auto;
+  flex: 1 1 var(--op-env-min);
+  min-width: var(--op-env-min);
+  height: 54px;
+}
+.op-adv {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.op-adv-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 4px;
+}
+.op-adv-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 6px;
+}
+.op-adv-start {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+/* The group sizes to its content, so each segment button keeps its label's
+   width rather than an even share that would clip "Trigger". */
+.op-adv .seg button {
+  flex: 1 1 auto;
+}
+.op-harmonics {
+  grid-column: 1 / -1;
+}
 .bay-off {
   opacity: 0.48;
 }
@@ -5005,12 +5132,7 @@ input.field {
 .bay-off:focus-within {
   opacity: 1;
 }
-.bay-body {
-  padding: 9px 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
+/* The Drive section's shape line (`partsTab.ts`) still uses the bay line. */
 .bay-line {
   display: flex;
   align-items: flex-end;
@@ -5103,13 +5225,6 @@ body.env-dragging .env-canvas {
   background: var(--inset);
   border: 1px solid var(--line);
   border-radius: var(--r);
-}
-
-.adv {
-  display: none;
-}
-.adv.open {
-  display: flex;
 }
 
 /* ---------- scope + keyboard ---------- */
