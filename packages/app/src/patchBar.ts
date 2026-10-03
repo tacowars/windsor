@@ -4,8 +4,9 @@
  * `PART`, the name and the sequencer; then `PATCH`, ◀ ▶, the patch box (the
  * name, the unsaved dot and `<category> · <source>`; a click opens the search
  * popover), Save, Save as…, Init and the ⋯ menu; and at the right end
- * ⤢ Browse patches, hidden until the full browser lands (windsor#522). It is
- * a flex row that wraps by its own width, never by the screen's.
+ * ⤢ Browse patches, which opens the full-pane browser under the bar
+ * (`patchBrowser.ts`, windsor#522) and shows as pressed while it is open. It
+ * is a flex row that wraps by its own width, never by the screen's.
  */
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -15,6 +16,13 @@ import { partListControls } from './partListControls';
 import { badgeText, patchMenuEntries, patchSummary } from './patchLibrary';
 import type { MenuItem } from './patchMenu';
 import { SEPARATOR, patchMenu } from './patchMenu';
+import {
+  focusBrowserSearch,
+  isPatchBrowserOpen,
+  openPatchBrowser,
+  syncPatchBrowser,
+  togglePatchBrowser,
+} from './patchBrowser';
 import { togglePatchPopover, wirePatchSearchKey } from './patchPopover';
 import type { StepDirection } from './patchStepModel';
 import { stepPatch } from './patchStepModel';
@@ -77,13 +85,17 @@ function patchBox(ctx: AppCtx, actions: PatchBarActions): HTMLElement {
     el('span', 'patch-box-src', summary.detail),
     el('span', 'patch-box-search', '⌕ search'),
   );
-  box.onclick = (): void =>
+  box.onclick = (): void => {
+    // The open browser is the search already: the box and ⌘K go to its field.
+    if (isPatchBrowserOpen()) return focusBrowserSearch();
     togglePatchPopover({
       anchor: wrap,
       entries,
       current: partAt(ctx.model.doc, slot)?.preset ?? '',
       load: (id) => loadPreset(ctx, id, actions, focusById('patchBox')),
+      browse: () => openPatchBrowser(ctx, actions),
     });
+  };
   wrap.appendChild(box);
   return wrap;
 }
@@ -107,10 +119,14 @@ function menuItems(ctx: AppCtx, actions: PatchBarActions): MenuItem[] {
 /** The bar for the selected part; rebuilt whole after a pick, a library action or a part switch. */
 export function patchBar(ctx: AppCtx, actions: PatchBarActions): HTMLElement[] {
   wirePatchSearchKey();
-  const browse = el('button', 'btn', '⤢ Browse patches') as HTMLButtonElement;
+  const browse = el('button', 'btn patch-browse', '⤢ Browse patches') as HTMLButtonElement;
   browse.type = 'button';
-  // The full-pane browser is windsor#522; until then the button is not shown.
-  browse.hidden = true;
+  browse.id = 'patchBrowse';
+  browse.title = 'Browse every patch in a full pane: facets, a table and an info pane';
+  browse.setAttribute('aria-pressed', String(isPatchBrowserOpen()));
+  browse.onclick = (): void => togglePatchBrowser(ctx, actions);
+  // The pane follows the bar it hangs under, once the bar is in the page.
+  queueMicrotask(() => syncPatchBrowser(ctx, actions));
   return [
     ...partListControls(ctx),
     el('span', 'bar-sep'),

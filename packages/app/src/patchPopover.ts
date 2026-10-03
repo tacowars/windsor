@@ -2,7 +2,8 @@
  * The patch bar's search popover (windsor#521 decision 4; record
  * `2026-10-03-parts-tab-layout` decision 5, the second tier): a search field
  * with focus, the Category, Tag and Source selects in one row, the results
- * (the name, then `<category> · <source>`) and `<n> of <total>`. ↑ ↓ move the
+ * (the name, then `<category> · <source>`), `<n> of <total>` and ⤢ Browse
+ * all, which opens the full browser (windsor#522). ↑ ↓ move the
  * highlight, Enter or a click loads, Esc or a click outside closes. It opens
  * from a click on the patch box or ⌘K / Ctrl+K while the Parts tab shows,
  * and hangs from the patch box, so it follows the box at any width or zoom.
@@ -12,6 +13,7 @@
 import type { PresetListing } from '@windsor/engine';
 import { el } from './dom';
 import { filteredListing, filterSelects, patchFilter } from './presetBrowser';
+import { ROW_SOURCE_LABELS } from './patchLibrary';
 import { moveHighlight } from './patchStepModel';
 
 export interface PopoverRequest {
@@ -22,16 +24,11 @@ export interface PopoverRequest {
   readonly current: string;
   /** Load the chosen id; the popover has closed by then. */
   readonly load: (id: string) => void;
+  /** ⤢ Browse all: open the full-pane browser (windsor#522); the popover has closed by then. */
+  readonly browse: () => void;
 }
 
 const isMac = (): boolean => /Mac|iP(hone|ad|od)/.test(navigator.platform);
-
-/** A result row's source, capitalised as the approved mockup shows it. */
-const ROW_SOURCE_LABELS: Readonly<Record<PresetListing['source'], string>> = {
-  document: 'This song',
-  library: 'Library',
-  'built-in': 'Built-in',
-};
 
 function resultRow(entry: PresetListing): HTMLElement {
   const row = el('li', 'patch-pop-row');
@@ -72,7 +69,16 @@ export function togglePatchPopover(request: PopoverRequest): void {
   const foot = el('div', 'patch-pop-foot');
   const count = el('span');
   count.setAttribute('role', 'status');
-  foot.append(count, el('span', '', '↑↓ move · ⏎ load · Esc closes'));
+  const browse = el('button', 'btn', '⤢ Browse all') as HTMLButtonElement;
+  browse.type = 'button';
+  browse.title = 'Open the full patch browser';
+  browse.onclick = (): void => {
+    closePopover(anchor, false);
+    request.browse();
+  };
+  const keys = el('span', 'patch-pop-keys');
+  keys.append(count, ' · ↑↓ move · ⏎ load · Esc closes');
+  foot.append(keys, browse);
   let matches: PresetListing[] = [];
   let highlight = -1;
   const paint = (): void => {
