@@ -5,10 +5,12 @@
  * A tab may show an icon in place of its label (windsor#39): its name is then
  * the button's accessible name and its tooltip.
  * The pressed button follows the shown tab however it was shown: a click, or
- * an undo or a redo that shows its step's tab (windsor#163).
+ * an undo or a redo that shows its step's tab (windsor#163), or a Tab press
+ * (windsor#480, `tabKeys.ts`), which this shell listens for.
  */
 import type { AppContext, TabPanel } from './appContext';
 import { el, html } from './dom';
+import { tabKeyAction, tabKeyFacts } from './tabKeys';
 
 export interface TabSpec {
   /** The id the context registers and remembers; never shown. */
@@ -109,5 +111,24 @@ export function mountTabShell(
   }
   syncPressed = followShownTab(ctx, [...buttons.keys()], (tabId, pressed) => {
     buttons.get(tabId)?.setAttribute('aria-pressed', String(pressed));
+  });
+  listenForTabKey(ctx, () => syncPressed());
+}
+
+/**
+ * The one Tab listener (windsor#480): every Tab it handles is swallowed, so
+ * the browser never moves focus with it. A switch is a tab-bar click, and
+ * focus left in the panel it hid is dropped, with nothing new focused.
+ */
+function listenForTabKey(ctx: AppContext<HTMLElement>, syncPressed: () => void): void {
+  addEventListener('keydown', (e) => {
+    const action = tabKeyAction(tabKeyFacts(e), ctx.activeTab);
+    if (action === null) return;
+    e.preventDefault();
+    if (action.kind !== 'switch') return;
+    ctx.activate(action.tab);
+    syncPressed();
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused.closest('.tab-panel[hidden]')) focused.blur();
   });
 }

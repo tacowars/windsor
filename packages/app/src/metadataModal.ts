@@ -3,12 +3,13 @@
  * page's own `<dialog>`s, never `window.confirm`. The rules — required and
  * unique name, the id from the name, categories and tags from the library —
  * are `patchMetadata.ts`; this is the markup in `index.html`
- * driven. Focus is trapped while a modal is up and returns to the patch
- * controls on close (`focusTrap.ts`), so QWERTY plays straight away.
+ * driven. Tab does nothing while a modal is up (windsor#480, `tabKeys.ts`),
+ * and focus returns to the patch controls on close (`focusTrap.ts`), so
+ * QWERTY plays straight away.
  */
 import { $, el } from './dom';
-import { FocusReturn, tabWrapTarget } from './focusTrap';
-import { FOCUSABLE, NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
+import { FocusReturn } from './focusTrap';
+import { NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
 import type { LoudnessResult } from './loudnessCheck';
 import type { LibraryEntries, PatchMetadata } from './patchMetadata';
 import { categoriesOf, nameProblem, normaliseTags, suggestTags } from './patchMetadata';
@@ -21,33 +22,16 @@ const patchControls = (): HTMLElement | null =>
 const focusReturn = new FocusReturn<HTMLElement>(patchControls);
 
 /**
- * Open a dialog with the trap installed; resolves when it closes. Every modal
- * in the console opens through here, so Tab wraps inside it and closing
- * returns focus to `opener` (else the element that had focus).
+ * Open a dialog modally; resolves when it closes. Every modal in the console
+ * opens through here, so closing returns focus to `opener` (else the element
+ * that had focus).
  */
 export function showTrapped(dialog: HTMLDialogElement, opener: HTMLElement | null): Promise<void> {
   focusReturn.open(opener ?? (document.activeElement as HTMLElement | null));
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key !== 'Tab') return;
-    const focusables = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-      (node) => !node.hidden && !(node as HTMLButtonElement).disabled,
-    );
-    const target = tabWrapTarget(
-      focusables,
-      document.activeElement as HTMLElement | null,
-      event.shiftKey,
-    );
-    if (target) {
-      event.preventDefault();
-      target.focus();
-    }
-  };
-  dialog.addEventListener('keydown', onKey);
   return new Promise((resolve) => {
     dialog.addEventListener(
       'close',
       () => {
-        dialog.removeEventListener('keydown', onKey);
         focusReturn.close();
         resolve();
       },
