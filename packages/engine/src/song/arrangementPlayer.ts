@@ -315,6 +315,8 @@ export class ArrangementPlayer {
     this.current = merged;
     this.index();
     for (const binding of plan.fresh) binding.attach();
+    // The meter first, so a part edit in the same partial counts bars of the new one.
+    for (const binding of this.built.bindings.values()) binding?.setMeter(merged.transport.meter);
     for (const change of plan.changes) change.commit();
     // Regions, song length and harmony are live on every gate (#705): the next tick reads them.
     for (const part of merged.parts) {

@@ -18,8 +18,8 @@
  * - **A live edit** of the schedule or the drift takes effect at the next
  *   bar line: an epoch from that bar, with the rotation the counter holds
  *   there carried over, so an edit never resets a counter. The epoch before
- *   it keeps answering for earlier bars, so a playhead behind the scheduler
- *   lights what was heard. Only a region entry restarts (`restart`).
+ *   it keeps answering for earlier bars, even across edits in consecutive
+ *   bars, so a playhead behind the scheduler lights what was heard. Only a region entry restarts (`restart`).
  *
  * Arithmetic over the step and the bar, with no history to replay: a seek, a
  * loop jump and a re-entry land on the right cell at once.
@@ -81,9 +81,22 @@ const entry = ({ schedule, drift }: FigureProcesses): Epoch => ({
   rotation: 0,
 });
 
+/** The index of the epoch in force at local `bar`: the last from on or before it, else the first. */
+function epochIndexAt(epochs: readonly Epoch[], bar: number): number {
+  let index = epochs.length - 1;
+  while (index > 0 && (epochs[index]?.fromBar ?? 0) > bar) index -= 1;
+  return index;
+}
+
 export class FigureLine {
-  /** The epoch in force from the entry or before the last edit, then the last edit's. */
-  private epochs: readonly [Epoch, Epoch?];
+  /**
+   * The epochs in force from the entry on, by `fromBar`. An edit is made at
+   * the bar after the scheduler's, and the audible clock lags the scheduler
+   * by less than a bar, so no playhead reads a bar before the edit's two
+   * back: the epochs ending before it are dropped, and the rest kept, so
+   * edits in consecutive bars leave the heard bar its own process.
+   */
+  private epochs: readonly Epoch[];
 
   constructor(processes: FigureProcesses) {
     this.epochs = [entry(processes)];
@@ -96,21 +109,22 @@ export class FigureLine {
 
   /** Take `processes` from local bar `fromBar` on, the counter carried; nothing when they are unchanged. */
   edit(processes: FigureProcesses, fromBar: number): void {
-    const [first, edited] = this.epochs;
-    if (sig(edited ?? first) === sig(processes)) return;
-    const before = edited && edited.fromBar < fromBar ? edited : first;
-    if (before.fromBar >= fromBar) {
+    const last = this.epochs[this.epochs.length - 1];
+    if (last && sig(last) === sig(processes)) return;
+    const kept = this.epochs.filter((epoch) => epoch.fromBar < fromBar);
+    const before = kept[kept.length - 1];
+    if (!before) {
       this.restart(processes);
       return;
     }
     const { schedule, drift } = processes;
-    this.epochs = [before, { schedule, drift, fromBar, rotation: rotationAt(before, fromBar) }];
+    const heard = kept.slice(epochIndexAt(kept, fromBar - 2));
+    this.epochs = [...heard, { schedule, drift, fromBar, rotation: rotationAt(before, fromBar) }];
   }
 
   /** The written cell local `step`, in local `bar`, sounds. */
   cellAt(step: number, bar: number, frame: FigureFrame): number {
-    const [first, edited] = this.epochs;
-    const epoch = edited && edited.fromBar <= bar ? edited : first;
+    const epoch = this.epochs[epochIndexAt(this.epochs, bar)] ?? entry({});
     const stage = stageAt(epoch.schedule, bar);
     const length = Math.min(stage?.length ?? frame.length, frame.cells);
     const start = stage ? Math.ceil((stage.startBar * frame.barTicks) / frame.divisor) : 0;
