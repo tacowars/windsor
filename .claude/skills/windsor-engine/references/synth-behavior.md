@@ -1,7 +1,8 @@
 # Synth behavior that affects patch design
 
-Source of truth: `packages/client/src/audio/patch/patch.ts`, `audioConstants.ts`
-and `worklet/fm/` (the FM worklet's source) in the active checkout. Inspect `Voice.updateControl`,
+Source of truth: `packages/engine/src/patch/patch.ts`, `audioConstants.ts`
+and `worklet/fm/` (the FM worklet's source, with its defaults and ranges in
+`patchDefaults.ts`) in the active checkout. Inspect `Voice.updateControl`,
 `Voice.render`, `normalisePatch`, `getMips` and the envelope/LFO classes when
 changing behavior. These notes describe the implementation, not a promise
 that a familiar control matches another synthesizer.
@@ -87,6 +88,71 @@ establish the contour's direction. Noise is primarily shaped by amplitude
 and filtering; do not describe a noise filter sweep as a pitched oscillator
 sweep. Filter envelope/LFO amounts are in octaves, not semitones.
 
+## Drive, filter and noise colour
+
+The voice's signal runs carriers → **drive** → filter (if on) → steal fade
+(windsor#300, record `2026-10-01-voice-drive-stage`; `worklet/fm/voiceDrive.ts`).
+The drive is its own patch block, `drive = { on, gain, shape, bias, tone }`,
+and no longer needs the filter: a filter-off patch can be driven. The stage
+is `shape(gain · x + bias) − shape(bias)`, then a one-pole lowpass. `gain` is
+the input gain (1 is unity); `bias` shifts the curve's operating point, which
+is how the stage makes even harmonics, the lopsided body a kick wants, and
+subtracting `shape(bias)` keeps silence silent. `tone` runs from about 1 kHz
+at 0 to bypassed at exactly 1. The shapes are `soft` (the filter's old soft
+clip, the default), `hard`, `diode`, `tube` and `fold`; the voice does not
+oversample, so `hard` and `fold` alias by design. `on` false, or unity gain
+with no bias, costs nothing (windsor#309). The shaper's input is the
+carriers' sum, so higher carrier levels drive it harder at the same gain.
+
+The filter has Off, Lowpass, Highpass, Bandpass, Notch and **Formant**
+(windsor#331, record `2026-10-02-formant-filter-mode`;
+`worklet/fm/voiceFormant.ts`, `formantTables.ts`). Formant runs three
+bandpass peaks in parallel at a vowel's first three formants, which stay put
+while the pitch moves, as a sung vowel's do; one bandpass moving with the
+note does not sound like a vowel. `filter.vowel` reads 0 a, 1 e, 2 i, 3 o,
+4 u, a fraction morphing between neighbours, and a song lane or a step can
+move it. The filter's modulation (envelope, wheel, both LFOs, key track)
+shifts all three peaks together in octaves; the Cutoff knob, a cutoff lane
+and `slope24` are not heard in this mode. The three share one Q from
+`resonance` (8 per unit, capped at 40), and each peak stands at its vowel's
+level whatever the resonance, so resonance narrows the vowel rather than
+making it louder. Key track 0 keeps the peaks where the table puts them on
+every note.
+
+A **Noise** operator has its own colour (windsor#362, record
+`2026-10-02-operator-noise-colour`; `worklet/fm/noiseColour.ts`): `noiseLp`
+and `noiseHp`, in Hz, a two-pole Butterworth lowpass then highpass on that
+operator's noise, before its level and envelope, with no resonance; 0 is
+off. A cutoff that is on sounds between 20 Hz and 0.45 of the sample rate.
+Every other wave ignores the fields. They band a snare's or a hat's noise
+per operator, ahead of the voice filter, which stays free for the whole
+voice; windsor#361 measured that a resonant section fitted the snares worse,
+so there is no Q. They are tuned when the voice binds the patch, so a live
+edit is heard from the next block.
+
+## Macros
+
+A patch may carry up to eight **macros** (windsor#559, record
+`2026-10-04-patch-macro-knobs`; `worklet/fm/voiceMacros.ts`,
+`macroMappings.ts`, `macroShape.ts`): each a name, a value 0..1 and up to
+eight mappings, each mapping a voice target, the target's value at the
+macro's 0 and 1 (`min`, `max`, in the target's own units), a curve and an
+invert. The macro's output becomes the mapped target's base: the patch's
+own number for that target is no longer heard, and a song lane or a step
+push on the macro moves every target it maps. Inverted is `1 − x` first;
+then Linear, Exp `x³`, Log `1 − (1 − x)³` or S `x²(3 − 2x)`. A ratio target
+(a cutoff, a decay time, an LFO rate) sweeps geometrically, in octaves,
+with an end below the row's floor raised to it (a decay mapped from 0 plays
+1 ms at the bottom); an add target sweeps linearly. Each target takes one
+mapping across all the macros, and the first wins; a macro cannot map
+another macro. A direct song lane on a mapped target is kept and does
+nothing while the mapping exists, and a step push on it still stacks. A
+macro is not among the targets a slide keeps, so a macro mapped to feedback
+or a decay curve moves it on a slide, which may click. The use it was built for
+is an accent under one name: a carrier level, the cutoff and a decay time
+pushed together by one step lane, each held inside the range its mapping
+gives it.
+
 ## Timing and voice lifecycle
 
 Amplitude/pitch/filter envelopes carry initial, peak, sustain and end levels,
@@ -107,8 +173,9 @@ Long release tails and repeated chords can consume the finite voice pool.
 A held note whose carriers all sit in sustain at level 0 (and whose filter
 has stopped ringing) goes **dormant** (#547): the part skips it, steals it
 first and silently, and ends it on note-off. Sustain 0 therefore does not tie
-up the pool under Hold. The plate likewise sleeps after ~1.6 s of silence in
-and out, and never under HOLD.
+up the pool under Hold. The plate likewise sleeps once its input and its tail
+have both been silent for longer than anything can recirculate unseen
+(`worklet/reverb/reverbConstants.ts`), and never under HOLD.
 
 Every voice renders through one fixed-index kernel for all eleven algorithms
 (#548): silent operators are skipped and the per-note `Math.pow` values are
@@ -157,14 +224,17 @@ Bandlimited and deliberately unbandlimited “digital” waveforms are separate
 choices. Choose intentional aliasing for a digital texture, not by assuming
 all saw/square variants are equivalent.
 
-Each worklet deliberately remains one import-free file: its URL is loaded
-directly in development and production, and the standalone editor embeds the
-same source. See `docs/log/2026-08-31-audio-worklet-single-file.md` before
-changing that boundary. Patch defaults/enums/routing are mirrored across TS
-and DSP; update the corresponding parity tests when changing that contract.
+Each worklet is written as a TypeScript source folder under `worklet/` and
+bundled by `scripts/build-worklets.mjs` into one import-free file in
+`worklet/generated/`, whose URL the engine loads (#643). The bundles are
+generated: edit the source, rebuild, and commit both. The patch defaults,
+enums and routing live once in `worklet/fm/` (`patchDefaults.ts`,
+`modeIds.ts`, `algorithms.ts`): `patch.ts` re-exports the ids and the
+algorithm table, and `makePatch()` writes the defaults; update the
+parity tests beside them when changing that contract.
 
 `makePatch` supplies defaults, and document normalization checks shapes and
 finite values. Do not assume every finite numeric field is range-clamped:
 inspect the actual normalizer/control/DSP path for the parameter in question.
 For a new patch field, consider factory defaults, old documents, live updates,
-editor controls, worklet defaults and the rebuilt standalone HTML together.
+editor controls, worklet defaults and the rebuilt worklet bundle together.
