@@ -35,6 +35,7 @@ import {
   discardEdits,
   dropInit,
   initPatch,
+  initPatchDefaults,
   isModified,
   patchOrigin,
   saveForks,
@@ -119,7 +120,7 @@ describe('Init', () => {
   it('loads makePatch defaults named Init, not saveable, not a library entry', async () => {
     const scope = await folderScope();
     const patch = initPatch(scope);
-    expect(patch).toEqual(makePatch({ name: INIT_PATCH_NAME }));
+    expect(patch).toEqual(initPatchDefaults());
     expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe(INIT_ID);
     expect(scope.ctx.model.doc.patches?.[INIT_ID]).toEqual(patch);
     const origin = patchOrigin(scope);
@@ -157,7 +158,7 @@ describe('Init', () => {
     const edited = clonePatch(scope.ctx.model.doc.patches![INIT_ID]!);
     edited.volume = 0.1;
     scope.ctx.change({ patches: { [INIT_ID]: edited } });
-    expect(initPatch(scope).volume).toBe(makePatch().volume);
+    expect(initPatch(scope).volume).toBe(initPatchDefaults().volume);
     scope.ctx.change({
       ...partChange(FULL_SLOT.kick, { preset: 'hat' }),
       patches: { hat: clonePatch(PATCH_LIBRARY['hat']!.patch) },
@@ -347,8 +348,8 @@ describe('the unsaved-changes guard', () => {
     const init = initPatch(scope);
     init.volume = 0.3;
     scope.ctx.change({ patches: { [INIT_ID]: init } });
-    expect(discardEdits(scope)).toEqual(makePatch({ name: INIT_PATCH_NAME }));
-    expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(makePatch().volume);
+    expect(discardEdits(scope)).toEqual(initPatchDefaults());
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(initPatchDefaults().volume);
     // A document-only patch has no baseline to restore.
     scope.ctx.change({
       ...partChange(FULL_SLOT.kick, { preset: 'mine' }),

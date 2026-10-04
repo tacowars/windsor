@@ -38,6 +38,19 @@ export const isInitPreset = (id: string): boolean => id.startsWith(INIT_PRESET_P
 /** The display name Init starts with, and the base of a Copy to new from it. */
 export const INIT_PATCH_NAME = 'Init';
 
+/**
+ * What Init sets over `makePatch()` defaults: tacowars's Init, taken from a
+ * song on 2026-10-05. Operator 1 restarts at phase 0 on each note with a
+ * slightly slower attack, the filter envelope opens at once, and the volume
+ * sits well under the clip line.
+ */
+export const INIT_PATCH_OVERRIDES = {
+  name: INIT_PATCH_NAME,
+  volume: 0.2296977796052631,
+  ops: [{ phaseFree: false, env: { attackTime: 0.004466565172673648 } }],
+  filter: { env: { attackTime: 0 } },
+};
+
 /** The repo folder the grant is asked on, shown in the picker's hint and the mode line. */
 export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
 

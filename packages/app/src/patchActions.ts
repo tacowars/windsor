@@ -16,7 +16,12 @@ import {
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { withGesture } from './gestureHooks';
-import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
+import {
+  INIT_PATCH_NAME,
+  INIT_PATCH_OVERRIDES,
+  initPresetId,
+  isInitPreset,
+} from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
 import { isWritable, removeLibraryFile, writeLibraryFile } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
@@ -37,8 +42,8 @@ export interface PatchScope {
   slot: number;
 }
 
-/** A fresh Init patch: `makePatch()` defaults under the Init name. */
-export const initPatchDefaults = (): Patch => makePatch({ name: INIT_PATCH_NAME });
+/** A fresh Init patch: `makePatch()` defaults under the Init overrides. */
+export const initPatchDefaults = (): Patch => makePatch(INIT_PATCH_OVERRIDES);
 
 /** Where the selected part's patch came from. */
 export function patchOrigin({ ctx, library, slot }: PatchScope): PatchOrigin {

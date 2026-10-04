@@ -300,7 +300,7 @@ export function libraryButtons(ctx: AppCtx, refresh: () => void): HTMLButtonElem
   save.onclick = (): void => void run(runSave, save);
   const copy = button('Save as…', 'Save as a new patch in your library', canCopy(origin));
   copy.onclick = (): void => void run(runCopy, copy);
-  const init = button('Init', 'makePatch() defaults; not in the library until Save as…', true);
+  const init = button('Init', 'A fresh starting patch; not in the library until Save as…', true);
   init.onclick = (): void => void run(runInit, init);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);

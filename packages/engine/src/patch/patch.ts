@@ -278,15 +278,20 @@ export type PartialMacroMapping = Partial<MacroMapping> & Pick<MacroMapping, 'ta
 /** A macro with every field optional, its mappings partial; `makeMacro` completes it. */
 export type PartialMacro = Partial<Omit<Macro, 'mappings'>> & { mappings?: PartialMacroMapping[] };
 
+/** A filter with every field optional, its envelope included; `makePatch` completes it. */
+export type PartialFilter = Partial<Omit<FilterSettings, 'env'>> & { env?: Partial<Envelope> };
+
 /** Every field optional, recursively -- what an editor or a preset supplies. */
 export type PartialPatch = {
   [K in keyof Patch]?: K extends 'ops'
     ? PartialOperator[]
     : K extends 'macros'
       ? PartialMacro[]
-      : Patch[K] extends object
-        ? Partial<Patch[K]>
-        : Patch[K];
+      : K extends 'filter'
+        ? PartialFilter
+        : Patch[K] extends object
+          ? Partial<Patch[K]>
+          : Patch[K];
 };
 
 export function makeEnvelope(
