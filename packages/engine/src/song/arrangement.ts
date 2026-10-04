@@ -56,8 +56,7 @@ export type RollDriver = RollSequencerConfig;
  * What may drive a part (#597, #705). `none` is inert: allowed anywhere,
  * skipped by every sequencing path. `arp` and `bass` are normalised in full
  * here and performed by #706 / #707, `figure` (windsor#484) by windsor#485.
- * `roll` (windsor#599) is normalised in full and builds no generator until
- * its performer lands (windsor#600).
+ * `roll` (windsor#599) is normalised in full and performed by windsor#600.
  */
 export const SEQUENCER_KINDS = [
   'none',

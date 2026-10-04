@@ -1,7 +1,7 @@
 /**
  * The Roll kind through the normaliser (windsor#599): a document at its
  * defaults and one with chords, extreme pitches and a note past the loop
- * both load clean and round-trip byte for byte, and nothing plays; the
+ * both load clean, round-trip byte for byte and play what is written; the
  * notes are sorted silently, and every other repair is reported, on the
  * part's sequencer and on a region's pattern alike.
  */
@@ -29,7 +29,7 @@ const FIXTURE = currentDocument('roll-part');
 const WRITTEN = FIXTURE.parts as { sequencer: object; regions: object[] }[];
 
 describe('a Roll part in a document (windsor#599)', () => {
-  it('loads with no correction, round-trips byte for byte and plays nothing', () => {
+  it('loads with no correction, round-trips byte for byte and plays its notes', () => {
     const first = makeArrangement(FIXTURE);
     expect(first.corrections).toEqual([]);
     const parts = first.document.parts;
@@ -46,15 +46,21 @@ describe('a Roll part in a document (windsor#599)', () => {
     const text = JSON.stringify(first.document);
     expect(JSON.stringify(makeArrangement(JSON.parse(text)).document)).toBe(text);
 
-    let played = 0;
-    const part = { ...silentPart(), noteOn: () => ++played, trigger: () => ++played };
+    // Since the performer (windsor#600) it plays: the empty roll nothing, the
+    // other its first region's five notes in the loop and its second's one.
+    const played: number[] = [];
+    const part = {
+      ...silentPart(),
+      noteOn: (note: number) => played.push(note),
+      trigger: (note: number) => played.push(note),
+    };
     const transport = new TickTransport();
     const doc = first.document;
     const playing = new Map(doc.parts.map((p) => [p.slot, part]));
     const player = new ArrangementPlayer(transport, playing, doc, doc.patches ?? {});
     for (let i = 0; i < 4 * TICKS_PER_BAR; i++) transport.advance(0);
     player.dispose();
-    expect(played).toBe(0);
+    expect(played).toEqual([60, 64, 67, 0, 127, 62]);
   });
 });
 

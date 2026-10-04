@@ -19,7 +19,12 @@ import {
 } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
-import { FULL_DOCUMENT, FULL_PART_IDS, FULL_SLOT } from '../__fixtures__/fullArrangement';
+import {
+  FULL_DOCUMENT,
+  FULL_PART_IDS,
+  FULL_SLOT,
+  withDocumentPart,
+} from '../__fixtures__/fullArrangement';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
 import { BARS_MAX, BPM_MIN, SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
 import type { ArrangementDocument } from '../song/arrangementDocument';
@@ -146,6 +151,24 @@ describe('renderSong', () => {
     const grid = built[FULL_DOCUMENT.parts.findIndex((part) => part.slot === FULL_SLOT.arp)]!;
     const noteOns = [...(grid.options.events ?? []), ...(grid.node.posted as { type?: string }[])];
     expect(noteOns.filter((m) => m.type === 'noteOn')).toEqual([]);
+  });
+
+  it('renders a Roll part as the live pump plays it (windsor#600)', async () => {
+    // A chord on the opening tick, a note cut at the loop's end, one past the loop.
+    const notes = [
+      ...[38, 41, 45].map((pitch) => ({ tick: 0, ticks: 36, pitch })),
+      { tick: 150, ticks: 96, pitch: 50, velocity: 0.5 },
+      { tick: 200, ticks: 12, pitch: 53 },
+    ];
+    const roll = withDocumentPart(FULL_DOCUMENT, 'drone', {
+      sequencer: { kind: 'roll', loopTicks: 192, notes },
+    });
+    await expectLiveMatch(roll);
+    const part = built[FULL_DOCUMENT.parts.findIndex((p) => p.slot === FULL_SLOT.drone)]!;
+    const sent = [...(part.options.events ?? []), ...(part.node.posted as { type?: string }[])];
+    const ons = sent.filter((m) => m.type === 'noteOn') as { note: number }[];
+    // Two passes of the loop, then the chord again on tick 384, the last tick the render issues.
+    expect(ons.map((m) => m.note)).toEqual([38, 41, 45, 50, 38, 41, 45, 50, 38, 41, 45]);
   });
 
   it('renders the same song twice bit-identically, each part on its own fixed seed', async () => {

@@ -183,8 +183,7 @@ export function makeArrangement(raw: unknown, options: ResolveOptions = {}): Mak
  * The verify gate's predicate: usable, naming nothing the code does not
  * define, and with something to play. A part plays only when its kind builds
  * a generator (`buildsNoGenerator`): a `none` part is inert and allowed (#597),
- * and so is a `roll` part until its performer lands (windsor#600), but a song
- * of nothing but such parts is silent and must not ship.
+ * but a song of nothing but such parts is silent and must not ship.
  */
 export function isShippable(result: MakeArrangementResult): boolean {
   return (

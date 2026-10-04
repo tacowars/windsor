@@ -18,6 +18,7 @@ import type {
   EuclideanDriver,
   FigureDriver,
   GridDriver,
+  RollDriver,
   SequencerKind,
   SequencerSpec,
 } from './arrangement';
@@ -33,6 +34,7 @@ import {
   type FigureResolver,
 } from '../sequencing/figureSequencer';
 import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
+import { RollSequencer, assertRollConfig } from '../sequencing/rollSequencer';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 
@@ -42,7 +44,8 @@ export type Generator =
   | ChordSequencer
   | Arpeggiator
   | BassSequencer
-  | FigureSequencer;
+  | FigureSequencer
+  | RollSequencer;
 
 /** A generator emitting note events, whose held notes a region end releases. */
 export type PitchedGenerator = Exclude<Generator, EuclideanSequencer>;
@@ -56,8 +59,8 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
  * What builds a part's generator: its kind, its divisor (the subscription)
  * and its seed (the stream — a seed edit restarts the part at once, by a
  * rebuild; record `2026-09-26-harmony-v2-document-v3-timeline-and-regions`).
- * A Chord Player subscribes at every tick and draws nothing, so only its
- * kind rebuilds it. Every other field reconfigures the live generator, so
+ * A Chord Player and a Roll subscribe at every tick and draw nothing, so
+ * only their kind rebuilds them. Every other field reconfigures the live generator, so
  * an edit never cuts the held note or restarts the stream; `regions` and the
  * harmony are the gate's and rebuild nothing. Since windsor#74 the rule
  * holds per region: each region's pattern has its own generator, and the
@@ -70,17 +73,12 @@ export function generatorSig(spec: SequencerSpec): string {
   return sig([spec.kind, spec.divisor, spec.seed]);
 }
 
-/**
- * The kinds that build no generator, so a part of one has no binding: `none`,
- * and `roll` until its performer lands (windsor#600), so a Roll part loads
- * and plays nothing (windsor#599).
- */
-export const buildsNoGenerator = (kind: SequencerKind): boolean =>
-  kind === 'none' || kind === 'roll';
+/** The kind that builds no generator, so a part of it has no binding: `none`. */
+export const buildsNoGenerator = (kind: SequencerKind): boolean => kind === 'none';
 
 /**
  * The generator a spec builds — a part's `sequencer`, or one region's
- * pattern (`regionPattern`, windsor#74) — or null for `none` and `roll`. A Figure
+ * pattern (`regionPattern`, windsor#74) — or null for `none`. A Figure
  * counts its schedule and drift in bars of `barTicks`, the song meter's bar,
  * and a canon finds its leader through `figureOf` (windsor#487).
  */
@@ -105,7 +103,7 @@ export function buildGenerator(
     case 'figure':
       return new FigureSequencer(sampler, driver as FigureDriver, barTicks, figureOf);
     case 'roll':
-      return null;
+      return new RollSequencer(driver as RollDriver);
     default:
       return null;
   }
@@ -154,6 +152,11 @@ export function liveReconfiguration(
     assertFigureConfig(config);
     return () => generator.reconfigure(config, sampler);
   }
+  if (spec.kind === 'roll' && generator instanceof RollSequencer) {
+    const config = driver as RollDriver;
+    assertRollConfig(config);
+    return () => generator.reconfigure(config);
+  }
   return null;
 }
 
@@ -161,9 +164,11 @@ export function liveReconfiguration(
  * The step a generator is sounding at a local tick (since its region entry),
  * or -1 when it has no position to show — an empty Chord Player, a stub
  * (#619 decision 2). Each generator's own `stepAt` answers, so the console's
- * playhead *is* the engine's rule rather than a second copy of it.
+ * playhead *is* the engine's rule rather than a second copy of it. A Roll's
+ * step is its loop tick (windsor#600), which has no divisor.
  */
 export function generatorStepAt(generator: Generator, localTick: number): number {
   if (generator instanceof ChordSequencer) return generator.stepAt(localTick)?.step ?? -1;
+  if (generator instanceof RollSequencer) return generator.stepAt(localTick);
   return generator.stepAt(Math.floor(localTick / generator.config.divisor));
 }

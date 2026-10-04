@@ -39,10 +39,10 @@ describe('the JSON test songs', () => {
     expect(isShippable(result)).toBe(false);
   });
 
-  it('does not ship a song of only Roll parts, which build no generator yet', () => {
+  it('ships a song of only Roll parts, which play since their performer (windsor#600)', () => {
     const result = makeArrangement(currentDocument('roll-part'));
     expect(result.usable).toBe(true);
-    expect(isShippable(result)).toBe(false);
+    expect(isShippable(result)).toBe(true);
   });
 
   it('reports the preset a part names but the song does not embed as dangling', () => {
