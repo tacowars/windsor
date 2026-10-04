@@ -9,8 +9,11 @@
  * - an insert knob by its insert's stable id and its field. A lane on a field
  *   its insert's settings leave unread (`automatableInsertFields`) is inert,
  *   so the knob stays free: it drives the field once the field is read again;
- * - a patch knob by its path, for the 30 voice targets only, against the
+ * - a patch knob by its path, for the 38 voice targets only, against the
  *   selected part's lanes, so two parts sharing a patch lock independently;
+ *   a knob a macro mapping covers is held by its macro first (windsor#561,
+ *   record `2026-10-04-patch-macro-knobs` decision 11): a lane on the
+ *   target is inert while the mapping exists;
  * - a sequencer knob (Gate, Skip, Density) by its field, while the part's
  *   sequencer kind offers that field a lane (windsor#491). Changing the kind
  *   drops the lane in the engine, so the knob frees on the next read.
@@ -20,6 +23,7 @@
  */
 import type {
   Arrangement,
+  Macro,
   AutomationLane,
   AutomationTargetId,
   AutomationTargetKind,
@@ -41,13 +45,19 @@ import {
   valueAt,
   voiceTargetId,
 } from '@windsor/engine';
+import { macroValuePath, mappedKnob } from './macroModel';
 import { LANE_KIND_COLOR } from './songAutomationTables';
 import { songTickOf } from './transportModel';
 
-/** What a locked knob shows: its lane's colour and the lane's value at the playhead. */
+/**
+ * What a locked knob shows: its lane's colour and the lane's value at the
+ * playhead, or, for a knob a macro mapping holds, the voice lane colour, the
+ * value the mapping plays and the macro's name, which its tag reads.
+ */
 export interface KnobAutomation {
   readonly color: string;
   readonly value: number;
+  readonly macro?: string;
 }
 
 /** The colours of the kinds a knob locks under, as `LANE_KIND_COLOR` holds them. */
@@ -115,6 +125,26 @@ export function voiceKnobAutomation(
 }
 
 /**
+ * A Parts-tab knob's lock at `tick`: the macro mapping that covers `path` in
+ * `macros` (the working patch's), at its macro's value or the value a lane
+ * on the macro holds it at, else the lane on `path` of `part`, the selected
+ * part.
+ */
+export function patchKnobAutomation(
+  part: DocumentPart | undefined,
+  macros: readonly Macro[],
+  path: string,
+  tick: number,
+  colors: KnobLockColors = LANE_KIND_COLOR,
+): KnobAutomation | null {
+  const live = (index: number): number | undefined =>
+    voiceKnobAutomation(part, macroValuePath(index), tick, colors)?.value;
+  const mapped = mappedKnob(macros, path, live);
+  if (mapped) return { color: colors.voice, value: mapped.value, macro: mapped.macro };
+  return voiceKnobAutomation(part, path, tick, colors);
+}
+
+/**
  * A sequencer knob's lock at `tick`: the knob over `field` of `part`'s
  * sequencer. Null when the part's kind offers `field` no lane (a Chord's
  * Gate), or no lane on it is on.
@@ -157,11 +187,20 @@ export function insertKnobAutomation(
 
 /** Whether two locks draw the same: both free, or the same colour at the same value. */
 export const sameKnobAutomation = (a: KnobAutomation | null, b: KnobAutomation | null): boolean =>
-  a === b || (a !== null && b !== null && a.color === b.color && a.value === b.value);
+  a === b ||
+  (a !== null && b !== null && a.color === b.color && a.value === b.value && a.macro === b.macro);
 
 /** What a press on a locked knob says (decision 6). */
 export const lockedKnobNotice = (label: string): string =>
   `${label} is automated in the song. Switch its lane off to edit it.`;
+
+/** What a press on a knob a macro mapping holds says (windsor#561). */
+export const macroKnobNotice = (label: string, macro: string): string =>
+  `${label} is driven by the macro ${macro}. Remove its mapping to edit it.`;
+
+/** What a press on `lock`'s knob says: the macro that drives it, or its lane. */
+export const lockNotice = (label: string, lock: KnobAutomation): string =>
+  lock.macro === undefined ? lockedKnobNotice(label) : macroKnobNotice(label, lock.macro);
 
 /** A locked knob's `aria-valuetext`: its readout, then ", automated". */
 export const automatedValueText = (readout: string): string => `${readout}, automated`;

@@ -18,15 +18,26 @@
  * (`resolveSlot`), and the Song view adopts a change it did not make
  * (`partSelectionSync.ts`).
  */
-import type { ArrangementDocument, Patch } from '@windsor/engine';
+import type { ArrangementDocument, DocumentPart, Patch, PartsPartial } from '@windsor/engine';
 import { clonePatch, makePatch, partAt } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
 import { library, libraryPatch } from './libraryModel';
 import { resolveSlot } from './partSelectionSync';
 
+/**
+ * The parts partial an edit of a patch makes on the parts playing it (a
+ * macro's removal moves their lanes, windsor#561), from the document and the
+ * selected part's preset at the commit.
+ */
+export type PatchPartsEdit = (
+  doc: ArrangementDocument,
+  preset: string,
+) => PartsPartial<DocumentPart>;
+
 /** What the session needs of the context: the document write, the document, and the other tabs' invalidation. */
 export interface PartsSessionDeps {
-  commit(patch: Patch): boolean;
+  /** The patch, and `parts`' partial when given, as one change; true when it landed. */
+  commit(patch: Patch, parts?: PatchPartsEdit): boolean;
   doc(): ArrangementDocument;
   invalidate(): void;
 }
@@ -102,6 +113,19 @@ export class PartsSession {
   }
 
   /**
+   * Push the working patch, with `parts`' partial when given, as one change,
+   * and, once it landed, put every other tab out of date: an edit another
+   * tab draws from the patch (a macro's name and mappings are the Song tab's
+   * lane titles and lane picker, windsor#561), which a plain knob's push
+   * leaves alone. True when it landed.
+   */
+  pushShared(parts?: PatchPartsEdit): boolean {
+    if (!this.deps.commit(this.patch, parts)) return false;
+    this.deps.invalidate();
+    return true;
+  }
+
+  /**
    * The one change path (windsor#470 decision 3): the slot resolved to a part
    * that exists; the working patch reloaded from it, so the next knob edit
    * writes into this part's preset and never the last part's patch; every
@@ -131,6 +155,12 @@ export class PartsSession {
 export interface PatchEditor {
   readonly patch: Patch;
   push(): void;
+  /**
+   * Push the working patch for an edit another tab draws (`PartsSession.pushShared`):
+   * with `parts`' partial when given, one change, so one undo step, and every
+   * other tab out of date once it landed. Absent, `push` stands in.
+   */
+  pushShared?(parts?: PatchPartsEdit): void;
   /** Rebuild the whole patch UI (an algorithm change recolours the bays). */
   refresh(): void;
   /**

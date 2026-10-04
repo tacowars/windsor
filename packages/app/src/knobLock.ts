@@ -4,7 +4,9 @@
  * in `docs/design/automation-lanes-mockup.html`): while a lane holds the
  * knob, its arc, pin and cap ring take the lane's colour and an AUTO tag
  * sits under its value (`console.css`'s "locked knob" section, keyed on
- * `.locked` and `--lock-color`). Which lane holds it is `knobAutomation.ts`.
+ * `.locked` and `--lock-color`). A knob a macro mapping holds reads the
+ * macro's name in the tag instead (windsor#561), and takes `.mapped`. Which
+ * lane or mapping holds it is `knobAutomation.ts`.
  *
  * The knob follows its lane on the console's one frame loop
  * (`watchPlayhead`): each frame it is on screen it asks its lane again and
@@ -18,9 +20,15 @@ import { watchPlayhead, type FrameSource } from './stepStrip';
 /** The AUTO tag's text. */
 export const AUTO_TAG_TEXT = 'AUTO';
 
-/** Light or clear the lock on `node`: the class the stylesheet keys on, and the lane's colour. */
+/** The tag a lock reads: its macro's name, else AUTO. */
+export const lockTagText = (lock: KnobAutomation | null): string => lock?.macro ?? AUTO_TAG_TEXT;
+
+/** Light or clear the lock on `node`: the classes the stylesheet keys on, the lane's colour and the tag. */
 export function paintLock(node: HTMLElement, lock: KnobAutomation | null): void {
   node.classList.toggle('locked', lock !== null);
+  node.classList.toggle('mapped', lock?.macro !== undefined);
+  const tag = node.querySelector('.knob-auto');
+  if (tag) tag.textContent = lockTagText(lock);
   if (lock) node.style.setProperty('--lock-color', lock.color);
   else node.style.removeProperty('--lock-color');
 }

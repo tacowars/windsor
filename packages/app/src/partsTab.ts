@@ -7,16 +7,19 @@
  * export carries the sound itself. The working patch is `ctx.parts` (#620
  * decision 3); every control here is handed a `PatchEditor` over it, built
  * once per render, whose push also keeps the patch bar (`patchBar.ts`) honest.
+ * The deck's last card is the patch's macros (`macroCard.ts`, windsor#561),
+ * and a knob a macro mapping covers locks under the macro's name.
  */
 import type { PartialPatch } from '@windsor/engine';
 import { makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $ } from './dom';
-import { knobSongTick, voiceKnobAutomation } from './knobAutomation';
+import { knobSongTick, patchKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
 import { showTrapped } from './metadataModal';
+import { buildMacroCard } from './macroCard';
 import { midiPanel } from './midiPanel';
 import { dropInit } from './patchActions';
 import { keepBarFocus, patchBar } from './patchBar';
@@ -86,6 +89,7 @@ const GRID_HTML = `
             <div class="knob-row" id="driveKnobs"></div>
           </div>
         </section>
+        <section class="deck-card deck-macros" id="macroCard"></section>
       </div>
     </main>
   </div>
@@ -108,21 +112,24 @@ const GRID_HTML = `
  * box's source (#563), and the box re-reads its unsaved dot — and the rebuild.
  */
 function patchEditor(ctx: AppCtx): PatchEditor {
+  const commit = (push: () => boolean): void => {
+    const preset = partAt(ctx.model.doc, ctx.parts.selected)?.preset;
+    const wasDocument = preset !== undefined && ctx.model.doc.patches?.[preset] !== undefined;
+    if (!push()) return;
+    if (!wasDocument) syncPresetAndBadge(ctx, editor);
+    syncModifiedMarker(ctx);
+  };
   const editor: PatchEditor = {
     get patch() {
       return ctx.parts.patch;
     },
-    push() {
-      const preset = partAt(ctx.model.doc, ctx.parts.selected)?.preset;
-      const wasDocument = preset !== undefined && ctx.model.doc.patches?.[preset] !== undefined;
-      if (!ctx.parts.push()) return;
-      if (!wasDocument) syncPresetAndBadge(ctx, editor);
-      syncModifiedMarker(ctx);
-    },
+    push: () => commit(() => ctx.parts.push()),
+    pushShared: (parts) => commit(() => ctx.parts.pushShared(parts)),
     refresh: () => refreshPatchUi(editor),
     automation: (path) =>
-      voiceKnobAutomation(
+      patchKnobAutomation(
         partAt(ctx.model.doc, ctx.parts.selected),
+        ctx.parts.patch.macros,
         path,
         knobSongTick(ctx.model.doc, ctx.transport.position()),
       ),
@@ -139,6 +146,7 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildLfo(editor, 'lfo');
   buildLfo(editor, 'lfo2');
   buildPitch(editor);
+  buildMacroCard(editor);
 }
 
 /** Reload the working patch and rebuild the bar and the editor: after a load, a library action or a part switch. */

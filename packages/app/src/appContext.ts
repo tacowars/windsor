@@ -29,7 +29,7 @@ import type { DocumentModel } from './documentModel';
 import { setGestureHook } from './gestureHooks';
 import type { BuildOptions, EngineHost } from './host';
 import { loadRenames } from './partAutoName';
-import { PartsSession } from './partsSession';
+import { PartsSession, type PatchPartsEdit } from './partsSession';
 import { followSongLength } from './regionModel';
 import type { OpenAmend } from './songSession';
 import { SongSession } from './songSession';
@@ -91,7 +91,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.notify = deps.notify;
     this.transport = deps.host.transport;
     this.parts = new PartsSession({
-      commit: (patch) => this.commitPatch(patch),
+      commit: (patch, parts) => this.commitPatch(patch, parts),
       doc: () => this.model.doc,
       invalidate: () => this.invalidate(),
     });
@@ -311,11 +311,17 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.rebuild();
   }
 
-  /** The working patch into the document under the selected part's preset name (a built-in forks). */
-  private commitPatch(patch: Patch): boolean {
-    const part = partAt(this.model.doc, this.parts.selected);
+  /**
+   * The working patch into the document under the selected part's preset
+   * name (a built-in forks), with `parts`' partial on the parts playing it
+   * when given: one change.
+   */
+  private commitPatch(patch: Patch, parts?: PatchPartsEdit): boolean {
+    const doc = this.model.doc;
+    const part = partAt(doc, this.parts.selected);
     if (!part) return false;
-    return this.change({ patches: { [part.preset]: patch } }).ok;
+    const patches = { [part.preset]: patch };
+    return this.change(parts ? { patches, parts: parts(doc, part.preset) } : { patches }).ok;
   }
 
   /** The one path every edit takes: the live system first, then the document; a refusal is reported and changes nothing. */

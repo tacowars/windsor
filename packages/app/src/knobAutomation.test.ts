@@ -19,6 +19,7 @@ import {
   VOICE_AUTOMATION_ROWS,
   VOICE_TARGET_IDS,
   followingTick,
+  makeMacro,
   partAt,
   songTicksOf,
   type AutomationLane,
@@ -31,13 +32,16 @@ import {
   insertKnobAutomation,
   knobSongTick,
   isSeqField,
+  lockNotice,
   lockedKnobNotice,
+  patchKnobAutomation,
   sameKnobAutomation,
   seqKnobAutomation,
   voiceKnobAutomation,
   voiceKnobTarget,
   type KnobLockColors,
 } from './knobAutomation';
+import { lockTagText } from './knobLock';
 import { LANE_KIND_COLOR } from './songAutomationTables';
 
 const BAR = TICKS_PER_BAR;
@@ -215,12 +219,55 @@ describe('a sequencer knob (windsor#491)', () => {
   });
 });
 
+describe('a knob a macro mapping holds (windsor#561)', () => {
+  // Accent maps the cutoff 400 Hz .. 3.2 kHz, Exp, at 0.35: it plays 437 Hz (the mockup's).
+  const macros = [
+    makeMacro({ name: 'Wobble', value: 0.62 }),
+    makeMacro({
+      name: 'Accent',
+      value: 0.35,
+      mappings: [{ target: 'filter.cutoff', min: 400, max: 3200, curve: 1 }],
+    }),
+  ];
+
+  it('locks under its macro’s name at the value the mapping plays, over the lane on it', () => {
+    const lock = patchKnobAutomation(AUTOMATION_PART, macros, 'filter.cutoff', 0, COLORS);
+    expect(lock?.macro).toBe('Accent');
+    expect(lock?.color).toBe('amber');
+    expect(lock?.value).toBeCloseTo(437.3, 1);
+    expect(lockTagText(lock)).toBe('Accent');
+  });
+
+  it('follows a lane on its macro, and frees once the mapping goes', () => {
+    const lane: AutomationLane = {
+      target: 'voice.macros.1.value',
+      on: true,
+      points: [{ tick: 0, value: 1, bend: 0 }],
+    };
+    const part = withLanes([...(AUTOMATION_PART.automation ?? []), lane]);
+    expect(patchKnobAutomation(part, macros, 'filter.cutoff', 0)?.value).toBeCloseTo(3200, 6);
+    expect(patchKnobAutomation(part, macros, 'macros.1.value', 0, COLORS)).toEqual({
+      color: 'amber',
+      value: 1,
+    });
+    const unmapped = [macros[0]!, makeMacro({ name: 'Accent', value: 0.35 })];
+    expect(patchKnobAutomation(AUTOMATION_PART, unmapped, 'filter.cutoff', 0, COLORS)).toEqual(
+      voiceKnobAutomation(AUTOMATION_PART, 'filter.cutoff', 0, COLORS),
+    );
+    expect(patchKnobAutomation(AUTOMATION_PART, unmapped, 'filter.resonance', 0)).toBeNull();
+  });
+});
+
 describe('the lock’s wording and change check', () => {
   it('names the knob in the press notice and the readout', () => {
     expect(lockedKnobNotice('Cutoff')).toBe(
       'Cutoff is automated in the song. Switch its lane off to edit it.',
     );
     expect(automatedValueText('1.20 kHz')).toBe('1.20 kHz, automated');
+    expect(lockNotice('Cutoff', { color: 'amber', value: 400, macro: 'Accent' })).toBe(
+      'Cutoff is driven by the macro Accent. Remove its mapping to edit it.',
+    );
+    expect(lockTagText({ color: 'amber', value: 400 })).toBe('AUTO');
   });
 
   it('redraws only on a change of lock, colour or value', () => {
@@ -230,6 +277,7 @@ describe('the lock’s wording and change check', () => {
     expect(sameKnobAutomation(a, null)).toBe(false);
     expect(sameKnobAutomation(a, { ...a, value: 0.6 })).toBe(false);
     expect(sameKnobAutomation(a, { ...a, color: 'amber' })).toBe(false);
+    expect(sameKnobAutomation(a, { ...a, macro: 'Accent' })).toBe(false);
   });
 });
 

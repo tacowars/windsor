@@ -12,7 +12,14 @@ import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureCon
 import { partChange } from './context';
 import { settleGestures } from './gestureHooks';
 import { KNOB_PAD_PX, KNOB_R } from './knobConstants';
-import { attachKnobInput, continuesKeySteps, knobGeometry, scaleFor } from './knob';
+import {
+  attachKnobInput,
+  continuesKeySteps,
+  knobGeometry,
+  knobMarkup,
+  relabelKnob,
+  scaleFor,
+} from './knob';
 import type { KnobSpec, Scale } from './knob';
 import type { KnobAutomation } from './knobAutomation';
 import { ENVELOPE_KNOBS } from './patchKnobTables';
@@ -271,6 +278,18 @@ describe('a knob a lane holds (windsor#351)', () => {
     expect(levelOf(ctx)).not.toBe(before);
     expect(notify).not.toHaveBeenCalled();
   });
+
+  it('names the knob as it is labelled now: a macro renamed after its knob was built', () => {
+    const ctx = openGestureConsole();
+    vi.mocked(notify).mockClear();
+    const node = levelKnob(ctx, () => held);
+    const shown = Object.assign(node, { setAttribute: () => {}, querySelector: () => null });
+    relabelKnob(shown as unknown as HTMLElement, 'Accent');
+    fire(node, 'pointerdown', { clientY: 100 });
+    expect(notify).toHaveBeenCalledWith(
+      'Accent is automated in the song. Switch its lane off to edit it.',
+    );
+  });
 });
 
 /** Dispatch a cancelable `type` on `node` carrying `fields`: whether the knob prevented it. */
@@ -331,5 +350,14 @@ describe("the insert rack's dials (windsor#173)", () => {
     expect(knobGeometry({ dial: 'rack' }).size).toBe(30);
     expect(knobGeometry({ dial: 'rack-big' }).size).toBe(42);
     expect(knobGeometry({ dial: 'rack' }).r).toBeLessThan(knobGeometry({}).r);
+  });
+});
+
+describe("a knob's label (windsor#561)", () => {
+  it('lands as text, never markup, so an imported macro name cannot run', () => {
+    const markup = knobMarkup({ label: '<img src=x onerror=alert(1)>', automation: () => null });
+    expect(markup).not.toContain('<img');
+    expect(markup).toContain('&#60;img src=x onerror=alert(1)&#62;');
+    expect(markup).toContain('<span class="knob-auto">AUTO</span>');
   });
 });

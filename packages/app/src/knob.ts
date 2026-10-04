@@ -38,7 +38,9 @@ export interface KnobSpec {
    * Which lane holds the knob (windsor#351): null while none that is on does,
    * else the lane's colour and its value at the playhead. A held knob is
    * locked: drawn in the lane's colour with an AUTO tag, following the lane,
-   * deaf to drags, keys and resets (`knobAutomation.ts`, `knobLock.ts`).
+   * deaf to drags, keys and resets (`knobAutomation.ts`, `knobLock.ts`). A
+   * knob a macro mapping holds is locked the same way, its tag the macro's
+   * name (windsor#561).
    */
   automation?: () => KnobAutomation | null;
 }
@@ -52,10 +54,11 @@ export interface KnobElement extends HTMLElement {
   refresh: () => void;
 }
 
+import { escapeHtml } from './dom';
 import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 import type { OpenGesture } from './gestureHooks';
 import type { KnobAutomation } from './knobAutomation';
-import { automatedValueText, lockedKnobNotice } from './knobAutomation';
+import { automatedValueText, lockNotice } from './knobAutomation';
 import { AUTO_TAG_TEXT, followAutomation, paintLock } from './knobLock';
 import { notify } from './toast';
 import {
@@ -123,26 +126,58 @@ function knobClass(spec: Pick<KnobSpec, 'compact' | 'dial'>): string {
   return spec.dial === 'rack' ? 'knob rack' : 'knob';
 }
 
-function knobDom(spec: KnobSpec): HTMLElement {
-  const node = document.createElement('div');
-  node.className = knobClass(spec);
-  node.tabIndex = 0;
-  node.setAttribute('role', 'slider');
-  node.setAttribute('aria-label', spec.label);
-  if (spec.color) node.style.setProperty('--knob-color', spec.color);
+/**
+ * The knob's inner markup: its dial, readout, AUTO tag and label. The label
+ * is text, never markup: a macro's name (windsor#561) comes from whatever
+ * patch was imported, so every knob escapes it here, at the sink.
+ */
+export function knobMarkup(
+  spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation'>,
+): string {
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
-  const label = spec.compact ? '' : `<span class="knob-label">${spec.label}</span>`;
-  const auto = spec.automation ? `<span class="knob-auto">${AUTO_TAG_TEXT}</span>` : '';
-  node.innerHTML =
+  const label = spec.compact ? '' : `<span class="knob-label">${escapeHtml(spec.label)}</span>`;
+  const tag = escapeHtml(AUTO_TAG_TEXT);
+  const auto = spec.automation ? `<span class="knob-auto">${tag}</span>` : '';
+  return (
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
     `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE_INSET}"></circle>` +
     `<path class="dial-track" d="${arcPath(c, c, r, ARC_START, ARC_END)}"></path>` +
     `<path class="dial-arc" d=""></path>` +
     `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN_INSET}"></line>` +
     `</svg>` +
-    `<span class="knob-val"></span>${auto}${label}`;
-  node.title = `${spec.label} - drag, shift-drag for fine, double-click to reset`;
+    `<span class="knob-val"></span>${auto}${label}`
+  );
+}
+
+/** The knob's tooltip: its label and how to turn it. */
+export const knobTitle = (label: string): string =>
+  `${label} - drag, shift-drag for fine, double-click to reset`;
+
+/** Each relabelled knob's label now: what a press on it while locked names. */
+const currentLabels = new WeakMap<HTMLElement, string>();
+
+/**
+ * Give a built knob a new label: its `aria-label`, its title, the label
+ * under its dial and the name its lock notice gives. Its undo steps keep the
+ * label it was built with.
+ */
+export function relabelKnob(node: HTMLElement, label: string): void {
+  currentLabels.set(node, label);
+  node.setAttribute('aria-label', label);
+  node.title = knobTitle(label);
+  const shown = node.querySelector('.knob-label');
+  if (shown) shown.textContent = label;
+}
+
+function knobDom(spec: KnobSpec): HTMLElement {
+  const node = document.createElement('div');
+  node.className = knobClass(spec);
+  node.tabIndex = 0;
+  node.setAttribute('role', 'slider');
+  if (spec.color) node.style.setProperty('--knob-color', spec.color);
+  node.innerHTML = knobMarkup(spec);
+  relabelKnob(node, spec.label);
   return node;
 }
 
@@ -346,10 +381,9 @@ export function attachKnobInput(
   node.addEventListener('pointerdown', (e) => {
     drag?.close();
     drag = null;
-    if (locked()) {
-      notify(lockedKnobNotice(spec.label));
-      return;
-    }
+    const lock = spec.automation?.() ?? null;
+    // The label now, not at build: a macro's knob is relabelled in place on a rename.
+    if (lock) return notify(lockNotice(currentLabels.get(node) ?? spec.label, lock));
     drag = dragGesture(spec.label);
     startY = e.clientY;
     startV = spec.get();
