@@ -168,6 +168,15 @@ const OP_FILTER_CEILING = 0.45;
 const OP_FILTER_DAMPING = Math.SQRT2;
 const OP_FILTER_TRACK_OCTAVES_MAX = 32;
 /*
+ * The SVF's 24 dB mode (windsor#595, record
+ * `2026-10-04-24db-filter-one-resonant-stage`): two TPT sections in series,
+ * only the first resonant. The second takes this fixed Butterworth Q, so the
+ * pair peaks at about Reso / sqrt 2, about 3 dB under the 12 dB mode, while
+ * the slope stays 24 dB an octave. Both sections taking the Reso put the
+ * peak at about Reso squared, twice the 12 dB mode's boost in dB.
+ */
+const SVF24_SECOND_STAGE_Q = Math.SQRT1_2;
+/*
  * The Formant filter mode (windsor#331, `voiceFormant.ts`): three bandpass
  * peaks share one Q, FORMANT_Q_PER_RESONANCE per unit of the patch's
  * `resonance` (the default 0.707 is Q 5.66), capped at FORMANT_Q_MAX (reached
@@ -292,6 +301,7 @@ export {
   OP_FILTER_CEILING,
   OP_FILTER_DAMPING,
   OP_FILTER_TRACK_OCTAVES_MAX,
+  SVF24_SECOND_STAGE_Q,
   FORMANT_Q_PER_RESONANCE,
   FORMANT_Q_MAX,
   FORMANT_MAKEUP,

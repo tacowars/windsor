@@ -34,6 +34,7 @@ var DRIVE_TONE_OCTAVES = 4.25;
 var OP_FILTER_CEILING = 0.45;
 var OP_FILTER_DAMPING = Math.SQRT2;
 var OP_FILTER_TRACK_OCTAVES_MAX = 32;
+var SVF24_SECOND_STAGE_Q = Math.SQRT1_2;
 var FORMANT_Q_PER_RESONANCE = 8;
 var FORMANT_Q_MAX = 40;
 var FORMANT_MAKEUP = 1.787;
@@ -2456,7 +2457,7 @@ function updateVoiceFilter(voice, n) {
   if (f.slope24) {
     const svfB = voice.svfB;
     svfB.cutoffHz = cutoff;
-    svfB.q = resonance;
+    svfB.q = SVF24_SECOND_STAGE_Q;
     svfB.setCoeffs(voice.sr);
   }
 }
