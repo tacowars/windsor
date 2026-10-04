@@ -3,6 +3,8 @@
  * and their ghost repeats, the velocity stems, the playhead with the notes
  * it lights, and the key guide on the keyboard, the corner and the chord
  * strip. The colours are the models' (`rollNoteLook.ts`, `rollHarmony.ts`).
+ * A selected note (windsor#603) and its stem are ringed in ink; each note
+ * carries its index in the roll's list for the gestures.
  */
 import { noteName } from './consoleFormat';
 import { el } from './dom';
@@ -21,7 +23,7 @@ export interface DrawnNote {
 
 const px = (n: number): string => `${n}px`;
 
-function noteNode(scene: RollScene, instance: RollInstance): HTMLElement | null {
+function noteNode(scene: RollScene, instance: RollInstance, sel: boolean): HTMLElement | null {
   const note = scene.notes[instance.index];
   const row = note ? scene.rowByPitch.get(note.pitch) : undefined;
   if (!note || !row) return null;
@@ -30,7 +32,13 @@ function noteNode(scene: RollScene, instance: RollInstance): HTMLElement | null 
   const h = row.thin ? row.h : row.h - 1;
   const w = Math.max(ROLL_NOTE.minWPx, instance.ticks * scene.pxPerTick - 1);
   const ghost = instance.pass > 0 ? ' ghost' : '';
-  const node = el('div', `roll-note ${look}${ghost}`, noteNamed(w, h) ? noteName(note.pitch) : '');
+  const ring = sel ? ' sel' : '';
+  const node = el(
+    'div',
+    `roll-note ${look}${ghost}${ring}`,
+    noteNamed(w, h) ? noteName(note.pitch) : '',
+  );
+  node.dataset.index = String(instance.index);
   node.style.left = px(instance.start * scene.pxPerTick);
   node.style.top = px(top);
   node.style.width = px(w);
@@ -41,11 +49,12 @@ function noteNode(scene: RollScene, instance: RollInstance): HTMLElement | null 
   return node;
 }
 
-function stemNode(scene: RollScene, instance: RollInstance): HTMLElement | null {
+function stemNode(scene: RollScene, instance: RollInstance, sel: boolean): HTMLElement | null {
   const note = scene.notes[instance.index];
   if (!note || instance.parked || !scene.rowByPitch.has(note.pitch)) return null;
   const ghost = instance.pass > 0 ? ' ghost' : '';
-  const stem = el('span', `roll-stem ${stemLook(note, instance, scene.place)}${ghost}`);
+  const ring = sel ? ' sel' : '';
+  const stem = el('span', `roll-stem ${stemLook(note, instance, scene.place)}${ghost}${ring}`);
   stem.style.left = px(instance.start * scene.pxPerTick);
   stem.style.height = px(stemPx(velocityOf(note), ROLL_PANE_PX.vel));
   return stem;
@@ -53,23 +62,25 @@ function stemNode(scene: RollScene, instance: RollInstance): HTMLElement | null 
 
 /**
  * The notes and the stems of `instances`, the ones the view's window holds
- * (`rollInstances`); returns the drawn notes and the lane's playhead.
+ * (`rollInstances`), the `selected` notes ringed on their own pass;
+ * returns the drawn notes and the lane's playhead.
  */
 export function paintNotes(
   panes: RollPanes,
   layer: HTMLElement,
   scene: RollScene,
-  instances: readonly RollInstance[],
+  paint: { readonly instances: readonly RollInstance[]; readonly selected: ReadonlySet<number> },
 ): { drawn: DrawnNote[]; ph: HTMLElement } {
   const drawn: DrawnNote[] = [];
   const notes = document.createDocumentFragment();
   const stems = document.createDocumentFragment();
-  for (const instance of instances) {
-    const node = noteNode(scene, instance);
+  for (const instance of paint.instances) {
+    const sel = instance.pass === 0 && paint.selected.has(instance.index);
+    const node = noteNode(scene, instance, sel);
     if (!node) continue;
     notes.appendChild(node);
     drawn.push({ node, instance });
-    const stem = stemNode(scene, instance);
+    const stem = stemNode(scene, instance, sel);
     if (stem) stems.appendChild(stem);
   }
   layer.replaceChildren(notes);

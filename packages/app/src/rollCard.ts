@@ -7,8 +7,9 @@
  *
  * One tab, Notes, with the summary at its right; the controls
  * (`rollControls.ts`); and the roll's four panes (`rollPanes.ts`), painted
- * from a `RollScene` (`rollPaint.ts`, `rollNotesPaint.ts`). It draws and
- * navigates; windsor#603 edits.
+ * from a `RollScene` (`rollPaint.ts`, `rollNotesPaint.ts`). It edits
+ * (windsor#603) through `rollEditing.ts`, whose edit in progress it draws
+ * over the document.
  *
  * One playhead loop (`watchPlayhead`) per card: each frame it repaints when
  * the roll, the region or the harmony changed under it, moves the key guide
@@ -20,6 +21,7 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { DARK, readPlayhead } from './regionPlayhead';
 import { type RollControls, rollControls } from './rollControls';
+import { type RollEditing, rollEditing } from './rollEditing';
 import { type RollExpander, rollExpander } from './rollExpand';
 import { chordLabel, keyName, tonesAt } from './rollHarmony';
 import { guideTick, playingTick, pointerTick, rollPlayhead, standingTick } from './rollGuide';
@@ -30,7 +32,7 @@ import {
   paintGuide,
   paintNotes,
 } from './rollNotesPaint';
-import { paintBody, paintHead, paintKeys } from './rollPaint';
+import { markKeys, paintBody, paintHead, paintKeys } from './rollPaint';
 import { type RollPanes, rollPanes, syncPanes } from './rollPanes';
 import {
   type TickWindow,
@@ -41,7 +43,14 @@ import {
 } from './rollRepeats';
 import { nearestRow, rowIndexAt } from './rollRows';
 import { type RollScene, centrePitch, rollScene } from './rollScene';
-import { type RollSource, readRollSource, regionClock, sameInputs, sourceKey } from './rollSource';
+import {
+  type RollSource,
+  readRollSource,
+  regionClock,
+  sameInputs,
+  sourceKey,
+  withDraft,
+} from './rollSource';
 import { rollSummary } from './rollSummary';
 import {
   ROLL_COLORS,
@@ -93,6 +102,7 @@ class RollDevice {
   private readonly panes: RollPanes;
   private readonly controls: RollControls;
   private readonly expander: RollExpander;
+  private readonly editing: RollEditing;
   private source: RollSource;
   private sourceSeen: string;
   private scene: RollScene | null = null;
@@ -121,6 +131,18 @@ class RollDevice {
       this.body.style.setProperty(prop, colour);
     }
     this.panes = rollPanes(() => this.scrolled());
+    this.editing = rollEditing({
+      ctx,
+      slot,
+      region,
+      body: this.body,
+      panes: this.panes,
+      view: this.view,
+      scene: () => this.scene,
+      source: () => this.source,
+      previewNotes: () => this.previewNotes(),
+      repaint: () => this.paint(),
+    });
     this.expander = rollExpander({
       slot,
       body: this.body,
@@ -145,6 +167,7 @@ class RollDevice {
         bar: this.source.barTicks,
       }),
       repaint: () => this.paint(),
+      stepLoop: (dir) => this.editing.stepLoop(dir),
     });
     this.wire();
     this.paint();
@@ -172,6 +195,14 @@ class RollDevice {
 
   private beatPx(): number {
     return beatPxOf(this.zoom(), this.fit());
+  }
+
+  /** Redraw the notes from the edit in progress or a new selection, on the rows already drawn. */
+  private previewNotes(): void {
+    if (!this.scene) return;
+    this.scene = { ...this.scene, notes: this.editing.editor.current().notes };
+    this.paintWindow();
+    this.light();
   }
 
   private wire(): void {
@@ -240,10 +271,12 @@ class RollDevice {
       breaks: scene.spans.map((span) => span.start),
       budget: ROLL_DRAW_BUDGET,
     });
-    const notes = paintNotes(this.panes, notesLayer, scene, instances);
+    const selected = new Set(this.editing.editor.selected());
+    const notes = paintNotes(this.panes, notesLayer, scene, { instances, selected });
     this.painted = ticks;
     this.drawn = notes.drawn;
     this.lines = [...this.fixedLines, notes.ph];
+    if (this.guideTargets) markKeys(this.guideTargets.keys, this.editing.editor.selectedPitches());
   }
 
   /** A scroll keeps the spot, and redraws the notes once the view leaves what was drawn. */
@@ -258,8 +291,9 @@ class RollDevice {
   /** Draw the whole roll from the document and the view. */
   private paint(): void {
     const { panes, view } = this;
-    this.source = readRollSource(this.ctx.model.doc, this.slot, this.region);
-    this.sourceSeen = sourceKey(this.source);
+    const read = readRollSource(this.ctx.model.doc, this.slot, this.region);
+    this.sourceSeen = sourceKey(read);
+    this.source = withDraft(read, this.editing.editor.drafting());
     const scene = rollScene({
       ...this.source,
       snapTicks: snapOf(view.snap).ticks,
@@ -335,7 +369,8 @@ class RollDevice {
         }
         const next = readRollSource(this.ctx.model.doc, this.slot, this.region);
         if (!sameInputs(next, this.source)) {
-          if (sourceKey(next) === this.sourceSeen) this.source = next;
+          if (sourceKey(next) === this.sourceSeen)
+            this.source = withDraft(next, this.editing.editor.drafting());
           else this.paint();
         }
         this.updateGuide();

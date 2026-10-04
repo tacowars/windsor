@@ -2,13 +2,14 @@
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
  * columns: Snap, Loop, Keys and Fold; then Vel, the ↔ and ↕ zooms and the
  * Audition switch. Vel is the console's knob on the part's `velocity`.
- * Snap, Keys, Fold, Audition and the zooms are the view's (`rollView.ts`),
- * never the song's. Loop is shown here; windsor#603 makes it editable and
- * wires Audition to sound.
+ * Snap, Keys, Fold and the zooms are the view's (`rollView.ts`), and
+ * Audition the console's (`rollAudition.ts`), never the song's. Loop's − and
+ * + step the song's loop through whole bars (windsor#603 decision 3).
  */
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, seg, select } from './dom';
+import { auditionOn, setAudition } from './rollAudition';
 import { tableKnob } from './seqFields';
 import { ROLL_KNOBS } from './sequencerKnobTables';
 import { barsOf, loopText } from './rollSummary';
@@ -32,6 +33,8 @@ export interface RollControlsTarget {
   ticks(): { loop: number; region: number; bar: number };
   /** Redraw the roll for a changed view setting. */
   repaint(): void;
+  /** One − (−1) or + (+1) of the loop, written to the song. */
+  stepLoop(dir: number): void;
 }
 
 /** The controls, and the readouts' refresh after a repaint. */
@@ -71,16 +74,14 @@ const segs = (
   return box;
 };
 
-/** Loop, shown: its readout between − and +, which windsor#603 enables. */
+/** Loop: its readout between − and +. */
 function loopItem(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
   const label = el('span', 'field-label roll-loop-label', 'Loop');
   const most = el('em');
   label.appendChild(most);
   const text = el('span', 'roll-readout');
-  const less = stepButton('−', 'Shorter loop', () => undefined);
-  const more = stepButton('+', 'Longer loop', () => undefined);
-  less.disabled = true;
-  more.disabled = true;
+  const less = stepButton('−', 'Shorter loop', () => target.stepLoop(-1));
+  const more = stepButton('+', 'Longer loop', () => target.stepLoop(1));
   const refresh = (): void => {
     const { loop, region, bar } = target.ticks();
     most.textContent = `≤ ${barsOf(region, bar)} bars`;
@@ -165,7 +166,6 @@ function zooms(target: RollControlsTarget): { node: HTMLElement; refresh: () => 
 }
 
 function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
-  const { view } = target;
   const vel = ROLL_KNOBS[0];
   const zoom = zooms(target);
   const audition = segs(
@@ -173,10 +173,8 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
       { value: 'on', label: 'On' },
       { value: 'off', label: 'Off' },
     ],
-    () => (view.audition ? 'on' : 'off'),
-    (v) => {
-      view.audition = v === 'on';
-    },
+    () => (auditionOn() ? 'on' : 'off'),
+    (v) => setAudition(v === 'on'),
   );
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
   const col = el('div', 'roll-ctl');

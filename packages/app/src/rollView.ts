@@ -1,8 +1,10 @@
 /**
  * The Roll's view settings (windsor#602 decision 2), without the DOM: Snap,
- * Keys, Fold, the Audition switch and the two zooms. They are console
- * state, kept per part by slot for the session and never written to the
- * song. The device and the Expanded view keep separate zooms.
+ * Keys, Fold, the two zooms, and the last length a note was drawn or
+ * resized to (windsor#603). They are console state, kept per part by slot
+ * for the session and never written to the song. The device and the
+ * Expanded view keep separate zooms. The Audition switch is the console's,
+ * not a part's (`rollAudition.ts`).
  *
  * The ↔ zoom is px per beat, or Fit (null): the region in the notes pane's
  * width, refitted whenever that width changes. − and + leave Fit from the
@@ -34,16 +36,17 @@ export interface RollViewState {
   snap: number;
   keys: RollKeys;
   fold: boolean;
-  audition: boolean;
+  /** The length the next added note takes, in ticks: the last drawn or resized, at first the opening snap's. */
+  lastTicks: number;
   zoom: Record<RollViewKind, RollZoom>;
 }
 
-/** A roll as it first opens: 1/16, 12 keys, unfolded, Audition on, both zooms at Fit. */
+/** A roll as it first opens: 1/16, 12 keys, unfolded, a note a sixteenth long, both zooms at Fit. */
 export const defaultRollView = (): RollViewState => ({
   snap: ROLL_SNAP_DEFAULT,
   keys: '12',
   fold: false,
-  audition: true,
+  lastTicks: ROLL_SNAPS[ROLL_SNAP_DEFAULT]?.ticks ?? 1,
   zoom: {
     device: { beatPx: null, row: ROLL_ROW_DEFAULT.device },
     wide: { beatPx: null, row: ROLL_ROW_DEFAULT.wide },
@@ -66,6 +69,10 @@ export function rollViewOf(slot: number, views: Map<number, RollViewState> = VIE
 /** The Snap choice at `index`, clamped to the table. */
 export const snapOf = (index: number, snaps: readonly RollSnap[] = ROLL_SNAPS): RollSnap =>
   snaps[Math.max(0, Math.min(snaps.length - 1, index))] as RollSnap;
+
+/** The length a new note takes: the last length used, never under one snap (`snapTicks`). */
+export const addTicksOf = (view: RollViewState, snapTicks: number): number =>
+  Math.max(snapTicks, view.lastTicks);
 
 /** Fit: the px per beat that lays `regionTicks` across `widthPx`, never under the zoom's floor. */
 export function fitBeatPx(widthPx: number, regionTicks: number, zoom = ROLL_TIME_ZOOM): number {

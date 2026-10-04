@@ -166,3 +166,26 @@ export const ROLL_SCALE_NAMES: Readonly<Record<ScaleName, string>> = {
 
 /** A scale given as its own offsets. */
 export const ROLL_CUSTOM_SCALE_NAME = 'custom scale';
+
+/** The editing gestures (windsor#603 decisions 1 and 2, the mockup's numbers). */
+export const ROLL_EDIT = {
+  /** A new note's velocity. */
+  addVelocity: 0.8,
+  /** A press moving no more than this many px is a tap: on a note it deletes, on touch it adds. */
+  tapSlopPx: 3,
+  /** A note's resize edge: its last `edgePx`, or `edgeShare` of a short note. */
+  edgePx: 6,
+  edgeShare: 1 / 3,
+  /** A press on the lane takes a stem within this many px of it. */
+  stemReachPx: 7,
+  /** A note's velocity range, and the steps per unit a stem drag sets it in. */
+  velocityMin: 0.05,
+  velocityMax: 1,
+  velocitySteps: 100,
+} as const;
+
+/** Edge scroll: a note dragged within `zonePx` of the notes pane's edge scrolls it, up to `maxPx` a frame. */
+export const ROLL_EDGE_SCROLL = { zonePx: 24, maxPx: 14 } as const;
+
+/** Audition (decision 5): how long a note sounds, and where its switch is kept. */
+export const ROLL_AUDITION = { ms: 180, storageKey: 'windsor.roll.audition' } as const;

@@ -5,7 +5,7 @@
  * so the card's loop repaints when the document moved under it and not on
  * every edit elsewhere in the song.
  */
-import type { ArrangementDocument, Harmony, RollNote } from '@windsor/engine';
+import type { ArrangementDocument, Harmony, RollNote, RollSequencerConfig } from '@windsor/engine';
 import { partAt, songTicksOf, ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { patternOf } from './partEdits';
@@ -57,6 +57,13 @@ export function readRollSource(
     inputs: [spec, target, doc.harmony, doc.transport.meter, songTicks],
   };
 }
+
+/**
+ * The read with an edit in progress drawn over it (windsor#603 decision 6):
+ * a drag redraws from its draft and writes the song once, on release.
+ */
+export const withDraft = (source: RollSource, draft: RollSequencerConfig | null): RollSource =>
+  draft ? { ...source, notes: draft.notes, loopTicks: draft.loopTicks } : source;
 
 /** Whether two reads saw the very same objects. */
 export const sameInputs = (a: RollSource, b: RollSource): boolean =>

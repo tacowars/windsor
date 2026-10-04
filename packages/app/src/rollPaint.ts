@@ -66,23 +66,43 @@ export function paintHead(
   return { chords, ph };
 }
 
-/** The keys, top down, one per row; each carries its pitch for the guide. */
+/** The keys, top down, one per row; each carries its pitch for the guide and its own label. */
 export function paintKeys(panes: RollPanes, scene: RollScene): HTMLElement[] {
   panes.keysIn.style.height = px(scene.rows.height + ROLL_PANE_PX.overhang);
   const keys = scene.rows.rows.map((row) => {
     const shade = row.thin ? 'thin' : BLACK.has(pitchClassOf(row.pitch)) ? 'b' : 'w';
     const c = isC(row.pitch) && !row.thin ? ' c' : '';
     const out = scene.scalePcs.has(pitchClassOf(row.pitch)) ? '' : ' out-scale';
-    const key = el('div', `roll-key ${shade}${c}${out}`, keyNamed(row) ? noteName(row.pitch) : '');
+    const label = keyNamed(row) ? noteName(row.pitch) : '';
+    const key = el('div', `roll-key ${shade}${c}${out}`, label);
     key.style.top = px(row.top);
     key.style.height = px(row.h);
     key.style.fontSize = px(keyFontPx(row.h));
     key.title = noteName(row.pitch);
     key.dataset.pitch = String(row.pitch);
+    key.dataset.label = label;
     return key;
   });
   panes.keysIn.replaceChildren(...keys);
   return keys;
+}
+
+/**
+ * The selected notes' keys (windsor#603 decision 4): outlined in ink and
+ * named, a row too short for a label (`tight`) by a tag that spills over
+ * its neighbours; every other key back to its own label.
+ */
+export function markKeys(keys: readonly HTMLElement[], pitches: ReadonlySet<number>): void {
+  for (const key of keys) {
+    const pitch = Number(key.dataset.pitch);
+    const on = pitches.has(pitch);
+    if (!on && !key.classList.contains('sel-key')) continue;
+    const label = key.dataset.label ?? '';
+    key.classList.toggle('sel-key', on);
+    key.classList.toggle('tight', on && label === '');
+    if (on) key.replaceChildren(el('span', 'roll-key-name', noteName(pitch)));
+    else key.textContent = label;
+  }
 }
 
 /** The bar, beat and snap lines as one layer of gradients. */

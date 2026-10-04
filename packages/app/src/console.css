@@ -3111,6 +3111,8 @@ body.chord-dragging {
 }
 .roll-vel {
   border-top: 1px solid var(--line);
+  cursor: ns-resize;
+  touch-action: none;
 }
 .roll-vel > .roll-inner {
   height: var(--roll-vel-h);
@@ -3149,6 +3151,11 @@ body.chord-dragging {
   margin-left: -5px;
   background: var(--carrier);
   border-radius: 2px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.roll-brace-end:hover {
+  box-shadow: 0 0 0 2px rgba(224, 164, 78, 0.35);
 }
 .roll-repeats {
   position: absolute;
@@ -3237,6 +3244,37 @@ body.chord-dragging {
   background-image: linear-gradient(var(--roll-k-scale), var(--roll-k-scale));
   color: var(--ink-dim);
 }
+/* A selected note's key (windsor#603 decision 4): an ink outline with a
+   3 px edge against the roll, and its name shown even on a row too short
+   for it, spilling over its neighbours. */
+.roll-key.sel-key {
+  z-index: 1;
+  overflow: visible;
+  box-shadow:
+    inset 0 0 0 1px var(--ink),
+    inset -3px 0 0 var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+  text-shadow:
+    0 0 2px var(--inset),
+    0 0 2px var(--inset);
+}
+.roll-key.sel-key.k-root {
+  color: var(--inset);
+  text-shadow: none;
+}
+.roll-key.sel-key.tight {
+  z-index: 2;
+}
+.roll-key.sel-key.tight .roll-key-name {
+  padding: 0 3px;
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--inset);
+  font-size: 8.5px;
+  line-height: 11px;
+  text-shadow: none;
+}
 
 /* Under the notes: the rows, the lines and the repeats' hatch. */
 .roll-row {
@@ -3296,6 +3334,25 @@ body.chord-dragging {
   font-weight: 500;
   line-height: normal;
   white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+}
+/* The resize edge (windsor#603): the note's last 6 px. */
+.roll-note::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  max-width: 33%;
+  cursor: ew-resize;
+}
+.roll-note.ghost {
+  cursor: default;
+}
+.roll-note.ghost::after {
+  display: none;
 }
 .roll-note.chord {
   --nc: var(--carrier);
@@ -3327,6 +3384,20 @@ body.chord-dragging {
 .roll-note.ghost.on {
   opacity: 0.7;
 }
+.roll-note.sel {
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 0 0 1px #000;
+}
+/* A Shift-drag's box. */
+.roll-box {
+  position: absolute;
+  z-index: 4;
+  border: 1px dashed var(--ink);
+  background: rgba(220, 227, 227, 0.06);
+  pointer-events: none;
+}
 
 /* The velocity stems, coloured as their notes. */
 .roll-stem {
@@ -3357,6 +3428,9 @@ body.chord-dragging {
 }
 .roll-stem.ghost {
   opacity: var(--roll-ghost-stem);
+}
+.roll-stem.sel::before {
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 /* The playhead, across the ruler, the notes and the lane. */
