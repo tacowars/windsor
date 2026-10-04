@@ -30,8 +30,11 @@
  * rational of `ladderTables.ts` and its slope the rational's own
  * derivative: no `Math` transcendental, so the same bits on arm64 and x64.
  * `oversample` 2 runs two sub-steps a sample on a linearly interpolated
- * input and decimates through `LADDER_DECIMATOR`: the research's other
- * candidate, kept for its bench; the voice ships `LADDER_OVERSAMPLE`.
+ * input and decimates through `LADDER_DECIMATOR`. The voice ships
+ * `LADDER_OVERSAMPLE` 2 with `LADDER_NEWTON_STEPS` 3 (windsor#593, record
+ * `2026-10-04-acid-ladder-ships-2x-and-reso-17-2`), which replaced decision
+ * 6's 1× with four steps, whose aliasing tacowars heard as a high whine at
+ * open cutoff and high Reso; 1 stays selectable for the research bench.
  *
  * The output mix (windsor#577): the TB-303's second resonance path, the
  * Reso pot's wiper into the VCA beside the ladder's output, so what leaves
@@ -49,6 +52,9 @@
  * circuit's up to the gain; 1 at the knob's bottom, where the output is the
  * solve's to the bit.
  *
+ * At the Reso knob's top k is `LADDER_FEEDBACK_MAX`, 17.2, and the makeup
+ * √18.2 (+12.6 dB).
+ *
  * Level and polarity (decision 7): the sample enters times
  * `LADDER_INPUT_SCALE` and leaves divided by it, negated, so the mode has
  * the Lowpass mode's polarity.
@@ -59,8 +65,8 @@
  * every double field is born NaN (rule 7); `reset` zeroes every state, the
  * two high-passes' included, at a note's start; `quiet` is every state under
  * `DORMANT_FILTER_STATE`. `ladder.test.ts` pins the saturator, the
- * polynomial, the response with and without the mix and the mix's absence
- * at p = 0, and the makeup as a gain alone; `ladderLimits.test.ts` the
+ * polynomial, the 2× response with and without the mix and the mix's
+ * absence at p = 0, and the makeup as a gain alone; `ladderLimits.test.ts` the
  * convergence, the bounds, the threshold, the harmonics and the reset;
  * `synth/fmProcessorFilterLadder.test.ts` the voice.
  */

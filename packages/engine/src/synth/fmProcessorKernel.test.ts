@@ -11,6 +11,7 @@ import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarne
 import { makePatch, WAVE } from '../patch/patch';
 import type { PartialPatch, Patch } from '../patch/patch';
 import { PRESET_NAMES, PRESETS } from '../patch/presets';
+import { LADDER_FEEDBACK_MAX, LADDER_OVERSAMPLE } from '../worklet/fm/fmConstants';
 import { voiceSlotParamName } from './audioPart';
 
 const loaded = loadProcessor();
@@ -218,10 +219,12 @@ describe('rebinding a sounding voice', () => {
     expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
   });
 
-  // The Acid scenario: a saw through the drive into the ladder at k 16.5,
-  // its envelope and key track moving the cutoff, live edits sweeping the
-  // cutoff past the top and switching to Lowpass (3100) and back.
-  it('matches the generic loop on an Acid saw at k 16.5 as live edits sweep its cutoff and switch the mode to Lowpass and back (windsor#573)', () => {
+  // The Acid scenario: a saw through the drive into the ladder on its 2×
+  // solver at k 17.2 (windsor#593), its envelope and key track moving the
+  // cutoff, live edits sweeping the cutoff past the top and switching to
+  // Lowpass (3100) and back.
+  it('matches the generic loop on an Acid saw at 2× and k 17.2 as live edits sweep its cutoff and switch the mode to Lowpass and back (windsor#573)', () => {
+    expect([LADDER_OVERSAMPLE, LADDER_FEEDBACK_MAX]).toEqual([2, 17.2]);
     const moved = { resonance: 12, envAmount: 2.5, keyTrack: 0.6 };
     const acid = (cutoff: number): PartialPatch => ({
       algorithm: 1,

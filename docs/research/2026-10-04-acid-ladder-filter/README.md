@@ -1130,3 +1130,123 @@ An Acid voice costs 270.2 → 273.6 ns a voice-sample, the median of the
 four runs, +1.3 % (the ladder's own share 244.7 → 247.5, +1.1 %); run by
 run +2.5, +0.5, +0.0 and +1.1 %, the first run's inside its own IQR. Every
 other mode is within 0.45 ns of before, inside the runs' spread.
+
+## The 2× solver at the Reso ceiling of 17.2 (windsor#593)
+
+tacowars's listen on 2026-10-04: with the Reso high and the cutoff open,
+the shipped 1× solver aliased into an audible high whine. The 2× candidate
+(`LADDER_OVERSAMPLE` 2, `LADDER_NEWTON_STEPS` 3) removed it, and tacowars
+set the Reso knob's top, `LADDER_FEEDBACK_MAX`, from 16.5 to 17.2 (record
+`2026-10-04-acid-ladder-ships-2x-and-reso-17-2`). Both ship; the cap stays
+at 10 kHz as a product choice. The readings below are on the shipped
+bundle.
+
+### Convergence and the tail
+
+`node ship2x.mjs <repo>` (Apple M1, Node 24.21.0). Three Newton steps at
+2× against 24, the research matrix's inputs at k 0, 8 and 17.2, the worst
+cell at each cutoff, dBr:
+
+| cutoff | 44.1 kHz | 48 kHz |
+|---|---|---|
+| 500 Hz | −297 | −297 |
+| 2 kHz | −292 | −294 |
+| 5 kHz | −207 | −216 |
+| 10 kHz | −133 | −142 |
+
+The worst cell from 5 kHz up is k 17.2, the square at peak 8.
+`ladderLimits.test.ts` holds the top cutoff's below −60 dBr at both rates.
+
+An impulse of 1e-6 at k 17.2, the peak |y| at 2–5 ms and at 180–200 ms,
+and the least k at which the ring grows instead (bisected to 0.005 on the
+solver, the ring's last 20 ms of 0.5 s against its 2–5 ms):
+
+| cutoff | 44.1 kHz: 2–5 ms → 180–200 ms | grows from k | 48 kHz: 2–5 ms → 180–200 ms | grows from k |
+|---|---|---|---|---|
+| 100 Hz | 9.5e-10 → 3.0e-12 | 60.67 | 8.7e-10 → 2.7e-12 | 60.67 |
+| 200 Hz | 1.6e-9 → 8.9e-13 | 35.79 | 1.5e-9 → 8.2e-13 | 35.79 |
+| 500 Hz | 3.0e-9 → 2.9e-13 | 23.69 | 2.7e-9 → 2.7e-13 | 23.69 |
+| 1 kHz | 4.7e-9 → 1.8e-13 | 20.19 | 4.6e-9 → 1.6e-13 | 20.19 |
+| 2 kHz | 9.8e-9 → 1.3e-13 | 18.56 | 9.0e-9 → 1.2e-13 | 18.56 |
+| 5 kHz | 2.4e-8 → 1.1e-13 | 17.61 | 2.2e-8 → 1.0e-13 | 17.61 |
+| 8 kHz | 3.7e-8 → 1.1e-13 | 17.37 | 3.4e-8 → 9.9e-14 | 17.38 |
+| 10 kHz | 4.3e-8 → 1.1e-13 | 17.29 | 4.2e-8 → 1.0e-13 | 17.30 |
+
+The tail decays at every cutoff at both rates, so 17.2 does not
+self-oscillate anywhere on the knob, as tacowars heard. The thresholds are
+the one-pole model's at the bilinear image of twice the rate
+(`__fixtures__/ladderAnalog.ts`'s `thresholdK`, 17.29 at 10 kHz and
+44.1 kHz). The margin is narrowest at the cap: 0.09 of k. The late window
+reads the feedback high-pass's slow mode once the resonance has died, so
+the figures there sit near 1e-13 at every high cutoff. At 10 kHz and
+48 kHz the ring's 20 ms peaks fall from 5.3e-8 to 2.6e-10 over the first
+80 ms.
+
+### Response
+
+The 2× chain is the analog loop at the bilinear image of twice the rate,
+seen through the input's linear interpolation to the midpoint and the
+three-tap decimator. In the linear region it is time-invariant at the
+sample rate, and its response is the two images the resampling folds onto
+a frequency, θ = π f / f_s and θ + π, summed:
+½ Σ (1 + cos θ) T(θ) L(θ). `oversampledLadderResponse` in
+`__fixtures__/ladderAnalog.ts` computes it. `ladder.test.ts` holds the
+shipped ladder to it within 0.01 dB and 0.1° from 100 Hz to 2 f_c, f_c
+500 Hz to the cap and k 0, 8 and 16, and with the output mix and the
+makeup at the Reso knob's top. `synth/fmProcessorFilterLadder.test.ts`
+holds the voice to it within 0.5 dB and 5° through white noise. This
+replaces the 1× bilinear image those tests held before; reading 1's table
+gives how far the 2× chain sits from that image.
+
+### The 2× solver in Chrome
+
+Decision 5 of windsor#593: the Acid voice on 1×4 and on 2×3, and every
+other mode in the same bench, in a browser.
+
+- **Machine:** Apple M1 (8 cores), macOS 26.7.1, other sessions running
+  (load average about 2.2 to 2.7).
+- **Browser:** headless Chrome 154.0.8037.93, arm64, the project's
+  `chrome-devtools-mcp` instance (`.mcp.json`).
+- **Backend:** `OfflineAudioContext` at 48 kHz, stereo, one `fm-part`
+  `AudioWorkletNode` from the generated bundle, 128-frame quanta. An
+  offline context renders as fast as it can, so a render's wall time is
+  the worklet's CPU time on the render thread.
+- **Bundles:** the branch's `generated/fm-processor.js` (2×3), and a copy
+  with `LADDER_OVERSAMPLE` set to 1 and `LADDER_NEWTON_STEPS` to 4 by
+  editing those two lines (1×4). The bundle is not minified and its
+  constants are not inlined, so the copy is what a build with those
+  constants writes.
+- **Script:** `browserBench.js`, loaded on a static page served beside the
+  two bundles and `patches/pad-drift.json`, run as
+  `bench({ bundles, patchUrl, rounds: 7, seconds: 10 })`. `bench.mjs`'s
+  scenario: eight held `pad-drift` voices with `spread` 0 and every
+  sustain raised so dormancy never engages, the Acid variant at Reso 9.
+  Each round renders every bundle × mode once, its order rotated, after
+  one warm-up round. Raw records and the summary are in `chrome-2x.json`.
+- **The page must be in front.** A first run in a background tab read Off
+  at 225 ns and Acid at 1185 and 1723: macOS runs a background tab's
+  renderer at a lower priority, so it was discarded and the bench rerun
+  with the page in front.
+
+ns per voice-sample, median of seven rounds [min–max], and the median per
+round over the same bundle's Off:
+
+| mode | 1×4 | over Off | 2×3 | over Off |
+|---|---|---|---|---|
+| Off | 38.20 [37.94–38.33] | | 38.05 [37.94–41.12] | |
+| LP 12 | 42.60 [42.37–44.84] | +4.43 | 42.68 [42.27–43.12] | +4.22 |
+| BP 12 | 43.07 [42.53–43.83] | +4.97 | 43.12 [42.71–49.32] | +4.66 |
+| LP 24 | 46.46 [46.25–48.59] | +8.23 | 46.74 [46.28–48.80] | +8.31 |
+| Formant | 48.65 [47.66–49.74] | +10.44 | 48.07 [47.71–50.42] | +9.66 |
+| **Acid** | **278.83** [276.38–282.71] | +240.89 | **403.54** [401.41–413.75] | +364.30 |
+
+- **The mode.** An Acid voice costs 1.45 times as much on 2×3: 278.8 →
+  403.5 ns a voice-sample, the ladder's own share 240.9 → 364.3 (1.51×).
+  Under Node the research read 269–271 → 394–396 (reading 2), so Chrome's
+  worklet costs what Node's direct calls do, within about 4 %. At 48 kHz
+  one Acid voice on 2×3 is about 1.9 % of a core; a mono acid line stays
+  well within a part's budget.
+- **The other modes.** Every other mode is within 0.6 ns of its cost on
+  the 1×4 bundle (Off −0.15, LP 12 +0.08, BP 12 +0.05, LP 24 +0.28,
+  Formant −0.58), inside each variant's spread across rounds: the switch
+  moves nothing outside the ladder.

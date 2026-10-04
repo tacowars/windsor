@@ -1,10 +1,11 @@
 /**
  * The Acid Ladder directly (windsor#573, record
  * `2026-10-04-acid-ladder-filter-mode` decision 9): the saturator against
- * `Math.tanh`; the shipped solver's linearised chain against Stinchcombe's
- * polynomial; its small-signal magnitude and phase against the analog
- * 1 / (D(s) + k HP(s)) at the bilinear image, and with the output mix
- * (windsor#577) times 1 + g HP_mix(s) and the makeup; the mix's absence
+ * `Math.tanh`; the solver's step, linearised, against Stinchcombe's
+ * polynomial; the shipped 2× chain's small-signal magnitude and phase
+ * (windsor#593) against the analog 1 / (D(s) + k HP(s)) at the bilinear
+ * image of twice the rate through the resampling pair, and with the output
+ * mix (windsor#577) times 1 + g HP_mix(s) and the makeup; the mix's absence
  * at the Reso knob's bottom, to the bit; the makeup (windsor#587) as a gain
  * alone, (1 + k)^`LADDER_MAKEUP_POWER` times the output before it; the
  * tuning. The large-signal
@@ -17,8 +18,7 @@ import { describe, expect, it } from 'vitest';
 import {
   characteristicPolynomial,
   inverse,
-  ladderResponse,
-  mixedLadderResponse,
+  oversampledLadderResponse,
 } from '../../__fixtures__/ladderAnalog';
 import type { Response } from '../../__fixtures__/ladderAnalog';
 import {
@@ -31,9 +31,11 @@ import {
   LADDER_MAKEUP_POWER,
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
+  LADDER_NEWTON_STEPS,
+  LADDER_OVERSAMPLE,
 } from './fmConstants';
 import { Ladder } from './ladder';
-import { LADDER_SATURATOR } from './ladderTables';
+import { LADDER_DECIMATOR, LADDER_SATURATOR } from './ladderTables';
 import { tuneLadder } from './voiceLadder';
 
 const RATE = 48000;
@@ -93,6 +95,8 @@ function chainMatrix(): number[][] {
   const ladder = tuned(1000, 0);
   const h = 0.01;
   ladder.h = h;
+  // One trapezoidal step a sample: the solve alone, without the 2× pair's interpolation and decimator.
+  ladder.oversample = 1;
   const eps = 1e-7;
   const columns: number[][] = [];
   for (let j = 0; j < 4; j++) {
@@ -162,64 +166,45 @@ function probes(cutoffHz: number, lowHz = 100): number[] {
 const wrap = (degrees: number): number => ((((degrees + 180) % 360) + 360) % 360) - 180;
 
 describe('the small-signal response (decision 9)', () => {
-  it('matches 1 / (D(s) + k HP(s)) at the bilinear image within 0.5 dB and 5°, 100 Hz to 2 f_c, f_c 500 Hz to the top, k 0, 8 and 16', () => {
-    let worstDb = 0;
-    let worstDegrees = 0;
-    for (const cutoff of [500, 2000, 10000, LADDER_CUTOFF_MAX_HZ]) {
+  it('is the 2× chain: 1 / (D(s) + k HP(s)) at the bilinear image of twice the rate, through the resampling pair, within 0.01 dB and 0.1°, 100 Hz to 2 f_c, f_c 500 Hz to the top, k 0, 8 and 16', () => {
+    const noMix = { gain: 0, hpHz: LADDER_MIX_HP_HZ };
+    for (const cutoff of [500, 2000, 5000, LADDER_CUTOFF_MAX_HZ]) {
       for (const k of [0, 8, 16]) {
         const ladder = tuned(cutoff, k);
+        const loop = { cutoffHz: cutoff, k, hpHz: LADDER_FEEDBACK_HP_HZ };
         for (const hz of probes(cutoff)) {
           const got = measured(ladder, hz);
-          const want = ladderResponse(hz, cutoff, k, RATE, LADDER_FEEDBACK_HP_HZ);
+          const want = oversampledLadderResponse(hz, loop, noMix, RATE, LADDER_DECIMATOR);
+          // The solve is the bilinear image itself and the pair is linear: what is left is the DFT's.
           const label = `f_c ${cutoff}, k ${k}, ${hz} Hz`;
-          expect(Math.abs(got.db - want.db), label).toBeLessThan(0.5);
-          expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(5);
-          worstDb = Math.max(worstDb, Math.abs(got.db - want.db));
-          worstDegrees = Math.max(worstDegrees, Math.abs(wrap(got.degrees - want.degrees)));
+          expect(Math.abs(got.db - want.db), label).toBeLessThan(0.01);
+          expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(0.1);
         }
       }
     }
-    // The discretisation is the bilinear image itself: what is left is the DFT's.
-    expect(worstDb).toBeLessThan(0.01);
-    expect(worstDegrees).toBeLessThan(0.1);
   });
 
-  it("with the output mix and the makeup at the Reso knob's top, matches √17.5 (1 + g HP_mix(s)) / (D(s) + k HP(s)) within 0.5 dB and 5°, 48 Hz to 2 f_c, f_c 300 Hz, 2 kHz and 8 kHz", () => {
+  it("with the output mix and the makeup at the Reso knob's top, is √18.2 (1 + g HP_mix(s)) times the 2× chain within 0.01 dB and 0.1°, 48 Hz to 2 f_c, f_c 300 Hz, 2 kHz and 8 kHz", () => {
     const mix = { gain: LADDER_MIX_GAIN, hpHz: LADDER_MIX_HP_HZ };
     const makeupDb = 20 * Math.log10(Math.sqrt(1 + LADDER_FEEDBACK_MAX));
-    let worstDb = 0;
     for (const cutoff of [300, 2000, 8000]) {
       const ladder = tuned(cutoff, undefined, 12);
       expect(ladder.k).toBe(LADDER_FEEDBACK_MAX);
       expect(ladder.mixGain).toBe(LADDER_MIX_GAIN);
+      const loop = { cutoffHz: cutoff, k: LADDER_FEEDBACK_MAX, hpHz: LADDER_FEEDBACK_HP_HZ };
       for (const hz of probes(cutoff, 48)) {
         const got = measured(ladder, hz);
-        const want = mixedLadderResponse(
-          hz,
-          { cutoffHz: cutoff, k: LADDER_FEEDBACK_MAX, hpHz: LADDER_FEEDBACK_HP_HZ },
-          mix,
-          RATE,
-        );
-        want.db += makeupDb;
+        const want = oversampledLadderResponse(hz, loop, mix, RATE, LADDER_DECIMATOR);
         const label = `f_c ${cutoff}, ${hz} Hz`;
-        expect(Math.abs(got.db - want.db), label).toBeLessThan(0.5);
-        expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(5);
-        worstDb = Math.max(worstDb, Math.abs(got.db - want.db));
+        expect(Math.abs(got.db - want.db - makeupDb), label).toBeLessThan(0.01);
+        expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(0.1);
       }
-    }
-    // The mix is a TPT one-pole, the bilinear image of its analog high-pass.
-    expect(worstDb).toBeLessThan(0.01);
-  });
-
-  it('is −21.9 dB at the cutoff itself with no feedback, at every cutoff up to the top', () => {
-    for (const cutoff of [200, 1000, 5000, LADDER_CUTOFF_MAX_HZ]) {
-      expect(measured(tuned(cutoff, 0), cutoff).db).toBeCloseTo(-21.91, 1);
     }
   });
 });
 
 describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
-  it("adds nothing: each output is the solve's own x₄, to the bit, while the mix's high-pass runs on", () => {
+  it("adds nothing: each output is the decimator's sum over the solve's x₄, to the bit, while the mix's high-pass runs on", () => {
     const ladder = tuned(700, undefined, 0.5);
     expect(ladder.mixGain).toBe(0);
     expect(ladder.makeup).toBe(1);
@@ -227,7 +212,10 @@ describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
     for (let i = 0; i < 4800; i++) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       const out = step(ladder, (seed / 2 ** 31 - 1) * (i < 2400 ? 1 : 0));
-      expect(Object.is(out, -ladder.y * (1 / LADDER_INPUT_SCALE)), `sample ${i}`).toBe(true);
+      let decimated = 0;
+      for (let j = 0; j < ladder.taps.length; j++)
+        decimated += ladder.taps[j]! * ladder.history[j]!;
+      expect(Object.is(out, -decimated * (1 / LADDER_INPUT_SCALE)), `sample ${i}`).toBe(true);
     }
     expect(ladder.mixS).not.toBe(0);
   });
@@ -242,13 +230,13 @@ describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
 });
 
 describe('the makeup (windsor#587)', () => {
-  it("is (1 + k)^LADDER_MAKEUP_POWER: 1 at the Reso knob's bottom, √17.5 (+12.4 dB) at its top", () => {
+  it("is (1 + k)^LADDER_MAKEUP_POWER: 1 at the Reso knob's bottom, √18.2 (+12.6 dB) at its top", () => {
     expect(LADDER_MAKEUP_POWER).toBe(0.5);
     expect(tuned(1000, undefined, 0.5).makeup).toBe(1);
     expect(tuned(1000, undefined, 0.2).makeup).toBe(1);
     const top = tuned(1000, undefined, 12).makeup;
-    expect(Math.abs(top / Math.sqrt(17.5) - 1)).toBeLessThan(1e-15);
-    expect(20 * Math.log10(top)).toBeCloseTo(12.43, 2);
+    expect(Math.abs(top / Math.sqrt(18.2) - 1)).toBeLessThan(1e-15);
+    expect(20 * Math.log10(top)).toBeCloseTo(12.6, 2);
   });
 
   it('is a gain alone: at Reso floor, 25, 50, 75 and 100 % each output is the output before it times (1 + k)^0.5, within 1e-12', () => {
@@ -279,8 +267,9 @@ describe('the makeup (windsor#587)', () => {
 });
 
 describe('the tuning (decisions 4 and 5)', () => {
-  it('maps Reso 0.5..12 to k 0..16.5 on its log scale', () => {
+  it('maps Reso 0.5..12 to k 0..17.2 on its log scale', () => {
     const k = (resonance: number): number => tuned(1000, undefined, resonance).k;
+    expect(LADDER_FEEDBACK_MAX).toBe(17.2);
     expect(k(0.5)).toBe(0);
     expect(k(0.2)).toBe(0);
     expect(k(12)).toBe(LADDER_FEEDBACK_MAX);
@@ -289,18 +278,22 @@ describe('the tuning (decisions 4 and 5)', () => {
       const p = Math.log2(resonance / 0.5) / Math.log2(24);
       expect(k(resonance)).toBeCloseTo(LADDER_FEEDBACK_MAX * p, 12);
     }
-    expect(k(0.707)).toBeCloseTo(1.8, 1);
+    expect(k(0.707)).toBeCloseTo(1.9, 1);
   });
 
-  it('steps by tan(π f_c / f_s) / 2^¼, holding the cutoff to 20 Hz .. the top, and the high-pass by its own tangent', () => {
-    const h = (hz: number): number => Math.tan((Math.PI * hz) / RATE) / 2 ** 0.25;
+  it('steps 2× by tan(π f_c / 2 f_s) / 2^¼, holding the cutoff to 20 Hz .. the top, and the high-passes by their own tangents', () => {
+    expect([LADDER_OVERSAMPLE, LADDER_NEWTON_STEPS]).toEqual([2, 3]);
+    expect([tuned(1000).oversample, tuned(1000).steps]).toEqual([2, 3]);
+    const stepRate = 2 * RATE;
+    const h = (hz: number): number => Math.tan((Math.PI * hz) / stepRate) / 2 ** 0.25;
     for (const cutoff of [30, 440, 5000, LADDER_CUTOFF_MAX_HZ]) {
       expect(tuned(cutoff).h).toBeCloseTo(h(cutoff), 14);
     }
     expect(tuned(18000).h).toBe(tuned(LADDER_CUTOFF_MAX_HZ).h);
     expect(tuned(5).h).toBe(tuned(LADDER_CUTOFF_MIN_HZ).h);
     expect(tuned(-1).h).toBe(tuned(LADDER_CUTOFF_MIN_HZ).h);
-    const g = Math.tan((Math.PI * LADDER_FEEDBACK_HP_HZ) / RATE);
+    // The feedback's high-pass runs in the loop, at the step rate; the output mix's after the decimator.
+    const g = Math.tan((Math.PI * LADDER_FEEDBACK_HP_HZ) / stepRate);
     expect(tuned(1000).hpG).toBeCloseTo(g / (1 + g), 15);
     const gm = Math.tan((Math.PI * LADDER_MIX_HP_HZ) / RATE);
     expect(tuned(1000).mixG).toBeCloseTo(gm / (1 + gm), 15);

@@ -2,14 +2,16 @@
  * The Acid Ladder's analog reference (windsor#573, record
  * `2026-10-04-acid-ladder-filter-mode`, research
  * `docs/research/2026-10-04-acid-ladder-filter/`): Stinchcombe's TB-303
- * polynomial D(s), the response 1 / (D(s) + k HP(s)) with the feedback's
+ * polynomial D(s), the loop 1 / (D(s) + k HP(s)) with the feedback's
  * one-pole high-pass, read at a digital frequency's bilinear image so the
- * warp is not counted as error, the feedback at which that loop
- * self-oscillates, the output mix's factor 1 + g HP(s) (windsor#577), and
- * a 4 × 4 matrix's characteristic polynomial. The
- * ladder's own output is −x₄; the shipped mode negates it, so the response
- * here is the mode's, with the inversion undone. `ladder.test.ts` and
- * `synth/fmProcessorFilterLadder.test.ts` hold the shipped filter to it.
+ * warp is not counted as error; the shipped 2× solver's response, that
+ * loop at twice the rate through the resampling pair (windsor#593), times
+ * the output mix's factor 1 + g HP(s) (windsor#577); the feedback at which
+ * the loop self-oscillates; and a 4 × 4 matrix's characteristic
+ * polynomial. The ladder's own output is −x₄; the shipped mode negates it,
+ * so the response here is the mode's, with the inversion undone.
+ * `ladder.test.ts` and `synth/fmProcessorFilterLadder.test.ts` hold the
+ * shipped filter to it.
  */
 
 /** A complex number as [re, im]. */
@@ -56,29 +58,20 @@ export interface Response {
   degrees: number;
 }
 
-/**
- * The mode's analog response at `hz` for a ladder at cutoff `cutoffHz` and
- * feedback `k`, its high-pass at `hpHz`, every frequency read at its
- * bilinear image at `rate`: 1 / (D(jw) + k jw / (jw + w_hp)).
- */
-export function ladderResponse(
-  hz: number,
-  cutoffHz: number,
-  k: number,
-  rate: number,
-  hpHz: number,
-): Response {
+/** 1 / (D(jw) + k jw / (jw + w_hp)) at `hz`, every frequency at its bilinear image at `rate`. */
+function loopAt(hz: number, cutoffHz: number, k: number, rate: number, hpHz: number): Complex {
   const wc = bilinearImage(cutoffHz, rate);
   const w = bilinearImage(hz, rate) / wc;
   const whp = bilinearImage(hpHz, rate) / wc;
   const hp = div([0, w], [whp, w]);
   const d = polynomialAt(w);
-  const h = div([1, 0], [d[0] + k * hp[0], d[1] + k * hp[1]]);
-  return {
-    db: 10 * Math.log10(h[0] * h[0] + h[1] * h[1]),
-    degrees: (Math.atan2(h[1], h[0]) * 180) / Math.PI,
-  };
+  return div([1, 0], [d[0] + k * hp[0], d[1] + k * hp[1]]);
 }
+
+const toResponse = (h: Complex): Response => ({
+  db: 10 * Math.log10(h[0] * h[0] + h[1] * h[1]),
+  degrees: (Math.atan2(h[1], h[0]) * 180) / Math.PI,
+});
 
 /** The output mix (windsor#577): its gain, `LADDER_MIX_GAIN` × p, and its high-pass's corner in Hz. */
 export interface OutputMix {
@@ -86,25 +79,50 @@ export interface OutputMix {
   hpHz: number;
 }
 
+/** The output mix's factor at `hz`, 1 + g jw / (jw + w_mix), at its bilinear image at `rate`. */
+function mixAt(hz: number, mix: OutputMix, rate: number): Complex {
+  const w = bilinearImage(hz, rate);
+  const hp = div([0, w], [bilinearImage(mix.hpHz, rate), w]);
+  return [1 + mix.gain * hp[0], mix.gain * hp[1]];
+}
+
 /**
- * The mode's analog response at `hz` with the output mix: `ladderResponse`
- * times 1 + g jw / (jw + w_mix), w_mix at its bilinear image at `rate` too.
+ * The 2× solver's response at `hz` (windsor#593), the output mix's
+ * included: the loop runs at twice `rate` on the input interpolated
+ * linearly to the midpoint, and its output leaves through the decimator's
+ * `taps` (newest first), so in the linear region the whole is
+ * time-invariant at `rate` and its response is the two images the
+ * resampling folds onto `hz`, at θ = π hz / rate and θ + π, summed:
+ * ½ Σ (1 + cos θ) T(θ) L(θ), the interpolation's, the taps' and the loop's
+ * at its bilinear image at 2 `rate`. The image's loop, at hz + rate, is the
+ * conjugate of the loop's at rate − hz. The output mix runs after the
+ * decimator, at `rate`, so its factor multiplies the sum.
  */
-export function mixedLadderResponse(
+export function oversampledLadderResponse(
   hz: number,
   ladder: { cutoffHz: number; k: number; hpHz: number },
   mix: OutputMix,
   rate: number,
+  taps: readonly number[],
 ): Response {
-  const loop = ladderResponse(hz, ladder.cutoffHz, ladder.k, rate, ladder.hpHz);
-  const w = bilinearImage(hz, rate);
-  const hp = div([0, w], [bilinearImage(mix.hpHz, rate), w]);
-  const factor: Complex = [1 + mix.gain * hp[0], mix.gain * hp[1]];
-  const radians = Math.atan2(factor[1], factor[0]);
-  return {
-    db: loop.db + 10 * Math.log10(factor[0] * factor[0] + factor[1] * factor[1]),
-    degrees: loop.degrees + (radians * 180) / Math.PI,
-  };
+  const stepRate = 2 * rate;
+  const { cutoffHz, k, hpHz } = ladder;
+  const direct = loopAt(hz, cutoffHz, k, stepRate, hpHz);
+  const mirror = loopAt(rate - hz, cutoffHz, k, stepRate, hpHz);
+  const images: [number, Complex][] = [
+    [(Math.PI * hz) / rate, direct],
+    [(Math.PI * hz) / rate + Math.PI, [mirror[0], -mirror[1]]],
+  ];
+  let sum: Complex = [0, 0];
+  for (const [theta, loop] of images) {
+    let t: Complex = [0, 0];
+    taps.forEach((tap, j) => {
+      t = [t[0] + tap * Math.cos(j * theta), t[1] - tap * Math.sin(j * theta)];
+    });
+    const term = mul(mul(t, loop), [(1 + Math.cos(theta)) / 2, 0]);
+    sum = [sum[0] + term[0], sum[1] + term[1]];
+  }
+  return toResponse(mul(sum, mixAt(hz, mix, rate)));
 }
 
 /**

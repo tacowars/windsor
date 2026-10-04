@@ -1,9 +1,12 @@
 /**
  * The Acid Ladder at large signals (windsor#573, record
- * `2026-10-04-acid-ladder-filter-mode` decision 9): the shipped Newton
- * count against a converged solve on the research matrix's worst cells;
+ * `2026-10-04-acid-ladder-filter-mode` decision 9): the shipped 2× Newton
+ * count against a converged solve on the research matrix's worst cells, at
+ * 44.1 and 48 kHz;
  * finite and bounded output at Drive's ceiling and under a cutoff sweep;
- * where the loop decays and grows against the analog threshold; the
+ * where the loop decays and grows against the analog threshold, and a
+ * tail at the Reso ceiling of 17.2 (windsor#593) decaying at every cutoff
+ * at both rates; the
  * feedback high-pass thinning the peak at low cutoffs; odd harmonics with
  * level; a resonant tail that ends, and a reset that clears it, the output
  * mix's high-pass included (windsor#577). The small-signal response and the
@@ -18,19 +21,22 @@ import {
   LADDER_FEEDBACK_MAX,
   LADDER_INPUT_SCALE,
   LADDER_NEWTON_STEPS,
+  LADDER_OVERSAMPLE,
 } from './fmConstants';
 import { Ladder } from './ladder';
 import { tuneLadder } from './voiceLadder';
 
 const RATE = 48000;
+/** The two rates the convergence and the tail are read at. */
+const RATES = [44100, 48000];
 const TOP = LADDER_CUTOFF_MAX_HZ;
 
-/** A ladder at `cutoffHz` tuned at 48 kHz with the Reso knob at `resonance` (its bottom, the output mix off, by default), its feedback then set to `k`. */
-function tuned(cutoffHz: number, k: number, resonance = 0.5): Ladder {
+/** A ladder at `cutoffHz` tuned at `rate` (48 kHz) with the Reso knob at `resonance` (its bottom, the output mix off, by default), its feedback then set to `k`. */
+function tuned(cutoffHz: number, k: number, resonance = 0.5, rate = RATE): Ladder {
   const ladder = new Ladder();
   ladder.cutoffHz = cutoffHz;
   ladder.resonance = resonance;
-  tuneLadder(ladder, RATE);
+  tuneLadder(ladder, rate);
   ladder.k = k;
   return ladder;
 }
@@ -41,14 +47,14 @@ const step = (ladder: Ladder, x: number): number => {
   return ladder.point;
 };
 
-/** A 110 Hz saw or square, harmonics through 127, at `peak` in the ladder's units, 0.5 s: the research matrix's input. */
-function bandLimited(kind: 'saw' | 'square', peak: number): Float64Array {
-  const out = new Float64Array(RATE / 2);
+/** A 110 Hz saw or square at `rate`, harmonics through 127, at `peak` in the ladder's units, 0.5 s: the research matrix's input. */
+function bandLimited(kind: 'saw' | 'square', peak: number, rate: number): Float64Array {
+  const out = new Float64Array(rate / 2);
   let max = 0;
   for (let i = 0; i < out.length; i++) {
     let v = 0;
     for (let h = 1; h <= 127; h += kind === 'square' ? 2 : 1) {
-      v += Math.sin((2 * Math.PI * 110 * h * i) / RATE) / h;
+      v += Math.sin((2 * Math.PI * 110 * h * i) / rate) / h;
     }
     out[i] = v;
     max = Math.max(max, Math.abs(v));
@@ -67,12 +73,15 @@ function noise(seed: number): () => number {
 }
 
 describe('the solver (decision 6)', () => {
-  it('holds the shipped Newton count below −60 dBr of a 24-step solve on the worst cells: the top cutoff, k 16.5, saw and square at peak 8', () => {
-    for (const kind of ['saw', 'square'] as const) {
-      const input = bandLimited(kind, 8);
-      const shipped = tuned(TOP, LADDER_FEEDBACK_MAX);
-      const converged = tuned(TOP, LADDER_FEEDBACK_MAX);
-      expect(shipped.steps).toBe(LADDER_NEWTON_STEPS);
+  it('holds the shipped Newton count at 2× below −60 dBr of a 24-step solve on the worst cells: the top cutoff, k 17.2, saw and square at peak 8, at 44.1 and 48 kHz', () => {
+    for (const [rate, kind] of RATES.flatMap((r) => [
+      [r, 'saw'] as const,
+      [r, 'square'] as const,
+    ])) {
+      const input = bandLimited(kind, 8, rate);
+      const shipped = tuned(TOP, LADDER_FEEDBACK_MAX, 0.5, rate);
+      const converged = tuned(TOP, LADDER_FEEDBACK_MAX, 0.5, rate);
+      expect([shipped.oversample, shipped.steps]).toEqual([LADDER_OVERSAMPLE, LADDER_NEWTON_STEPS]);
       converged.steps = 24;
       let peak = 0;
       let error = 0;
@@ -83,7 +92,7 @@ describe('the solver (decision 6)', () => {
         peak = Math.max(peak, Math.abs(want));
         error = Math.max(error, Math.abs(got - want));
       }
-      expect(20 * Math.log10(error / peak), kind).toBeLessThan(-60);
+      expect(20 * Math.log10(error / peak), `${kind} at ${rate} Hz`).toBeLessThan(-60);
     }
   });
 });
@@ -125,7 +134,7 @@ const outputBound = (ladder: Ladder): number =>
 const RESO_TOP = 12;
 
 describe('the bounds (decision 6)', () => {
-  it('keeps a full-scale noise burst at 64× finite and bounded at the top cutoff, k 0 and 16.5 (the mix in), and a 64× square too', () => {
+  it('keeps a full-scale noise burst at 64× finite and bounded at the top cutoff, k 0 and 17.2 (the mix in), and a 64× square too', () => {
     for (const [k, resonance] of [
       [0, 0.5],
       [LADDER_FEEDBACK_MAX, RESO_TOP],
@@ -142,7 +151,7 @@ describe('the bounds (decision 6)', () => {
     }
   });
 
-  it('stays finite and bounded through a cutoff sweep 30 Hz → top → 30 Hz over 50 ms at k 16.5, the mix in', () => {
+  it('stays finite and bounded through a cutoff sweep 30 Hz → top → 30 Hz over 50 ms at k 17.2, the mix in', () => {
     const n = RATE / 20;
     const sweep = (i: number): number => 30 * (TOP / 30) ** (1 - Math.abs((2 * i) / n - 1));
     for (const level of [1, 64]) {
@@ -154,21 +163,21 @@ describe('the bounds (decision 6)', () => {
   });
 });
 
-/** An impulse of 1e-6 through `ladder`: the peak |y| in two windows, 2–5 ms and 180–200 ms. */
-function ring(ladder: Ladder): [number, number] {
+/** An impulse of 1e-6 through `ladder` at `rate`: the peak |y| in two windows, 2–5 ms and 180–200 ms. */
+function ring(ladder: Ladder, rate = RATE): [number, number] {
   let early = 0;
   let late = 0;
-  for (let i = 0; i < RATE / 5; i++) {
+  for (let i = 0; i < rate / 5; i++) {
     const y = Math.abs(step(ladder, i === 0 ? 1e-6 : 0));
-    if (i >= RATE / 500 && i < RATE / 200) early = Math.max(early, y);
-    if (i >= (9 * RATE) / 50) late = Math.max(late, y);
+    if (i >= rate / 500 && i < rate / 200) early = Math.max(early, y);
+    if (i >= (9 * rate) / 50) late = Math.max(late, y);
   }
   return [early, late];
 }
 
 describe('resonance (decision 4)', () => {
-  it("decays just under the one-pole model's threshold at 5 kHz and grows at 1.1× it", () => {
-    const k = thresholdK(5000, RATE, LADDER_FEEDBACK_HP_HZ);
+  it("decays just under the one-pole model's threshold at 5 kHz and grows at 1.1× it, the loop at the 2× step rate", () => {
+    const k = thresholdK(5000, LADDER_OVERSAMPLE * RATE, LADDER_FEEDBACK_HP_HZ);
     expect(k).toBeGreaterThan(17);
     expect(k).toBeLessThan(18.5);
     const [early, late] = ring(tuned(5000, 0.99 * k));
@@ -178,10 +187,13 @@ describe('resonance (decision 4)', () => {
     expect(risen).toBeGreaterThan(1000 * rising);
   });
 
-  it('decays at k 16.5 at every cutoff from 100 Hz to the top', () => {
-    for (const cutoff of [100, 500, 2000, 5000, TOP]) {
-      const [early, late] = ring(tuned(cutoff, LADDER_FEEDBACK_MAX));
-      expect(late, `${cutoff} Hz`).toBeLessThan(early);
+  it('decays at k 17.2 at every cutoff from 100 Hz to the top, at 44.1 and 48 kHz', () => {
+    expect(LADDER_FEEDBACK_MAX).toBe(17.2);
+    for (const rate of RATES) {
+      for (const cutoff of [100, 500, 2000, 5000, 8000, TOP]) {
+        const [early, late] = ring(tuned(cutoff, LADDER_FEEDBACK_MAX, 0.5, rate), rate);
+        expect(late, `${cutoff} Hz at ${rate} Hz`).toBeLessThan(early);
+      }
     }
   });
 
@@ -232,7 +244,7 @@ describe('the saturation (decisions 3 and 7)', () => {
 });
 
 describe('the end of a ring (decision 8)', () => {
-  it('goes quiet after a resonant tail at k 16.5 and 200 Hz, the mix in, and not before', () => {
+  it('goes quiet after a resonant tail at k 17.2 and 200 Hz, the mix in, and not before', () => {
     const ladder = tuned(200, LADDER_FEEDBACK_MAX, RESO_TOP);
     const draw = noise(7);
     for (let i = 0; i < RATE / 10; i++) step(ladder, draw());
@@ -248,7 +260,6 @@ describe('the end of a ring (decision 8)', () => {
 
   it('clears every state on reset, the two high-passes and the oversampler included', () => {
     const ladder = tuned(800, LADDER_FEEDBACK_MAX, RESO_TOP);
-    ladder.oversample = 2;
     const draw = noise(9);
     for (let i = 0; i < 2000; i++) step(ladder, draw());
     expect(ladder.hpS).not.toBe(0);

@@ -193,18 +193,25 @@ const FORMANT_MAKEUP = 1.787;
  * output mix 150), times a gain k =
  * LADDER_FEEDBACK_MAX x p, p the Reso knob's place on its log scale,
  * log2(reso / LADDER_RESONANCE_FLOOR) / log2(LADDER_RESONANCE_SPAN), 0 at
- * 0.5 and 1 at 12. The linear self-oscillation threshold is k = 17, so
- * 16.5 stays short of it, as the stock unit does. The carrier sum enters
+ * 0.5 and 1 at 12. LADDER_FEEDBACK_MAX is 17.2, set by tacowars's ear
+ * (windsor#593, record `2026-10-04-acid-ladder-ships-2x-and-reso-17-2`):
+ * the chirpy end of the stock TD-3s tacowars has owned, short of a
+ * Devilfish-modded unit's self-oscillation. With the high-pass in the loop
+ * the threshold rises above the ladder's own 17 as the cutoff falls, to
+ * about 17.3 at the 10 kHz cap and 60 at 100 Hz, so a tail at 17.2 still
+ * decays at every cutoff (`ladderLimits.test.ts`). The carrier sum enters
  * times LADDER_INPUT_SCALE (the model's 2 V_T unit) and leaves divided by
  * it (0.25 since windsor#577: the voice's full level, the drive's ceiling,
  * is a quarter of a 2 V_T unit, so the input pair compresses the resonance
  * less; windsor#574 had set 1 before the output mix). The cutoff is held
  * between LADDER_CUTOFF_MIN_HZ and LADDER_CUTOFF_MAX_HZ, and below LADDER_CUTOFF_CEILING of the sample rate
- * at a low rate. The solver (decision 6): LADDER_NEWTON_STEPS Newton steps
- * a sample on the trapezoidal step, at LADDER_OVERSAMPLE times the sample
- * rate. The shipped candidate is 1x with four steps and the cutoff capped
- * at 10 kHz; the other, 2x with three steps and no cap, stays selectable
- * here for the research bench (`docs/research/2026-10-04-acid-ladder-filter/`).
+ * at a low rate. The solver: LADDER_NEWTON_STEPS Newton steps a sample on
+ * the trapezoidal step, at LADDER_OVERSAMPLE times the sample rate. It ships
+ * the research's 2x candidate with three steps (windsor#593, chosen by ear:
+ * the 1x solver with four steps aliased into a high whine at open cutoff
+ * and high Reso; `docs/research/2026-10-04-acid-ladder-filter/`). The
+ * 10 kHz cap stays as a product choice, not an aliasing guard: the mode is
+ * not useful above about 6 kHz.
  * The output is the ladder's plus the TB-303's second resonance path
  * (windsor#577): the Reso pot's wiper into the VCA beside the ladder's own
  * output, LADDER_MIX_GAIN x p times the output through a one-pole
@@ -214,7 +221,7 @@ const FORMANT_MAKEUP = 1.787;
  * 400 Hz, where its lift and bass loss both meet the references.
  * Last, a makeup gain (windsor#587), a product choice and not the
  * circuit's: the output times (1 + k)^LADDER_MAKEUP_POWER, 1 at the Reso
- * knob's bottom and sqrt(17.5), +12.4 dB, at its top. The loop takes about
+ * knob's bottom and sqrt(18.2), +12.6 dB, at its top. The loop takes about
  * 1 / (1 + k) of the passband, so the power is the fraction of that loss,
  * in dB, given back at every place of the knob: 0 is the circuit's level,
  * 1 full compensation (25 dB more peak and self-oscillation at the top),
@@ -224,7 +231,7 @@ const FORMANT_MAKEUP = 1.787;
  */
 const LADDER_BOTTOM_CAP = 0.5;
 const LADDER_FEEDBACK_HP_HZ = 150;
-const LADDER_FEEDBACK_MAX = 16.5;
+const LADDER_FEEDBACK_MAX = 17.2;
 const LADDER_RESONANCE_FLOOR = 0.5;
 const LADDER_RESONANCE_SPAN = 24;
 const LADDER_INPUT_SCALE = 0.25;
@@ -234,8 +241,8 @@ const LADDER_MAKEUP_POWER = 0.5;
 const LADDER_CUTOFF_MIN_HZ = 20;
 const LADDER_CUTOFF_MAX_HZ = 10000;
 const LADDER_CUTOFF_CEILING = 0.45;
-const LADDER_NEWTON_STEPS = 4;
-const LADDER_OVERSAMPLE = 1;
+const LADDER_NEWTON_STEPS = 3;
+const LADDER_OVERSAMPLE = 2;
 
 /*
  * Voice stealing (windsor#410, `voiceSteal.ts`). A voice a full part steals

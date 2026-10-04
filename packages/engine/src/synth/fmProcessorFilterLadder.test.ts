@@ -2,10 +2,11 @@
  * The Acid filter mode (windsor#573, record
  * `2026-10-04-acid-ladder-filter-mode`) through the shipped worklet: white
  * noise through the voice meets the analog TB-303 ladder's response
- * 1 / (D(s) + k HP(s)) times the output mix's 1 + g HP_mix(s) (windsor#577)
- * and the makeup (1 + k)^`LADDER_MAKEUP_POWER` (windsor#587) at the bilinear
- * image, in magnitude and phase, across the cutoff range
- * and the feedback; the envelope, key track and a
+ * 1 / (D(s) + k HP(s)) at the bilinear image of the 2× solver's step rate,
+ * through its resampling pair (windsor#593), times the output mix's
+ * 1 + g HP_mix(s) (windsor#577) and the makeup (1 + k)^`LADDER_MAKEUP_POWER`
+ * (windsor#587), in magnitude and phase, across the cutoff range and the
+ * feedback; the envelope, key track and a
  * cutoff lane move its cutoff by the octaves they move the Lowpass mode's,
  * and its resonant peak with it; Slope and Vowel are not heard in it; and
  * an Acid voice ends after its release as any filtered voice does, the
@@ -18,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { mixedLadderResponse } from '../__fixtures__/ladderAnalog';
+import { oversampledLadderResponse } from '../__fixtures__/ladderAnalog';
 import { peakNear, transfer } from '../__fixtures__/powerSpectrum';
 import type { PowerSpectrum } from '../__fixtures__/powerSpectrum';
 import { loadProcessor } from '../__fixtures__/workletHarness';
@@ -33,6 +34,7 @@ import {
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
 } from '../worklet/fm/fmConstants';
+import { LADDER_DECIMATOR } from '../worklet/fm/ladderTables';
 
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
@@ -65,7 +67,7 @@ const PARAMS = {
   gain: new Float32Array([1]),
 };
 
-/** The Reso knob's value for feedback `k`: p = k / 16.5 on its log scale from 0.5 to 12. */
+/** The Reso knob's value for feedback `k`: p = k / LADDER_FEEDBACK_MAX on its log scale from 0.5 to 12. */
 const resonanceFor = (k: number): number => 0.5 * 24 ** (k / LADDER_FEEDBACK_MAX);
 
 /**
@@ -126,7 +128,7 @@ const sameBits = (a: Float32Array, b: Float32Array): boolean =>
   a.length === b.length && Buffer.compare(Buffer.from(a.buffer), Buffer.from(b.buffer)) === 0;
 
 describe('the Acid mode through white noise (windsor#573)', () => {
-  it('meets the analog ladder with its output mix and makeup at the bilinear image within 0.5 dB and 5°, 100 Hz to 2 f_c, f_c 500 Hz to past the top, k 0, 8 and 16', () => {
+  it('meets the analog ladder through the 2× pair with its output mix and makeup within 0.5 dB and 5°, 100 Hz to 2 f_c, f_c 500 Hz to past the top, k 0, 8 and 16', () => {
     // 18 kHz on the knob plays the top of the ladder's range.
     for (const cutoff of [500, 2000, 10000, 18000]) {
       for (const k of [0, 8, 16]) {
@@ -144,7 +146,7 @@ describe('the Acid mode through white noise (windsor#573)', () => {
         const last = Math.floor(Math.min(2 * fc, 0.46 * SR) / response.binHz);
         for (let bin = Math.ceil(100 / response.binHz); bin <= last; bin++) {
           const hz = bin * response.binHz;
-          const want = mixedLadderResponse(hz, loop, mix, SR);
+          const want = oversampledLadderResponse(hz, loop, mix, SR, LADDER_DECIMATOR);
           want.db += makeupDb;
           const db = 10 * Math.log10(response.power[bin]!);
           const degrees = (response.phase![bin]! * 180) / Math.PI;
@@ -158,14 +160,14 @@ describe('the Acid mode through white noise (windsor#573)', () => {
   }, 30_000);
 });
 
-/** The analog response's peak, the output mix's included, between `lowHz` and `highHz`, on a 0.5 Hz grid. */
+/** The 2× chain's modelled response's peak, the output mix's included, between `lowHz` and `highHz`, on a 0.5 Hz grid. */
 function analogPeakHz(ladder: LadderLike, fc: number, lowHz: number, highHz: number): number {
   let best = lowHz;
   let bestDb = -Infinity;
   const loop = { cutoffHz: fc, k: ladder.k, hpHz: LADDER_FEEDBACK_HP_HZ };
   const mix = { gain: ladder.mixGain, hpHz: LADDER_MIX_HP_HZ };
   for (let hz = lowHz; hz <= highHz; hz += 0.5) {
-    const db = mixedLadderResponse(hz, loop, mix, SR).db;
+    const db = oversampledLadderResponse(hz, loop, mix, SR, LADDER_DECIMATOR).db;
     if (db > bestDb) [best, bestDb] = [hz, db];
   }
   return best;
@@ -233,7 +235,7 @@ describe('the ladder on every platform (windsor#573)', () => {
 });
 
 describe('an Acid voice ending (windsor#573)', () => {
-  it('ends after its release, its resonant tail at k 16.5 and 200 Hz included, as a Lowpass voice does', () => {
+  it('ends after its release, its resonant tail at k 17.2 and 200 Hz included, as a Lowpass voice does', () => {
     const release = (patch: Patch): Patch => {
       patch.ops[0]!.env.releaseTime = 0.05;
       return patch;

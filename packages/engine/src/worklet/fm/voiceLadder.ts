@@ -14,12 +14,13 @@
  *
  * - the cutoff is held to `LADDER_CUTOFF_MIN_HZ` .. `LADDER_CUTOFF_MAX_HZ`,
  *   and below `LADDER_CUTOFF_CEILING` of the sample rate, and the half-step
- *   h = tan(π f_c / (M f_s)) / 2^¼ for M sub-steps a sample;
+ *   h = tan(π f_c / (M f_s)) / 2^¼ for M sub-steps a sample (the voice
+ *   ships M = `LADDER_OVERSAMPLE`, 2, windsor#593);
  * - k = `LADDER_FEEDBACK_MAX` × p, p = log₂(reso / 0.5) / log₂ 24 held to
- *   0..1, so 0 at the knob's bottom (0.5) and 16.5 at its top (12), and
+ *   0..1, so 0 at the knob's bottom (0.5) and 17.2 at its top (12), and
  *   the output mix's gain `LADDER_MIX_GAIN` × p (windsor#577);
  * - the makeup (1 + k)^`LADDER_MAKEUP_POWER` (windsor#587), the ladder's
- *   last gain, 1 at the knob's bottom and √17.5 (+12.4 dB) at its top,
+ *   last gain, 1 at the knob's bottom and √18.2 (+12.6 dB) at its top,
  *   only when k changed: 2^(power × log₂(1 + k)) through `log2InPlace` and
  *   `exp2InPlace`, a scalar per control block and never per sample, which
  *   steps with the Reso at the cadence the loop's own k does;
