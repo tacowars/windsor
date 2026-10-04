@@ -7,7 +7,14 @@
  * (`documentParts.ts`), which prunes a patch only no other part plays.
  */
 import type { ArrangementDocument, DocumentPart, Meter, SequencerKind } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, MUSIC_PARTS_MAX, SEEDED_KINDS, songTicks } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  MUSIC_PARTS_MAX,
+  SEEDED_KINDS,
+  isInfiniteRegion,
+  songTicks,
+  songTicksOf,
+} from '@windsor/engine';
 import { initPresetId } from './libraryConstants';
 import { initPatchDefaults } from './patchActions';
 import { NEW_SONG_BARS, NEW_SONG_BPM, NEW_SONG_HARMONY, partLabelFor } from './songConstants';
@@ -86,8 +93,9 @@ export function freshSequencer(kind: SequencerKind): RawDocument {
  * The song with the part on `slot` driven by a sequencer of `kind`, at that
  * kind's defaults — preset, name, velocity, strip and regions stay; a
  * captured pattern goes with the old sequencer, and so does every region's
- * own pattern (windsor#75 decision 6). Unchanged when the kind already
- * matches.
+ * own pattern (windsor#75 decision 6). A part set to Roll from one ∞
+ * region is left with none, so its first drawn region sets the roll's length
+ * (windsor#601 decision 1). Unchanged when the kind already matches.
  */
 export function setSequencerKind(
   doc: ArrangementDocument,
@@ -98,7 +106,10 @@ export function setSequencerKind(
     part.slot === slot && part.sequencer.kind !== kind
       ? {
           ...part,
-          regions: part.regions.map(({ start, duration }) => ({ start, duration })),
+          regions:
+            kind === 'roll' && isInfiniteRegion(part.regions, songTicksOf(doc))
+              ? []
+              : part.regions.map(({ start, duration }) => ({ start, duration })),
           sequencer: freshSequencer(kind),
         }
       : part,

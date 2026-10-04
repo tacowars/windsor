@@ -25,6 +25,7 @@ import type {
   SequencerSpec,
 } from '@windsor/engine';
 import {
+  ROLL_LOOP_TICKS_MAX,
   TICKS_PER_BAR,
   partAt,
   regionPattern,
@@ -69,9 +70,12 @@ export function sequencerKindChange(
   if (next === doc) return null;
   const part = partAt(preview(next), slot);
   if (!part) return null;
-  // `setSequencerKind` cleared the regions' patterns (windsor#75 decision 6): send them when there were any.
-  const patterned = partAt(doc, slot)?.regions.some((r) => r.pattern !== undefined) ?? false;
-  const regions = patterned ? { regions: part.regions } : {};
+  // `setSequencerKind` cleared the regions' patterns (windsor#75 decision 6), or a Roll part's ∞
+  // region (windsor#601 decision 1): send the regions when either happened.
+  const before = partAt(doc, slot)?.regions ?? [];
+  const changed =
+    before.length !== part.regions.length || before.some((r) => r.pattern !== undefined);
+  const regions = changed ? { regions: part.regions } : {};
   return partChange(slot, { sequencer: part.sequencer, ...regions });
 }
 
@@ -120,6 +124,7 @@ export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<Sequence
   'bass',
   'euclidean',
   'figure',
+  'roll',
 ]);
 
 /** True when `part`'s regions each carry their own pattern. */
@@ -262,11 +267,27 @@ function defaultPattern(
 }
 
 /**
+ * The pattern of a part's first region, `added`: the kind's default, a roll
+ * looping over the region's length up to `ROLL_LOOP_TICKS_MAX` (windsor#601
+ * decision 3).
+ */
+function firstPattern(
+  doc: ArrangementDocument,
+  slot: number,
+  added: PartRegion,
+  preview: Preview,
+): RegionPattern | undefined {
+  const pattern = defaultPattern(doc, slot, preview);
+  if (pattern?.kind !== 'roll') return pattern;
+  return { ...pattern, loopTicks: Math.min(added.duration, ROLL_LOOP_TICKS_MAX) };
+}
+
+/**
  * `regions` — the part's own with one region added — and the added one's
  * index, the new region holding a copy of the pattern of the nearest region
  * that starts before it, else of the nearest after it (decision 4); the
- * first region of a part with none starts from the kind's default pattern,
- * and a kind whose regions carry no pattern draws a bare region.
+ * first region of a part with none starts from the kind's default pattern
+ * (`firstPattern`), and a kind whose regions carry no pattern draws a bare region.
  */
 function withNeighbourPattern(
   doc: ArrangementDocument,
@@ -278,7 +299,8 @@ function withNeighbourPattern(
   const added = regions[index];
   if (!added || !keepsRegionPatterns(part)) return { regions, index };
   const from = neighbourIndex(part.regions, added.start);
-  const pattern = from >= 0 ? patternCopy(part, from) : defaultPattern(doc, part.slot, preview);
+  const pattern =
+    from >= 0 ? patternCopy(part, from) : firstPattern(doc, part.slot, added, preview);
   if (!pattern) return { regions, index };
   return { regions: regions.map((r, i) => (i === index ? { ...r, pattern } : r)), index };
 }

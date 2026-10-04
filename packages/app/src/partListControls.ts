@@ -22,12 +22,7 @@ function kindPicker(ctx: AppCtx, slot: number): HTMLSelectElement {
   picker.title = 'Sequencer';
   picker.setAttribute('aria-label', 'Sequencer');
   const current = partAt(ctx.model.doc, slot)?.sequencer.kind ?? 'none';
-  // The Roll is offered once a part can be set to one by its region rule and device (windsor#601,
-  // windsor#602); a part that already is one (an imported song) still names it.
-  for (const kind of SEQUENCER_KINDS) {
-    if (kind === 'roll' && current !== 'roll') continue;
-    picker.add(new Option(`Seq: ${KIND_LABELS[kind]}`, kind));
-  }
+  for (const kind of SEQUENCER_KINDS) picker.add(new Option(`Seq: ${KIND_LABELS[kind]}`, kind));
   picker.value = current;
   picker.onchange = (): void => {
     if (!setSequencerKindLive(ctx, slot, picker.value as SequencerKind))

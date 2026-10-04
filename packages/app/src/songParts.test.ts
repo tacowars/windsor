@@ -163,6 +163,23 @@ describe('sequencer kind', () => {
     ]);
   });
 
+  it('leaves a Roll part set from one ∞ region with none, and keeps drawn windows (windsor#601)', () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, setSequencerKind(model.doc, 0, 'roll'));
+    expect(model.corrections).toEqual([]);
+    expect(partAt(model.doc, 0)!.regions).toEqual([]);
+    const windows = [
+      { start: 0, duration: TICKS_PER_BAR },
+      { start: 2 * TICKS_PER_BAR, duration: TICKS_PER_BAR },
+    ];
+    restructure(model, setSequencerKind(model.doc, 0, 'chord'));
+    model.merge({ parts: { 0: { regions: windows } } });
+    restructure(model, setSequencerKind(model.doc, 0, 'roll'));
+    expect(partAt(model.doc, 0)!.regions).toEqual(windows);
+    restructure(model, setSequencerKind(model.doc, 0, 'grid'));
+    expect(partAt(model.doc, 0)!.regions).toEqual(windows);
+  });
+
   it('is a no-op for the kind the part already has', () => {
     const model = new DocumentModel(newSong());
     expect(setSequencerKind(model.doc, 0, 'none')).toBe(model.doc);
