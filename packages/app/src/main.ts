@@ -13,6 +13,7 @@
  */
 import { AppContext } from './appContext';
 import { renderArrangementTab } from './arrangementTab';
+import { mountAudioGate } from './audioGate';
 import { $ } from './dom';
 import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
@@ -71,7 +72,14 @@ mountTabShell(
 ctx.render();
 keyboard.attachGlobalKeys();
 void midi.resume();
-wirePowerButton($('power'), ctx);
+// The gate's button is the gesture that starts or resumes audio (windsor#578);
+// the header's power button shows up as the CPU meter once audio is on.
+const power = wirePowerButton($('power'), ctx);
+mountAudioGate({
+  host,
+  enable: () => host.enable(ctx.model.doc),
+  onEnabled: () => power.audioOn(),
+});
 // The user's patches and autosaved song (IndexedDB), and a remembered library
 // folder whose grant still stands; the row's button re-grants a dropped one.
 bootUserState(ctx).catch((error: unknown) => notify(`your library: ${String(error)}`, 'error'));

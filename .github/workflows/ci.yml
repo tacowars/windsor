@@ -94,9 +94,14 @@ jobs:
         run: node scripts/check-vitest-provider.mjs
       # On a pull request, the base sha puts vitest in vitest.config.ts's
       # changed-files mode. On a push to main it is empty and every test runs.
+      # The audio gate's build line (windsor#578): a PR checks out a merge
+      # commit, so the build stamps the PR's head SHA and number instead. On a
+      # push to main both are empty and the build reads the checkout's commit.
       - if: steps.changes.outputs.code == 'true'
         env:
           VERIFY_CHANGED_SINCE: ${{ github.event.pull_request.base.sha }}
+          WINDSOR_COMMIT: ${{ github.event.pull_request.head.sha }}
+          WINDSOR_PR: ${{ github.event.pull_request.number }}
         run: npm run verify
       # verify ends with `vite build`; its relative base serves the same
       # dist/ from the site root and from any pr-preview/pr-<N>/ folder.

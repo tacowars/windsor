@@ -198,9 +198,36 @@ export class EngineHost {
   /** The harmony card's audition part (windsor#332), made on the first press; dropped with its system. */
   private audition: { system: AudioSystem; part: Promise<AudioPart | null> } | null = null;
   private readonly log: HostLog;
+  /** Who hears the context's state changes (windsor#578); `onAudioState`. */
+  private readonly audioListeners = new Set<() => void>();
+  private readonly audioChanged = (): void => {
+    for (const listener of this.audioListeners) listener();
+  };
 
   constructor(log: HostLog) {
     this.log = log;
+  }
+
+  /**
+   * The page's context is running, so audio can sound (windsor#578). False
+   * before the first press, after a failed start discarded its context, and
+   * while the browser holds the context `suspended` (or Safari's
+   * `interrupted`).
+   */
+  get audioRunning(): boolean {
+    return this.context?.state === 'running';
+  }
+
+  /**
+   * Call `listener` whenever `audioRunning` may have changed: on each
+   * `statechange` of whichever context the host holds — a rebuild keeps it,
+   * a failed start's is discarded and a retry's followed — and as a
+   * discarded one goes, so a listener never hears a closed context.
+   * Returns the unsubscribe.
+   */
+  onAudioState(listener: () => void): () => void {
+    this.audioListeners.add(listener);
+    return () => void this.audioListeners.delete(listener);
   }
 
   get enabled(): boolean {
@@ -254,6 +281,13 @@ export class EngineHost {
     this.system = null;
     this.analyser = null;
     this.urls = null;
+    this.closeContext();
+    this.audioChanged();
+  }
+
+  /** Stop hearing the context, then close it. */
+  private closeContext(): void {
+    if (this.context) this.context.onstatechange = null;
     void this.context?.close();
     this.context = null;
   }
@@ -262,8 +296,9 @@ export class EngineHost {
    * The same URLs let a rebuilt engine re-init from the context's worklet
    * module cache without re-registering the processors. */
   private async start(document: ArrangementDocument, urls: WorkletUrls): Promise<void> {
-    void this.context?.close();
+    this.closeContext();
     this.context = new AudioContext({ latencyHint: 'interactive' });
+    this.context.onstatechange = this.audioChanged;
     this.urls = urls;
     this.analyser = this.context.createAnalyser();
     this.analyser.fftSize = 2048;

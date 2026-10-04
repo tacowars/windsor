@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The audio gate mockup tacowars approved on 2026-10-04: a modal that cannot be
+     dismissed, shown on load and whenever the browser has suspended the
+     audio context (a phone returning from another tab). Its one button is the
+     user gesture that creates or resumes the context. The console behind it
+     is a stand-in, blurred on purpose. Static and self-contained: open it in
+     a browser. The strip at the very top is the mockup's own state switcher,
+     not part of the console. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Windsor Audio Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: the console fills the page; the gate is one centred card over a
+   dimmed, blurred console, the power button its centre of gravity.
+   Tokens copied from packages/app/src/console.css. The app is dark only. */
+:root {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 13px/1.4 var(--f-ui); display: flex; flex-direction: column; }
+button { font: inherit; }
+[hidden] { display: none !important; }
+
+/* ---------- the mockup's own switcher (not the console) ---------- */
+.mock-bar {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 8px 16px; background: #2a2140; border-bottom: 1px dashed var(--return);
+  font: 11px var(--f-ui); color: #cbbfe6; position: relative; z-index: 20;
+}
+.mock-bar b { font-family: var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px; color: var(--return); }
+.mock-bar label { display: inline-flex; gap: 6px; align-items: center; }
+.mock-bar select { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 3px 6px; font: 11px var(--f-ui); }
+
+/* ---------- the stage: full window, or a phone-sized frame ---------- */
+.stage { flex: 1; display: flex; justify-content: center; align-items: stretch; min-height: 0; }
+.stage.phone { padding: 20px 16px; background: #0b0d0e; align-items: center; }
+.viewport { position: relative; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.stage.phone .viewport { flex: 0 1 390px; height: min(780px, 100%); border: 1px solid var(--line-bright); border-radius: 22px; }
+
+/* ---------- a stand-in console, only ever seen blurred ---------- */
+.console { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.head { background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { height: 24px; border-radius: var(--r); background: var(--panel-hi); border: 1px solid var(--line); }
+.pill.on { border-color: var(--carrier); }
+.parts { display: flex; gap: 6px; padding: 8px 14px; background: var(--inset); border-bottom: 1px solid var(--line); overflow: hidden; }
+.chip { flex: 0 0 72px; height: 34px; border-radius: var(--r); background: var(--panel); border-left: 3px solid var(--modulator); }
+.chip:nth-child(3n) { border-left-color: var(--carrier); }
+.chip:nth-child(4n) { border-left-color: var(--return); }
+.cards { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 12px 14px; align-content: start; }
+.card { height: 150px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; display: flex; gap: 10px; align-items: end; }
+.knob { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line-bright); border-top-color: var(--carrier); }
+
+/* ---------- the gate ---------- */
+.scrim {
+  position: absolute; inset: 0; z-index: 10;
+  display: grid; place-items: center; padding: 16px;
+  background: rgba(10, 12, 13, 0.62);
+  backdrop-filter: blur(7px) saturate(0.7); -webkit-backdrop-filter: blur(7px) saturate(0.7);
+  overflow-y: auto;
+}
+.gate {
+  width: min(420px, 100%);
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel) 38%);
+  border: 1px solid var(--line-bright); border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 26px 24px 0;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { display: block; }
+.wordmark { font: 700 26px/1 var(--f-panel); letter-spacing: 0.22em; padding-left: 0.22em; }
+.tagline { margin: 10px 0 0; font: 500 10.5px var(--f-panel); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); }
+
+.power-wrap { margin: 30px 0 16px; position: relative; display: grid; place-items: center; }
+.power {
+  position: relative; width: 136px; height: 136px; border-radius: 50%;
+  border: 2px solid var(--carrier); cursor: pointer; color: var(--carrier);
+  background: radial-gradient(circle at 50% 38%, #313940, var(--inset) 72%);
+  box-shadow: 0 0 0 6px var(--well), 0 0 0 7px var(--line-bright), 0 0 34px rgba(224, 164, 78, 0.22);
+  display: grid; place-items: center; transition: transform 0.12s, box-shadow 0.2s;
+}
+.power:hover { box-shadow: 0 0 0 6px var(--well), 0 0 0 7px var(--carrier), 0 0 46px rgba(224, 164, 78, 0.38); }
+.power:active { transform: scale(0.97); }
+.power:focus-visible { outline: 2px solid var(--ink); outline-offset: 10px; }
+.power svg { width: 52px; height: 52px; }
+.power::after {
+  content: ''; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid var(--carrier); opacity: 0; animation: ring 2.4s ease-out infinite;
+}
+@keyframes ring { 0% { transform: scale(1); opacity: 0.55; } 70%, 100% { transform: scale(1.28); opacity: 0; } }
+.power.busy { cursor: progress; border-color: var(--line-bright); color: var(--ink-faint); }
+.power.busy::after { animation: none; }
+.power.busy::before {
+  content: ''; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid transparent; border-top-color: var(--carrier); animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(1turn); } }
+.power.fail { border-color: var(--hot); color: var(--hot); box-shadow: 0 0 0 6px var(--well), 0 0 0 7px var(--line-bright), 0 0 34px rgba(210, 100, 60, 0.25); }
+.power.fail::after { border-color: var(--hot); }
+@media (prefers-reduced-motion: reduce) { .power::after { animation: none; } .power.busy::before { animation-duration: 2.5s; } }
+
+.action { font: 600 15px var(--f-panel); letter-spacing: 0.14em; text-transform: uppercase; }
+.action.fail { color: var(--hot); }
+.lede { margin: 8px 0 0; max-width: 34ch; color: var(--ink-dim); font-size: 13px; text-wrap: balance; }
+.lede code { font: 11.5px var(--f-num); color: var(--ink); background: var(--inset); padding: 1px 4px; border-radius: var(--r); }
+
+.foot {
+  margin-top: 26px; align-self: stretch; border-top: 1px solid var(--line);
+  padding: 11px 0 13px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 14px;
+  font: 11px var(--f-num); color: var(--ink-faint);
+}
+.foot .build { font-variant-numeric: tabular-nums; }
+.foot .build b { color: var(--ink-dim); font-weight: 500; }
+.foot nav { display: flex; gap: 14px; }
+.foot a { color: var(--ink-dim); text-decoration: none; display: inline-flex; gap: 5px; align-items: center; }
+.foot a:hover { color: var(--ink); }
+.foot svg { width: 13px; height: 13px; }
+
+.stand-in { outline: 1px dashed var(--return); outline-offset: 3px; }
+</style>
+
+<div class="mock-bar">
+  <b>Mockup</b>
+  <label for="mState">State
+    <select id="mState">
+      <option value="first">First load</option>
+      <option value="busy">Starting the engine</option>
+      <option value="fail">Engine failed to start</option>
+      <option value="back">Back from another tab</option>
+    </select>
+  </label>
+  <label for="mFrame">Frame
+    <select id="mFrame">
+      <option value="fill">Fill the window</option>
+      <option value="phone">Phone (390 px)</option>
+    </select>
+  </label>
+  <span>Click the power button to step first load → starting → done.</span>
+</div>
+
+<div class="stage" id="stage">
+  <div class="viewport">
+    <div class="console" aria-hidden="true">
+      <div class="head">
+        <div class="pill on" style="width:62px"></div><div class="pill" style="width:62px"></div><div class="pill" style="width:62px"></div><div class="pill" style="width:62px"></div>
+        <div class="pill" style="width:96px;margin-left:auto"></div><div class="pill" style="width:150px"></div>
+      </div>
+      <div class="parts"><div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div><div class="chip"></div></div>
+      <div class="cards">
+        <div class="card"><div class="knob"></div><div class="knob"></div><div class="knob"></div></div>
+        <div class="card"><div class="knob"></div><div class="knob"></div></div>
+        <div class="card"><div class="knob"></div><div class="knob"></div><div class="knob"></div><div class="knob"></div></div>
+        <div class="card"><div class="knob"></div></div>
+        <div class="card"><div class="knob"></div><div class="knob"></div></div>
+        <div class="card"><div class="knob"></div><div class="knob"></div><div class="knob"></div></div>
+      </div>
+    </div>
+
+    <div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="gAction">
+      <div class="gate">
+        <div class="brand">
+          <!-- The mark: a W drawn as one carrier stroke over a modulator sine, the
+               four vertices of its lower half the engine's four operators. -->
+          <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="43" height="43" rx="7" fill="#0c0f10" stroke="#3d4950"/>
+            <path d="M5 22 C 9 13, 13 13, 17 22 S 25 31, 29 22 S 37 13, 41 22" fill="none" stroke="#5fa8a0" stroke-width="1.4" opacity="0.7"/>
+            <polyline points="8,11 15,33 22,17 29,33 36,11" fill="none" stroke="#e0a44e" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="15" cy="33" r="2.4" fill="#e0a44e"/><circle cx="22" cy="17" r="2.4" fill="#e0a44e"/>
+            <circle cx="29" cy="33" r="2.4" fill="#e0a44e"/><circle cx="36" cy="11" r="2.4" fill="#e0a44e"/>
+          </svg>
+          <span class="wordmark">WINDSOR</span>
+        </div>
+        <p class="tagline">FM sequencer</p>
+
+        <div class="power-wrap">
+          <button class="power" id="gPower" type="button" aria-describedby="gLede" autofocus>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/>
+            </svg>
+          </button>
+        </div>
+        <div class="action" id="gAction">Enable audio</div>
+        <p class="lede" id="gLede">Browsers keep a page silent until you ask for sound. Windsor starts its audio engine when you press this.</p>
+
+        <div class="foot">
+          <span class="build stand-in" title="Stand-in: the build's commit and date, injected by Vite at build time"><b>Windsor</b> 9543344 · 4 Oct 2026</span>
+          <nav>
+            <a href="https://github.com/tacowars/windsor" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+              Source
+            </a>
+            <a href="https://github.com/tacowars/windsor/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COPY = {
+  first: { action: 'Enable audio', lede: 'Browsers keep a page silent until you ask for sound. Windsor starts its audio engine when you press this.', power: '' },
+  busy: { action: 'Starting…', lede: 'Loading the synth and effects into the audio thread.', power: 'busy' },
+  fail: { action: 'Audio didn’t start', lede: 'The audio engine failed to load (<code>AbortError: Unable to load a worklet’s module</code>). Press to try again.', power: 'fail' },
+  back: { action: 'Resume audio', lede: 'Your browser paused Windsor’s audio while you were away. Press to pick up where you left off.', power: '' },
+};
+const $ = (id) => document.getElementById(id);
+let timer = 0;
+function show(state) {
+  clearTimeout(timer);
+  const c = COPY[state];
+  $('scrim').hidden = false;
+  $('gAction').textContent = c.action;
+  $('gAction').className = 'action' + (state === 'fail' ? ' fail' : '');
+  $('gLede').innerHTML = c.lede;
+  $('gPower').className = 'power' + (c.power ? ' ' + c.power : '');
+  $('gPower').disabled = state === 'busy';
+  $('mState').value = state;
+}
+$('mState').onchange = (e) => show(e.target.value);
+$('mFrame').onchange = (e) => $('stage').classList.toggle('phone', e.target.value === 'phone');
+$('gPower').onclick = () => {
+  const from = $('mState').value;
+  if (from === 'back') { $('scrim').hidden = true; timer = setTimeout(() => show('back'), 2500); return; }
+  show('busy');
+  timer = setTimeout(() => { $('scrim').hidden = true; timer = setTimeout(() => show('first'), 2500); }, 1400);
+};
+</script>
+</html>

@@ -35,9 +35,12 @@ let closed = 0;
 /** Set to hold each module load until the test calls `refusals`. */
 let deferModules = false;
 const refusals: (() => void)[] = [];
+/** Every context the host has made, newest last. */
+const made: FakeAudioContext[] = [];
 
 class FakeAudioContext {
   state = 'suspended';
+  onstatechange: (() => void) | null = null;
   destination = node();
   audioWorklet = {
     addModule: (url: string | URL): Promise<void> => {
@@ -50,6 +53,7 @@ class FakeAudioContext {
   };
   constructor() {
     contexts++;
+    made.push(this);
   }
   createGain = node;
   createDynamicsCompressor = node;
@@ -125,6 +129,35 @@ describe('EngineHost.enable when the DSP will not load', () => {
     await expect(first).rejects.toThrow();
     await expect(second).resolves.toBeUndefined();
     expect(contexts).toBe(1);
+  });
+});
+
+describe("the context's state, for the audio gate (windsor#578)", () => {
+  const song = makeArrangement({}).document;
+
+  it('is heard on the live context, and dropped with a discarded one', async () => {
+    const host = new EngineHost(() => undefined);
+    let heard = 0;
+    host.onAudioState(() => void heard++);
+    expect(host.audioRunning).toBe(false);
+    // The context exists from the press on; this one's build will fail.
+    const enabling = host.enable(song);
+    const first = made.at(-1)!;
+    first.state = 'running';
+    first.onstatechange?.();
+    expect([host.audioRunning, heard]).toEqual([true, 1]);
+    await expect(enabling).rejects.toThrow();
+    // Discarded: no longer heard, and its going is heard once.
+    expect(first.onstatechange).toBeNull();
+    expect([host.audioRunning, heard]).toEqual([false, 2]);
+    // The retry's context is the one followed.
+    const retry = host.enable(song);
+    const second = made.at(-1)!;
+    expect(second).not.toBe(first);
+    second.state = 'suspended';
+    second.onstatechange?.();
+    expect([host.audioRunning, heard]).toEqual([false, 3]);
+    await expect(retry).rejects.toThrow();
   });
 });
 

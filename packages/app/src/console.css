@@ -5954,6 +5954,231 @@ dialog select.field {
   color: var(--hot);
 }
 
+/* ---------- the audio gate (windsor#578) ----------
+   Built to the approved mockup, docs/design/audio-gate-mockup.html: one
+   centred card over the dimmed, blurred console, the power button its
+   centre of gravity. The dialog is the card's frame; its layout is the inner
+   .gate, so the dialog's own closed `display: none` stands. Sized by the
+   window with no screen-width query (zoom-safe): 16px from the edges on a
+   phone, and a card taller than the window scrolls inside itself.
+   Centred on the screen, not only in the fixed layout viewport: a phone
+   widens that to fit a console wider than the screen (the transport row
+   at 390 px), which would put the card off to the side. The viewport units
+   are the screen there, and the smaller of the two wins everywhere. */
+dialog.audio-gate {
+  inset: min(50%, 50dvh) auto auto min(50%, 50vw);
+  transform: translate(-50%, -50%);
+  margin: 0;
+  width: min(420px, calc(100% - 32px), calc(100vw - 32px));
+  max-width: none;
+  max-height: min(calc(100% - 32px), calc(100dvh - 32px));
+  overflow-y: auto;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel) 38%);
+  border: 1px solid var(--line-bright);
+  border-radius: 6px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+dialog.audio-gate::backdrop {
+  background: rgba(10, 12, 13, 0.62);
+  backdrop-filter: blur(7px) saturate(0.7);
+  -webkit-backdrop-filter: blur(7px) saturate(0.7);
+}
+.gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 26px 24px 0;
+}
+.gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gate-brand svg {
+  display: block;
+}
+.gate-wordmark {
+  font: 700 26px/1 var(--f-panel);
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+}
+.gate-tagline {
+  margin: 10px 0 0;
+  font: 500 10.5px var(--f-panel);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.gate-power-wrap {
+  margin: 30px 0 16px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.gate-power {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  border: 2px solid var(--carrier);
+  cursor: pointer;
+  color: var(--carrier);
+  background: radial-gradient(circle at 50% 38%, #313940, var(--inset) 72%);
+  box-shadow:
+    0 0 0 6px var(--well),
+    0 0 0 7px var(--line-bright),
+    0 0 34px rgba(224, 164, 78, 0.22);
+  display: grid;
+  place-items: center;
+  transition:
+    transform 0.12s,
+    box-shadow 0.2s;
+}
+.gate-power:hover {
+  box-shadow:
+    0 0 0 6px var(--well),
+    0 0 0 7px var(--carrier),
+    0 0 46px rgba(224, 164, 78, 0.38);
+}
+.gate-power:active {
+  transform: scale(0.97);
+}
+.gate-power:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 10px;
+}
+.gate-power svg {
+  width: 52px;
+  height: 52px;
+}
+/* The ring that pulses out of the button until it is pressed. */
+.gate-power::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--carrier);
+  opacity: 0;
+  animation: gate-ring 2.4s ease-out infinite;
+}
+@keyframes gate-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+/* Starting: dimmed and disabled, a carrier arc spinning round the rim. */
+.gate-power.busy {
+  cursor: progress;
+  border-color: var(--line-bright);
+  color: var(--ink-faint);
+}
+.gate-power.busy::after {
+  animation: none;
+}
+.gate-power.busy::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--carrier);
+  animation: gate-spin 0.9s linear infinite;
+}
+@keyframes gate-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.gate-power.fail {
+  border-color: var(--hot);
+  color: var(--hot);
+  box-shadow:
+    0 0 0 6px var(--well),
+    0 0 0 7px var(--line-bright),
+    0 0 34px rgba(210, 100, 60, 0.25);
+}
+.gate-power.fail::after {
+  border-color: var(--hot);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-power::after {
+    animation: none;
+  }
+  .gate-power.busy::before {
+    animation-duration: 2.5s;
+  }
+}
+.gate-action {
+  font: 600 15px var(--f-panel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.gate-action.fail {
+  color: var(--hot);
+}
+.gate-lede {
+  margin: 8px 0 0;
+  max-width: 34ch;
+  color: var(--ink-dim);
+  font-size: 13px;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+.gate-lede code {
+  font: 11.5px var(--f-num);
+  color: var(--ink);
+  background: var(--inset);
+  padding: 1px 4px;
+  border-radius: var(--r);
+}
+.gate-foot {
+  margin-top: 26px;
+  align-self: stretch;
+  border-top: 1px solid var(--line);
+  padding: 11px 0 13px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px 14px;
+  font: 11px var(--f-num);
+  color: var(--ink-faint);
+}
+.gate-build {
+  font-variant-numeric: tabular-nums;
+}
+.gate-build b {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.gate-foot nav {
+  display: flex;
+  gap: 14px;
+}
+.gate-foot a {
+  color: var(--ink-dim);
+  text-decoration: none;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.gate-foot a:hover {
+  color: var(--ink);
+}
+.gate-foot svg {
+  width: 13px;
+  height: 13px;
+}
+
 /* ---------- the Songs section (windsor#434) ----------
    The gear tab's library, built to docs/design/song-library-mockup.html:
    the open-song strip, the filter row, the table, the row menu and the
