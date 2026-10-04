@@ -30,7 +30,7 @@
       "preset": "acid-saw",
       "velocity": 0.8,
       "strip": {
-        "level": 1.9,
+        "level": 0.52,
         "pan": 0,
         "lowCut": 20,
         "sends": {},
@@ -164,7 +164,7 @@
       "preset": "acid-square",
       "velocity": 0.8,
       "strip": {
-        "level": 1.55,
+        "level": 0.68,
         "pan": 0,
         "lowCut": 20,
         "sends": {},
@@ -298,7 +298,7 @@
       "preset": "acid-accent",
       "velocity": 0.8,
       "strip": {
-        "level": 1.6,
+        "level": 0.66,
         "pan": 0,
         "lowCut": 20,
         "sends": {},
@@ -435,7 +435,7 @@
     "acid-saw": {
       "name": "Acid Saw",
       "algorithm": 0,
-      "volume": 0.22,
+      "volume": 0.64,
       "tone": 1,
       "glide": 0,
       "pitchEnvAmount": 0,
@@ -601,7 +601,7 @@
         "shape": 0,
         "bias": 0,
         "tone": 1,
-        "on": true
+        "on": false
       },
       "pitchEnv": {
         "initLevel": 0,
@@ -668,7 +668,7 @@
     "acid-square": {
       "name": "Acid Square",
       "algorithm": 0,
-      "volume": 0.28,
+      "volume": 0.46,
       "tone": 1,
       "glide": 0,
       "pitchEnvAmount": 0,
@@ -834,7 +834,7 @@
         "shape": 0,
         "bias": 0,
         "tone": 1,
-        "on": true
+        "on": false
       },
       "pitchEnv": {
         "initLevel": 0,
@@ -901,7 +901,7 @@
     "acid-accent": {
       "name": "Acid Accent",
       "algorithm": 0,
-      "volume": 0.3,
+      "volume": 0.68,
       "tone": 1,
       "glide": 0,
       "pitchEnvAmount": 0,
@@ -1067,7 +1067,7 @@
         "shape": 0,
         "bias": 0,
         "tone": 1,
-        "on": true
+        "on": false
       },
       "pitchEnv": {
         "initLevel": 0,

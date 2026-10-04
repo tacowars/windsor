@@ -10,7 +10,10 @@
   is reopened on a convergence matrix, and the release premise under
   Consequences is corrected. Revised again on 2026-10-04 by windsor#577:
   decision 10 adds the TB-303's second resonance path, the pot's output
-  mix into the VCA, and decisions 4 and 7 are amended with it.
+  mix into the VCA, and decisions 4 and 7 are amended with it. Revised
+  again on 2026-10-04 by windsor#587: decision 11 adds a resonance-tied
+  makeup after the ladder, a product choice, and decision 7 is amended
+  again.
 - **Links:** the modelling and its numbers in
   `docs/research/2026-10-04-acid-ladder-filter/README.md` · the Formant
   mode, the precedent for adding a mode,
@@ -159,6 +162,13 @@ are not touched, and every factory preset renders bit for bit as before.
    lift, the bass and the zero-resonance errors all meet the reference
    there (`docs/research/2026-10-04-acid-ladder-filter/README.md`, "The
    output mix").
+   **Amended again (windsor#587):** the level with resonance is now the
+   circuit's two paths plus a product makeup (decision 11). The two paths
+   match the reference's level, and so its fall with resonance too, which
+   tacowars heard as the level dropping under a performed Reso sweep; the
+   makeup brings high resonance up and leaves the knob's bottom where it
+   was. The makeup is resonance-tied, so the clip a fixed one would bring
+   at low resonance does not arise.
 8. **Where it lives.** `worklet/fm/ladder.ts`: `Ladder`, the states, the
    per-block coefficients, `process()` over a `point` field (the sample in
    and out, so no double crosses the call, rule 2), `reset()` and
@@ -229,6 +239,36 @@ are not touched, and every factory preset renders bit for bit as before.
     their peaks within 3 dB of before. Every value is tacowars's to set by
     ear (the renders in the research's "The output mix").
 
+11. **The makeup (windsor#587).** tacowars's listen of windsor#577: the
+    character is right, but the level falls as Reso rises, the TB-303's
+    own fall (the loop attenuates everything between the feedback's
+    high-pass and the cutoff by about 1 / (1 + k), and the output mix
+    returns the peak and the lift but not the loudness), and that is a
+    problem when the Reso is performed. So the ladder's output is
+    multiplied, last, by `(1 + k) ^ LADDER_MAKEUP_POWER`, k decision 4's
+    feedback gain, the power a tunable in `fmConstants.ts` shipped at
+    **0.5**: 1 at the knob's bottom, so a patch there renders bit for bit
+    as before, and √17.5, +12.4 dB, at its top. The law puts back the same
+    fraction of the 1 / (1 + k) loss, in dB, at every place of the knob,
+    so a sweep is even; a linear `1 + p × amount` would not, and full
+    compensation (power 1) raises the peak and the self-oscillation by
+    25 dB at the top. It is a product choice, not the circuit's, and set
+    by ear: the research renders the song and a Reso sweep at powers 0,
+    0.35, 0.5 and 0.7 (`docs/research/2026-10-04-acid-ladder-filter/README.md`,
+    "The makeup"). The gain is a scalar in `Ladder.process` after the
+    output mix and before the polarity and the input scale's undoing, so
+    nothing nonlinear sees it and the spectrum at every Reso is the
+    circuit's up to the gain; `tuneLadder` works it out beside k, only when
+    k changes, through `portablePowers.ts`'s log₂ and 2^x, and it steps
+    with the Reso at the control-block cadence k already does, with no
+    smoothing of its own. No new patch field; `PATCH_FILE_FORMAT` does not
+    move. The acid patches keep their Cutoff, Reso, envelopes and mod
+    depths, and their `volume` is set so each peaks between 0.6 and 0.75
+    at the loudest of C1, C2 and C3 at velocity 1. The factory acid
+    patches ship with the Drive off, tacowars's decision on 2026-10-04, so
+    a patch's volume is pure gain and the Drive stays an optional push.
+    The ladder costs what it did within 2 %.
+
 ## Consequences
 
 - One more branch in both render loops and one more class per voice; the
@@ -240,7 +280,9 @@ are not touched, and every factory preset renders bit for bit as before.
   cutoff. Both are the instrument's; a patch compensates with the knob.
   Since windsor#577 the output mix returns level and lift with resonance,
   as the hardware's second path does, and the low cutoffs keep about 3 dB
-  more bass than the reference's.
+  more bass than the reference's. Since windsor#587 a makeup tied to the
+  resonance holds the loudness as Reso rises, so the mode is louder than
+  the hardware at high resonance by design.
 - Factory acid patches add rows to the golden, which the sound-design
   ticket refreshes and says so.
 - The one-pole high-pass (150 Hz shipped since windsor#577) is a

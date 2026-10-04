@@ -53,11 +53,13 @@ export const CANDIDATES = {
  * `Math.tan`, as the shipped tuning works them out in portable arithmetic.
  * On a bundle with the output mix (windsor#577) its gain is `mixGain` (0,
  * off, unless given) and its high-pass's corner `mixHz`, at the base rate.
+ * On a bundle with the makeup (windsor#587) it is `makeup` (1, none, unless
+ * given).
  */
 export function candidate(
   ladder,
   name,
-  { cutoffHz, k, hpHz = 150, taps, rate: baseRate = SR, mixGain = 0, mixHz = 400 } = {},
+  { cutoffHz, k, hpHz = 150, taps, rate: baseRate = SR, mixGain = 0, mixHz = 400, makeup = 1 } = {},
 ) {
   const c = CANDIDATES[name];
   ladder.oversample = c.oversample;
@@ -77,6 +79,7 @@ export function candidate(
     ladder.mixG = gm / (1 + gm);
     ladder.mixGain = mixGain;
   }
+  if ('makeup' in ladder) ladder.makeup = makeup;
   ladder.reset();
   return ladder;
 }

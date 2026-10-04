@@ -1,7 +1,7 @@
 {
   "name": "Acid Saw",
   "algorithm": 0,
-  "volume": 0.22,
+  "volume": 0.64,
   "tone": 1,
   "glide": 0,
   "pitchEnvAmount": 0,
@@ -167,7 +167,7 @@
     "shape": 0,
     "bias": 0,
     "tone": 1,
-    "on": true
+    "on": false
   },
   "pitchEnv": {
     "initLevel": 0,

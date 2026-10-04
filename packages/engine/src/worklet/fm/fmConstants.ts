@@ -206,6 +206,14 @@ const FORMANT_MAKEUP = 1.787;
  * circuit's two paths. The schematic gives 2.2 (220 kOhm / 100 kOhm) and
  * 159 Hz (10 nF into 100 kOhm); the ACB comparison's fit ships 2.6 and
  * 400 Hz, where its lift and bass loss both meet the references.
+ * Last, a makeup gain (windsor#587), a product choice and not the
+ * circuit's: the output times (1 + k)^LADDER_MAKEUP_POWER, 1 at the Reso
+ * knob's bottom and sqrt(17.5), +12.4 dB, at its top. The loop takes about
+ * 1 / (1 + k) of the passband, so the power is the fraction of that loss,
+ * in dB, given back at every place of the knob: 0 is the circuit's level,
+ * 1 full compensation (25 dB more peak and self-oscillation at the top),
+ * 0.5 half of it, so a performed Reso sweep holds its loudness while low
+ * resonance stays where it was.
  * Each value is tacowars's to set by ear.
  */
 const LADDER_BOTTOM_CAP = 0.5;
@@ -216,6 +224,7 @@ const LADDER_RESONANCE_SPAN = 24;
 const LADDER_INPUT_SCALE = 0.25;
 const LADDER_MIX_GAIN = 2.6;
 const LADDER_MIX_HP_HZ = 400;
+const LADDER_MAKEUP_POWER = 0.5;
 const LADDER_CUTOFF_MIN_HZ = 20;
 const LADDER_CUTOFF_MAX_HZ = 10000;
 const LADDER_CUTOFF_CEILING = 0.45;
@@ -280,6 +289,7 @@ export {
   LADDER_INPUT_SCALE,
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
+  LADDER_MAKEUP_POWER,
   LADDER_CUTOFF_MIN_HZ,
   LADDER_CUTOFF_MAX_HZ,
   LADDER_CUTOFF_CEILING,

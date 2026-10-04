@@ -3,7 +3,8 @@
  * `2026-10-04-acid-ladder-filter-mode`) through the shipped worklet: white
  * noise through the voice meets the analog TB-303 ladder's response
  * 1 / (D(s) + k HP(s)) times the output mix's 1 + g HP_mix(s) (windsor#577)
- * at the bilinear image, in magnitude and phase, across the cutoff range
+ * and the makeup (1 + k)^`LADDER_MAKEUP_POWER` (windsor#587) at the bilinear
+ * image, in magnitude and phase, across the cutoff range
  * and the feedback; the envelope, key track and a
  * cutoff lane move its cutoff by the octaves they move the Lowpass mode's,
  * and its resonant peak with it; Slope and Vowel are not heard in it; and
@@ -28,6 +29,7 @@ import {
   LADDER_CUTOFF_MAX_HZ,
   LADDER_FEEDBACK_HP_HZ,
   LADDER_FEEDBACK_MAX,
+  LADDER_MAKEUP_POWER,
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
 } from '../worklet/fm/fmConstants';
@@ -44,6 +46,7 @@ interface LadderLike {
   mixS: number;
   k: number;
   mixGain: number;
+  makeup: number;
   tunedHz: number;
 }
 
@@ -123,7 +126,7 @@ const sameBits = (a: Float32Array, b: Float32Array): boolean =>
   a.length === b.length && Buffer.compare(Buffer.from(a.buffer), Buffer.from(b.buffer)) === 0;
 
 describe('the Acid mode through white noise (windsor#573)', () => {
-  it('meets the analog ladder with its output mix at the bilinear image within 0.5 dB and 5°, 100 Hz to 2 f_c, f_c 500 Hz to past the top, k 0, 8 and 16', () => {
+  it('meets the analog ladder with its output mix and makeup at the bilinear image within 0.5 dB and 5°, 100 Hz to 2 f_c, f_c 500 Hz to past the top, k 0, 8 and 16', () => {
     // 18 kHz on the knob plays the top of the ladder's range.
     for (const cutoff of [500, 2000, 10000, 18000]) {
       for (const k of [0, 8, 16]) {
@@ -135,10 +138,14 @@ describe('the Acid mode through white noise (windsor#573)', () => {
         expect(voice.ladder.mixGain).toBeCloseTo((LADDER_MIX_GAIN * k) / LADDER_FEEDBACK_MAX, 9);
         const mix = { gain: voice.ladder.mixGain, hpHz: LADDER_MIX_HP_HZ };
         const loop = { cutoffHz: fc, k: voice.ladder.k, hpHz: LADDER_FEEDBACK_HP_HZ };
+        // The makeup, the ladder's last gain (windsor#587): (1 + k)^power, 1 at k 0.
+        expect(voice.ladder.makeup).toBeCloseTo((1 + voice.ladder.k) ** LADDER_MAKEUP_POWER, 12);
+        const makeupDb = 20 * Math.log10(voice.ladder.makeup);
         const last = Math.floor(Math.min(2 * fc, 0.46 * SR) / response.binHz);
         for (let bin = Math.ceil(100 / response.binHz); bin <= last; bin++) {
           const hz = bin * response.binHz;
           const want = mixedLadderResponse(hz, loop, mix, SR);
+          want.db += makeupDb;
           const db = 10 * Math.log10(response.power[bin]!);
           const degrees = (response.phase![bin]! * 180) / Math.PI;
           const label = `f_c ${cutoff}, k ${k}, ${hz.toFixed(0)} Hz`;

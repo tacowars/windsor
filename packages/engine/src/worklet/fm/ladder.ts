@@ -43,6 +43,12 @@
  * solve's to the bit; the high-pass runs either way, so a Reso that rises
  * mid-note meets a settled state.
  *
+ * The makeup (windsor#587): last, the output times `makeup` =
+ * (1 + k)^`LADDER_MAKEUP_POWER`, which `tuneLadder` works out with k. A
+ * scalar after everything nonlinear, so the spectrum at any Reso is the
+ * circuit's up to the gain; 1 at the knob's bottom, where the output is the
+ * solve's to the bit.
+ *
  * Level and polarity (decision 7): the sample enters times
  * `LADDER_INPUT_SCALE` and leaves divided by it, negated, so the mode has
  * the Lowpass mode's polarity.
@@ -54,8 +60,8 @@
  * two high-passes' included, at a note's start; `quiet` is every state under
  * `DORMANT_FILTER_STATE`. `ladder.test.ts` pins the saturator, the
  * polynomial, the response with and without the mix and the mix's absence
- * at p = 0; `ladderLimits.test.ts` the convergence, the
- * bounds, the threshold, the harmonics and the reset;
+ * at p = 0, and the makeup as a gain alone; `ladderLimits.test.ts` the
+ * convergence, the bounds, the threshold, the harmonics and the reset;
  * `synth/fmProcessorFilterLadder.test.ts` the voice.
  */
 
@@ -105,13 +111,14 @@ class Ladder {
   /**
    * Per block (`tuneLadder`): the prewarped half-step over τ, the feedback
    * gain, the feedback high-pass's G = g / (1 + g), the output mix's gain
-   * and its high-pass's G.
+   * and its high-pass's G, and the makeup, (1 + k)^`LADDER_MAKEUP_POWER`.
    */
   h: number;
   k: number;
   hpG: number;
   mixGain: number;
   mixG: number;
+  makeup: number;
   /** `tuneLadder`'s inputs: the cutoff (Hz) and the Reso knob's value. */
   cutoffHz: number;
   resonance: number;
@@ -145,7 +152,8 @@ class Ladder {
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value (windsor#233).
     this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = NaN;
-    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.cutoffHz = this.resonance = NaN;
+    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.makeup = NaN;
+    this.cutoffHz = this.resonance = NaN;
     this.tunedHz = this.tunedResonance = this.tunedRate = NaN;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = NaN;
     this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = 0;
@@ -154,6 +162,7 @@ class Ladder {
     this.hpG = 0;
     this.mixGain = 0;
     this.mixG = 0;
+    this.makeup = 1;
     this.cutoffHz = 0;
     this.resonance = 0;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = 0;
@@ -220,7 +229,7 @@ class Ladder {
    * the last sample's), each `steps` Newton steps on the four states from
    * their memories, after which the memories and the high-pass advance;
    * at 1× the output is the last x₄, at 2× the decimator's sum over them,
-   * then the output mix on it.
+   * then the output mix on it, then the makeup.
    */
   // One Newton solve read top to bottom: the residual, the Jacobian and its
   // elimination share every local, and a helper per part would pass them
@@ -332,6 +341,8 @@ class Ladder {
     this.mixS = mlp + mv;
     const mixGain = this.mixGain;
     if (mixGain !== 0) out += mixGain * (out - mlp);
+    // The makeup (windsor#587): a scalar, the last thing the ladder does; 1 at the Reso knob's bottom.
+    out *= this.makeup;
     this.point = -out * OUTPUT_SCALE;
   }
 }

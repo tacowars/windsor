@@ -44,6 +44,7 @@ var LADDER_RESONANCE_SPAN = 24;
 var LADDER_INPUT_SCALE = 0.25;
 var LADDER_MIX_GAIN = 2.6;
 var LADDER_MIX_HP_HZ = 400;
+var LADDER_MAKEUP_POWER = 0.5;
 var LADDER_CUTOFF_MIN_HZ = 20;
 var LADDER_CUTOFF_MAX_HZ = 1e4;
 var LADDER_CUTOFF_CEILING = 0.45;
@@ -1056,7 +1057,8 @@ var SAT_LIMIT = LADDER_SATURATOR.limit;
 var Ladder = class {
   constructor() {
     this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = NaN;
-    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.cutoffHz = this.resonance = NaN;
+    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.makeup = NaN;
+    this.cutoffHz = this.resonance = NaN;
     this.tunedHz = this.tunedResonance = this.tunedRate = NaN;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = NaN;
     this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = 0;
@@ -1065,6 +1067,7 @@ var Ladder = class {
     this.hpG = 0;
     this.mixGain = 0;
     this.mixG = 0;
+    this.makeup = 1;
     this.cutoffHz = 0;
     this.resonance = 0;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = 0;
@@ -1120,7 +1123,7 @@ var Ladder = class {
    * the last sample's), each `steps` Newton steps on the four states from
    * their memories, after which the memories and the high-pass advance;
    * at 1× the output is the last x₄, at 2× the decimator's sum over them,
-   * then the output mix on it.
+   * then the output mix on it, then the makeup.
    */
   // One Newton solve read top to bottom: the residual, the Jacobian and its
   // elimination share every local, and a helper per part would pass them
@@ -1207,6 +1210,7 @@ var Ladder = class {
     this.mixS = mlp + mv;
     const mixGain = this.mixGain;
     if (mixGain !== 0) out += mixGain * (out - mlp);
+    out *= this.makeup;
     this.point = -out * OUTPUT_SCALE;
   }
 };
@@ -1982,7 +1986,18 @@ function tuneLadder(ladder, rate) {
       p = slot[0] / LADDER_LOG2_SPAN;
       if (p > 1) p = 1;
     }
-    ladder.k = LADDER_FEEDBACK_MAX * p;
+    const k = LADDER_FEEDBACK_MAX * p;
+    if (k !== ladder.k) {
+      if (k === 0) ladder.makeup = 1;
+      else {
+        slot[0] = 1 + k;
+        log2InPlace(slot, 0);
+        slot[0] *= LADDER_MAKEUP_POWER;
+        exp2InPlace(slot, 0);
+        ladder.makeup = slot[0];
+      }
+      ladder.k = k;
+    }
     ladder.mixGain = LADDER_MIX_GAIN * p;
     ladder.tunedResonance = reso;
   }

@@ -18,13 +18,18 @@
  * - k = `LADDER_FEEDBACK_MAX` × p, p = log₂(reso / 0.5) / log₂ 24 held to
  *   0..1, so 0 at the knob's bottom (0.5) and 16.5 at its top (12), and
  *   the output mix's gain `LADDER_MIX_GAIN` × p (windsor#577);
+ * - the makeup (1 + k)^`LADDER_MAKEUP_POWER` (windsor#587), the ladder's
+ *   last gain, 1 at the knob's bottom and √17.5 (+12.4 dB) at its top,
+ *   only when k changed: 2^(power × log₂(1 + k)) through `log2InPlace` and
+ *   `exp2InPlace`, a scalar per control block and never per sample, which
+ *   steps with the Reso at the cadence the loop's own k does;
  * - the feedback high-pass's G = g / (1 + g), g =
  *   tan(π `LADDER_FEEDBACK_HP_HZ` / (M f_s)), and the output mix's, g =
  *   tan(π `LADDER_MIX_HP_HZ` / f_s) (the mix runs once per output sample),
  *   once per sample rate.
  *
  * Each is worked out only when its input changed, so a held cutoff and
- * Reso cost three compares a block. The tangent and the log are
+ * Reso cost three compares a block. The tangent, the log and the power are
  * `portableTangent.ts`'s and `portablePowers.ts`'s, so the coefficients are
  * the same bits on arm64 and x64; 2^¼ is a square root's, which IEEE rounds
  * exactly.
@@ -47,12 +52,13 @@ import {
   LADDER_CUTOFF_MIN_HZ,
   LADDER_FEEDBACK_HP_HZ,
   LADDER_FEEDBACK_MAX,
+  LADDER_MAKEUP_POWER,
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
   LADDER_RESONANCE_FLOOR,
   LADDER_RESONANCE_SPAN,
 } from './fmConstants';
-import { log2InPlace } from './portablePowers';
+import { exp2InPlace, log2InPlace } from './portablePowers';
 import { tanInPlace } from './portableTangent';
 import { VT_RESONANCE } from './voiceTargetTables';
 
@@ -109,7 +115,19 @@ function tuneLadder(ladder: Ladder, rate: number): void {
       // The portable log is within ulps of log₂, so just under the top it may pass 1 by one.
       if (p > 1) p = 1;
     }
-    ladder.k = LADDER_FEEDBACK_MAX * p;
+    const k = LADDER_FEEDBACK_MAX * p;
+    if (k !== ladder.k) {
+      // The makeup, (1 + k)^power: exactly 1 with no feedback, so the knob's bottom is the circuit's to the bit.
+      if (k === 0) ladder.makeup = 1;
+      else {
+        slot[0] = 1 + k;
+        log2InPlace(slot, 0);
+        slot[0] *= LADDER_MAKEUP_POWER;
+        exp2InPlace(slot, 0);
+        ladder.makeup = slot[0];
+      }
+      ladder.k = k;
+    }
     ladder.mixGain = LADDER_MIX_GAIN * p;
     ladder.tunedResonance = reso;
   }

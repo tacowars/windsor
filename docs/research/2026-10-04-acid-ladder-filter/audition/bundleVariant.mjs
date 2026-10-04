@@ -23,14 +23,21 @@ const BUNDLE = fileURLToPath(
 export const SR = 48000;
 const BLOCK = 128;
 const MONO_GAIN = 0.5;
+/** The processor's song-lane slots, `voiceSlot0` .. `voiceSlot7` (`voiceOffsets.ts`). */
+const LANE_SLOTS = 8;
 
-/** The constants an override may name: the three tunables of record decisions 4 and 7, and the output mix's two (windsor#577). */
+/**
+ * The constants an override may name: the three tunables of record
+ * decisions 4 and 7, the output mix's two (windsor#577) and the makeup's
+ * power (windsor#587).
+ */
 export const TUNABLES = [
   'LADDER_FEEDBACK_MAX',
   'LADDER_FEEDBACK_HP_HZ',
   'LADDER_INPUT_SCALE',
   'LADDER_MIX_GAIN',
   'LADDER_MIX_HP_HZ',
+  'LADDER_MAKEUP_POWER',
 ];
 
 /** The bundle's text with each `{ NAME: value }` override written into its `var` line. */
@@ -75,10 +82,14 @@ export function loadVariant(overrides = {}) {
  * playing `patch`, for `seconds`. Each event reaches the processor before the
  * block that holds its frame. `options`: `seconds`, and the processor's
  * `seed` (1), `maxVoices` (4) and `slideSeconds` (the processor's own 0 when
- * omitted; the engine passes `SLIDE_SECONDS_DEFAULT`). Mono, (L + R) / 2.
+ * omitted; the engine passes `SLIDE_SECONDS_DEFAULT`); and `lanes`, song
+ * lanes as the engine plays them (windsor#587's Reso sweep): `{ paths, at }`,
+ * the slots' target paths (`'filter.resonance'`) and `at(frame)`, each
+ * slot's offset for the block from `frame`, set on its k-rate parameter.
+ * Mono, (L + R) / 2.
  */
 export function renderEvents(variant, patch, events, options) {
-  const { seconds, seed = 1, maxVoices = 4, slideSeconds } = options;
+  const { seconds, seed = 1, maxVoices = 4, slideSeconds, lanes } = options;
   const processorOptions = { maxVoices, patch: structuredClone(patch), seed };
   if (slideSeconds !== undefined) processorOptions.slideSeconds = slideSeconds;
   const processor = new variant.Processor({ processorOptions });
@@ -92,12 +103,15 @@ export function renderEvents(variant, patch, events, options) {
     modWheel: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
+  for (let slot = 0; slot < LANE_SLOTS; slot++) params[`voiceSlot${slot}`] = new Float32Array([0]);
+  if (lanes) processor.inbox({ type: 'voiceSlots', slots: lanes.paths });
   const queue = [...events].sort((a, b) => a.frame - b.frame);
   let next = 0;
   variant.setFrame(0);
   for (let b = 0; b < blocks; b++) {
     const start = b * BLOCK;
     variant.setFrame(start);
+    if (lanes) lanes.at(start).forEach((offset, slot) => (params[`voiceSlot${slot}`][0] = offset));
     while (next < queue.length && queue[next].frame < start + BLOCK) {
       processor.inbox(queue[next++]);
     }

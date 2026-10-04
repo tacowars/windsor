@@ -4,8 +4,10 @@
  * `Math.tanh`; the shipped solver's linearised chain against Stinchcombe's
  * polynomial; its small-signal magnitude and phase against the analog
  * 1 / (D(s) + k HP(s)) at the bilinear image, and with the output mix
- * (windsor#577) times 1 + g HP_mix(s); the mix's absence at the Reso
- * knob's bottom, to the bit; the tuning. The large-signal
+ * (windsor#577) times 1 + g HP_mix(s) and the makeup; the mix's absence
+ * at the Reso knob's bottom, to the bit; the makeup (windsor#587) as a gain
+ * alone, (1 + k)^`LADDER_MAKEUP_POWER` times the output before it; the
+ * tuning. The large-signal
  * readings (convergence, bounds, threshold, the high-pass, harmonics, the
  * end of a ring) are `ladderLimits.test.ts`; the voice is
  * `synth/fmProcessorFilterLadder.test.ts`.
@@ -26,6 +28,7 @@ import {
   LADDER_FEEDBACK_HP_HZ,
   LADDER_FEEDBACK_MAX,
   LADDER_INPUT_SCALE,
+  LADDER_MAKEUP_POWER,
   LADDER_MIX_GAIN,
   LADDER_MIX_HP_HZ,
 } from './fmConstants';
@@ -181,8 +184,9 @@ describe('the small-signal response (decision 9)', () => {
     expect(worstDegrees).toBeLessThan(0.1);
   });
 
-  it("with the output mix at the Reso knob's top, matches (1 + g HP_mix(s)) / (D(s) + k HP(s)) within 0.5 dB and 5°, 48 Hz to 2 f_c, f_c 300 Hz, 2 kHz and 8 kHz", () => {
+  it("with the output mix and the makeup at the Reso knob's top, matches √17.5 (1 + g HP_mix(s)) / (D(s) + k HP(s)) within 0.5 dB and 5°, 48 Hz to 2 f_c, f_c 300 Hz, 2 kHz and 8 kHz", () => {
     const mix = { gain: LADDER_MIX_GAIN, hpHz: LADDER_MIX_HP_HZ };
+    const makeupDb = 20 * Math.log10(Math.sqrt(1 + LADDER_FEEDBACK_MAX));
     let worstDb = 0;
     for (const cutoff of [300, 2000, 8000]) {
       const ladder = tuned(cutoff, undefined, 12);
@@ -196,6 +200,7 @@ describe('the small-signal response (decision 9)', () => {
           mix,
           RATE,
         );
+        want.db += makeupDb;
         const label = `f_c ${cutoff}, ${hz} Hz`;
         expect(Math.abs(got.db - want.db), label).toBeLessThan(0.5);
         expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(5);
@@ -217,6 +222,7 @@ describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
   it("adds nothing: each output is the solve's own x₄, to the bit, while the mix's high-pass runs on", () => {
     const ladder = tuned(700, undefined, 0.5);
     expect(ladder.mixGain).toBe(0);
+    expect(ladder.makeup).toBe(1);
     let seed = 0x577;
     for (let i = 0; i < 4800; i++) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -231,6 +237,43 @@ describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
       const ladder = tuned(1000, undefined, resonance);
       const p = Math.log2(resonance / 0.5) / Math.log2(24);
       expect(ladder.mixGain).toBeCloseTo(LADDER_MIX_GAIN * p, 12);
+    }
+  });
+});
+
+describe('the makeup (windsor#587)', () => {
+  it("is (1 + k)^LADDER_MAKEUP_POWER: 1 at the Reso knob's bottom, √17.5 (+12.4 dB) at its top", () => {
+    expect(LADDER_MAKEUP_POWER).toBe(0.5);
+    expect(tuned(1000, undefined, 0.5).makeup).toBe(1);
+    expect(tuned(1000, undefined, 0.2).makeup).toBe(1);
+    const top = tuned(1000, undefined, 12).makeup;
+    expect(Math.abs(top / Math.sqrt(17.5) - 1)).toBeLessThan(1e-15);
+    expect(20 * Math.log10(top)).toBeCloseTo(12.43, 2);
+  });
+
+  it('is a gain alone: at Reso floor, 25, 50, 75 and 100 % each output is the output before it times (1 + k)^0.5, within 1e-12', () => {
+    for (const place of [0, 0.25, 0.5, 0.75, 1]) {
+      const resonance = 0.5 * 24 ** place;
+      const ladder = tuned(500, undefined, resonance);
+      const before = tuned(500, undefined, resonance);
+      before.makeup = 1;
+      expect(ladder.k).toBeCloseTo(LADDER_FEEDBACK_MAX * place, 12);
+      const gain = Math.sqrt(1 + ladder.k);
+      let seed = 0x587;
+      for (let i = 0; i < 4800; i++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        // A loud saw with noise on it, past the input pair's knee, then the ring after it.
+        const x =
+          i < 3600
+            ? 2 * ((i * 110) / RATE - Math.floor((i * 110) / RATE)) - 1 + (seed / 2 ** 32 - 0.5)
+            : 0;
+        const got = step(ladder, x);
+        const want = step(before, x) * gain;
+        const label = `p ${place}, sample ${i}`;
+        // At the knob's bottom the makeup is 1, so the output is the one before it to the bit.
+        if (place === 0) expect(Object.is(got, want), label).toBe(true);
+        expect(Math.abs(got - want), label).toBeLessThanOrEqual(1e-12 * Math.abs(want));
+      }
     }
   });
 });
@@ -263,15 +306,22 @@ describe('the tuning (decisions 4 and 5)', () => {
     expect(tuned(1000).mixG).toBeCloseTo(gm / (1 + gm), 15);
   });
 
-  it('works a coefficient out again only when its input changed', () => {
+  it('works a coefficient out again only when its input changed, the makeup only when k did', () => {
     const ladder = tuned(1000, undefined, 3);
-    ladder.h = ladder.k = -1;
+    ladder.h = ladder.k = ladder.makeup = -1;
     tuneLadder(ladder, RATE);
-    expect([ladder.h, ladder.k]).toEqual([-1, -1]);
+    expect([ladder.h, ladder.k, ladder.makeup]).toEqual([-1, -1, -1]);
     ladder.cutoffHz = 1001;
     ladder.resonance = 3.5;
     tuneLadder(ladder, RATE);
     expect(ladder.h).toBeGreaterThan(0);
     expect(ladder.k).toBeGreaterThan(0);
+    expect(ladder.makeup).toBeCloseTo(Math.sqrt(1 + ladder.k), 14);
+    // A Reso that moves under the knob's floor leaves k at 0, and the makeup is not worked out again.
+    const floor = tuned(1000, undefined, 0.4);
+    floor.makeup = -1;
+    floor.resonance = 0.3;
+    tuneLadder(floor, RATE);
+    expect([floor.k, floor.makeup]).toEqual([0, -1]);
   });
 });

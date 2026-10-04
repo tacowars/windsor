@@ -17,7 +17,8 @@ the cost of the shipped filter is a measurement the engine ticket makes on
 the bundle. The engine ticket (windsor#573) made it: its readings of the
 shipped bundle, both solver candidates, the saturator, the cost, the
 aliasing and the convergence, are the section "The shipped filter"; the
-sound-design pass (windsor#574) and the output mix (windsor#577) follow it.
+sound-design pass (windsor#574), the output mix (windsor#577) and the
+makeup (windsor#587) follow it.
 
 Codex reviewed the first version of this folder (`codex-review.md`,
 `review-check.mjs`, which identifies the prototype it reviewed by hash and
@@ -1010,3 +1011,122 @@ bundle's Off (median [IQR]):
 An Acid voice costs 1.9 % more (273 → 278–279 ns a voice-sample; the
 ladder's own share 247 → 252–253, +2.2 %); every other mode is within
 0.25 ns of before, inside the runs' spread.
+
+## The makeup (windsor#587)
+
+tacowars's listen of windsor#577: the character is right, smoother than
+the SVF at low cutoffs and squelching when the resonance is high and the
+cutoff opens, but the level falls as Reso rises. That fall is the
+TB-303's own (the loop attenuates the passband between the feedback's
+high-pass and the cutoff by about 1 / (1 + k), and the output mix returns
+the peak and the lift but not the loudness), and it is a problem when the
+Reso is performed. `ladder.ts` now multiplies its output, last, by
+
+    makeup = (1 + k) ^ LADDER_MAKEUP_POWER
+
+k the loop's feedback gain, the power shipped at **0.5** (record decision
+11): 1 at the Reso knob's bottom and √17.5, **+12.4 dB**, at its top. It
+is a scalar after the output mix and before the polarity, so nothing
+nonlinear sees it; `tuneLadder` works it out beside k, only when k
+changes, through `portablePowers.ts`'s `log2InPlace` and `exp2InPlace`
+(no new power function was needed), and it steps with the Reso at the
+control-block cadence k already does.
+
+**Nothing but the gain.** `ladder.test.ts` runs a loud saw with noise on
+it through the ladder at Reso floor, 25, 50, 75 and 100 % and holds each
+output to the output with the makeup at 1 times (1 + k)^0.5, sample by
+sample, within 1e-12 relative, and to the bit at the floor. On the bundle,
+`acid-saw`, `acid-square` and `acid-accent` with the Reso knob at its
+bottom render bit for bit as origin/main's at notes 33, 45 and 57, plain
+and accented (18 of 18 renders, the patches as windsor#577 shipped them). The voice's white-noise test holds the
+whole mode to the analog response plus the makeup's dB at k 0, 8 and 16.
+
+**The patches.** The factory acid patches ship with the Drive off,
+tacowars's decision on 2026-10-04: the Drive stage before the filter is
+an optional push, not part of their gain staging, and the ladder's
+calibration on the ACB rig was made with it off. Each patch's `drive.on`
+is false, the drive's other fields as they were, and nothing else moves
+but `volume`, which is now pure gain. It is set so the patch peaks between
+0.6 and 0.75 at the loudest of C1, C2 and C3 held at velocity 1, with the
+makeup in place (`patch/patchLibraryEnvelope.test.ts`'s render, which
+requires under 0.8). The audition song's strips follow so each line plays
+within 1 dB of its level on windsor#577 (line: the part alone, two passes,
+as rendered; in the song, the line plus its strip's dB):
+
+| patch | drive | volume | peak at C1 / C2 / C3 | line RMS, dBFS | strip | line in the song, dBFS |
+|---|---|---|---|---|---|---|
+| `acid-saw` | gain 3, on → **off** | 0.22 → **0.64** | **0.679** / 0.482 / 0.579 | −29.18 → −17.90 | 1.9 → **0.52** | −23.61 → −23.58 |
+| `acid-square` | gain 3, on → **off** | 0.28 → **0.46** | **0.674** / 0.414 / 0.454 | −22.71 → −15.55 | 1.55 → **0.68** | −18.90 → −18.90 |
+| `acid-accent` | gain 4, on → **off** | 0.30 → **0.68** | **0.681** / 0.430 / 0.483 | −24.84 → −17.10 | 1.6 → **0.66** | −20.76 → −20.71 |
+
+With the drive off a patch's tone no longer depends on its `volume`, so
+setting the level changes nothing else. `fmGolden.json` and
+`fmGoldenFineInterval.json` change in the three acid rows each and
+nowhere else. A patch whose Reso sits at its floor renders as it did
+before the makeup; turned down from their own Reso, these three now hold
+their level where on windsor#577 they grew louder.
+
+**The listen.** `audition/renderTunables.mjs <out dir>` now renders, by
+default, the song's three lines (each twice, its own patch alone, half a
+second apart, the patches as shipped here, drive off) at the makeup's power 0
+(the circuit's level), 0.35, 0.5 (shipped) and 0.7,
+`LADDER_MAKEUP_POWER-<power>.wav`; and for each power the performance
+case, `reso-sweep-<power>.wav` (`audition/resoSweep.mjs`): `acid-saw` on
+sixteen A1 sixteenths a bar at 128 BPM and velocity 0.8, its cutoff held
+at 500 Hz (the envelope's amount 0), while a song lane takes the Reso
+knob's travel from its floor to its top and back over 4 bars.
+`--listen tunables` renders windsor#574's and windsor#577's sets as before.
+The files went to `~/Desktop/acid-tunables/`, never into the repository;
+windsor#577's renders moved to its `before-makeup/` folder (its
+`LADDER_MIX_GAIN-2.6.wav` is the song as windsor#577 shipped it). The
+files were rendered again with the drive-off patches. Levels as rendered:
+
+| power | gain at the top | song, RMS per part (saw / square / `acid-accent`), dBFS | sweep RMS, dBFS | sweep, 100 ms windows: range, floor, top |
+|---|---|---|---|---|
+| 0 | 0 dB | −29.0 / −26.8 / −28.5 | −24.3 | **11.3 dB**, −18.3, −29.1 dBFS |
+| 0.35 | +8.7 dB | −21.2 / −18.9 / −20.5 | −19.2 | 3.5 dB, −17.7, −20.4 dBFS |
+| **0.5** | **+12.4 dB** | **−17.9 / −15.6 / −17.1** | **−16.7** | **1.4 dB**, −17.4, −16.7 dBFS |
+| 0.7 | +17.4 dB | −13.5 / −11.0 / −12.5 | −13.0 | 5.9 dB, −17.1, −11.7 dBFS |
+
+At power 0 the sweep loses 10.8 dB from the floor to the top; at the
+shipped 0.5 its level stays within 1.4 dB over the whole sweep, 9.9 dB
+narrower, with the top 0.7 dB over the floor. At a 500 Hz cutoff the
+circuit's own loss is far less than 1 / (1 + k)'s 24.9 dB (the feedback's
+high-pass returns the bass under it, and the output mix adds its share),
+so half the 1 / (1 + k) loss in dB, 12.4, is about all of this cutoff's.
+Power 0.35 leaves a 2.7 dB fall; 0.7 overshoots, the top 5.4 dB over the
+floor. The song files share the shipped volumes, so the power-0 file is
+the circuit's level. The song file peaks at −3.0 dBFS at the shipped
+power and at +1.5 dBFS at 0.7, as rendered.
+
+**Cost**, on an Apple M1 under Node 24.21.0, the machine shared with other
+sessions (load average 2.8–4.1). `ladderBench.mjs`, the ladder alone at
+k 16.5 with the mix and the makeup at the top's (`--makeup` defaults to
+√17.5; `bundle.mjs`'s `candidate` sets it), twelve interleaved pairs of
+runs of `--seconds 20` against origin/main's bundle, three readings each,
+median [range] ns a sample: the shipped 1× candidate **244.9 [238.3–275.1]
+before and 248.1 [239.3–275.2] after, +1.3 %**; the 2× candidate 380.5 →
+387.2, +1.8 %. `bench.mjs . <origin/main root> --rounds 20 --seconds 2
+--beforeAcid 1`, eight held `pad-drift` voices, Acid at Reso 9, four runs,
+ns per voice-sample and against the same bundle's Off (median [IQR]):
+
+| variant | run 1 | | run 2 | | run 3 | | run 4 | |
+|---|---|---|---|---|---|---|---|---|
+| before Off | 25.01 | | 25.19 | | 24.96 | | 25.31 | |
+| before LP 12 | 27.85 | +2.74 [2.62, 2.91] | 27.89 | +2.64 [2.29, 2.94] | 28.27 | +2.82 [2.71, 3.13] | 28.07 | +2.86 [2.62, 3.34] |
+| before BP 12 | 27.87 | +2.79 [2.32, 3.01] | 28.02 | +2.79 [2.29, 2.90] | 28.14 | +2.99 [2.75, 3.32] | 28.05 | +2.81 [2.42, 3.42] |
+| before LP 24 | 31.18 | +6.17 [5.85, 6.38] | 31.43 | +6.01 [5.63, 6.49] | 31.28 | +6.26 [6.18, 7.17] | 31.28 | +5.97 [5.54, 6.33] |
+| before Formant | 33.59 | +8.64 [8.24, 8.76] | 33.56 | +8.31 [7.85, 8.53] | 34.05 | +8.90 [8.58, 10.09] | 33.68 | +8.46 [8.11, 8.63] |
+| before Acid 1×4 | 269.11 | +243.79 [241.90, 247.51] | 270.05 | +244.11 [242.31, 246.09] | 273.92 | +248.71 [244.61, 253.34] | 270.36 | +245.34 [243.82, 247.80] |
+| engine Off | 24.99 | | 25.08 | | 25.27 | | 25.10 | |
+| engine LP 12 | 27.85 | +2.85 [2.75, 2.91] | 27.98 | +3.07 [2.77, 3.53] | 28.63 | +2.80 [2.55, 3.40] | 27.90 | +2.76 [2.62, 2.85] |
+| engine BP 12 | 27.91 | +2.95 [2.81, 3.53] | 28.00 | +2.95 [2.72, 3.24] | 28.44 | +2.87 [2.18, 3.46] | 28.12 | +2.87 [2.71, 3.16] |
+| engine LP 24 | 31.83 | +6.41 [6.25, 7.25] | 31.39 | +6.27 [6.10, 6.86] | 31.64 | +6.33 [5.71, 6.80] | 31.81 | +6.36 [6.08, 6.84] |
+| engine Formant | 33.80 | +8.71 [8.54, 9.17] | 33.69 | +8.55 [8.33, 9.55] | 34.31 | +8.68 [8.04, 9.97] | 33.91 | +8.80 [8.29, 9.35] |
+| **engine Acid 1×4** | **275.76** | +250.43 [244.28, 255.03] | **271.38** | +245.41 [243.12, 248.52] | **274.04** | +247.43 [244.70, 250.57] | **273.24** | +247.48 [245.06, 249.20] |
+| engine Acid 2×3 | 399.25 | +372.45 [367.77, 380.40] | 408.13 | +383.12 [379.22, 388.33] | 397.46 | +372.34 [369.66, 376.48] | 399.64 | +374.68 [371.29, 377.64] |
+
+An Acid voice costs 270.2 → 273.6 ns a voice-sample, the median of the
+four runs, +1.3 % (the ladder's own share 244.7 → 247.5, +1.1 %); run by
+run +2.5, +0.5, +0.0 and +1.1 %, the first run's inside its own IQR. Every
+other mode is within 0.45 ns of before, inside the runs' spread.

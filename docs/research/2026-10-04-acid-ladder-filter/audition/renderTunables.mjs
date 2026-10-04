@@ -1,15 +1,24 @@
 /* global console, process, URL */
 /**
- * The tunables' listen (windsor#574, decision 3; windsor#577): the audition
- * song's lines at three values of each of the Acid Ladder's sound-design
- * tunables, the others at their shipped values. One WAV per value; each
- * plays every part's line twice in slot order, its own patch alone, with
- * half a second between parts. Then the output mix's pair for each part:
- * `<patch>-mix-on.wav` (shipped) and `<patch>-mix-off.wav`
- * (`LADDER_MIX_GAIN` 0), its line alone. Levels are as rendered, never
- * normalised, so the change in level with feedback is heard.
+ * The tunables' listen. Every file plays every part's line of the audition
+ * song twice in slot order, its own patch alone, with half a second between
+ * parts; levels are as rendered, never normalised, so a change in level is
+ * heard, and each file's RMS per part is printed.
  *
- *   node renderTunables.mjs <out dir> [--song acid-audition.song.json] [--passes 2]
+ * `--listen makeup` (the default, windsor#587): the makeup's power at 0
+ * (the circuit's level, as windsor#577 shipped), 0.35, 0.5 (shipped) and
+ * 0.7, `LADDER_MAKEUP_POWER-<power>.wav`; and for each power the
+ * performance case, `reso-sweep-<power>.wav` (`resoSweep.mjs`): the saw on
+ * an A1 figure while the Reso knob sweeps floor to top and back at a 500 Hz
+ * cutoff, with its level range over 100 ms windows printed.
+ *
+ * `--listen tunables` (windsor#574, decision 3; windsor#577): three values
+ * of each of the other sound-design tunables, the rest at their shipped
+ * values, `<NAME>-<value>.wav`; then the output mix's pair for each part:
+ * `<patch>-mix-on.wav` (shipped) and `<patch>-mix-off.wav`
+ * (`LADDER_MIX_GAIN` 0), its line alone.
+ *
+ *   node renderTunables.mjs <out dir> [--listen makeup|tunables] [--song acid-audition.song.json] [--passes 2]
  *
  * The Grid line is played as `sequencing/gridSequencer.ts` plays it: a note
  * releases the held note and starts its own; a slide with a note held sends
@@ -26,8 +35,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { writeWav } from '../../../../scripts/sound-match/render.mjs';
+import { resolvePatch, writeWav } from '../../../../scripts/sound-match/render.mjs';
 import { SR, loadVariant, renderEvents } from './bundleVariant.mjs';
+import { levelRange, renderResoSweep } from './resoSweep.mjs';
 
 const SONG = fileURLToPath(new URL('./acid-audition.song.json', import.meta.url));
 /** `audioConstants.ts`'s scales the song may name, and the engine's slide time. */
@@ -52,6 +62,9 @@ export const VARIANTS = {
   LADDER_MIX_GAIN: [2.2, 2.6, 3],
   LADDER_MIX_HP_HZ: [160, 400, 600],
 };
+
+/** The makeup's powers (windsor#587): the circuit's level, two either side, and the shipped 0.5. */
+export const MAKEUP_POWERS = [0, 0.35, 0.5, 0.7];
 
 function noteOf(step, register, harmony) {
   const scale = SCALES[harmony.scale];
@@ -97,9 +110,9 @@ export function lineEvents(sequencer, { harmony, bpm, velocity, passes }) {
   return { events, end };
 }
 
-/** Every part's line, its own patch alone, one after another; mono samples. */
-export function renderSong(variant, song, passes) {
-  const pieces = song.parts.map((part) => {
+/** Every part's line, its own patch alone, each its own mono piece. */
+export function renderParts(variant, song, passes) {
+  return song.parts.map((part) => {
     const { events, end } = lineEvents(part.sequencer, {
       harmony: song.harmony,
       bpm: song.transport.bpm,
@@ -110,6 +123,10 @@ export function renderSong(variant, song, passes) {
     const seconds = end / SR + PART_GAP_S;
     return renderEvents(variant, patch, events, { seconds, slideSeconds: SLIDE_SECONDS_DEFAULT });
   });
+}
+
+/** The pieces one after another. */
+function concatenate(pieces) {
   const out = new Float32Array(pieces.reduce((sum, p) => sum + p.length, 0));
   let at = 0;
   for (const piece of pieces) {
@@ -119,10 +136,66 @@ export function renderSong(variant, song, passes) {
   return out;
 }
 
+/** Every part's line, its own patch alone, one after another; mono samples. */
+export function renderSong(variant, song, passes) {
+  return concatenate(renderParts(variant, song, passes));
+}
+
 function peakDb(samples) {
   let peak = 0;
   for (const s of samples) peak = Math.max(peak, Math.abs(s));
   return 20 * Math.log10(peak);
+}
+
+function rmsDb(samples) {
+  let sum = 0;
+  for (const s of samples) sum += s * s;
+  return 10 * Math.log10(sum / samples.length);
+}
+
+/** Write the song's parts one after another to `path`, and print its peak and each part's RMS. */
+function writeSong(path, variant, song, passes) {
+  const pieces = renderParts(variant, song, passes);
+  const samples = concatenate(pieces);
+  writeWav(path, samples);
+  const parts = pieces.map((piece) => rmsDb(piece).toFixed(1)).join(' / ');
+  console.log(`${path}  peak ${peakDb(samples).toFixed(1)} dBFS  RMS per part ${parts} dBFS`);
+}
+
+/** windsor#587's listen: the song and the Reso sweep at each makeup power. */
+function makeupListen(outDir, song, passes) {
+  const saw = resolvePatch('acid-saw');
+  const sawPart = song.parts.find((part) => part.preset === 'acid-saw');
+  for (const power of MAKEUP_POWERS) {
+    const variant = loadVariant({ LADDER_MAKEUP_POWER: power });
+    writeSong(join(outDir, `LADDER_MAKEUP_POWER-${power}.wav`), variant, song, passes);
+    const { samples, end } = renderResoSweep(variant, saw, {
+      bpm: song.transport.bpm,
+      velocity: sawPart.velocity,
+    });
+    const path = join(outDir, `reso-sweep-${power}.wav`);
+    writeWav(path, samples);
+    const { range, floor, top } = levelRange(samples, end);
+    console.log(
+      `${path}  RMS ${rmsDb(samples.subarray(0, end)).toFixed(1)} dBFS, 100 ms windows: range ${range.toFixed(1)} dB, floor ${floor.toFixed(1)}, top ${top.toFixed(1)} dBFS`,
+    );
+  }
+}
+
+/** windsor#574's and windsor#577's listen: three values of each other tunable, and the mix's pairs. */
+function tunablesListen(outDir, song, passes) {
+  for (const [name, values] of Object.entries(VARIANTS)) {
+    for (const value of values) {
+      writeSong(join(outDir, `${name}-${value}.wav`), loadVariant({ [name]: value }), song, passes);
+    }
+  }
+  const pairs = { on: loadVariant(), off: loadVariant({ LADDER_MIX_GAIN: 0 }) };
+  for (const part of song.parts) {
+    for (const [label, variant] of Object.entries(pairs)) {
+      const path = join(outDir, `${part.preset}-mix-${label}.wav`);
+      writeSong(path, variant, { ...song, parts: [part] }, passes);
+    }
+  }
 }
 
 function main() {
@@ -133,28 +206,16 @@ function main() {
   };
   const songPath = option('song', SONG);
   const passes = Number(option('passes', 2));
-  if (args.length !== 1) {
-    console.error('usage: node renderTunables.mjs <out dir> [--song path] [--passes 2]');
+  const listen = option('listen', 'makeup');
+  if (args.length !== 1 || !['makeup', 'tunables'].includes(listen)) {
+    console.error(
+      'usage: node renderTunables.mjs <out dir> [--listen makeup|tunables] [--song path] [--passes 2]',
+    );
     process.exit(2);
   }
   const song = JSON.parse(readFileSync(songPath, 'utf8'));
-  for (const [name, values] of Object.entries(VARIANTS)) {
-    for (const value of values) {
-      const samples = renderSong(loadVariant({ [name]: value }), song, passes);
-      const path = join(args[0], `${name}-${value}.wav`);
-      writeWav(path, samples);
-      console.log(`${path}  peak ${peakDb(samples).toFixed(1)} dBFS`);
-    }
-  }
-  const pairs = { on: loadVariant(), off: loadVariant({ LADDER_MIX_GAIN: 0 }) };
-  for (const part of song.parts) {
-    for (const [label, variant] of Object.entries(pairs)) {
-      const samples = renderSong(variant, { ...song, parts: [part] }, passes);
-      const path = join(args[0], `${part.preset}-mix-${label}.wav`);
-      writeWav(path, samples);
-      console.log(`${path}  peak ${peakDb(samples).toFixed(1)} dBFS`);
-    }
-  }
+  if (listen === 'makeup') makeupListen(args[0], song, passes);
+  else tunablesListen(args[0], song, passes);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

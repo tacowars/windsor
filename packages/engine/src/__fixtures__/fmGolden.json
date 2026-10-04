@@ -4,19 +4,19 @@
   "sampleRate": 48000,
   "hashes": {
     "acid-accent": {
-      "default": "1c14e79a0e8e61c8c18e77507559cfd1a25749cca9011f092255aa32b9f6d351",
-      "generic": "1c14e79a0e8e61c8c18e77507559cfd1a25749cca9011f092255aa32b9f6d351",
-      "noDormancy": "1c14e79a0e8e61c8c18e77507559cfd1a25749cca9011f092255aa32b9f6d351"
+      "default": "86bef9d921a5a0fcd6eb87eddb34a90a2f0a0c308f20a744c5032f29a2f89df5",
+      "generic": "86bef9d921a5a0fcd6eb87eddb34a90a2f0a0c308f20a744c5032f29a2f89df5",
+      "noDormancy": "86bef9d921a5a0fcd6eb87eddb34a90a2f0a0c308f20a744c5032f29a2f89df5"
     },
     "acid-saw": {
-      "default": "c440578723e3e4f45b28835a7be3f57fbb4d6c15aab77e296db48f997a4a0f8f",
-      "generic": "c440578723e3e4f45b28835a7be3f57fbb4d6c15aab77e296db48f997a4a0f8f",
-      "noDormancy": "c440578723e3e4f45b28835a7be3f57fbb4d6c15aab77e296db48f997a4a0f8f"
+      "default": "e15d282dbf0ef032348da64f9e5aad28b3fa524a0a456f788a39abee763e50bb",
+      "generic": "e15d282dbf0ef032348da64f9e5aad28b3fa524a0a456f788a39abee763e50bb",
+      "noDormancy": "e15d282dbf0ef032348da64f9e5aad28b3fa524a0a456f788a39abee763e50bb"
     },
     "acid-square": {
-      "default": "c4e3beaeb319279f7341f3de0eea42db3ca3f054d63f7239517f75d822ff320d",
-      "generic": "c4e3beaeb319279f7341f3de0eea42db3ca3f054d63f7239517f75d822ff320d",
-      "noDormancy": "c4e3beaeb319279f7341f3de0eea42db3ca3f054d63f7239517f75d822ff320d"
+      "default": "55d10915daee8d877b9e66dfeae5edb36350b03fa0e30e0ea590ba3e39d46276",
+      "generic": "55d10915daee8d877b9e66dfeae5edb36350b03fa0e30e0ea590ba3e39d46276",
+      "noDormancy": "55d10915daee8d877b9e66dfeae5edb36350b03fa0e30e0ea590ba3e39d46276"
     },
     "ai-voice": {
       "default": "e8e8a364dcd1df29217449c9674b9bcfec5cc49c7d6e556bb1b49be96316131f",
