@@ -33,6 +33,7 @@ import {
   addMapping,
   canAddMacro,
   canAddMapping,
+  floorSeedNote,
   macroLabel,
   macroTileNames,
   macroValuePath,
@@ -43,18 +44,14 @@ import {
   renameMacro,
   setMappingField,
 } from './macroModel';
-import {
-  ADD_MAPPING_HINT,
-  CURVE_GLYPH_BOX,
-  CURVE_GLYPH_PATHS,
-  CURVE_SEGMENT_LABELS,
-  MACRO_CARD_PX,
-} from './macroTables';
+import { ADD_MAPPING_HINT, CURVE_SEGMENT_LABELS, MACRO_CARD_PX } from './macroTables';
+import { curveGlyph } from './macroCurveGlyph';
 import { commitMacros, removeMacroAndItsLanes } from './macroLaneShift';
 import { openConfirm } from './metadataModal';
 import type { PatchEditor } from './partsSession';
 import { getPath, pathKnob } from './patchPath';
 import { knobRangeOf, voiceKnobRange } from './patchKnobRange';
+import { notify } from './toast';
 
 /** The selected macro's index: the session's view state, kept across rebuilds. */
 let selectedMacro = 0;
@@ -289,30 +286,6 @@ function mappingRow(
   return box;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function svgNode(tag: string, attrs: Readonly<Record<string, string | number>>): SVGElement {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, String(value));
-  return node;
-}
-
-/** A curve's glyph: its two axes and its shape, mirrored when the mapping is inverted. */
-function curveGlyph(curve: number, inverted: boolean): SVGElement {
-  const { w, h, inset } = CURVE_GLYPH_BOX;
-  const svg = svgNode('svg', { class: 'glyph', viewBox: `0 0 ${w} ${h}`, 'aria-hidden': 'true' });
-  const name = MACRO_CURVE_NAMES[curve] ?? MACRO_CURVE_NAMES[0];
-  svg.append(
-    svgNode('line', { x1: inset, y1: h - inset, x2: w - inset, y2: h - inset }),
-    svgNode('line', { x1: inset, y1: inset, x2: inset, y2: h - inset }),
-    svgNode('path', {
-      d: CURVE_GLYPH_PATHS[name],
-      ...(inverted ? { transform: `translate(${w} 0) scale(-1 1)` } : {}),
-    }),
-  );
-  return svg;
-}
-
 /** The curve glyph and its segment, then Invert: each a field of the mapping. */
 function curveControls(view: MacroCardView, index: number, at: number): DocumentFragment {
   const mapping = (): Macro['mappings'][number] | undefined => macrosOf(view)[index]?.mappings[at];
@@ -395,6 +368,8 @@ function targetPicker(view: MacroCardView, index: number): HTMLElement {
         const current = Number(getPath(view.editor.patch, option.path) ?? 0);
         view.commit(addMapping(macrosOf(view), index, option.path, current));
         view.rebuild();
+        const notice = floorSeedNote(option.path, current);
+        if (notice) notify(notice);
       };
       box.appendChild(b);
     }

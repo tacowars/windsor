@@ -13,12 +13,14 @@ import {
   makeMacro,
   type Macro,
   type VoiceTargetPath,
+  voiceTargetRow,
 } from '@windsor/engine';
 import {
   addMacro,
   addMapping,
   canAddMacro,
   canAddMapping,
+  floorSeedNote,
   mappedKnob,
   macroTileNames,
   mappingPickerGroups,
@@ -88,6 +90,21 @@ describe('a mapping', () => {
       inverted: false,
     });
     expect(plays(next[1]!, 2)).toBeCloseTo(0.71, 12);
+  });
+
+  it('starts a decay at 0 at its floor, which it plays at every macro value', () => {
+    const floor = voiceTargetRow('ops.0.env.decayTime')!.floor;
+    expect(floor).toBeGreaterThan(0);
+    const next = addMapping([makeMacro()], 0, 'ops.0.env.decayTime', 0);
+    const mapping = next[0]!.mappings[0]!;
+    expect([mapping.min, mapping.max]).toEqual([floor, floor]);
+    for (const x of [0, 0.5, 1]) expect(mappingPlays(mapping, x)).toBeCloseTo(floor, 12);
+    const above = addMapping([makeMacro()], 0, 'ops.0.env.decayTime', 0.4)[0]!.mappings[0]!;
+    expect([above.min, above.max]).toEqual([0.4, 0.4]);
+    expect(floorSeedNote('ops.0.env.decayTime', 0)).toBe(
+      'Op A Decay is at 0, which a macro cannot reach; the mapping starts at 1 ms.',
+    );
+    expect(floorSeedNote('ops.0.env.decayTime', 0.4)).toBeUndefined();
   });
 
   it('is refused on a mapped target, a macro row, or a full macro', () => {

@@ -22,7 +22,8 @@ import {
   macroTargetProblem,
   voiceTargetRow,
 } from '@windsor/engine';
-import { MACRO_NAME_PREFIX, PICKER_GROUP_PREFIX } from './macroTables';
+import { readout } from './automationReadout';
+import { MACRO_NAME_PREFIX, PICKER_GROUP_PREFIX, floorSeedNotice } from './macroTables';
 import { voiceGroupLabel } from './songAutomationTables';
 
 /** The voice target row of macro `index`'s value: what its knob and a lane on it address. */
@@ -103,10 +104,33 @@ export function macroTileNames(macro: Macro, index: number): MacroTileNames {
 }
 
 /**
+ * Where a new mapping onto `target` starts: `current`, the target's value in
+ * the patch, or the row's floor where a `ratio` row's value sits below it (a
+ * decay time at 0, an LFO rate at 0). A mapping's endpoint below the floor
+ * plays the floor (decision 4), so seeding there shows what plays (windsor#568).
+ */
+export function mappingSeed(target: VoiceTargetPath, current: number): number {
+  const row = voiceTargetRow(target);
+  return row?.curve === 'ratio' && current < row.floor ? row.floor : current;
+}
+
+/**
+ * The notice when a new mapping onto `target` starts at its row's floor
+ * rather than at `current` (windsor#568), or undefined when it starts at
+ * `current`: `Op A Decay is at 0, which a macro cannot reach; the mapping starts at 1 ms.`
+ */
+export function floorSeedNote(target: VoiceTargetPath, current: number): string | undefined {
+  const seed = mappingSeed(target, current);
+  const row = VOICE_AUTOMATION_ROWS.find((r) => r.path === target);
+  return seed !== current && row ? floorSeedNotice(row.label, readout(row, seed)) : undefined;
+}
+
+/**
  * Macro `index` with a mapping onto `target` that starts with `min` and `max`
- * at `current`, the target's value in the patch, `Linear` and not inverted,
- * so adding it changes nothing until a knob moves. Unchanged when the macro
- * is full, or the target is a macro's row, unknown or already mapped.
+ * at `mappingSeed(target, current)`, `Linear` and not inverted, so adding it
+ * changes nothing until a knob moves, except a target below its floor, which
+ * starts at the floor. Unchanged when the macro is full, or the target is a
+ * macro's row, unknown or already mapped.
  */
 export function addMapping(
   macros: readonly Macro[],
@@ -120,8 +144,8 @@ export function addMapping(
   }
   const mapping = makeMacroMapping({
     target,
-    min: current,
-    max: current,
+    min: mappingSeed(target, current),
+    max: mappingSeed(target, current),
     curve: MACRO_CURVE.LINEAR,
     inverted: false,
   });

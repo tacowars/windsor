@@ -35,6 +35,14 @@ export const ADD_MAPPING_HINT =
   "A new mapping starts with Min and Max at the target's current value, so nothing changes until a knob moves.";
 
 /**
+ * The notice when a new mapping starts at its row's floor, not at the
+ * target's value of 0 (windsor#568), word for word: `<target>` is the row's
+ * label, `<floor>` its floor as the row reads.
+ */
+export const floorSeedNotice = (target: string, floor: string): string =>
+  `${target} is at 0, which a macro cannot reach; the mapping starts at ${floor}.`;
+
+/**
  * The picker's group labels drop the lane picker's `Voice · ` (the mockup
  * heads them Filter, Op A, LFO, Pitch); a mapping row's group line keeps it.
  */
