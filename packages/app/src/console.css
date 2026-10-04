@@ -146,6 +146,12 @@ input {
   gap: 8px;
   flex: none;
 }
+/* The song's settings, the first three groups (windsor#584): no box of its
+   own from 720 px up, so they wrap in the row as before; below that it is
+   the header's sideways-scrolling row (the phone block at the end). */
+.transport-settings {
+  display: contents;
+}
 .transport-position {
   font-family: var(--f-num);
   font-size: 13px;
@@ -7609,4 +7615,121 @@ dialog.song-dlg {
   right: auto;
   width: 1px;
   height: auto;
+}
+
+/* ---------- the header on a phone (windsor#584; record
+   2026-10-04-phone-header; the approved mockup is
+   docs/design/phone-header-mockup.html, its "Proposed" screen) ----------
+   Below 720 px the header is three rows plus the part strip: the tabs
+   stretched across with undo and redo at the end; the CPU meter and output
+   light taking what the position, ▶ ■ ‖ and loop leave; and the song's
+   settings in one row that scrolls sideways inside the header. The strip
+   and its row step aside (display: contents), so the groups order straight
+   into .head-row. Every phone rule is in this one block: 720 px and wider
+   render exactly as before. */
+@media (max-width: 719.98px) {
+  .head-row {
+    --head-gap: 8px;
+    align-items: center;
+  }
+  .transport-strip,
+  .transport-row {
+    display: contents;
+  }
+  /* Row 1. The tabs take the row less undo (two 28px buttons, their 4px gap,
+     the row's 8px gap and their 4px margin) and a pixel's slack. */
+  .head-row > .tabs {
+    order: 1;
+    flex: 1 1 calc(100% - 73px);
+    min-width: 0;
+  }
+  .head-row > .tabs > .tab-btn {
+    flex: 1 1 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .head-row > .tabs > .tab-btn-icon {
+    flex: 0 0 38px;
+    justify-content: center;
+  }
+  .head-row > .undo-controls {
+    order: 2;
+    margin-left: 4px;
+  }
+  /* Row 2. The meter shrinks first, its bar before its label; at 360 px
+     the bar is a sliver and the row still holds. */
+  .head-row > .btn.cpu-meter {
+    order: 3;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 56px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .head-row > .output-light {
+    order: 4;
+    margin-top: 0;
+    margin-left: -2px;
+  }
+  .transport-row > .transport-group {
+    order: 5;
+    margin-left: 4px;
+  }
+  /* Row 3: the settings, edge to edge, faded at its edges, with a hairline
+     between the groups. A vertical drag on a number
+     box still moves its number; a sideways one scrolls the row. */
+  .transport-settings {
+    order: 6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 calc(100% + 32px);
+    margin: 0 -16px;
+    padding: 0 16px;
+    scroll-padding: 0 16px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .transport-settings::-webkit-scrollbar {
+    display: none;
+  }
+  /* The fades: the panel's colour over a strip at each edge of the row,
+     stuck there while it scrolls, as the mockup's mask draws them. The left
+     one lies over the row's padding until the row moves; the right one
+     covers the padding and the last 12px of the row. Drawn over, not
+     masked: a mask-image anywhere in the sheet moved a pixel of the wide
+     header (the 720 px and wider check). */
+  .transport-settings::before,
+  .transport-settings::after {
+    content: '';
+    position: sticky;
+    z-index: 1;
+    flex: none;
+    align-self: stretch;
+    pointer-events: none;
+  }
+  .transport-settings::before {
+    left: 0;
+    width: 16px;
+    margin: 0 -8px 0 -16px;
+    background: linear-gradient(90deg, var(--panel), transparent);
+  }
+  .transport-settings::after {
+    right: 0;
+    width: 28px;
+    margin: 0 -16px 0 -20px;
+    background: linear-gradient(90deg, transparent, var(--panel));
+  }
+  .transport-settings > .transport-group + .transport-group::before {
+    content: '';
+    flex: none;
+    width: 1px;
+    align-self: stretch;
+    margin: 4px 2px;
+    background: var(--line);
+  }
+  .transport-settings .transport-box {
+    touch-action: pan-x;
+  }
 }

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The phone header mockup tacowars approved on 2026-10-04: the console's sticky
+     header at 390 px, today and proposed. "Today" reproduces main's header
+     CSS (packages/app/src/console.css, .head-row / .transport-strip /
+     .transport-group) so it overflows the way the app does: the transport
+     strip is squeezed to 146 px beside the tabs, meter and undo, and each of
+     its four non-wrapping groups runs past the screen. "Proposed" keeps
+     every control and only changes the frame below 720 px. Desktop is
+     unchanged. Static and self-contained: open it in a browser. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Windsor Phone Header</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: two 390 px phone screens side by side (stacked on a phone), each
+   showing the sticky header over the top of the Parts tab.
+   Tokens copied from packages/app/src/console.css. The app is dark only. */
+:root {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --head-control-h: 28px;
+  --head-gap: 12px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #0b0d0e; color: var(--ink); font: 13px/1.4 var(--f-ui); }
+button, select { font: inherit; color: inherit; }
+
+/* ---------- the mockup's own frame (not the console) ---------- */
+.mock-bar {
+  padding: 10px 16px; background: #2a2140; border-bottom: 1px dashed var(--return);
+  font: 12px/1.5 var(--f-ui); color: #cbbfe6;
+}
+.mock-bar b { font-family: var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px; color: var(--return); margin-right: 8px; }
+.screens { display: flex; flex-wrap: wrap; gap: 32px 48px; justify-content: center; padding: 24px 16px 40px; }
+.screen-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
+.screen-col h2 { margin: 0; font: 600 12px var(--f-panel); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+.screen-col h2 span { color: var(--ink-faint); font: 11px var(--f-num); letter-spacing: 0; text-transform: none; margin-left: 8px; }
+.scroller { overflow-x: auto; max-width: 100%; padding-bottom: 4px; }
+.today .scroller { padding-right: 100px; }
+.phone {
+  position: relative; width: 390px; height: 560px; background: var(--ground);
+  border: 1px solid var(--line-bright); border-radius: 18px 18px 0 0; border-bottom: 0;
+}
+.today .phone { overflow: visible; }
+.proposed .phone { overflow: hidden; }
+/* The screen's right edge, and what lies past it. */
+.today .phone::after {
+  content: 'off screen'; position: absolute; top: 0; bottom: 0; left: 390px; width: 90px;
+  border-left: 2px dashed var(--hot); background: repeating-linear-gradient(135deg, rgba(210,100,60,0.10) 0 6px, transparent 6px 12px);
+  font: 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--hot);
+  writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.notes { margin: 0; padding-left: 18px; max-width: 390px; color: var(--ink-dim); font-size: 12.5px; }
+.notes li + li { margin-top: 4px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.stat { font: 11px var(--f-num); color: var(--ink-faint); }
+.stat b { color: var(--carrier); font-weight: 500; }
+.today .stat b { color: var(--hot); }
+
+/* ---------- console furniture, as console.css draws it ---------- */
+.head { background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; padding: 8px 16px; border-radius: 17px 17px 0 0; }
+.head-row { display: flex; align-items: flex-start; gap: 8px var(--head-gap); flex-wrap: wrap; min-width: 0; }
+.tabs { display: flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex: none; }
+.tab { height: var(--head-control-h); padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--inset); border: 0; border-right: 1px solid var(--line); font: 600 11px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.tab:last-child { border-right: 0; }
+.tab.on { background: var(--carrier); color: #1a1408; }
+.tab svg { width: 14px; height: 14px; }
+.meter { height: var(--head-control-h); width: 116px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 500 11px var(--f-num); }
+.meter i { flex: 1; height: 5px; border: 1px solid var(--line-bright); border-radius: 2px; position: relative; }
+.meter i::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4%; background: var(--carrier); }
+.light { width: 10px; height: 10px; border-radius: 50%; background: var(--line-bright); flex: none; margin-top: 9px; margin-left: -4px; }
+.undo { display: flex; gap: 4px; flex: none; margin-left: calc(var(--head-gap) / -2); }
+.btn { height: var(--head-control-h); min-width: var(--head-control-h); padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 600 11px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; flex: none; }
+.btn svg { width: 13px; height: 13px; display: block; }
+.btn.t { min-width: 34px; font-size: 13px; color: var(--ink); }
+.undo .btn { opacity: 0.45; }
+.box { height: var(--head-control-h); display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 13px var(--f-num); color: var(--ink); flex: none; white-space: nowrap; }
+.box small { font: 500 9.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.sel { height: var(--head-control-h); display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 13px var(--f-ui); flex: none; white-space: nowrap; }
+.sel::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--ink-dim); border-bottom: 1.5px solid var(--ink-dim); transform: rotate(45deg) translate(-2px, -2px); }
+.pos { height: var(--head-control-h); min-width: 7ch; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 13px var(--f-num); font-variant-numeric: tabular-nums; flex: none; }
+.transport-strip { flex: 1 1 0; min-width: 0; }
+.transport-row { display: flex; align-items: center; gap: 8px var(--head-gap); flex-wrap: wrap; }
+.tg { display: flex; align-items: flex-end; gap: 8px; flex: none; }
+.parts { display: flex; gap: 8px; align-items: center; }
+.chip { width: 150px; height: 38px; background: var(--carrier); color: #1a1408; border-radius: var(--r); padding: 4px 10px; font: 600 11px/1.3 var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; }
+.chip span { display: block; font: 500 10px var(--f-ui); letter-spacing: 0; text-transform: none; }
+.parts .add { margin-left: auto; display: flex; gap: 4px; }
+.parts .add .btn { width: 34px; height: 38px; }
+.below { padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.ghost { height: 28px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); }
+.ghost.tall { height: 110px; }
+
+/* ---------- proposed: below 720 px, three rows plus the part strip ---------- */
+.proposed .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.proposed .row-1 .tabs { flex: 1; }
+.proposed .row-1 .tab { flex: 1; padding: 0 6px; }
+.proposed .row-1 .tab.gear { flex: 0 0 38px; }
+.proposed .row-1 .undo { margin-left: 4px; }
+.proposed .row-2 .meter { flex: 1 1 0; width: auto; min-width: 64px; }
+.proposed .row-2 .light { margin-top: 0; margin-left: -2px; }
+.proposed .row-2 .tg { margin-left: 4px; }
+/* The song's settings: one row that swipes sideways inside the header,
+   faded at an edge while there is more to see. */
+.swipe {
+  display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none; margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 28px), transparent);
+}
+.swipe::-webkit-scrollbar { display: none; }
+.swipe .sep { flex: none; width: 1px; align-self: stretch; background: var(--line); margin: 4px 2px; }
+.callout { outline: 1px dashed var(--return); outline-offset: 3px; border-radius: var(--r); }
+</style>
+
+<div class="mock-bar"><b>Mockup</b>The console's header on a 390 px phone, today and proposed. Desktop and tablet (720 px and wider) keep today's header. In the proposed screen, swipe the settings row sideways.</div>
+
+<div class="screens">
+  <!-- ======================= today ======================= -->
+  <section class="screen-col today">
+    <h2>Today<span>main, 390 × 844</span></h2>
+    <div class="scroller">
+      <div class="phone">
+        <div class="head">
+          <div class="head-row">
+            <nav class="tabs"><span class="tab on">Parts</span><span class="tab">Mixer</span><span class="tab">Song</span><span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span></nav>
+            <span class="meter"><i></i>2%</span><span class="light"></span>
+            <span class="undo"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 3 2 6l3 3"/><path d="M2 6h7a4 4 0 0 1 0 8H7"/></svg></span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m11 3 3 3-3 3"/><path d="M14 6H7a4 4 0 0 0 0 8h2"/></svg></span></span>
+            <section class="transport-strip">
+              <div class="transport-row">
+                <div class="tg"><span class="btn">Tap</span><span class="box">120.00<small>BPM</small></span><span class="box">4<small>Bars</small></span></div>
+                <div class="tg"><span class="box">50<small>%</small></span><span class="sel">1/16</span><span class="sel">4/4</span></div>
+                <div class="tg"><span class="sel">C</span><span class="sel">naturalMinor</span></div>
+                <div class="tg"><span class="pos">1.1.1</span><span class="btn t">▶</span><span class="btn t">■</span><span class="btn t">‖</span><span class="btn t">⟲</span></div>
+              </div>
+            </section>
+          </div>
+          <div class="parts"><div class="chip">Part 1<span>1 · None</span></div><div class="add"><span class="btn t">+</span><span class="btn t">−</span></div></div>
+        </div>
+        <div class="below"><div class="ghost"></div><div class="ghost"></div><div class="ghost tall"></div></div>
+      </div>
+    </div>
+    <p class="stat">header <b>237 px</b> tall · page <b>465 px</b> wide on every tab</p>
+    <ul class="notes">
+      <li>The transport gets only <b>146 px</b> beside the tabs, meter and undo, so it stacks into four rows down the right.</li>
+      <li>Each of those rows is wider than 146 px and can't wrap, so <b>Bars, 4/4, the scale and ‖ ⟲</b> sit off screen.</li>
+      <li>The phone then zooms the whole page out to fit, which is why modals ended up off centre.</li>
+    </ul>
+  </section>
+
+  <!-- ======================= proposed ======================= -->
+  <section class="screen-col proposed">
+    <h2>Proposed<span>below 720 px</span></h2>
+    <div class="scroller">
+      <div class="phone">
+        <div class="head">
+          <div class="row row-1">
+            <nav class="tabs"><span class="tab on">Parts</span><span class="tab">Mixer</span><span class="tab">Song</span><span class="tab gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></span></nav>
+            <span class="undo"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 3 2 6l3 3"/><path d="M2 6h7a4 4 0 0 1 0 8H7"/></svg></span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m11 3 3 3-3 3"/><path d="M14 6H7a4 4 0 0 0 0 8h2"/></svg></span></span>
+          </div>
+          <div class="row row-2">
+            <span class="meter"><i></i>2%</span><span class="light"></span>
+            <div class="tg"><span class="pos">1.1.1</span><span class="btn t">▶</span><span class="btn t">■</span><span class="btn t">‖</span><span class="btn t">⟲</span></div>
+          </div>
+          <div class="swipe callout" aria-label="Song settings">
+            <span class="btn">Tap</span><span class="box">120.00<small>BPM</small></span><span class="box">4<small>Bars</small></span>
+            <span class="sep"></span>
+            <span class="box">50<small>%</small></span><span class="sel">1/16</span><span class="sel">4/4</span>
+            <span class="sep"></span>
+            <span class="sel">C</span><span class="sel">naturalMinor</span>
+          </div>
+          <div class="parts"><div class="chip">Part 1<span>1 · None</span></div><div class="add"><span class="btn t">+</span><span class="btn t">−</span></div></div>
+        </div>
+        <div class="below"><div class="ghost"></div><div class="ghost"></div><div class="ghost tall"></div></div>
+      </div>
+    </div>
+    <p class="stat">header <b>~165 px</b> tall · page <b>390 px</b> wide from the header</p>
+    <ul class="notes">
+      <li><b>Row 1:</b> the tabs stretch across, with undo and redo at the end.</li>
+      <li><b>Row 2:</b> what you reach for while playing: the position, ▶ ■ ‖ and loop, with the CPU meter and output light taking the remaining space.</li>
+      <li><b>Row 3:</b> the song's settings (tempo, bars, swing, grid, meter, key, scale) in one row that swipes sideways inside the header. It fades at the edge while there's more to see.</li>
+      <li>Every control stays, at today's size and in today's order within its group. Only the rows change.</li>
+    </ul>
+  </section>
+</div>
+</html>

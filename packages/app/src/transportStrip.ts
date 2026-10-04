@@ -316,13 +316,19 @@ function group(nodes: readonly HTMLElement[]): HTMLElement {
  * Draw the strip into `root` from the current document and transport: four
  * groups — tempo and bars, swing and the meter, key and scale, position and
  * buttons — so a narrow header wraps between them, never inside one.
+ * The first three, the song's settings, share a wrapper (windsor#584, record
+ * 2026-10-04-phone-header): `display: contents` from 720 px up, so the
+ * groups lay out as before, and below that the header's own row that
+ * scrolls sideways.
  */
 export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.innerHTML = '';
   const row = el('div', 'transport-row');
-  row.appendChild(group(tempoBoxes(ctx)));
-  row.appendChild(group([...swingControls(ctx), meterPicker(ctx)]));
-  row.appendChild(group(keyPickers(ctx)));
+  const settings = el('div', 'transport-settings');
+  settings.appendChild(group(tempoBoxes(ctx)));
+  settings.appendChild(group([...swingControls(ctx), meterPicker(ctx)]));
+  settings.appendChild(group(keyPickers(ctx)));
+  row.appendChild(settings);
   row.appendChild(group(transportControls(ctx)));
   root.appendChild(row);
 }
