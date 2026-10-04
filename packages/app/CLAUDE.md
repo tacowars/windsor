@@ -112,7 +112,7 @@ knows the one below it and nothing above.
 
 1. **`main.ts` is composition only** (67 lines): it constructs the
    `DocumentModel`, the `EngineHost`, the `AppContext`, the `Keyboard` and the
-   `MidiAccessor`, hands `mountTabShell` the four tabs, wires the power button,
+   `MidiAccessor`, hands `mountTabShell` the four tabs, wires the audio gate and the power button,
    starts `userSession.ts`'s `bootUserState` (the user library, the restore
    question, the autosave) and the look-ahead pump. No behaviour lives here.
 2. **`appContext.ts` is the `AppCtx` implementation** (#620): it owns the tab
@@ -145,8 +145,10 @@ knows the one below it and nothing above.
    `AudioSystem.setMuted(true)`, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0
    with every region gate cleared); the rules are `transportModel.ts`, the
    ranges `transportTables.ts`. Power-on leaves the transport idle at 1.1.1;
-   the position reads `ctx.transport.position()` on `watchPlayhead`; `powerButton.ts` is the first user gesture that creates the
-   audio context and builds the live system.
+   the position reads `ctx.transport.position()` on `watchPlayhead`; the audio gate (`audioGate.ts`, its rules in `audioGateModel.ts`) is the
+   first user gesture that creates the audio context and builds the live
+   system, and it returns whenever the context stops running.
+   `powerButton.ts` turns the header button into the CPU meter once audio is on.
 4. **The tabs** — `partsTab.ts`, `mixerTab.ts`, `songTab.ts`,
    `arrangementTab.ts` — lay out sections and hand each control the context.
    `songTab.ts` is the Song view's composition (#709): its one piece of state
@@ -460,7 +462,7 @@ npm run verify                                 # the gate
 ```
 
 Open the console at the dev server's URL (or a served `dist/`) in Chrome and
-press the power button; audio starts on that gesture. A MIDI controller is
+press the audio gate's power button; audio starts on that gesture. A MIDI controller is
 offered once the browser grants access (#523).
 
 ## Hard-won constraints
