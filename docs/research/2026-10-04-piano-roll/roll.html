@@ -1,0 +1,972 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Windsor Roll Device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* A piano-roll sequencer kind, the Roll, in the agreed 244 px sequencer device (the Figure's frame), with an Expand that opens it wide. Single theme on purpose: Windsor's dark console tokens. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --kc: var(--modulator);
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --seq-h: 244px;
+  /* Row tints: how well a pitch sits on the chord above it */
+  --t-root: rgba(224, 164, 78, 0.30);
+  --t-chord: rgba(224, 164, 78, 0.15);
+  --t-scale: rgba(220, 227, 227, 0.055);
+  /* Key tints: the guide moved onto the keyboard */
+  --k-root: rgba(224, 164, 78, 0.88);
+  --k-chord: rgba(224, 164, 78, 0.42);
+  --k-scale: rgba(220, 227, 227, 0.11);
+  --row-white: #15191b;
+  --row-black: #101315;
+  /* Note fills by the same tiers */
+  --n-chord: var(--carrier);
+  --n-scale: var(--modulator);
+  --n-out: #7d7590;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); padding-block: 20px 48px; padding-inline: 16px; margin: 0; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1 { font: 600 17px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+p { margin: 0; max-width: 82ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+.meas { font: 10px var(--f-num); color: var(--ink-faint); }
+code { font: 11.5px var(--f-num); color: var(--ink); }
+
+/* Mockup toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: 0; z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.play-btn { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 4px 12px; font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; min-width: 74px; }
+.play-btn[aria-pressed="true"] { background: var(--carrier); color: var(--inset); border-color: var(--carrier); }
+
+/* Today's pane header and rack, kept */
+.pane { display: flex; flex-direction: column; gap: 6px; }
+.pane-head { display: flex; align-items: baseline; gap: 10px; }
+.fold { background: var(--inset); border: 1px solid var(--line-bright); color: var(--ink-dim); border-radius: var(--r); width: 18px; height: 18px; font-size: 8px; display: inline-grid; place-items: center; align-self: center; }
+.pane-title { font: 600 12px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; }
+.rack { display: flex; gap: 6px; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+
+/* The device: the Figure's rail and tab bar */
+.dev { flex: 1 1 auto; min-width: 620px; height: var(--seq-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.rail { width: 24px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kc); margin-top: 3px; }
+.dev-name { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 10.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; padding: 4px 0; }
+.rail .spacer { flex: 1; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.ib svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.ib.danger:hover { color: var(--hot); }
+.ib.expand { color: var(--carrier); }
+.rail .rnum { font: 8.5px var(--f-num); color: var(--ink-faint); writing-mode: vertical-rl; transform: rotate(180deg); }
+.dev-body { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tabs { height: 20px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.tab { background: var(--carrier); border: 0; border-radius: var(--r) var(--r) 0 0; color: var(--inset); font: 600 9px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; height: 17px; }
+.tabs .meas { margin-left: auto; align-self: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page { flex: 1; min-height: 0; display: flex; }
+.section { flex: none; display: flex; flex-direction: column; padding: 4px 8px 6px; min-height: 0; min-width: 0; }
+.section + .section { border-left: 1px solid var(--line); }
+.section.grow { flex: 1; }
+.placeholder { flex: 1; display: grid; place-items: center; color: var(--ink-faint); font: 11px var(--f-num); }
+
+/* The controls column */
+.ctl { width: 112px; display: flex; flex-direction: column; gap: 5px; justify-content: flex-start; }
+.ctl .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 11px; display: flex; justify-content: space-between; }
+.ctl .lab em { font: 9px var(--f-num); font-style: normal; letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
+.ctl .item { display: flex; flex-direction: column; gap: 2px; }
+.ctl select { appearance: none; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 20px; color: var(--ink); font: 11px var(--f-num); padding: 0 6px; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%); background-position: calc(100% - 9px) 8px, calc(100% - 5px) 8px; background-size: 4px 4px; background-repeat: no-repeat; }
+.stepper { display: flex; height: 20px; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; background: var(--inset); }
+.stepper button { width: 20px; flex: none; background: transparent; border: 0; color: var(--ink-dim); font: 12px var(--f-num); cursor: pointer; padding: 0; }
+.stepper button:hover { color: var(--ink); background: var(--panel-hi); }
+.stepper .fit { flex: 1; width: auto; font: 10.5px/18px var(--f-num); color: var(--ink); border-inline: 1px solid var(--line); }
+.stepper .fit.on { color: var(--carrier); }
+.stepper span { flex: 1; text-align: center; font: 10.5px/18px var(--f-num); color: var(--ink); border-inline: 1px solid var(--line); white-space: nowrap; }
+.mini-segs { display: flex; height: 20px; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.mini-segs button { flex: 1; background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); font: 600 9.5px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; padding: 0; }
+.mini-segs button:last-child { border-right: 0; }
+.mini-segs button[aria-pressed="true"] { background: var(--kc); color: var(--inset); }
+.ctl-cols { display: flex; gap: 10px; height: 100%; }
+.knob { display: flex; flex-direction: column; align-items: center; padding: 1px 0; border-radius: var(--r); cursor: ns-resize; touch-action: none; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; }
+.knob .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 11px; }
+.zooms { display: grid; grid-template-columns: 14px 1fr; gap: 3px 4px; align-items: center; }
+.zooms i { font-style: normal; color: var(--ink-faint); font-size: 11px; text-align: center; }
+
+/* The roll: four panes, the body scrolls and the others follow it */
+.roll { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: 32px minmax(0, 1fr) 34px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--inset); }
+.pane-x { overflow: hidden; position: relative; min-height: 0; min-width: 0; }
+.r-corner { background: var(--panel-hi); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 9px var(--f-num); color: var(--ink-faint); display: flex; flex-direction: column; justify-content: flex-end; padding: 0 4px 1px; }
+.r-head { background: var(--panel-hi); border-bottom: 1px solid var(--line); }
+.r-keys { border-right: 1px solid var(--line); }
+.r-body { overflow: auto; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--inset); overscroll-behavior: none; }
+.r-vcorner { background: var(--panel-hi); border-right: 1px solid var(--line); border-top: 1px solid var(--line); font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; color: var(--ink-faint); display: grid; place-items: center; }
+.r-vel { border-top: 1px solid var(--line); cursor: ns-resize; touch-action: none; }
+.inner { position: relative; }
+
+/* Header: the bar ruler with the loop brace, then the chords */
+.ruler { position: absolute; left: 0; top: 0; height: 17px; }
+.bar-n { position: absolute; top: 1px; font: 9px var(--f-num); color: var(--ink-dim); padding-left: 3px; border-left: 1px solid var(--line-bright); height: 10px; line-height: 10px; }
+.brace { position: absolute; top: 12px; height: 4px; background: var(--carrier); border-radius: 2px 0 0 2px; }
+.brace-end { position: absolute; top: 8px; width: 9px; height: 9px; margin-left: -5px; background: var(--carrier); border-radius: 2px; cursor: ew-resize; touch-action: none; }
+.brace-end:hover { box-shadow: 0 0 0 2px rgba(224, 164, 78, 0.35); }
+.repeats { position: absolute; top: 11px; font: 8px var(--f-num); color: var(--ink-faint); padding-left: 6px; white-space: nowrap; }
+.chords { position: absolute; left: 0; top: 17px; height: 15px; }
+.chord { position: absolute; top: 0; height: 14px; border-left: 1px solid var(--line-bright); font: 600 9.5px/14px var(--f-panel); color: var(--ink-dim); padding-left: 4px; white-space: nowrap; overflow: hidden; }
+.chord.ghosted { color: var(--ink-faint); }
+
+/* Keys */
+.key { position: absolute; left: 0; right: 0; font: 8.5px var(--f-num); color: var(--ink-faint); padding-left: 4px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+.key.w { background: #1b2023; }
+.key.b { background: #0f1214; }
+.key.c { color: var(--ink-dim); font-weight: 500; }
+.key.c::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; border-bottom: 1px solid var(--line-bright); }
+.key.thin { background: #0b0d0e; }
+.key.k-root { background-image: linear-gradient(var(--k-root), var(--k-root)); color: var(--inset); font-weight: 600; }
+.key.k-chord { background-image: linear-gradient(var(--k-chord), var(--k-chord)); color: var(--ink); }
+.key.k-scale { background-image: linear-gradient(var(--k-scale), var(--k-scale)); color: var(--ink-dim); }
+/* The selected note's key: an ink outline and edge, its name always shown, so a moving note can be read off the keyboard */
+.key.sel-key { box-shadow: inset 0 0 0 1px var(--ink), inset -3px 0 0 var(--ink); color: var(--ink); font-weight: 600; z-index: 1; }
+.key.sel-key.k-root { color: var(--inset); }
+.r-corner .guide { font: 600 11px/13px var(--f-panel); color: var(--carrier); letter-spacing: 0.04em; }
+.chord.guide { background: rgba(224, 164, 78, 0.16); color: var(--carrier); }
+.key.out-scale { color: #48535a; }
+
+/* Body layers */
+.row { position: absolute; left: 0; }
+.row.w { background: var(--row-white); }
+.row.b { background: var(--row-black); }
+.row.thin { background: #0b0d0e; }
+.row.sep { box-shadow: inset 0 -1px 0 #0c0f10; }
+.row.csep { box-shadow: inset 0 -1px 0 #2a3236; }
+.tint { position: absolute; top: 0; bottom: 0; }
+.tint.root { background: var(--t-root); }
+.tint.chord { background: var(--t-chord); }
+.tint.scale { background: var(--t-scale); }
+.lines { position: absolute; inset: 0; pointer-events: none; }
+.ghostzone { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgba(0,0,0,0.22) 0 6px, rgba(0,0,0,0.12) 6px 12px); pointer-events: none; border-left: 2px solid var(--carrier); }
+.nt { position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--nc) var(--vm), var(--inset)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nc) 80%, #000); font: 500 8.5px var(--f-num); color: var(--inset); padding-left: 3px; overflow: hidden; white-space: nowrap; cursor: grab; touch-action: none; --nc: var(--kc); }
+.nt::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: ew-resize; }
+.nt.chord { --nc: var(--n-chord); }
+.nt.scale { --nc: var(--n-scale); }
+.nt.out { --nc: var(--n-out); box-shadow: inset 0 0 0 1px var(--hot); }
+.nt.sel { box-shadow: 0 0 0 1px var(--ink), inset 0 0 0 1px #000; z-index: 2; }
+.nt.ghost { opacity: 0.38; pointer-events: none; }
+.nt.grey { --nc: var(--ink-faint); }
+.nt.parked { background: transparent; box-shadow: inset 0 0 0 1px var(--ink-faint); color: var(--ink-faint); }
+.nt.on { filter: brightness(1.35); box-shadow: 0 0 0 1px var(--ink), 0 0 8px color-mix(in srgb, var(--nc) 70%, transparent); }
+.nt.ghost.on { opacity: 0.7; }
+.boxsel { position: absolute; border: 1px dashed var(--ink); background: rgba(220, 227, 227, 0.06); pointer-events: none; display: none; }
+.ph { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--carrier); pointer-events: none; display: none; z-index: 3; }
+.playing .ph { display: block; }
+
+/* Velocity lane */
+.stem { position: absolute; bottom: 0; width: 2px; margin-left: 0; background: var(--nc, var(--kc)); --nc: var(--kc); }
+.stem::before { content: ''; position: absolute; left: -2px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: inherit; }
+.stem.chord { --nc: var(--n-chord); }
+.stem.scale { --nc: var(--n-scale); }
+.stem.out { --nc: var(--n-out); }
+.stem.ghost { opacity: 0.3; }
+.stem.sel::before { box-shadow: 0 0 0 1px var(--ink); }
+
+/* Expanded */
+.overlay { position: fixed; inset: 0; background: var(--ground); z-index: 20; padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.overlay .ohead { display: flex; align-items: baseline; gap: 10px; }
+.overlay .dev { height: auto; flex: 1; min-height: 0; }
+
+/* Legend and notes */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font: 10px var(--f-num); color: var(--ink-dim); }
+.legend span { display: inline-flex; gap: 5px; align-items: center; }
+.sw { width: 18px; height: 10px; border-radius: 2px; border: 1px solid var(--line); display: inline-block; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.notes > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+.notes .q { color: var(--carrier); font-weight: 600; }
+pre { margin: 6px 0 0; font: 10.5px/1.45 var(--f-num); color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 8px; overflow-x: auto; }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor Roll device</h1>
+    <p>A new sequencer kind beside Grid and Figure: a piano roll over the selected region. Notes are absolute pitches with free start, length and velocity, on a loop that is the region's length or shorter. The keys on the left are coloured by how each pitch sits on the chord at the playhead (or under the pointer), and each note by the chord at its own start: a guide, never a limit. The Keys switch shows all twelve semitones or only the key's scale, and Fold shows only the rows that hold notes. It lives in the 244 px device, and Expand opens it wide.</p>
+    <p>It works: click empty space to add a note, drag a note to move it, drag its right edge to resize, click a note to delete it (right-click too), shift-drag to box-select, Delete removes the selection. Drag the velocity stems. Drag the brace's end on the ruler to change the loop. ▶ Play plays it with a plain test tone.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">View</span>
+      <div class="segs" id="opt-expanded"><button type="button" data-v="false">Device</button><button type="button" data-v="true">Expanded</button></div>
+    </div>
+    <div class="opt"><span class="opt-label">Colour</span>
+      <div class="segs" id="opt-colour"><button type="button" data-v="keys">Keys + notes</button><button type="button" data-v="notes">Notes only</button><button type="button" data-v="off">Off</button></div>
+    </div>
+    <div class="opt"><span class="opt-label">Example</span>
+      <div class="segs" id="opt-example"><button type="button" data-v="keys">Keys and lead</button><button type="button" data-v="empty">Empty</button></div>
+    </div>
+    <div class="opt"><span class="opt-label">Sound</span>
+      <div class="segs" id="opt-sound"><button type="button" data-v="true">On</button><button type="button" data-v="false">Off</button></div>
+    </div>
+    <button type="button" class="play-btn" id="play" aria-pressed="false">▶ Play</button>
+  </div>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span class="fold">▼</span>
+      <span class="pane-title">Keys I — Roll</span>
+      <span class="meas">roll · region 1 of 2 · bars 1–8 of the song</span>
+    </div>
+    <div class="rack" id="rack"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h3>The device</h3>
+      <ul>
+        <li><b>The Figure's frame:</b> 244 px, the rail with the region number, Split and Delete, plus <b>Expand</b> (amber). The tab bar has one page, Notes, and its summary gives the loop, the region, the note count and the key.</li>
+        <li><b>Two control columns:</b> Snap (1/4 to 1/32, the triplets and Off), Loop in bars (− +, or the brace's end on the ruler), Keys (12 or Scale) and Fold; then <b>Vel</b>, the part's velocity, which scales every note's own as the Grid's Vel does, the two zooms, ↔ (Fit by default) and ↕, and <b>Audition</b>, which plays a note as you add it or drag it to a new pitch, or keeps quiet.</li>
+        <li><b>The roll:</b> a bar ruler with the loop brace, a chord strip read from the Harmony tab, the keys down the left and a velocity lane under the notes. The body scrolls and the ruler, keys and lane follow it.</li>
+        <li><b>Past the loop</b> the region's repeats are drawn hatched, with the loop's notes ghosted over the chords they will meet there (bars 5 to 8 here run Am F Dm E).</li>
+        <li><b>Expand</b> opens the same device over the page with its own zoom, wide and tall enough to write in. Esc or the rail button closes it.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Colour, Keys and Fold</h3>
+      <ul>
+        <li><b>The keys</b> are tinted by one chord: the one under the playhead while it plays, under the pointer while you edit, otherwise where the playhead stopped. The root is solid amber, the chord's other tones half amber, the key's scale tones a light grey, and keys outside the key stay plain. The corner names that chord and the chord strip lights it. Every row stays writable.</li>
+        <li><b>The selected note's key</b> is outlined in ink with an edge against the roll, and shows its name even where the rows are too short for labels, so a note being dragged can be read off the keyboard. A selection lights every key it covers.</li>
+        <li><b>Notes</b> take the tier of their own onset: amber on a chord tone, teal on a scale tone, grey with a red edge outside the key. A ghost repeat takes the chord it meets, so the loop's G♯ reads as out of key over G in bar 4 and as a chord tone over E in bar 8. Fill strength is velocity.</li>
+        <li><b>Keys: Scale</b> keeps the key's seven rows and hides the other five. A row outside the scale that holds a note stays, as a thin grey sliver with the note greyed on it.</li>
+        <li><b>Fold</b> shows only the rows that hold notes, in pitch order, and overrides Keys.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Draft data</h3>
+      <ul>
+        <li><b>A new kind, <code>roll</code></b>, appended to <code>SEQUENCER_KINDS</code>. It draws nothing, so it has no seed. Each region can carry its own roll, as every kind's pattern can (<code>regionPattern</code>).</li>
+        <li><b>No region comes with it.</b> Setting a part to Roll puts nothing on the timeline, and clears the ∞ region a new part starts with; the author draws the first region, and the new roll's loop takes that region's length.</li>
+        <li><b>Vel</b> is the part's existing <code>velocity</code>, the field the Grid's Vel knob sets; the roll adds no velocity of its own.</li>
+        <li><b>On the 24 PPQ grid:</b> 1/32 is 3 ticks and 1/16T is 4, so Off snaps to 1 tick. A note held past the loop's end is cut there, and the region's end cuts it as it cuts every kind.</li>
+        <li>Notes overlap freely across pitches, up to the part's voices. A note dropped over another of the same pitch trims the earlier one.</li>
+      </ul>
+      <pre>sequencer: {
+  kind: 'roll',
+  loopTicks: 384,               // 4 bars, ≤ the region
+  notes: [
+    { tick: 0, ticks: 42, pitch: 57, velocity: 0.7 },
+    …
+  ]
+}</pre>
+    </div>
+    <div>
+      <h3>Decided</h3>
+      <ul>
+        <li><b>The name</b> is Roll, kind <code>roll</code>.</li>
+        <li><b>A click on a note deletes it</b>, as in FL; a drag moves it and its right edge resizes it.</li>
+        <li><b>Note colours</b> stay as drawn: amber chord tones, teal scale tones, grey with a red edge outside the key.</li>
+        <li><b>No automatic region:</b> setting a part to Roll clears an ∞ region; the author draws the first one, and the roll takes its length. Drawn regions are kept, each roll taking its own region's length.</li>
+        <li><b>Shrinking the loop</b> keeps the notes past it, hollow and silent.</li>
+        <li><b>A part Vel knob</b> scales every note.</li>
+        <li><b>The keyboard is the colour guide</b>, for the chord at the playhead or pointer; the rows stay plain.</li>
+        <li><b>Scale view hides</b> the rows outside the scale.</li>
+        <li><b>The selected note's key</b> is highlighted on the keyboard.</li>
+        <li><b>Audition</b> is a switch on the device: on, a note sounds as you add it or drag it to a new pitch; off, editing is silent.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  // ── The song's 24 PPQ grid, the key and a chord per bar, as the Harmony tab would hand them over ──
+  const PPQ = 24, BAR = PPQ * 4;
+  const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'B♭', 'B'];
+  const pname = (p) => NAMES[p % 12] + (Math.floor(p / 12) - 1);
+  const isBlack = (p) => [1, 3, 6, 8, 10].includes(p % 12);
+  const KEY = { name: 'A minor', pcs: [9, 11, 0, 2, 4, 5, 7] };
+  const CH = (n, root, pcs) => ({ n, root, pcs });
+  const CHORDS = [CH('Am', 9, [9, 0, 4]), CH('F', 5, [5, 9, 0]), CH('C', 0, [0, 4, 7]), CH('G', 7, [7, 11, 2]), CH('Am', 9, [9, 0, 4]), CH('F', 5, [5, 9, 0]), CH('Dm', 2, [2, 5, 9]), CH('E', 4, [4, 8, 11])];
+  const chordAt = (tick) => CHORDS[Math.floor(tick / BAR) % CHORDS.length];
+  function tierOf(p, chord) {
+    const pc = p % 12;
+    if (pc === chord.root) return 'root';
+    if (chord.pcs.includes(pc)) return 'chord';
+    if (KEY.pcs.includes(pc)) return 'scale';
+    return 'out';
+  }
+  const inScale = (p) => KEY.pcs.includes(p % 12);
+
+  const SNAPS = [['1/4', 24], ['1/8', 12], ['1/8T', 8], ['1/16', 6], ['1/16T', 4], ['1/32', 3], ['Off', 1]];
+  const HZ_MIN = 6, HZ_MAX = 120, HZ_STEP = 1.4; // px per beat; null is Fit
+  const VZ = [5, 7, 9, 12, 15, 19]; // px per row
+  const THIN = 3, LO = 24, HI = 96, FOLD_ROW_MAX = 16, HEAD_H = 32, VEL_H = 34, PAD = 24;
+  const SECONDS_PER_TICK = 60 / 120 / PPQ;
+
+  // ── The example: chord stabs and a lead over Am F C G, a C♯ passing tone and a G♯ leading back to the loop ──
+  let nextId = 1;
+  const N = (t, len, p, v) => ({ id: nextId++, t, len, p, v });
+  function keysExample() {
+    const out = [];
+    const stab = (bar, ps) => { for (const p of ps) { out.push(N(bar * BAR, 42, p, 0.72)); out.push(N(bar * BAR + 60, 30, p, 0.55)); } };
+    stab(0, [57, 60, 64]); stab(1, [53, 57, 60]); stab(2, [55, 60, 64]); stab(3, [55, 59, 62]);
+    const lead = [[0, 24, 76, 0.95], [24, 12, 74, 0.7], [36, 12, 72, 0.75], [48, 24, 71, 0.85], [72, 24, 72, 0.8],
+      [96, 36, 69, 0.95], [132, 12, 72, 0.7], [144, 24, 77, 0.9], [168, 24, 76, 0.75],
+      [192, 24, 79, 1], [216, 24, 76, 0.8], [240, 12, 72, 0.7], [252, 12, 73, 0.6], [264, 24, 74, 0.85],
+      [288, 48, 71, 0.9], [336, 24, 79, 0.75], [360, 24, 80, 0.85]];
+    for (const [t, len, p, v] of lead) out.push(N(t, len, p, v));
+    return out;
+  }
+
+  const state = {
+    expanded: false, colour: 'keys', offscale: 'hidden', example: 'keys', sound: true, partVel: 0.75, audition: true,
+    keys: '12', fold: false, snap: 3, loopBars: 4, regionBars: 8,
+    zoom: { dev: { h: null, v: 1 }, wide: { h: null, v: 4 } },
+    notes: keysExample(), sel: new Set(), lastLen: 6, playing: false, tick: 0,
+  };
+  const z = () => state.zoom[state.expanded ? 'wide' : 'dev'];
+  // Fit: the whole region in the body's visible width
+  const fitBeat = () => { const w = document.getElementById('r-body')?.clientWidth; return w ? Math.max(HZ_MIN, (w - 2) / (state.regionBars * 4)) : 20; };
+  const pxBeat = () => z().h ?? fitBeat();
+  const px = () => pxBeat() / PPQ;
+  const snapT = () => SNAPS[state.snap][1];
+  const loopT = () => state.loopBars * BAR;
+  const regionT = () => state.regionBars * BAR;
+  const inLoop = (n) => n.t < loopT();
+
+  // ── Rows: all twelve, the scale (others thinned or hidden), or folded to the pitches in use ──
+  let rows = [], rowMap = new Map();
+  function buildRows() {
+    const rh = VZ[z().v];
+    const used = new Set(state.notes.map((n) => n.p));
+    const list = [];
+    if (state.fold) {
+      const avail = document.getElementById('r-body')?.clientHeight ?? 0;
+      const fh = Math.max(rh, Math.min(FOLD_ROW_MAX, Math.floor(avail / used.size)));
+      for (const p of [...used].sort((a, b) => b - a)) list.push({ p, h: fh });
+    } else {
+      for (let p = HI; p >= LO; p--) {
+        if (state.keys === '12' || inScale(p)) list.push({ p, h: rh });
+        else if (state.offscale === 'thin' || used.has(p)) list.push({ p, h: THIN, thin: true });
+      }
+    }
+    let top = 0;
+    for (const r of list) { r.top = top; top += r.h; }
+    rows = list;
+    rowMap = new Map(list.map((r, i) => [r.p, { ...r, i }]));
+    return top;
+  }
+  function rowIndexAt(y) {
+    for (let i = 0; i < rows.length; i++) if (y < rows[i].top + rows[i].h) return i;
+    return rows.length - 1;
+  }
+
+  // ── Icons ──
+  const ICON_SPLIT = '<svg viewBox="0 0 12 12"><rect x="1" y="3" width="4" height="6" rx="1"/><rect x="7" y="3" width="4" height="6" rx="1"/><path d="M6 1v10" stroke-dasharray="1.5 1.5"/></svg>';
+  const ICON_DELETE = '<svg viewBox="0 0 12 12"><path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"/></svg>';
+  const ICON_EXPAND = '<svg viewBox="0 0 12 12"><path d="M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7"/></svg>';
+  const ICON_COLLAPSE = '<svg viewBox="0 0 12 12"><path d="M6.8 1.8v3.4h3.4M10.5 1.5 6.8 5.2M5.2 10.2V6.8H1.8M1.5 10.5l3.7-3.7"/></svg>';
+
+  // ── The device ──
+  function controls() {
+    const snapOpts = SNAPS.map(([l], i) => `<option value="${i}"${i === state.snap ? ' selected' : ''}>${l}</option>`).join('');
+    const seg = (act, v, l) => `<button type="button" data-act="${act}" data-v="${v}" aria-pressed="${String(act === 'keys' ? state.keys === v : state.fold === (v === 'on'))}">${l}</button>`;
+    return `<div class="section"><div class="ctl-cols"><div class="ctl">
+      <div class="item"><span class="lab">Snap</span><select name="snap" data-act="snap" aria-label="Snap">${snapOpts}</select></div>
+      <div class="item"><span class="lab">Loop <em>≤ ${state.regionBars} bars</em></span><div class="stepper"><button type="button" data-act="loop" data-d="-1" aria-label="Shorter loop">−</button><span>${state.loopBars} bar${state.loopBars === 1 ? '' : 's'}</span><button type="button" data-act="loop" data-d="1" aria-label="Longer loop">+</button></div></div>
+      <div class="item"><span class="lab">Keys</span><div class="mini-segs">${seg('keys', '12', '12')}${seg('keys', 'scale', 'Scale')}</div></div>
+      <div class="item"><span class="lab">Fold</span><div class="mini-segs">${seg('fold', 'off', 'All')}${seg('fold', 'on', 'Fold')}</div></div>
+    </div><div class="ctl">
+      ${knob('Vel', state.partVel)}
+      <div class="item"><span class="lab">Zoom</span><div class="zooms">
+        <i title="Horizontal zoom">↔</i><div class="stepper"><button type="button" data-act="hz" data-d="-1" aria-label="Zoom out in time">−</button><button type="button" class="fit${z().h === null ? ' on' : ''}" data-act="fit" title="Fit the region to the width">${z().h === null ? 'fit' : `${Math.round(pxBeat() * 4)} px/bar`}</button><button type="button" data-act="hz" data-d="1" aria-label="Zoom in in time">+</button></div>
+        <i title="Vertical zoom">↕</i><div class="stepper"><button type="button" data-act="vz" data-d="-1" aria-label="Shorter rows">−</button><span>${VZ[z().v]} px/row</span><button type="button" data-act="vz" data-d="1" aria-label="Taller rows">+</button></div>
+      </div></div>
+      <div class="item" title="Hear a note as you add it or drag it to a new pitch"><span class="lab">Audition</span><div class="mini-segs"><button type="button" data-act="audition" data-v="on" aria-pressed="${state.audition}">On</button><button type="button" data-act="audition" data-v="off" aria-pressed="${!state.audition}">Off</button></div></div>
+    </div></div></div>`;
+  }
+  // The part's Vel, the Figure's knob drawn small: drag up or down
+  const A0 = -0.75 * Math.PI, SPAN = 1.5 * Math.PI;
+  function arc(c, r, a0, a1) {
+    const pt = (a) => [(c + r * Math.sin(a)).toFixed(2), (c - r * Math.cos(a)).toFixed(2)];
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  }
+  function knob(l, v) {
+    const size = 30, mid = size / 2, r = mid - 3, face = r - 4, a = A0 + Math.max(0.001, v) * SPAN;
+    const px2 = (mid + face * Math.sin(a)).toFixed(2), py = (mid - face * Math.cos(a)).toFixed(2);
+    return `<div class="knob" data-act="pvel" title="The part's velocity: scales every note's own. Drag up or down"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+      <circle class="face" cx="${mid}" cy="${mid}" r="${face}"/><path class="track" d="${arc(mid, r, A0, A0 + SPAN)}"/>
+      <path class="arc" d="${arc(mid, r, A0, a)}"/><line class="pin" x1="${mid}" y1="${mid}" x2="${px2}" y2="${py}"/>
+      </svg><span class="val">${v.toFixed(2)}</span><span class="lab">${l}</span></div>`;
+  }
+  let kdrag = null;
+  document.addEventListener('pointerdown', (e) => {
+    const k = e.target.closest('[data-act="pvel"]');
+    if (!k) return;
+    e.preventDefault();
+    kdrag = { y: e.clientY, v: state.partVel };
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!kdrag) return;
+    const v = Math.round(Math.max(0, Math.min(1, kdrag.v + (kdrag.y - e.clientY) / 150)) * 100) / 100;
+    if (v === state.partVel) return;
+    state.partVel = v;
+    document.querySelector('[data-act="pvel"]').outerHTML = knob('Vel', v);
+  });
+  document.addEventListener('pointerup', () => { kdrag = null; });
+  function device(live) {
+    const rail = `<div class="rail"><span class="dot"></span><span class="dev-name">Roll</span><span class="spacer"></span>
+      <span class="rnum" title="Region 1 of 2">1/2</span>
+      <button type="button" class="ib expand" data-act="expand" title="${state.expanded ? 'Close the wide view (Esc)' : 'Expand: open the roll wide'}" aria-label="${state.expanded ? 'Close wide view' : 'Expand'}">${state.expanded ? ICON_COLLAPSE : ICON_EXPAND}</button>
+      <button type="button" class="ib" title="Split the region in two" aria-label="Split region">${ICON_SPLIT}</button>
+      <button type="button" class="ib danger" title="Delete this region" aria-label="Delete region">${ICON_DELETE}</button></div>`;
+    const tabs = `<div class="tabs" role="tablist"><span class="tab" role="tab" aria-selected="true">Notes</span>${live ? '<span class="meas" id="summary"></span>' : ''}</div>`;
+    const page = live
+      ? `${controls()}<div class="section grow"><div class="roll" id="roll">
+          <div class="r-corner pane-x" id="r-corner">bar</div>
+          <div class="r-head pane-x" id="r-head"><div class="inner" id="head-in"></div></div>
+          <div class="r-keys pane-x" id="r-keys"><div class="inner" id="keys-in"></div></div>
+          <div class="r-body" id="r-body"><div class="inner" id="canvas"></div></div>
+          <div class="r-vcorner">VEL</div>
+          <div class="r-vel pane-x" id="r-vel"><div class="inner" id="vel-in"></div></div>
+        </div></div>`
+      : '<div class="placeholder">Open wide — editing in the expanded view</div>';
+    return `<div class="dev${state.playing ? ' playing' : ''}">${rail}<div class="dev-body">${tabs}<div class="page">${page}</div></div></div>`;
+  }
+
+  function render() {
+    const keep = view;
+    document.querySelector('.overlay')?.remove();
+    const rack = document.getElementById('rack');
+    if (state.expanded) {
+      rack.innerHTML = device(false);
+      const ov = document.createElement('div');
+      ov.className = 'overlay';
+      ov.innerHTML = `<div class="ohead"><span class="pane-title">Keys I — Roll</span><span class="meas">Expanded · Esc closes</span></div>${device(true)}`;
+      document.body.appendChild(ov);
+    } else {
+      rack.innerHTML = device(true);
+    }
+    buildRoll(keep);
+    for (const [opt, key] of [['opt-expanded', 'expanded'], ['opt-colour', 'colour'], ['opt-offscale', 'offscale'], ['opt-example', 'example'], ['opt-sound', 'sound']]) {
+      for (const b of document.querySelectorAll(`#${opt} button`)) b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v));
+    }
+    legend();
+  }
+
+  // ── The roll's static layers: header, keys, row tints and lines ──
+  let el = {};
+  // Where the view sits, in ticks and pitch, so a zoom or a mode change keeps it
+  let view = null;
+  function buildRoll(keep) {
+    el = { body: document.getElementById('r-body'), head: document.getElementById('r-head'), keys: document.getElementById('r-keys'), vel: document.getElementById('r-vel'),
+      canvas: document.getElementById('canvas'), headIn: document.getElementById('head-in'), keysIn: document.getElementById('keys-in'), velIn: document.getElementById('vel-in') };
+    const H = buildRows();
+    const W = regionT() * px();
+    const p = px(), bar = BAR * p, beat = PPQ * p, snap = snapT() * p;
+    el.canvas.style.cssText = `width:${W}px;height:${H}px`;
+    el.headIn.style.cssText = `width:${W + PAD}px;height:${HEAD_H}px`;
+    el.velIn.style.cssText = `width:${W + PAD}px;height:${VEL_H}px`;
+    el.keysIn.style.cssText = `height:${H + PAD}px`;
+
+    // Header: bar numbers, the brace over the loop, the repeats, and the chords
+    const loopX = loopT() * p;
+    let head = `<div class="ruler" style="width:${W}px">`;
+    for (let b = 0; b < state.regionBars; b++) head += `<span class="bar-n" style="left:${b * bar}px">${b + 1}</span>`;
+    head += `<span class="brace" style="left:0;width:${loopX}px" title="The loop: ${state.loopBars} bars"></span><span class="brace-end" data-act="brace" style="left:${loopX}px" title="Drag to change the loop"></span>`;
+    if (state.loopBars < state.regionBars) head += `<span class="repeats" style="left:${loopX}px">repeats ×${(state.regionBars / state.loopBars).toFixed(state.regionBars % state.loopBars ? 1 : 0)}</span>`;
+    head += '</div><div class="chords">';
+    for (let b = 0; b < state.regionBars; b++) head += `<span class="chord${b >= state.loopBars ? ' ghosted' : ''}" data-b="${b}" style="left:${b * bar}px;width:${bar}px">${CHORDS[b % CHORDS.length].n}</span>`;
+    el.headIn.innerHTML = head + '</div><span class="ph" id="ph-head"></span>';
+
+    // Keys
+    el.keysIn.innerHTML = rows.map((r) => {
+      const c = r.p % 12 === 0 && !r.thin ? ' c' : '';
+      const cls = r.thin ? 'thin' : isBlack(r.p) ? 'b' : 'w';
+      const label = r.h >= 9 || (r.h >= 5 && r.p % 12 === 0) ? pname(r.p) : '';
+      return `<div class="key ${cls}${c}${inScale(r.p) ? '' : ' out-scale'}" data-p="${r.p}" data-label="${label}" style="top:${r.top}px;height:${r.h}px;font-size:${Math.min(9.5, Math.max(7, r.h - 3))}px" title="${pname(r.p)}">${label}</div>`;
+    }).join('');
+
+    // Rows with their chord tints, then the grid lines and the repeats' hatch
+    const tint = state.colour === 'rows';
+    let body = '';
+    for (const r of rows) {
+      const kind = r.thin ? 'thin' : isBlack(r.p) ? 'b' : 'w';
+      const sep = r.thin ? '' : r.p % 12 === 0 ? ' csep' : ' sep';
+      let inner = '';
+      if (tint) for (let b = 0; b < state.regionBars; b++) {
+        const t = tierOf(r.p, CHORDS[b % CHORDS.length]);
+        if (t !== 'out') inner += `<span class="tint ${t}" style="left:${b * bar}px;width:${bar}px${r.thin ? ';opacity:.5' : ''}"></span>`;
+      }
+      body += `<div class="row ${kind}${sep}" style="top:${r.top}px;height:${r.h}px;width:${W}px">${inner}</div>`;
+    }
+    const grads = [`linear-gradient(to right, var(--line-bright) 1px, transparent 1px)`, `linear-gradient(to right, #262d31 1px, transparent 1px)`];
+    const sizes = [`${bar}px 100%`, `${beat}px 100%`];
+    if (snap >= 4 && snapT() < PPQ) { grads.push('linear-gradient(to right, #1b2124 1px, transparent 1px)'); sizes.push(`${snap}px 100%`); }
+    body += `<div class="lines" style="background-image:${grads.join(',')};background-size:${sizes.join(',')}"></div>`;
+    if (loopT() < regionT()) body += `<div class="ghostzone" style="left:${loopX}px;width:${W - loopX}px"></div>`;
+    body += '<div id="notes-layer"></div><div class="boxsel" id="boxsel"></div><span class="ph" id="ph-body"></span>';
+    el.canvas.innerHTML = body;
+    el.velIn.innerHTML = '<div id="vel-layer"></div><span class="ph" id="ph-vel"></span>';
+    el.notes = document.getElementById('notes-layer');
+    el.velLayer = document.getElementById('vel-layer');
+    el.box = document.getElementById('boxsel');
+    el.ph = ['ph-head', 'ph-body', 'ph-vel'].map((id) => document.getElementById(id));
+
+    guideKey = '';
+    renderNotes();
+    // Keep the view: the same tick at the left edge, the same pitch in the middle; first time, centre the notes
+    const body0 = el.body;
+    const centrePitch = keep?.pitch ?? (state.notes.length ? state.notes.reduce((a, n) => a + n.p, 0) / state.notes.length : 64);
+    const near = rows.reduce((best, r) => (Math.abs(r.p - centrePitch) < Math.abs(best.p - centrePitch) ? r : best), rows[0]);
+    body0.scrollTop = near ? near.top - body0.clientHeight / 2 : 0;
+    body0.scrollLeft = keep ? keep.tick * px() : 0;
+    sync();
+    light();
+  }
+  function sync() {
+    el.head.scrollLeft = el.body.scrollLeft;
+    el.vel.scrollLeft = el.body.scrollLeft;
+    el.keys.scrollTop = el.body.scrollTop;
+    const mid = rows[rowIndexAt(el.body.scrollTop + el.body.clientHeight / 2)];
+    view = { tick: el.body.scrollLeft / px(), pitch: mid ? mid.p : null };
+  }
+  function forwardWheel(e) {
+    e.preventDefault();
+    el.body.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
+    if (!e.shiftKey) el.body.scrollTop += e.deltaY;
+  }
+
+  // ── Notes and velocity stems ──
+  function noteTier(p, start) {
+    if (state.colour === 'off') return '';
+    const t = tierOf(p, chordAt(start));
+    return t === 'root' ? 'chord' : t;
+  }
+  function renderNotes() {
+    const p = px(), L = loopT(), R = regionT();
+    let html = '', stems = '';
+    for (const n of state.notes) {
+      const row = rowMap.get(n.p);
+      if (!row) continue;
+      const top = row.thin ? row.top : row.top + 1, h = row.thin ? row.h : row.h - 1;
+      const label = h >= 11 && n.len * p >= 26 ? pname(n.p) : '';
+      if (!inLoop(n)) {
+        html += `<div class="nt parked${state.sel.has(n.id) ? ' sel' : ''}" data-id="${n.id}" data-k="-1" title="${pname(n.p)} — past the loop: kept, silent" style="left:${n.t * p}px;top:${top}px;width:${Math.max(3, n.len * p - 1)}px;height:${h}px">${label}</div>`;
+        continue;
+      }
+      for (let k = 0; n.t + k * L < R; k++) {
+        const start = n.t + k * L;
+        const len = Math.min(n.len, L - n.t, R - start);
+        const tier = row.thin ? 'grey' : noteTier(n.p, start);
+        const cls = `nt ${tier}${k ? ' ghost' : ''}${!k && state.sel.has(n.id) ? ' sel' : ''}`;
+        const vm = Math.round(45 + 55 * n.v);
+        html += `<div class="${cls}" data-id="${n.id}" data-k="${k}" style="left:${start * p}px;top:${top}px;width:${Math.max(3, len * p - 1)}px;height:${h}px;--vm:${vm}%"${k ? '' : ` title="${pname(n.p)} · vel ${n.v.toFixed(2)}"`}>${label}</div>`;
+        stems += `<span class="stem ${noteTier(n.p, start)}${k ? ' ghost' : ''}${!k && state.sel.has(n.id) ? ' sel' : ''}" style="left:${start * p}px;height:${Math.max(2, n.v * (VEL_H - 8))}px"></span>`;
+      }
+    }
+    el.notes.innerHTML = html;
+    el.velLayer.innerHTML = stems;
+    // The selected notes' keys, named even where the rows are too short for labels
+    const selP = new Set(state.notes.filter((n) => state.sel.has(n.id)).map((n) => n.p));
+    for (const k of el.keysIn.children) {
+      const on = selP.has(Number(k.dataset.p));
+      k.classList.toggle('sel-key', on);
+      k.textContent = on && !k.classList.contains('thin') ? pname(Number(k.dataset.p)) : k.dataset.label;
+    }
+    const count = state.notes.filter(inLoop).length;
+    document.getElementById('summary').textContent = `${state.loopBars}-bar loop in an ${state.regionBars}-bar region · ${count} note${count === 1 ? '' : 's'} · ${KEY.name} · snap ${SNAPS[state.snap][0]}`;
+  }
+
+  // ── Gestures on the body: add, move, resize, tap to delete, shift-drag to box-select ──
+  let drag = null;
+  const local = (e) => { const r = el.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  function snapshot() { return new Map(state.notes.filter((n) => state.sel.has(n.id)).map((n) => [n.id, { t: n.t, len: n.len, p: n.p }])); }
+  function onDown(e) {
+    if (e.button !== 0) return;
+    const { x, y } = local(e);
+    const hit = e.target.closest('.nt:not(.ghost)');
+    if (hit) {
+      const id = Number(hit.dataset.id);
+      if (e.shiftKey) state.sel.add(id); else if (!state.sel.has(id)) state.sel = new Set([id]);
+      const r = hit.getBoundingClientRect();
+      const edge = e.clientX > r.right - Math.min(6, r.width / 3);
+      drag = { mode: edge ? 'resize' : 'move', x, y, moved: false, tap: id, orig: snapshot(), anchor: id };
+      el.body.setPointerCapture(e.pointerId);
+      renderNotes();
+      return;
+    }
+    if (e.shiftKey) {
+      drag = { mode: 'box', x, y, moved: false };
+      el.body.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (e.pointerType === 'touch') { drag = { mode: 'tap', x, y, moved: false }; return; }
+    addAt(x, y);
+    drag = { mode: 'move', x, y, moved: false, tap: null, orig: snapshot(), anchor: [...state.sel][0] };
+    el.body.setPointerCapture(e.pointerId);
+  }
+  function addAt(x, y) {
+    if (y < 0 || y > (rows.at(-1)?.top ?? 0) + (rows.at(-1)?.h ?? 0)) return;
+    const s = snapT();
+    const t = Math.floor(x / px() / s) * s;
+    if (t >= loopT() || !rows.length) return;
+    const n = N(t, Math.min(state.lastLen, loopT() - t), rows[rowIndexAt(y)].p, 0.8);
+    state.notes.push(n);
+    state.sel = new Set([n.id]);
+    audition(n.p, n.v);
+    renderNotes();
+  }
+  // ── The key guide: the chord at the playhead while playing, under the pointer while editing ──
+  let hoverTick = null, guideKey = '';
+  function paintGuide() {
+    if (!el.keysIn) return;
+    const t = state.playing ? state.tick : hoverTick ?? state.tick;
+    const bar = Math.max(0, Math.min(state.regionBars - 1, Math.floor(t / BAR)));
+    const key = `${bar}|${state.colour}`;
+    if (key === guideKey) return;
+    guideKey = key;
+    const chord = CHORDS[bar % CHORDS.length], on = state.colour === 'keys';
+    for (const k of el.keysIn.children) {
+      k.classList.remove('k-root', 'k-chord', 'k-scale');
+      const tier = tierOf(Number(k.dataset.p), chord);
+      if (on && tier !== 'out') k.classList.add(`k-${tier}`);
+    }
+    for (const c of el.headIn.querySelectorAll('.chord')) c.classList.toggle('guide', on && Number(c.dataset.b) === bar);
+    document.getElementById('r-corner').innerHTML = on ? `<span class="guide">${chord.n}</span>bar ${bar + 1}` : 'bar';
+  }
+  function onMove(e) {
+    const { x, y } = local(e);
+    hoverTick = Math.max(0, Math.min(regionT() - 1, x / px()));
+    paintGuide();
+    if (!drag) return;
+    if (Math.abs(x - drag.x) > 3 || Math.abs(y - drag.y) > 3) drag.moved = true;
+    if (!drag.moved) return;
+    const s = snapT(), L = loopT();
+    if (drag.mode === 'move') {
+      // The selection moves as one block: the delta is clamped so no note leaves the loop or the rows
+      const origs = [...drag.orig.values()];
+      const inside = origs.filter((o) => o.t < L);
+      let dT = Math.round((x - drag.x) / px() / s) * s;
+      if (inside.length) {
+        const lo = Math.max(...inside.map((o) => -o.t));
+        const hi = Math.min(...inside.map((o) => L - Math.min(o.len, s) - o.t));
+        dT = Math.max(lo, Math.min(hi, dT));
+      }
+      const idx = origs.map((o) => rowMap.get(o.p)?.i).filter((i) => i !== undefined);
+      let dRow = rowIndexAt(y) - rowIndexAt(drag.y);
+      if (idx.length) dRow = Math.max(-Math.min(...idx), Math.min(rows.length - 1 - Math.max(...idx), dRow));
+      let lastPitch = null;
+      for (const n of state.notes) {
+        const o = drag.orig.get(n.id);
+        if (!o) continue;
+        if (o.t < L) {
+          n.t = o.t + dT;
+          n.len = Math.min(o.len, L - n.t);
+        } else if (dT !== 0) {
+          // A note past the loop stays parked on a pitch-only drag; a move in time brings it inside
+          n.t = Math.max(0, Math.min(L - Math.min(o.len, s), o.t + dT));
+          n.len = Math.min(o.len, L - n.t);
+        } else {
+          n.t = o.t;
+          n.len = o.len;
+        }
+        const ri = rowMap.get(o.p)?.i;
+        n.p = ri === undefined ? o.p : rows[ri + dRow].p;
+        if (n.id === drag.anchor) lastPitch = n.p;
+      }
+      if (lastPitch !== drag.heard && lastPitch !== null) { audition(lastPitch, 0.6); drag.heard = lastPitch; }
+    } else if (drag.mode === 'resize') {
+      const dT = Math.round((x - drag.x) / px() / s) * s;
+      for (const n of state.notes) {
+        const o = drag.orig.get(n.id);
+        if (o) n.len = Math.max(s, Math.min(L - n.t, o.len + dT));
+        if (n.id === drag.anchor) state.lastLen = n.len;
+      }
+    } else if (drag.mode === 'box') {
+      const l = Math.min(x, drag.x), t = Math.min(y, drag.y);
+      Object.assign(el.box.style, { display: 'block', left: `${l}px`, top: `${t}px`, width: `${Math.abs(x - drag.x)}px`, height: `${Math.abs(y - drag.y)}px` });
+      return;
+    } else return;
+    renderNotes();
+  }
+  function onUp(e) {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if ((d.mode === 'move' || d.mode === 'resize') && !d.moved && d.tap !== null) {
+      state.notes = state.notes.filter((n) => n.id !== d.tap);
+      state.sel.delete(d.tap);
+    } else if (d.mode === 'box') {
+      el.box.style.display = 'none';
+      const { x, y } = local(e);
+      const x0 = Math.min(x, d.x) / px(), x1 = Math.max(x, d.x) / px(), y0 = Math.min(y, d.y), y1 = Math.max(y, d.y);
+      for (const n of state.notes) {
+        const r = rowMap.get(n.p);
+        if (r && n.t < x1 && n.t + n.len > x0 && r.top < y1 && r.top + r.h > y0) state.sel.add(n.id);
+      }
+    } else if (d.mode === 'tap' && !d.moved) {
+      addAt(d.x, d.y);
+    }
+    if (d.mode === 'move' || d.mode === 'resize' || d.mode === 'tap') settle();
+    notesChanged();
+  }
+  // A note dropped over another of the same pitch trims the earlier one; on the same onset the selected note wins
+  function settle() {
+    const sorted = [...state.notes].sort((a, b) => a.p - b.p || a.t - b.t || (state.sel.has(a.id) ? 1 : -1));
+    const drop = new Set();
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], next = sorted[i];
+      if (prev.p !== next.p || drop.has(prev.id)) continue;
+      if (prev.t === next.t) drop.add(prev.id);
+      else if (prev.t + prev.len > next.t) prev.len = next.t - prev.t;
+    }
+    state.notes = state.notes.filter((n) => !drop.has(n.id));
+  }
+  // Scale keeps an outside row only while it holds a note, and Fold shows only used rows, so both rebuild
+  function notesChanged() {
+    if (state.fold || state.keys === 'scale') buildRoll(view); else renderNotes();
+  }
+  function onContext(e) {
+    e.preventDefault();
+    const hit = e.target.closest('.nt:not(.ghost)');
+    if (!hit) return;
+    const id = Number(hit.dataset.id);
+    state.notes = state.notes.filter((n) => n.id !== id);
+    state.sel.delete(id);
+    notesChanged();
+  }
+
+  // ── The velocity lane: drag a stem; a selected stem moves the whole selection ──
+  let vdrag = null;
+  function onVelDown(e) {
+    const r = el.velIn.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    let best = null, bestD = 7;
+    for (const n of state.notes) {
+      if (!inLoop(n)) continue;
+      const d = Math.abs(n.t * px() - x);
+      if (d < bestD) { best = n; bestD = d; }
+    }
+    if (!best) return;
+    vdrag = { ids: state.sel.has(best.id) ? new Set(state.sel) : new Set([best.id]) };
+    el.vel.setPointerCapture(e.pointerId);
+    onVelMove(e);
+  }
+  function onVelMove(e) {
+    if (!vdrag) return;
+    const r = el.velIn.getBoundingClientRect();
+    const v = Math.max(0.05, Math.min(1, 1 - (e.clientY - r.top - 4) / (VEL_H - 8)));
+    for (const n of state.notes) if (vdrag.ids.has(n.id)) n.v = Math.round(v * 100) / 100;
+    renderNotes();
+  }
+
+  // ── The loop brace's end: drag on the ruler, whole bars, 1 to the region ──
+  let bdrag = null;
+  function onBraceDown(e) {
+    if (!e.target.closest('[data-act="brace"]')) return;
+    bdrag = true;
+    el.head.setPointerCapture(e.pointerId);
+  }
+  function onBraceMove(e) {
+    if (!bdrag) return;
+    const x = e.clientX - el.headIn.getBoundingClientRect().left;
+    const bars = Math.max(1, Math.min(state.regionBars, Math.round(x / (BAR * px()))));
+    if (bars !== state.loopBars) { state.loopBars = bars; buildRoll(view); refreshControls(); }
+  }
+  function refreshControls() {
+    const sec = document.querySelector('#roll')?.closest('.page')?.querySelector('.section');
+    if (sec) sec.outerHTML = controls();
+  }
+
+  // ── Wiring ──
+  function wireRoll() {
+    if (!el.body) return;
+    el.body.addEventListener('scroll', sync);
+    for (const pane of [el.head, el.keys, el.vel]) pane.addEventListener('wheel', forwardWheel, { passive: false });
+    el.body.addEventListener('pointerdown', onDown);
+    el.body.addEventListener('pointermove', onMove);
+    el.body.addEventListener('pointerup', onUp);
+    el.body.addEventListener('pointercancel', () => { if (drag?.mode === 'tap') drag = null; });
+    el.body.addEventListener('pointerleave', () => { if (!drag) { hoverTick = null; paintGuide(); } });
+    el.body.addEventListener('contextmenu', onContext);
+    el.vel.addEventListener('pointerdown', onVelDown);
+    el.vel.addEventListener('pointermove', onVelMove);
+    el.vel.addEventListener('pointerup', () => { vdrag = null; });
+    el.head.addEventListener('pointerdown', onBraceDown);
+    el.head.addEventListener('pointermove', onBraceMove);
+    el.head.addEventListener('pointerup', () => { bdrag = null; });
+  }
+  const fullRender = () => { render(); wireRoll(); };
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (b) {
+      const act = b.dataset.act, d = Number(b.dataset.d);
+      if (act === 'loop') { state.loopBars = Math.max(1, Math.min(state.regionBars, state.loopBars + d)); }
+      else if (act === 'keys') state.keys = b.dataset.v;
+      else if (act === 'fold') state.fold = b.dataset.v === 'on';
+      else if (act === 'hz') z().h = Math.max(HZ_MIN, Math.min(HZ_MAX, pxBeat() * HZ_STEP ** d));
+      else if (act === 'fit') z().h = null;
+      else if (act === 'audition') { state.audition = b.dataset.v === 'on'; refreshControls(); return; }
+      else if (act === 'vz') z().v = Math.max(0, Math.min(VZ.length - 1, z().v + d));
+      else if (act === 'expand') state.expanded = !state.expanded;
+      else return;
+      fullRender();
+      return;
+    }
+    const opt = e.target.closest('.toolbar .segs button[data-v]');
+    if (!opt) return;
+    const key = { 'opt-expanded': 'expanded', 'opt-colour': 'colour', 'opt-offscale': 'offscale', 'opt-example': 'example', 'opt-sound': 'sound' }[opt.parentElement.id];
+    const v = opt.dataset.v;
+    state[key] = v === 'true' ? true : v === 'false' ? false : v;
+    if (key === 'offscale') state.keys = 'scale';
+    // Sound turned on mid-playback starts the audio at once
+    if (key === 'sound' && state.sound && state.playing) { audio(); ctx?.resume(); }
+    if (key === 'example') { state.notes = v === 'keys' ? keysExample() : []; state.sel.clear(); }
+    fullRender();
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.dataset?.act === 'snap') { state.snap = Number(e.target.value); state.lastLen = Math.max(snapT(), Math.min(state.lastLen, BAR)); fullRender(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest('select')) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.sel.size) {
+      e.preventDefault();
+      state.notes = state.notes.filter((n) => !state.sel.has(n.id));
+      state.sel.clear();
+      notesChanged();
+    } else if (e.key === 'Escape') {
+      if (state.expanded) { state.expanded = false; fullRender(); }
+      else if (state.sel.size) { state.sel.clear(); renderNotes(); }
+    }
+  });
+
+  // ── Playback: a plain test tone, so the colours can be heard against the chords ──
+  let ctx = null, rafId = 0, lastTs = null, prevTick = -1;
+  function audio() {
+    if (!state.sound) return null;
+    ctx ??= new AudioContext();
+    return ctx;
+  }
+  function tone(p, v, when, dur) {
+    const ac = audio();
+    if (!ac) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'triangle';
+    o.frequency.value = 440 * 2 ** ((p - 69) / 12);
+    const peak = (0.02 + 0.12 * v) * state.partVel, end = when + Math.max(0.03, dur);
+    if (peak <= 0) return;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(peak, when + 0.005);
+    g.gain.setValueAtTime(peak * 0.8, end);
+    g.gain.linearRampToValueAtTime(0, end + 0.06);
+    o.connect(g).connect(ac.destination);
+    o.start(when);
+    o.stop(end + 0.08);
+  }
+  function audition(p, v) {
+    if (state.playing || !state.audition || !audio()) return;
+    ctx.resume();
+    tone(p, v, ctx.currentTime, 0.18);
+  }
+  function crossed(a, b, t) { return a <= b ? t > a && t <= b : t > a || t <= b; }
+  function frame(ts) {
+    if (!state.playing) return;
+    if (lastTs === null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    const R = regionT(), L = loopT();
+    const next = (state.tick + dt / SECONDS_PER_TICK) % R;
+    if (ctx && state.sound) {
+      for (const n of state.notes) {
+        if (!inLoop(n)) continue;
+        for (let k = 0; n.t + k * L < R; k++) {
+          const start = n.t + k * L;
+          if (crossed(prevTick, next, start)) tone(n.p, n.v, ctx.currentTime, Math.min(n.len, L - n.t, R - start) * SECONDS_PER_TICK);
+        }
+      }
+    }
+    prevTick = next;
+    state.tick = next;
+    light();
+    rafId = requestAnimationFrame(frame);
+  }
+  function light() {
+    if (!el.ph) return;
+    const x = `${state.tick * px()}px`;
+    for (const ph of el.ph) if (ph) ph.style.left = x;
+    paintGuide();
+    for (const d of document.querySelectorAll('.dev')) d.classList.toggle('playing', state.playing);
+    const L = loopT(), k = Math.floor(state.tick / L), at = state.tick - k * L;
+    const byId = new Map(state.notes.map((n) => [n.id, n]));
+    for (const node of el.notes.children) {
+      const n = byId.get(Number(node.dataset.id));
+      const on = state.playing && n && Number(node.dataset.k) === k && at >= n.t && at < n.t + n.len;
+      node.classList.toggle('on', Boolean(on));
+    }
+  }
+  document.getElementById('play').addEventListener('click', (e) => {
+    state.playing = !state.playing;
+    e.currentTarget.setAttribute('aria-pressed', String(state.playing));
+    e.currentTarget.textContent = state.playing ? '■ Stop' : '▶ Play';
+    cancelAnimationFrame(rafId);
+    if (state.playing) { audio(); ctx?.resume(); state.tick = 0; prevTick = -1; lastTs = null; rafId = requestAnimationFrame(frame); }
+    light();
+  });
+
+  function legend() {
+    const sw = (c) => `<i class="sw" style="background:${c}"></i>`;
+    const base = 'var(--row-white)';
+    const guide = state.colour === 'keys'
+      ? `<span>keys, for the chord at the playhead or pointer: ${sw(`linear-gradient(var(--k-root),var(--k-root)),${base}`)}root ${sw(`linear-gradient(var(--k-chord),var(--k-chord)),${base}`)}chord tone ${sw(`linear-gradient(var(--k-scale),var(--k-scale)),${base}`)}scale tone ${sw(base)}outside the key</span>`
+      : state.colour === 'rows'
+        ? `<span>rows, per chord: ${sw(`linear-gradient(var(--t-root),var(--t-root)),${base}`)}root ${sw(`linear-gradient(var(--t-chord),var(--t-chord)),${base}`)}chord tone ${sw(`linear-gradient(var(--t-scale),var(--t-scale)),${base}`)}scale tone ${sw(base)}outside the key</span>`
+        : '';
+    const notes = state.colour === 'off' ? '<span>Colour off: rows shaded as piano keys only</span>'
+      : `<span>notes, at their start: ${sw('var(--n-chord)')}chord tone ${sw('var(--n-scale)')}scale tone ${sw('var(--n-out);border-color:var(--hot)')}outside the key</span>`;
+    document.getElementById('legend').innerHTML = guide + notes;
+  }
+
+  // Fit follows the window
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (z().h === null && el.body) { buildRoll(view); refreshControls(); } }, 120);
+  });
+
+  fullRender();
+})();
+</script>
