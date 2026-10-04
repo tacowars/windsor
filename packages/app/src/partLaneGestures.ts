@@ -21,6 +21,7 @@ import { laneScaleOf, paintLaneMarks, paintRegions } from './partLaneBlocks';
 import type { LanePress, LaneScale } from './partLaneModel';
 import { partLaneGeometry, pressedRegion, regionDraft, spanAt } from './partLaneModel';
 import { pointerDrag } from './pointerDrag';
+import { fitEmptyRolls } from './rollRegionFit';
 import type { SongView } from './songTab';
 import { boxTick, pxToTick } from './songViewTables';
 
@@ -175,7 +176,8 @@ function release(view: SongView, part: MusicPart, press: LanePress, draft: Draft
     view.paintLanes();
     return selectGrabbed(view, slot, press.hit);
   }
-  if (!view.commit({ parts: { [slot]: { regions: draft.regions } } })) return;
+  const regions = fitEmptyRolls(draft.regions, part.regions);
+  if (!view.commit({ parts: { [slot]: { regions } } })) return;
   if (draft.drawn !== null) return view.select({ kind: 'part', slot, region: draft.drawn });
   selectGrabbed(view, slot, press.hit);
 }

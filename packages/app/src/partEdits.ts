@@ -25,7 +25,6 @@ import type {
   SequencerSpec,
 } from '@windsor/engine';
 import {
-  ROLL_LOOP_TICKS_MAX,
   TICKS_PER_BAR,
   partAt,
   regionPattern,
@@ -37,6 +36,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { deepMerge } from './documentModel';
 import { addRegion, drawRegion, neighbourIndex, snapGrain, splitRegion } from './regionModel';
+import { fitEmptyRoll, fitEmptyRolls } from './rollRegionFit';
 import { addPart, freshSequencer, setSequencerKind } from './songParts';
 
 /** A raw document normalised without being adopted — `DocumentModel.preview`. */
@@ -167,7 +167,8 @@ export const regionGrain = (
 
 /**
  * Region `index` of `part` cut at `tick`, snapped to that region's own grain
- * (`regionGrain`), both halves holding a copy of its pattern (decision 3);
+ * (`regionGrain`), both halves holding a copy of its pattern (decision 3),
+ * an empty roll's loop fitted to each half (`fitEmptyRolls`, windsor#608);
  * null when there is no such region or the cut lands on one of its edges.
  */
 export function splitPartRegion(
@@ -180,7 +181,7 @@ export function splitPartRegion(
   if (!part.regions[index]) return null;
   const grain = regionGrain(part, index, modifier, bar);
   const next = splitRegion(part.regions, index, tick, grain, splitFill(part));
-  return next.length === part.regions.length ? null : next;
+  return next.length === part.regions.length ? null : fitEmptyRolls(next, part.regions);
 }
 
 /**
@@ -267,27 +268,14 @@ function defaultPattern(
 }
 
 /**
- * The pattern of a part's first region, `added`: the kind's default, a roll
- * looping over the region's length up to `ROLL_LOOP_TICKS_MAX` (windsor#601
- * decision 3).
- */
-function firstPattern(
-  doc: ArrangementDocument,
-  slot: number,
-  added: PartRegion,
-  preview: Preview,
-): RegionPattern | undefined {
-  const pattern = defaultPattern(doc, slot, preview);
-  if (pattern?.kind !== 'roll') return pattern;
-  return { ...pattern, loopTicks: Math.min(added.duration, ROLL_LOOP_TICKS_MAX) };
-}
-
-/**
  * `regions` — the part's own with one region added — and the added one's
  * index, the new region holding a copy of the pattern of the nearest region
  * that starts before it, else of the nearest after it (decision 4); the
- * first region of a part with none starts from the kind's default pattern
- * (`firstPattern`), and a kind whose regions carry no pattern draws a bare region.
+ * first region of a part with none starts from the kind's default pattern,
+ * and a kind whose regions carry no pattern draws a bare region. An empty
+ * roll, copied or default, loops over the new region's length up to
+ * `ROLL_LOOP_TICKS_MAX` (`fitEmptyRoll`; windsor#601 decision 3, windsor#608
+ * decision 1), whether a click or a drag drew it.
  */
 function withNeighbourPattern(
   doc: ArrangementDocument,
@@ -299,10 +287,12 @@ function withNeighbourPattern(
   const added = regions[index];
   if (!added || !keepsRegionPatterns(part)) return { regions, index };
   const from = neighbourIndex(part.regions, added.start);
-  const pattern =
-    from >= 0 ? patternCopy(part, from) : firstPattern(doc, part.slot, added, preview);
+  const pattern = from >= 0 ? patternCopy(part, from) : defaultPattern(doc, part.slot, preview);
   if (!pattern) return { regions, index };
-  return { regions: regions.map((r, i) => (i === index ? { ...r, pattern } : r)), index };
+  return {
+    regions: regions.map((r, i) => (i === index ? fitEmptyRoll({ ...r, pattern }) : r)),
+    index,
+  };
 }
 
 /**

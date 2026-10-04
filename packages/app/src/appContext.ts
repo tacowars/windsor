@@ -31,6 +31,7 @@ import type { BuildOptions, EngineHost } from './host';
 import { loadRenames } from './partAutoName';
 import { PartsSession, type PatchPartsEdit } from './partsSession';
 import { followSongLength } from './regionModel';
+import { fitFollowedRolls } from './rollRegionFit';
 import type { OpenAmend } from './songSession';
 import { SongSession } from './songSession';
 import type { ToastTone } from './toastModel';
@@ -195,7 +196,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // document agree on what ∞ means; any other partial passes through
     // unchanged. The refit folds into this edit's step (epic windsor#112
     // decision 7).
-    const { partial, report } = followSongLength(before, edit);
+    const followed = followSongLength(before, edit);
+    const partial = fitFollowedRolls(before, edit, followed.partial);
+    const { report } = followed;
     const result = this.commit(partial, report);
     if (result.ok) this.remember(before, label ?? stepLabel(edit), tab);
     return result;

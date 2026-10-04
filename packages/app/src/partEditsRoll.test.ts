@@ -81,4 +81,24 @@ describe('a Roll part draws its first region and each region keeps its own roll 
     expect(halves?.[0]?.pattern).toMatchObject({ loopTicks: 2 * BAR, notes });
     expect(halves?.[1]?.pattern).toEqual(halves?.[0]?.pattern);
   });
+
+  it('fits a clicked and a dragged region beside an empty roll to one bar, and copies a roll with notes unchanged (windsor#608)', () => {
+    const model = rollSong();
+    const preview = (raw: unknown): ArrangementDocument => model.preview(raw);
+    const drawnBeside = (notes: { tick: number; ticks: number; pitch: number }[]): unknown[] => {
+      const pattern = { kind: 'roll', loopTicks: 4 * BAR, notes };
+      model.merge({ parts: { 0: { regions: [{ start: 0, duration: 4 * BAR, pattern }] } } });
+      const click = drawRegionChange(model.doc, 0, 5 * BAR, preview);
+      const stroke = { from: 5 * BAR, to: 5 * BAR + 1, modifier: false };
+      const drag = drawStrokeChange(model.doc, 0, stroke, preview);
+      expect(click?.regions[1]?.duration).toBe(BAR);
+      expect(drag?.regions[1]?.duration).toBe(BAR);
+      return [click?.regions[1]?.pattern, drag?.regions[1]?.pattern];
+    };
+    const empty = { kind: 'roll', loopTicks: BAR, notes: [] };
+    expect(drawnBeside([])).toEqual([empty, empty]);
+    const notes = [{ tick: 0, ticks: DIVISORS.sixteenth, pitch: 60 }];
+    const copied = { kind: 'roll', loopTicks: 4 * BAR, notes };
+    expect(drawnBeside(notes)).toEqual([copied, copied]);
+  });
 });

@@ -98,6 +98,15 @@ nothing is moved by it.
     browser (`localStorage`, as the MIDI input choice is).
 13. **View settings** (Snap, Keys, Fold, the zooms) are console state,
     not song data.
+14. **An empty roll's loop follows its region's length** (2026-10-04,
+    windsor#608). While a region's own roll holds no notes, an edit that
+    changes the region's length sets its `loopTicks` to the new duration,
+    capped at `ROLL_LOOP_TICKS_MAX`: an edge trim, a seam roll (both
+    regions), a split (both halves) and the song-length follow that
+    stretches an ∞ region. A roll with one note or more keeps its loop as
+    the author's own, and a region with no pattern of its own is left
+    alone. A body move changes no length and keeps the loop. The fit is
+    part of the same edit, so one undo takes back both.
 
 ## The normaliser
 
