@@ -1,10 +1,12 @@
 # The Roll sequencer
 
 - **Date:** 2026-10-04
-- **Status:** accepted, being built
+- **Status:** accepted, built (2026-10-05)
 - **Links:** the epic, windsor#596 · this record's issue, windsor#599 (the
   kind in the song format) · the performer windsor#600, the region rule
-  windsor#601, the device windsor#602, its editing windsor#603 · the
+  windsor#601, the device windsor#602, its editing windsor#603, an empty
+  roll's loop following its region windsor#608 · the PRs windsor#604,
+  windsor#605, windsor#606, windsor#607, windsor#609, windsor#610 · the
   mockup tacowars approved on 2026-10-04,
   `docs/research/2026-10-04-piano-roll/roll.html` (windsor#597) · the
   rack-device record `2026-10-01-sequencer-rack-devices` · format rules in
