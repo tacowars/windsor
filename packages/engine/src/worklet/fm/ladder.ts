@@ -33,6 +33,16 @@
  * input and decimates through `LADDER_DECIMATOR`: the research's other
  * candidate, kept for its bench; the voice ships `LADDER_OVERSAMPLE`.
  *
+ * The output mix (windsor#577): the TB-303's second resonance path, the
+ * Reso pot's wiper into the VCA beside the ladder's output, so what leaves
+ * is y + `mixGain` · hp_mix(y), y the ladder's output, hp_mix a TPT
+ * one-pole high-pass at `LADDER_MIX_HP_HZ` and `mixGain` = `LADDER_MIX_GAIN` × p, p
+ * the Reso knob's place (`tuneLadder` sets both). A post-stage, once per
+ * output sample after the solve: it changes nothing in the loop. With
+ * `mixGain` 0 the sum is skipped, so at the knob's bottom the output is the
+ * solve's to the bit; the high-pass runs either way, so a Reso that rises
+ * mid-note meets a settled state.
+ *
  * Level and polarity (decision 7): the sample enters times
  * `LADDER_INPUT_SCALE` and leaves divided by it, negated, so the mode has
  * the Lowpass mode's polarity.
@@ -41,9 +51,10 @@
  * and its helpers pass their operands in fields, so no double crosses a
  * call (worklet rule 2); nothing here allocates after the constructor;
  * every double field is born NaN (rule 7); `reset` zeroes every state, the
- * high-pass's included, at a note's start; `quiet` is every state under
+ * two high-passes' included, at a note's start; `quiet` is every state under
  * `DORMANT_FILTER_STATE`. `ladder.test.ts` pins the saturator, the
- * polynomial and the response; `ladderLimits.test.ts` the convergence, the
+ * polynomial, the response with and without the mix and the mix's absence
+ * at p = 0; `ladderLimits.test.ts` the convergence, the
  * bounds, the threshold, the harmonics and the reset;
  * `synth/fmProcessorFilterLadder.test.ts` the voice.
  */
@@ -86,14 +97,21 @@ class Ladder {
   s2: number;
   s3: number;
   s4: number;
-  /** The feedback high-pass's integrator memory. */
+  /** The feedback high-pass's integrator memory, and the output mix's. */
   hpS: number;
+  mixS: number;
   /** The last solve's output state, x₄. */
   y: number;
-  /** Per block (`tuneLadder`): the prewarped half-step over τ, the feedback gain and the high-pass's G = g / (1 + g). */
+  /**
+   * Per block (`tuneLadder`): the prewarped half-step over τ, the feedback
+   * gain, the feedback high-pass's G = g / (1 + g), the output mix's gain
+   * and its high-pass's G.
+   */
   h: number;
   k: number;
   hpG: number;
+  mixGain: number;
+  mixG: number;
   /** `tuneLadder`'s inputs: the cutoff (Hz) and the Reso knob's value. */
   cutoffHz: number;
   resonance: number;
@@ -126,14 +144,16 @@ class Ladder {
 
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value (windsor#233).
-    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = NaN;
-    this.h = this.k = this.hpG = this.cutoffHz = this.resonance = NaN;
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = NaN;
+    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.cutoffHz = this.resonance = NaN;
     this.tunedHz = this.tunedResonance = this.tunedRate = NaN;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = NaN;
-    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = 0;
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = 0;
     this.h = 0;
     this.k = 0;
     this.hpG = 0;
+    this.mixGain = 0;
+    this.mixG = 0;
     this.cutoffHz = 0;
     this.resonance = 0;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = 0;
@@ -145,13 +165,14 @@ class Ladder {
     this.chunk = new Float64Array(CTRL_INTERVAL_LONG);
   }
 
-  /** A new note: every state from rest, the high-pass's and the decimator's included. The tuning carries over. */
+  /** A new note: every state from rest, the high-passes' and the decimator's included. The tuning carries over. */
   reset(): void {
     this.s1 = 0;
     this.s2 = 0;
     this.s3 = 0;
     this.s4 = 0;
     this.hpS = 0;
+    this.mixS = 0;
     this.y = 0;
     this.lastIn = 0;
     this.history.fill(0);
@@ -165,7 +186,8 @@ class Ladder {
       Math.abs(ladder.s2) <= floor &&
       Math.abs(ladder.s3) <= floor &&
       Math.abs(ladder.s4) <= floor &&
-      Math.abs(ladder.hpS) <= floor
+      Math.abs(ladder.hpS) <= floor &&
+      Math.abs(ladder.mixS) <= floor
     );
   }
 
@@ -197,7 +219,8 @@ class Ladder {
    * trapezoidal steps on the input (at 2×, the first on the midpoint from
    * the last sample's), each `steps` Newton steps on the four states from
    * their memories, after which the memories and the high-pass advance;
-   * at 1× the output is the last x₄, at 2× the decimator's sum over them.
+   * at 1× the output is the last x₄, at 2× the decimator's sum over them,
+   * then the output mix on it.
    */
   // One Newton solve read top to bottom: the residual, the Jacobian and its
   // elimination share every local, and a helper per part would pass them
@@ -296,14 +319,20 @@ class Ladder {
       }
     }
     this.lastIn = input;
-    if (m === 1) {
-      this.point = -this.y * OUTPUT_SCALE;
-      return;
+    let out = this.y;
+    if (m !== 1) {
+      const taps = this.taps;
+      out = 0;
+      for (let j = 0; j < taps.length; j++) out += taps[j] * history[j];
     }
-    const taps = this.taps;
-    let sum = 0;
-    for (let j = 0; j < taps.length; j++) sum += taps[j] * history[j];
-    this.point = -sum * OUTPUT_SCALE;
+    // The output mix's high-pass, a TPT one-pole on the output; its sum only with the Reso knob up.
+    const mixS = this.mixS;
+    const mv = (out - mixS) * this.mixG;
+    const mlp = mv + mixS;
+    this.mixS = mlp + mv;
+    const mixGain = this.mixGain;
+    if (mixGain !== 0) out += mixGain * (out - mlp);
+    this.point = -out * OUTPUT_SCALE;
   }
 }
 

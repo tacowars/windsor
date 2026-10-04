@@ -24,8 +24,14 @@ export const SR = 48000;
 const BLOCK = 128;
 const MONO_GAIN = 0.5;
 
-/** The constants an override may name: the three tunables of record decisions 4 and 7. */
-export const TUNABLES = ['LADDER_FEEDBACK_MAX', 'LADDER_FEEDBACK_HP_HZ', 'LADDER_INPUT_SCALE'];
+/** The constants an override may name: the three tunables of record decisions 4 and 7, and the output mix's two (windsor#577). */
+export const TUNABLES = [
+  'LADDER_FEEDBACK_MAX',
+  'LADDER_FEEDBACK_HP_HZ',
+  'LADDER_INPUT_SCALE',
+  'LADDER_MIX_GAIN',
+  'LADDER_MIX_HP_HZ',
+];
 
 /** The bundle's text with each `{ NAME: value }` override written into its `var` line. */
 function variantSource(overrides) {

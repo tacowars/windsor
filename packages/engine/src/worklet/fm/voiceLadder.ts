@@ -16,8 +16,11 @@
  *   and below `LADDER_CUTOFF_CEILING` of the sample rate, and the half-step
  *   h = tan(π f_c / (M f_s)) / 2^¼ for M sub-steps a sample;
  * - k = `LADDER_FEEDBACK_MAX` × p, p = log₂(reso / 0.5) / log₂ 24 held to
- *   0..1, so 0 at the knob's bottom (0.5) and 16.5 at its top (12);
- * - the feedback high-pass's G = g / (1 + g), g = tan(π 150 Hz / (M f_s)),
+ *   0..1, so 0 at the knob's bottom (0.5) and 16.5 at its top (12), and
+ *   the output mix's gain `LADDER_MIX_GAIN` × p (windsor#577);
+ * - the feedback high-pass's G = g / (1 + g), g =
+ *   tan(π `LADDER_FEEDBACK_HP_HZ` / (M f_s)), and the output mix's, g =
+ *   tan(π `LADDER_MIX_HP_HZ` / f_s) (the mix runs once per output sample),
  *   once per sample rate.
  *
  * Each is worked out only when its input changed, so a held cutoff and
@@ -44,6 +47,8 @@ import {
   LADDER_CUTOFF_MIN_HZ,
   LADDER_FEEDBACK_HP_HZ,
   LADDER_FEEDBACK_MAX,
+  LADDER_MIX_GAIN,
+  LADDER_MIX_HP_HZ,
   LADDER_RESONANCE_FLOOR,
   LADDER_RESONANCE_SPAN,
 } from './fmConstants';
@@ -73,6 +78,10 @@ function tuneLadder(ladder: Ladder, rate: number): void {
     tanInPlace(slot, 0);
     const g = slot[0];
     ladder.hpG = g / (1 + g);
+    slot[0] = (Math.PI * LADDER_MIX_HP_HZ) / rate;
+    tanInPlace(slot, 0);
+    const gm = slot[0];
+    ladder.mixG = gm / (1 + gm);
     ladder.tunedRate = rate;
     // The cutoff's ceiling and step answer to the rate too.
     ladder.tunedHz = NaN;
@@ -101,6 +110,7 @@ function tuneLadder(ladder: Ladder, rate: number): void {
       if (p > 1) p = 1;
     }
     ladder.k = LADDER_FEEDBACK_MAX * p;
+    ladder.mixGain = LADDER_MIX_GAIN * p;
     ladder.tunedResonance = reso;
   }
 }

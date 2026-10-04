@@ -5,8 +5,9 @@
  * finite and bounded output at Drive's ceiling and under a cutoff sweep;
  * where the loop decays and grows against the analog threshold; the
  * feedback high-pass thinning the peak at low cutoffs; odd harmonics with
- * level; a resonant tail that ends, and a reset that clears it. The
- * small-signal response and the tuning are `ladder.test.ts`.
+ * level; a resonant tail that ends, and a reset that clears it, the output
+ * mix's high-pass included (windsor#577). The small-signal response and the
+ * tuning are `ladder.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -24,10 +25,11 @@ import { tuneLadder } from './voiceLadder';
 const RATE = 48000;
 const TOP = LADDER_CUTOFF_MAX_HZ;
 
-function tuned(cutoffHz: number, k: number): Ladder {
+/** A ladder at `cutoffHz` tuned at 48 kHz with the Reso knob at `resonance` (its bottom, the output mix off, by default), its feedback then set to `k`. */
+function tuned(cutoffHz: number, k: number, resonance = 0.5): Ladder {
   const ladder = new Ladder();
   ladder.cutoffHz = cutoffHz;
-  ladder.resonance = 0.5;
+  ladder.resonance = resonance;
   tuneLadder(ladder, RATE);
   ladder.k = k;
   return ladder;
@@ -109,32 +111,45 @@ function largest(
 }
 
 /**
- * The bound the output keeps at any input: past |x| ≈ 5 the saturator holds
- * a diode pair's current at ±1, so a state stops where its pair saturates,
- * and x₄ settles near 5 (2.5 in the carrier's units) at most, a little more
- * while the trapezoid overshoots it.
+ * The bound the output keeps at any input (carrier units): past |x| ≈ 5
+ * the saturator holds a diode pair's current at ±1, so a state stops where
+ * its pair saturates, and the solve's x₄ stays under 4 of the ladder's
+ * units; the output mix, y + g hp(y), adds at most 2g times that, since its
+ * one-pole low-pass never passes its input's largest value. Leaving the
+ * ladder divides by LADDER_INPUT_SCALE.
  */
-const OUTPUT_BOUND = 4;
+const LADDER_UNITS_BOUND = 4;
+const outputBound = (ladder: Ladder): number =>
+  (LADDER_UNITS_BOUND * (1 + 2 * ladder.mixGain)) / LADDER_INPUT_SCALE;
+/** The Reso knob's top, where k is LADDER_FEEDBACK_MAX and the output mix is at its full gain. */
+const RESO_TOP = 12;
 
 describe('the bounds (decision 6)', () => {
-  it('keeps a full-scale noise burst at 64× finite and bounded at the top cutoff, k 0 and 16.5, and a 64× square too', () => {
-    for (const k of [0, LADDER_FEEDBACK_MAX]) {
+  it('keeps a full-scale noise burst at 64× finite and bounded at the top cutoff, k 0 and 16.5 (the mix in), and a 64× square too', () => {
+    for (const [k, resonance] of [
+      [0, 0.5],
+      [LADDER_FEEDBACK_MAX, RESO_TOP],
+    ] as const) {
       const draw = noise(0xa204);
-      const burst = largest(tuned(TOP, k), RATE / 2, () => 64 * draw());
+      const bound = outputBound(tuned(TOP, k, resonance));
+      const burst = largest(tuned(TOP, k, resonance), RATE / 2, () => 64 * draw());
       let i = 0;
-      const square = largest(tuned(TOP, k), RATE / 2, () => (i++ % 960 < 480 ? 64 : -64));
-      expect(burst, `k ${k}`).toBeLessThan(OUTPUT_BOUND);
-      expect(square, `k ${k}`).toBeLessThan(OUTPUT_BOUND);
+      const square = largest(tuned(TOP, k, resonance), RATE / 2, () =>
+        i++ % 960 < 480 ? 64 : -64,
+      );
+      expect(burst, `k ${k}`).toBeLessThan(bound);
+      expect(square, `k ${k}`).toBeLessThan(bound);
     }
   });
 
-  it('stays finite and bounded through a cutoff sweep 30 Hz → top → 30 Hz over 50 ms at k 16.5', () => {
+  it('stays finite and bounded through a cutoff sweep 30 Hz → top → 30 Hz over 50 ms at k 16.5, the mix in', () => {
     const n = RATE / 20;
     const sweep = (i: number): number => 30 * (TOP / 30) ** (1 - Math.abs((2 * i) / n - 1));
     for (const level of [1, 64]) {
       const draw = noise(level);
-      const max = largest(tuned(30, LADDER_FEEDBACK_MAX), n, () => level * draw(), sweep);
-      expect(max, `${level}×`).toBeLessThan(OUTPUT_BOUND);
+      const ladder = tuned(30, LADDER_FEEDBACK_MAX, RESO_TOP);
+      const max = largest(ladder, n, () => level * draw(), sweep);
+      expect(max, `${level}×`).toBeLessThan(outputBound(ladder));
     }
   });
 });
@@ -217,8 +232,8 @@ describe('the saturation (decisions 3 and 7)', () => {
 });
 
 describe('the end of a ring (decision 8)', () => {
-  it('goes quiet after a resonant tail at k 16.5 and 200 Hz, and not before', () => {
-    const ladder = tuned(200, LADDER_FEEDBACK_MAX);
+  it('goes quiet after a resonant tail at k 16.5 and 200 Hz, the mix in, and not before', () => {
+    const ladder = tuned(200, LADDER_FEEDBACK_MAX, RESO_TOP);
     const draw = noise(7);
     for (let i = 0; i < RATE / 10; i++) step(ladder, draw());
     expect(Ladder.quiet(ladder)).toBe(false);
@@ -231,12 +246,13 @@ describe('the end of a ring (decision 8)', () => {
     expect(samples).toBeLessThan(4 * RATE);
   });
 
-  it('clears every state on reset, the high-pass and the oversampler included', () => {
-    const ladder = tuned(800, LADDER_FEEDBACK_MAX);
+  it('clears every state on reset, the two high-passes and the oversampler included', () => {
+    const ladder = tuned(800, LADDER_FEEDBACK_MAX, RESO_TOP);
     ladder.oversample = 2;
     const draw = noise(9);
     for (let i = 0; i < 2000; i++) step(ladder, draw());
     expect(ladder.hpS).not.toBe(0);
+    expect(ladder.mixS).not.toBe(0);
     ladder.reset();
     const states = [
       ladder.s1,
@@ -244,10 +260,11 @@ describe('the end of a ring (decision 8)', () => {
       ladder.s3,
       ladder.s4,
       ladder.hpS,
+      ladder.mixS,
       ladder.y,
       ladder.lastIn,
     ];
-    expect(states).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(states).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
     expect([...ladder.history]).toEqual([0, 0, 0]);
     expect(Ladder.quiet(ladder)).toBe(true);
     expect(Math.abs(step(ladder, 0))).toBe(0);

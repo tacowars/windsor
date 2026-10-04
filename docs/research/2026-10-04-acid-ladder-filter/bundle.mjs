@@ -51,8 +51,14 @@ export const CANDIDATES = {
  * `k`, the high-pass at `hpHz`, with `taps` as its decimator if given:
  * h = tan(π f_c / (M f_s)) / 2^¼ and G = g / (1 + g) worked out here with
  * `Math.tan`, as the shipped tuning works them out in portable arithmetic.
+ * On a bundle with the output mix (windsor#577) its gain is `mixGain` (0,
+ * off, unless given) and its high-pass's corner `mixHz`, at the base rate.
  */
-export function candidate(ladder, name, { cutoffHz, k, hpHz = 150, taps, rate: baseRate = SR } = {}) {
+export function candidate(
+  ladder,
+  name,
+  { cutoffHz, k, hpHz = 150, taps, rate: baseRate = SR, mixGain = 0, mixHz = 400 } = {},
+) {
   const c = CANDIDATES[name];
   ladder.oversample = c.oversample;
   ladder.steps = c.steps;
@@ -66,6 +72,11 @@ export function candidate(ladder, name, { cutoffHz, k, hpHz = 150, taps, rate: b
   const g = Math.tan((Math.PI * hpHz) / rate);
   ladder.hpG = g / (1 + g);
   ladder.k = k;
+  if ('mixG' in ladder) {
+    const gm = Math.tan((Math.PI * mixHz) / baseRate);
+    ladder.mixG = gm / (1 + gm);
+    ladder.mixGain = mixGain;
+  }
   ladder.reset();
   return ladder;
 }

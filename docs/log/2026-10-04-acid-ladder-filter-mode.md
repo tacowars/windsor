@@ -8,7 +8,9 @@
   (`docs/research/2026-10-04-acid-ladder-filter/codex-review.md`):
   decision 4's high-pass is labelled a calibration, decision 6's solver
   is reopened on a convergence matrix, and the release premise under
-  Consequences is corrected.
+  Consequences is corrected. Revised again on 2026-10-04 by windsor#577:
+  decision 10 adds the TB-303's second resonance path, the pot's output
+  mix into the VCA, and decisions 4 and 7 are amended with it.
 - **Links:** the modelling and its numbers in
   `docs/research/2026-10-04-acid-ladder-filter/README.md` · the Formant
   mode, the precedent for adding a mode,
@@ -66,7 +68,11 @@ are not touched, and every factory preset renders bit for bit as before.
    against Roland's ACB recordings moved it to **100 Hz**, where the bass
    loss at the two low Cut Off sections is nearest the reference
    (`docs/research/2026-10-04-acid-ladder-filter/README.md`, "The
-   sound-design pass"); tacowars's listen may move it again. A circuit reduction of
+   sound-design pass"); tacowars's listen may move it again.
+   **Amended (windsor#577):** with the output mix of decision 10 returning
+   bass, the fit moved the corner back to **150 Hz**, where the bass loss
+   over every section and the square's zero-resonance shape both meet the
+   reference. A circuit reduction of
    the return is later work, not assumed. The feedback gain k is
    `LADDER_FEEDBACK_MAX × p`, with p the Reso knob's position on its log
    scale (`log₂(reso / 0.5) / log₂(24)`, 0 at 0.5 and 1 at 12; the default
@@ -143,6 +149,16 @@ are not touched, and every factory preset renders bit for bit as before.
    bass; no makeup. Both values are tacowars's to set by ear; the voice's
    Drive stage before the filter is how a patch pushes the ladder harder,
    and no new knob is added.
+   **Amended (windsor#577):** the level with resonance is the circuit's two
+   paths, the loop's passband and decision 10's output mix, and still no
+   makeup: with the mix the level's change with resonance, against the
+   ACB's, is +0.5 dB at 90 and 100 % (−4.3 and −4.9 dB without it), so the
+   resonance-tied makeup the ticket held in reserve was not added, and a
+   fixed one would clip at low resonance. `LADDER_INPUT_SCALE` moves to
+   **0.25**: the input pair then compresses the resonance less, and the
+   lift, the bass and the zero-resonance errors all meet the reference
+   there (`docs/research/2026-10-04-acid-ladder-filter/README.md`, "The
+   output mix").
 8. **Where it lives.** `worklet/fm/ladder.ts`: `Ladder`, the states, the
    per-block coefficients, `process()` over a `point` field (the sample in
    and out, so no double crosses the call, rule 2), `reset()` and
@@ -187,6 +203,32 @@ are not touched, and every factory preset renders bit for bit as before.
    scenario an Acid patch; `fmGolden.json` does not change. The cost bench
    and the aliasing reading go in the research folder.
 
+10. **The output mix (windsor#577).** On the service notes' schematic the
+    resonance pot's wiper feeds the VCA through its own 10 nF / 100 kΩ
+    beside the ladder output's 10 nF / 220 kΩ (C21, C22 and R121 by IC15),
+    so the output heard is the ladder's plus a resonance-proportional,
+    high-passed copy of it. `Ladder` leaves `y + LADDER_MIX_GAIN × p ×
+    hp_mix(y)`, y the ladder's output (scaled, polarity as before), p the
+    Reso knob's place (decision 4's), hp_mix a TPT one-pole high-pass at
+    `LADDER_MIX_HP_HZ`: a post-stage after the solve, so the loop, the
+    Jacobian and the tuning are unchanged; `tuneLadder` sets the
+    high-pass's coefficient once per sample rate and the gain with k; its
+    state is reset with the rest and counted by `quiet`. At p = 0 the sum
+    is skipped, so the output is the solve's to the bit. The schematic
+    gives 2.2 (220 kΩ / 100 kΩ) and 159 Hz (10 nF into 100 kΩ); the fit on
+    the ACB comparison ships **2.6** and **400 Hz**: at the schematic's
+    corner the mix returns 3–5 dB more bass at the low Cut Off sections
+    than the reference keeps, so the one-pole is, like decision 4's, a
+    calibrated image of the hardware's coupling and not its two parts
+    alone. With it the emphasis lift is within 2 dB of the reference's at
+    50, 90 and 100 % (it was 4–10 dB short), the bass loss within 2.33 dB
+    RMS over every section (2.94), and the level's change with resonance
+    within 0.5 dB (decision 7). No new patch field; `PATCH_FILE_FORMAT`
+    does not move. The ladder costs 1.7–2.2 % more a voice-sample, and the
+    other modes what they did. The acid patches' volumes moved to keep
+    their peaks within 3 dB of before. Every value is tacowars's to set by
+    ear (the renders in the research's "The output mix").
+
 ## Consequences
 
 - One more branch in both render loops and one more class per voice; the
@@ -196,10 +238,14 @@ are not touched, and every factory preset renders bit for bit as before.
 - The Acid mode at zero resonance is three octaves darker than Lowpass at
   the same Cutoff value, and loses bass as resonance rises above a ~1 kHz
   cutoff. Both are the instrument's; a patch compensates with the knob.
+  Since windsor#577 the output mix returns level and lift with resonance,
+  as the hardware's second path does, and the low cutoffs keep about 3 dB
+  more bass than the reference's.
 - Factory acid patches add rows to the golden, which the sound-design
   ticket refreshes and says so.
-- The one-pole high-pass (100 Hz shipped) is a calibration of the hardware's
-  return, so the resonance thinning at low cutoffs is the model's claim,
+- The one-pole high-pass (150 Hz shipped since windsor#577) is a
+  calibration of the hardware's return, and so is the output mix's
+  (400 Hz), so the resonance thinning at low cutoffs is the model's claim,
   to be confirmed by ear and, if wanted, by a circuit reduction later.
 - Deferred: an extended-resonance option; a Reso readout in pot percent
   for this mode; a circuit reduction of the resonance return.

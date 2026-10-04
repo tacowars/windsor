@@ -37,11 +37,13 @@ var FORMANT_Q_PER_RESONANCE = 8;
 var FORMANT_Q_MAX = 40;
 var FORMANT_MAKEUP = 1.787;
 var LADDER_BOTTOM_CAP = 0.5;
-var LADDER_FEEDBACK_HP_HZ = 100;
+var LADDER_FEEDBACK_HP_HZ = 150;
 var LADDER_FEEDBACK_MAX = 16.5;
 var LADDER_RESONANCE_FLOOR = 0.5;
 var LADDER_RESONANCE_SPAN = 24;
-var LADDER_INPUT_SCALE = 1;
+var LADDER_INPUT_SCALE = 0.25;
+var LADDER_MIX_GAIN = 2.6;
+var LADDER_MIX_HP_HZ = 400;
 var LADDER_CUTOFF_MIN_HZ = 20;
 var LADDER_CUTOFF_MAX_HZ = 1e4;
 var LADDER_CUTOFF_CEILING = 0.45;
@@ -1053,14 +1055,16 @@ var DQ1 = 2 * Q1, DQ2 = 4 * Q2, DQ3 = 6 * Q3;
 var SAT_LIMIT = LADDER_SATURATOR.limit;
 var Ladder = class {
   constructor() {
-    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = NaN;
-    this.h = this.k = this.hpG = this.cutoffHz = this.resonance = NaN;
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = NaN;
+    this.h = this.k = this.hpG = this.mixGain = this.mixG = this.cutoffHz = this.resonance = NaN;
     this.tunedHz = this.tunedResonance = this.tunedRate = NaN;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = NaN;
-    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = 0;
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.mixS = this.y = 0;
     this.h = 0;
     this.k = 0;
     this.hpG = 0;
+    this.mixGain = 0;
+    this.mixG = 0;
     this.cutoffHz = 0;
     this.resonance = 0;
     this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = 0;
@@ -1071,13 +1075,14 @@ var Ladder = class {
     this.slot = new Float64Array(1);
     this.chunk = new Float64Array(CTRL_INTERVAL_LONG);
   }
-  /** A new note: every state from rest, the high-pass's and the decimator's included. The tuning carries over. */
+  /** A new note: every state from rest, the high-passes' and the decimator's included. The tuning carries over. */
   reset() {
     this.s1 = 0;
     this.s2 = 0;
     this.s3 = 0;
     this.s4 = 0;
     this.hpS = 0;
+    this.mixS = 0;
     this.y = 0;
     this.lastIn = 0;
     this.history.fill(0);
@@ -1085,7 +1090,7 @@ var Ladder = class {
   /** Every state under the dormancy floor (#547): the ladder has stopped ringing. */
   static quiet(ladder) {
     const floor = DORMANT_FILTER_STATE;
-    return Math.abs(ladder.s1) <= floor && Math.abs(ladder.s2) <= floor && Math.abs(ladder.s3) <= floor && Math.abs(ladder.s4) <= floor && Math.abs(ladder.hpS) <= floor;
+    return Math.abs(ladder.s1) <= floor && Math.abs(ladder.s2) <= floor && Math.abs(ladder.s3) <= floor && Math.abs(ladder.s4) <= floor && Math.abs(ladder.hpS) <= floor && Math.abs(ladder.mixS) <= floor;
   }
   /** `satIn` through the rational tanh: its value in `satOut`, its slope in `satSlope`. */
   saturate() {
@@ -1114,7 +1119,8 @@ var Ladder = class {
    * trapezoidal steps on the input (at 2×, the first on the midpoint from
    * the last sample's), each `steps` Newton steps on the four states from
    * their memories, after which the memories and the high-pass advance;
-   * at 1× the output is the last x₄, at 2× the decimator's sum over them.
+   * at 1× the output is the last x₄, at 2× the decimator's sum over them,
+   * then the output mix on it.
    */
   // One Newton solve read top to bottom: the residual, the Jacobian and its
   // elimination share every local, and a helper per part would pass them
@@ -1189,14 +1195,19 @@ var Ladder = class {
       }
     }
     this.lastIn = input;
-    if (m === 1) {
-      this.point = -this.y * OUTPUT_SCALE;
-      return;
+    let out = this.y;
+    if (m !== 1) {
+      const taps = this.taps;
+      out = 0;
+      for (let j = 0; j < taps.length; j++) out += taps[j] * history[j];
     }
-    const taps = this.taps;
-    let sum = 0;
-    for (let j = 0; j < taps.length; j++) sum += taps[j] * history[j];
-    this.point = -sum * OUTPUT_SCALE;
+    const mixS = this.mixS;
+    const mv = (out - mixS) * this.mixG;
+    const mlp = mv + mixS;
+    this.mixS = mlp + mv;
+    const mixGain = this.mixGain;
+    if (mixGain !== 0) out += mixGain * (out - mlp);
+    this.point = -out * OUTPUT_SCALE;
   }
 };
 
@@ -1942,6 +1953,10 @@ function tuneLadder(ladder, rate) {
     tanInPlace(slot, 0);
     const g = slot[0];
     ladder.hpG = g / (1 + g);
+    slot[0] = Math.PI * LADDER_MIX_HP_HZ / rate;
+    tanInPlace(slot, 0);
+    const gm = slot[0];
+    ladder.mixG = gm / (1 + gm);
     ladder.tunedRate = rate;
     ladder.tunedHz = NaN;
   }
@@ -1968,6 +1983,7 @@ function tuneLadder(ladder, rate) {
       if (p > 1) p = 1;
     }
     ladder.k = LADDER_FEEDBACK_MAX * p;
+    ladder.mixGain = LADDER_MIX_GAIN * p;
     ladder.tunedResonance = reso;
   }
 }

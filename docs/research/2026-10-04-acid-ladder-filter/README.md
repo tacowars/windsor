@@ -16,7 +16,8 @@ computed values, not performance readings: no CPU cost is claimed here, and
 the cost of the shipped filter is a measurement the engine ticket makes on
 the bundle. The engine ticket (windsor#573) made it: its readings of the
 shipped bundle, both solver candidates, the saturator, the cost, the
-aliasing and the convergence, are the last section, "The shipped filter".
+aliasing and the convergence, are the section "The shipped filter"; the
+sound-design pass (windsor#574) and the output mix (windsor#577) follow it.
 
 Codex reviewed the first version of this folder (`codex-review.md`,
 `review-check.mjs`, which identifies the prototype it reviewed by hash and
@@ -548,7 +549,9 @@ median [IQR]):
 Three factory acid patches, an audition song, a comparison rig against
 Roland's TB-303 software instrument, and the three sound-design tunables
 set from it: `LADDER_FEEDBACK_MAX` stays **16.5**, `LADDER_FEEDBACK_HP_HZ`
-moves from 150 to **100** Hz and `LADDER_INPUT_SCALE` from 2 to **1**.
+moves from 150 to **100** Hz and `LADDER_INPUT_SCALE` from 2 to **1**
+(windsor#577 moved the last two again, to 150 Hz and 0.25, when it added
+the output mix and re-fitted the patches' volumes: the last section).
 The sections above were read at 150 Hz and scale 2 (their conversions to
 the carrier's units divide by 2). Sound calibration stays provisional until
 tacowars has listened against the references. Every number below is
@@ -783,3 +786,227 @@ the median spectral centroid:
 `extra-acid-saw-glide-0.wav` and `extra-acid-saw-glide-0.08.wav` are the
 saw's line with the patch's glide at 0 (shipped: only the slides glide) and
 at 0.08 s (every note bends from the last).
+
+## The output mix (windsor#577)
+
+tacowars's listen of windsor#574 on its preview: with resonance off and the
+cutoff open the Acid and SVF modes sit at a similar level, but as Reso rises
+the Acid mode's level falls far more than a TB-303's, a TD-3's or the
+emulations', and it does not squelch. The model had only the loop. On the
+service notes' schematic the resonance pot's wiper also feeds the VCA,
+through its own 10 nF / 100 kΩ beside the ladder output's 10 nF / 220 kΩ
+(C21, C22 and R121 by IC15), so what is heard is the ladder's output plus a
+resonance-proportional, high-passed copy of it. `ladder.ts` now leaves
+
+    y_out = y + LADDER_MIX_GAIN × p × hp_mix(y)
+
+with y the ladder's output (scaled, polarity as before), p the Reso knob's
+place (the feedback's own p) and hp_mix a TPT one-pole high-pass at
+`LADDER_MIX_HP_HZ`: a post-stage after the solve, so the loop, its Jacobian
+and its tuning are untouched. `tuneLadder` sets the high-pass's coefficient
+once per sample rate and the gain with k. With p = 0 the sum is skipped and
+the output is the solve's own to the bit (`ladder.test.ts` pins it sample by
+sample); the high-pass runs either way, so a Reso that rises mid-note meets
+a settled state, and `quiet` and `reset` include its state. On the bundle,
+with `LADDER_INPUT_SCALE` set back to origin/main's 1, `acid-saw`,
+`acid-square` and `acid-accent` with the Reso knob at its bottom render bit
+for bit as origin/main's at notes 33, 45 and 57, plain and accented
+(eighteen renders). The shipped input scale moves (below), so the shipped
+p = 0 render is not origin/main's.
+
+**The linear model.** `outmix.mjs` (from the ticket's planning, with a
+header) puts the mix at the schematic's 2.2 (220 kΩ / 100 kΩ) and 159 Hz
+around the loop's analog response: it moves both the lift and the bass
+toward the ACB's, and overshoots the lift (34 dB at the 100 % section
+against the ACB's 27.2), because the linear loop's lift is not capped by
+the input pair's saturation as the solver's is.
+
+**The rig.** `compare.mjs` takes `--set LADDER_MIX_GAIN=…` and
+`--set LADDER_MIX_HP_HZ=…` (`audition/bundleVariant.mjs`), and prints one
+more summary: per resonance, the emphasis lift gap and the level, both
+Windsor minus ACB and the mean over sections and notes, the level as the
+power sum of the harmonics both hold (the level column's harmonics) and as
+a change from the same cell at 0 %. Run with the mix off it prints
+origin/main's numbers exactly.
+
+**The fit.** 149 variants over `LADDER_INPUT_SCALE` (1, 0.5, 0.25),
+`LADDER_FEEDBACK_HP_HZ` (50–200), `LADDER_MIX_GAIN` (1.5–3) and
+`LADDER_MIX_HP_HZ` (160–600), `LADDER_FEEDBACK_MAX` at 16.5 throughout.
+Every row is in `reference/mix-fit.txt`; 36 of them meet every rig
+acceptance of the ticket. The rows that decide it (lift gap, level change
+and bass in dB, Windsor minus ACB; shape and level RMS dB):
+
+| scale | feedback HP | mix | mix HP | lift gap 50 / 90 / 100 % | shape at 0 %, saw / square | level at 0 %, saw / square | bass, 24.78 + 49.38 %, RMS, mean | bass, every section, RMS, mean | level change at 90 / 100 % |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 100 | off | — | −4.1 / −8.6 / −10.0 | 6.37 / 7.31 | 8.68 / 6.72 | 1.33, +0.86 | 2.94, −1.34 | −4.27 / −4.91 |
+| 1 | 100 | 2.2 | 160 | +1.8 / +0.3 / −0.4 | 6.42 / 7.27 | 8.67 / 6.71 | 4.84, +4.57 | 3.69, +2.31 | +1.96 / +1.94 |
+| 0.25 | 100 | off | — | −3.0 / −7.0 / −8.2 | 5.66 / 8.09 | 7.90 / 7.08 | 0.92, −0.53 | 3.25, −2.39 | −4.81 / −5.46 |
+| 0.25 | 100 | 2.2 | 160 | +3.0 / +2.1 / +1.5 | 5.68 / 8.07 | 7.85 / 7.07 | 3.41, +3.13 | 2.72, +1.25 | +1.65 / +1.69 |
+| 1 | 100 | 3 | 400 | +1.8 / +0.8 / +0.1 | 6.15 / 7.46 | 9.08 / 7.05 | 2.21, +1.98 | 2.42, +0.03 | +0.36 / +0.38 |
+| 1 | 150 | 2.2 | 400 | +0.1 / −2.3 / −3.2 | 6.75 / 7.11 | 9.28 / 6.93 | 3.94, +3.86 | 2.98, +1.75 | +0.21 / +0.03 |
+| 0.5 | 150 | 2.6 | 400 | +1.5 / −0.2 / −1.0 | 5.94 / 7.62 | 8.24 / 6.95 | 3.02, +2.96 | 2.36, +1.17 | +0.40 / +0.32 |
+| 0.25 | 50 | 2.2 | 400 | +2.5 / +2.2 / +2.0 | 5.54 / 8.47 | 7.54 / 7.07 | 2.20, −1.59 | 4.50, −3.62 | −0.96 / −0.58 |
+| 0.25 | 125 | 2.6 | 400 | +1.9 / +0.7 / −0.1 | 5.87 / 7.71 | 8.42 / 7.22 | 2.26, +2.16 | 2.23, +0.19 | +0.30 / +0.30 |
+| 0.25 | 150 | 2.2 | 160 | +2.3 / +0.8 / −0.1 | 5.76 / 7.86 | 8.02 / 7.05 | 4.97, +4.85 | 3.79, +3.17 | +2.24 / +2.18 |
+| 0.25 | 150 | 2.2 | 400 | +1.0 / −0.8 / −1.6 | 5.88 / 7.70 | 8.07 / 7.00 | 2.67, +2.62 | 2.21, +0.80 | −0.11 / −0.23 |
+| **0.25** | **150** | **2.6** | **400** | **+1.7 / +0.2 / −0.7** | **5.88 / 7.69** | **8.07 / 6.99** | **2.95, +2.89** | **2.33, +1.07** | **+0.49 / +0.44** |
+| 0.25 | 150 | 3 | 400 | +2.3 / +1.0 / +0.2 | 5.89 / 7.69 | 8.06 / 6.98 | 3.24, +3.17 | 2.48, +1.34 | +1.07 / +1.07 |
+| 0.25 | 150 | 2.6 | 600 | +0.7 / −1.1 / −1.9 | 5.94 / 7.62 | 8.14 / 6.99 | 2.43, +2.37 | 2.20, +0.48 | −0.52 / −0.63 |
+| 0.25 | 200 | 2.6 | 400 | +1.1 / −1.0 / −1.9 | 6.34 / 7.33 | 8.65 / 7.11 | 4.67, +4.61 | 3.47, +2.80 | +1.31 / +1.21 |
+
+- **The schematic's values close the lift and return the level, but give
+  back too much bass.** At 2.2 and 160 Hz the lift gap is within 3 dB at
+  every resonance at either input scale, but the mix returns the bass the
+  loop takes: the low sections then lose 3–5 dB less than the ACB's. The
+  one-pole's corner stands for the hardware's coupling into the VCA, not
+  for the two parts alone; the rig puts it near **400 Hz**, where the bass
+  meets the acceptance and the lift keeps it, and a gain of **2.6** centres
+  the lift gap (2.2 leaves it 1.6 dB short at 100 %, 3 passes +2 at 50 %).
+- **The input scale: 0.25**, as the ticket proposed. Of the 36 variants
+  that meet everything, 24 are at 0.25 and 11 at 0.5; at 1 only mix 3 at
+  400 Hz does, on a Cut Off map whose first section jumped to 224 Hz. At
+  0.25 the input pair compresses the resonance less (with the mix off the
+  100 % lift gap reads −8.2 against −10.0 at 1) and the saw's 0 % shape and
+  level errors fall (5.88 and 8.07 against 6.37 and 8.68); the square's
+  0 % shape error rises, past the acceptance with the feedback's high-pass
+  at 100 Hz (8.07 against 7.31 + 0.5) and within it at 150 Hz (7.69).
+- **The feedback's high-pass: back to 150 Hz** (Open303's value, still a
+  calibration). With the mix returning bass, windsor#574's 100 Hz takes too
+  much at the low sections and darkens the square's 0 % shape at scale
+  0.25; 150 Hz meets both. 125 Hz meets everything too, at the edge of the
+  square's 0 % level (7.22 against 7.22); 200 and 50 Hz miss the bass.
+- **No makeup.** The level with resonance, as a change from 0 %, is now
+  +0.49 and +0.44 dB against the ACB's at 90 and 100 % (−4.27 and −4.91
+  before): the circuit's two paths return it, and decision 7's makeup is
+  not needed. Read as it is rather than as a change, the level at 90 and
+  100 % is −5.70 and −5.75 dB, the 0 % offset (−6.19 dB: Windsor's
+  zero-resonance roll-off starts three octaves under its cutoff, so the
+  low sections' higher notes are darker than the ACB's) carried up. A
+  makeup is unity at p = 0 and cannot move that offset; one that lifted the
+  level as read to within 3 dB (+2.75 dB at p = 1) would put the bass's
+  mean near +3.3 dB and the 50 % lift gap at +3.2.
+
+**Before and after**, the rig's summaries on origin/main's values and on
+the shipped ones (`reference/compare.txt` is the shipped run with
+`--cells`):
+
+| | Cut Off map, Hz | lift gap 50 / 90 / 100 % | shape at 0 %, saw / square | level at 0 %, saw / square | shape at 100 %, saw / square | level at 100 %, saw / square | bass, 24.78 + 49.38 % | bass, every section | level at 90 / 100 % | level change at 90 / 100 % |
+|---|---|---|---|---|---|---|---|---|---|---|
+| origin/main (16.5, 100 Hz, 1, no mix) | 199, 314, 630, 1465 | −4.1 / −8.6 / −10.0 | 6.37 / 7.31 | 8.68 / 6.72 | 11.49 / 8.65 | 17.50 / 13.29 | 1.33, +0.86 | 2.94, −1.34 | −10.14 / −10.78 | −4.27 / −4.91 |
+| shipped (16.5, 150 Hz, 0.25, mix 2.6 at 400 Hz) | 196, 291, 608, 1429 | +1.7 / +0.2 / −0.7 | 5.88 / 7.69 | 8.07 / 6.99 | 5.90 / 7.33 | 7.45 / 5.92 | 2.95, +2.89 | 2.33, +1.07 | −5.70 / −5.75 | +0.49 / +0.44 |
+
+The bass by section, RMS and mean dB, before → after: 24.78 % 1.62, +1.41 →
+3.12, +3.08; 49.38 % 0.94, +0.32 → 2.77, +2.70; 75.05 % 2.46, −2.22 → 0.66,
++0.29; 100 % 5.01, −4.87 → 1.95, −1.82. The upper sections' excess loss
+(the passband's 1 / (1 + k)) is gone; the low sections now keep about 3 dB
+more bass than the ACB's, the price of the mix, and no variant in the table
+holds every section under 2.5 dB RMS at once while meeting the lift.
+
+The emphasis lift, the mean of notes 33, 45 and 57, at 50 / 90 / 100 %:
+
+| wave | Cut Off | ACB | origin/main | shipped |
+|---|---|---|---|---|
+| saw | 24.78 % | 6.8 / 12.4 / 13.6 | 3.5 / 5.6 / 6.0 | 6.3 / 10.8 / 11.8 |
+| saw | 49.38 % | 7.4 / 15.8 / 17.9 | 3.9 / 7.4 / 8.4 | 8.3 / 14.4 / 16.0 |
+| saw | 75.05 % | 9.1 / 18.3 / 20.5 | 5.3 / 10.3 / 11.7 | 11.6 / 19.7 / 21.6 |
+| saw | 100 % | 10.6 / 22.9 / 27.2 | 6.0 / 13.1 / 15.9 | 13.8 / 24.6 / 28.7 |
+| square | 24.78 % | 6.3 / 12.4 / 13.7 | 1.0 / 3.7 / 4.3 | 6.3 / 10.9 / 11.9 |
+| square | 49.38 % | 7.0 / 15.5 / 17.7 | 2.5 / 4.9 / 5.8 | 7.8 / 13.3 / 14.4 |
+| square | 75.05 % | 8.2 / 17.9 / 20.6 | 4.9 / 10.4 / 11.5 | 11.5 / 20.4 / 22.0 |
+| square | 100 % | 10.6 / 22.6 / 27.8 | 5.7 / 13.7 / 15.7 | 13.9 / 25.1 / 27.3 |
+
+**The small-signal response.** `ladder.test.ts` holds the shipped ladder at
+the Reso knob's top to (1 + g HP_mix(s)) / (D(s) + k HP(s)) at the bilinear
+image, 48 Hz to 2 f_c at 300 Hz, 2 kHz and 8 kHz, within 0.01 dB (the
+acceptance asks 0.5 dB and 5°); the voice's white-noise test holds the
+whole mode to it at k 0, 8 and 16.
+
+**Large signals.** A 64× noise burst and a 64× square at the top cutoff
+read 3.94 and 11.45 (carrier units) with the Reso knob at its bottom and
+9.50 and 12.66 at its top, and the 30 Hz → 10 kHz → 30 Hz sweep at the
+top 0.72 (1×) and 5.69 (64×): a scale of 0.25 lets four times as much out
+of the ladder for the same state, and the mix adds up to 2g of it.
+`ladderLimits.test.ts` bounds the output at 4 / scale × (1 + 2g). The
+patches stay far under it: the drive's `soft` shape holds their ladder
+input to ±1.
+
+**The patches.** At the new values each patch keeps its Cutoff, Reso,
+envelope and drive gain; its `volume`, which feeds the drive, moves so its
+peak stays within 3 dB of origin/main's (C2 and C3 held 1 s at velocity 1,
+seeds 0–3, `audition/sweep.mjs`'s clip check):
+
+| patch | volume | peak, origin/main → shipped | line RMS, origin/main → shipped | line centroid, Hz |
+|---|---|---|---|---|
+| `acid-saw` | 0.35 → **0.22** | −18.5 → −15.9 dBFS | −29.7 → −29.2 dBFS | 715 → 1071 |
+| `acid-square` | 0.35 → **0.28** | −16.3 → −13.4 dBFS | −25.0 → −22.7 dBFS | 745 → 1143 |
+| `acid-accent` | 0.40 → **0.30** | −17.1 → −14.4 dBFS | −26.7 → −24.8 dBFS | 350 → 533 |
+
+At their old volumes they peaked 3.9–5.5 dB over origin/main's. The line
+columns are each audition line alone, two passes, as rendered (centroid:
+the median over 2048-sample Hann windows above −60 dBFS, a different
+reading from windsor#574's table). The sweep's emphasis follows the same
+path as before (the saw from 2506 Hz at 21 ms to 353 Hz by 277 ms,
+accented from 6704 Hz; the square from 2970, accented 8030; `acid-accent`
+946, accented 8140), and its lift is 18–23 dB at the top of the sweep and
+11–12 dB at its foot, against 9–12 and 5–7 before. The song's strips follow
+the lines: 1.9, 1.55 and 1.6 (from 2), so each line sits within 0.5 dB of
+its level in origin/main's song.
+
+**The listen.** `audition/renderTunables.mjs` now renders windsor#574's
+three tunables around the shipped values, the mix's two from the
+schematic's values past the fit's, and for each patch a pair, its line
+alone with the mix on (`<patch>-mix-on.wav`) and off (`<patch>-mix-off.wav`,
+`LADDER_MIX_GAIN` 0). The files went to `~/Desktop/acid-tunables/`, never
+into the repository; windsor#574's renders moved to its `before-577/`
+folder. Per part (saw / square / `acid-accent`), RMS dBFS and the median
+centroid, as above:
+
+| file | RMS dBFS | centroid Hz |
+|---|---|---|
+| `LADDER_FEEDBACK_MAX-15.5.wav` | −28.8 / −22.3 / −24.5 | 1032 / 1096 / 515 |
+| `LADDER_FEEDBACK_MAX-16.5.wav` (shipped) | −29.2 / −22.7 / −24.8 | 1071 / 1143 / 533 |
+| `LADDER_FEEDBACK_MAX-17.wav` | −29.4 / −22.9 / −25.0 | 1091 / 1168 / 542 |
+| `LADDER_FEEDBACK_HP_HZ-100.wav` | −30.6 / −24.6 / −26.4 | 1132 / 1246 / 588 |
+| `LADDER_FEEDBACK_HP_HZ-150.wav` (shipped) | −29.2 / −22.7 / −24.8 | 1071 / 1143 / 533 |
+| `LADDER_FEEDBACK_HP_HZ-250.wav` | −26.6 / −19.7 / −22.2 | 922 / 955 / 480 |
+| `LADDER_INPUT_SCALE-0.125.wav` | −29.2 / −22.7 / −24.8 | 1075 / 1149 / 537 |
+| `LADDER_INPUT_SCALE-0.25.wav` (shipped) | −29.2 / −22.7 / −24.8 | 1071 / 1143 / 533 |
+| `LADDER_INPUT_SCALE-1.wav` | −29.3 / −22.8 / −25.0 | 1005 / 1050 / 496 |
+| `LADDER_MIX_GAIN-2.2.wav` (the schematic's) | −29.5 / −23.0 / −25.2 | 1044 / 1107 / 518 |
+| `LADDER_MIX_GAIN-2.6.wav` (shipped) | −29.2 / −22.7 / −24.8 | 1071 / 1143 / 533 |
+| `LADDER_MIX_GAIN-3.wav` | −28.8 / −22.4 / −24.5 | 1095 / 1174 / 545 |
+| `LADDER_MIX_HP_HZ-160.wav` (the schematic's) | −26.9 / −20.5 / −22.5 | 957 / 1005 / 481 |
+| `LADDER_MIX_HP_HZ-400.wav` (shipped) | −29.2 / −22.7 / −24.8 | 1071 / 1143 / 533 |
+| `LADDER_MIX_HP_HZ-600.wav` | −29.8 / −23.2 / −25.4 | 1106 / 1178 / 539 |
+| the `-mix-off.wav` files (`LADDER_MIX_GAIN` 0) | −31.2 / −24.0 / −26.5 | 742 / 733 / 367 |
+
+**Cost**, on an Apple M1 under Node 24.21.0, the machine shared with other
+sessions (load average 3.5–5). `ladderBench.mjs`, the ladder alone with the
+mix at its full gain on this branch, eight interleaved pairs of runs of
+`--seconds 40`, three readings each, median [range] ns a sample: the
+shipped 1× candidate **244.7 [242.9–264.1] before and 248.8 [246.0–413.8]
+after, +1.7 %**; the 2× candidate 371.0 → 377.5, +1.8 %. (Without
+`--seconds` it read NaN; it now defaults to 20.) `bench.mjs . <origin/main
+root> --rounds 20 --seconds 2 --beforeAcid 1`, eight held `pad-drift`
+voices, Acid at Reso 9, two runs, ns per voice-sample and against the same
+bundle's Off (median [IQR]):
+
+| variant | run 1 | | run 2 | |
+|---|---|---|---|---|
+| before Off | 26.03 | | 25.98 | |
+| before LP 12 | 28.99 | +2.88 [2.57, 3.08] | 28.98 | +3.00 [2.77, 3.25] |
+| before BP 12 | 28.99 | +2.92 [2.81, 3.14] | 28.95 | +2.96 [2.69, 3.10] |
+| before LP 24 | 32.52 | +6.40 [6.26, 6.66] | 32.53 | +6.57 [6.26, 6.96] |
+| before Formant | 34.93 | +8.85 [8.44, 8.94] | 35.01 | +8.91 [8.63, 9.24] |
+| before Acid 1×4 | 272.89 | +246.72 [246.24, 247.71] | 273.78 | +247.37 [246.52, 250.83] |
+| engine Off | 25.95 | | 26.07 | |
+| engine LP 12 | 28.90 | +2.93 [2.77, 3.12] | 29.02 | +3.02 [2.65, 3.43] |
+| engine BP 12 | 28.93 | +2.95 [2.70, 3.18] | 29.17 | +3.00 [2.79, 3.41] |
+| engine LP 24 | 32.35 | +6.40 [6.22, 6.57] | 32.58 | +6.54 [6.42, 6.84] |
+| engine Formant | 34.84 | +8.78 [8.55, 9.07] | 34.97 | +8.96 [8.88, 9.16] |
+| **engine Acid 1×4** | **278.04** | +252.10 [250.68, 257.27] | **279.09** | +252.85 [251.85, 254.74] |
+| engine Acid 2×3 | 406.35 | +380.29 [379.20, 387.87] | 409.51 | +383.61 [380.55, 387.94] |
+
+An Acid voice costs 1.9 % more (273 → 278–279 ns a voice-sample; the
+ladder's own share 247 → 252–253, +2.2 %); every other mode is within
+0.25 ns of before, inside the runs' spread.

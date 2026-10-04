@@ -12,21 +12,31 @@
  * `acid-square` reduced to the recipe at the same notes, cutoffs and Reso
  * travel (0, 50, 90 and 100 %: reso 0.5, 2.45, 8.74 and 12 on the knob's log
  * sweep), measures them the same way, and prints the two side by side, then
- * three summaries: the emphasis, the bass loss and the error per resonance.
+ * four summaries: the emphasis, the bass loss, the error per resonance, and
+ * the lift gap and level per resonance (windsor#577's acceptance).
  *
  *   node compare.mjs <303-filter folder> [--set NAME=value]... [--level 1] [--cells]
  *
  * The folder is the one `settings.txt` describes; each WAV is checked
  * against its SHA-256 there, read in place and never copied. `--set`
- * overrides one of the three tunables (`LADDER_FEEDBACK_MAX`,
- * `LADDER_FEEDBACK_HP_HZ`, `LADDER_INPUT_SCALE`) in a copy of the bundle's
+ * overrides one of the tunables (`LADDER_FEEDBACK_MAX`,
+ * `LADDER_FEEDBACK_HP_HZ`, `LADDER_INPUT_SCALE`, and windsor#577's
+ * `LADDER_MIX_GAIN` and `LADDER_MIX_HP_HZ`) in a copy of the bundle's
  * text; `--level` is the carrier's peak into the ladder (the patch's volume,
  * with drive off); `--cells` prints the full side-by-side table. The
  * recordings are the whole Roland voice: behavioural references, never
  * filter measurements and never goldens.
  */
 import { NOTES, SECTIONS, WINDOW, measureAcb, noteHz } from './acbNotes.mjs';
-import { annotate, bassTable, cellTable, emphasisTable, errorTable, EMPHASIS_FLOOR_DB } from './compareReport.mjs';
+import {
+  annotate,
+  bassTable,
+  cellTable,
+  emphasisTable,
+  errorTable,
+  summaryTable,
+  EMPHASIS_FLOOR_DB,
+} from './compareReport.mjs';
 import { emphasis } from './spectrum.mjs';
 import { fitCutoff, measureWindsor, noteRenderer, referencePatch } from './windsorNotes.mjs';
 
@@ -99,6 +109,7 @@ function main() {
   console.log(`\nEmphasis (mean over notes 33, 45, 57)\n${emphasisTable(acb, win)}`);
   console.log(`\nBass: each note's fundamental against its own 0 % resonance, dB\n${bassTable(acb, win)}`);
   console.log(`\nErrors, Windsor minus ACB, over the harmonics both hold above the floor\n${errorTable(acb, win)}`);
+  console.log(`\nSummary, Windsor minus ACB, mean over sections and notes\n${summaryTable(acb, win)}`);
 }
 
 main();

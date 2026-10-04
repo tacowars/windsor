@@ -5,7 +5,8 @@
  * polynomial D(s), the response 1 / (D(s) + k HP(s)) with the feedback's
  * one-pole high-pass, read at a digital frequency's bilinear image so the
  * warp is not counted as error, the feedback at which that loop
- * self-oscillates, and a 4 × 4 matrix's characteristic polynomial. The
+ * self-oscillates, the output mix's factor 1 + g HP(s) (windsor#577), and
+ * a 4 × 4 matrix's characteristic polynomial. The
  * ladder's own output is −x₄; the shipped mode negates it, so the response
  * here is the mode's, with the inversion undone. `ladder.test.ts` and
  * `synth/fmProcessorFilterLadder.test.ts` hold the shipped filter to it.
@@ -76,6 +77,33 @@ export function ladderResponse(
   return {
     db: 10 * Math.log10(h[0] * h[0] + h[1] * h[1]),
     degrees: (Math.atan2(h[1], h[0]) * 180) / Math.PI,
+  };
+}
+
+/** The output mix (windsor#577): its gain, `LADDER_MIX_GAIN` × p, and its high-pass's corner in Hz. */
+export interface OutputMix {
+  gain: number;
+  hpHz: number;
+}
+
+/**
+ * The mode's analog response at `hz` with the output mix: `ladderResponse`
+ * times 1 + g jw / (jw + w_mix), w_mix at its bilinear image at `rate` too.
+ */
+export function mixedLadderResponse(
+  hz: number,
+  ladder: { cutoffHz: number; k: number; hpHz: number },
+  mix: OutputMix,
+  rate: number,
+): Response {
+  const loop = ladderResponse(hz, ladder.cutoffHz, ladder.k, rate, ladder.hpHz);
+  const w = bilinearImage(hz, rate);
+  const hp = div([0, w], [bilinearImage(mix.hpHz, rate), w]);
+  const factor: Complex = [1 + mix.gain * hp[0], mix.gain * hp[1]];
+  const radians = Math.atan2(factor[1], factor[0]);
+  return {
+    db: loop.db + 10 * Math.log10(factor[0] * factor[0] + factor[1] * factor[1]),
+    degrees: loop.degrees + (radians * 180) / Math.PI,
   };
 }
 

@@ -7,7 +7,8 @@
  * shape constants and tone curve (windsor#300), a Noise operator's
  * colour filters' ceiling and damping (windsor#362), and the Formant
  * filter's Q scale, cap and makeup (windsor#331), the Acid Ladder's
- * circuit, feedback, level and solver (windsor#573), and the steal fade and
+ * circuit, feedback, level and solver (windsor#573) and its output mix
+ * (windsor#577), and the steal fade and
  * reserve (windsor#410). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
@@ -181,29 +182,40 @@ const FORMANT_MAKEUP = 1.787;
  * schematic's 18 nF under 33 nF, Stinchcombe's half). Resonance is the
  * output fed back into the input pair through a one-pole high-pass at
  * LADDER_FEEDBACK_HP_HZ (a one-pole image of the hardware's return, a
- * tunable and not a component value: Open303's calibration is 150 Hz, and
- * the ACB comparison of windsor#574 set 100), times a gain k =
+ * tunable and not a component value: Open303's calibration is 150 Hz, the
+ * ACB comparison of windsor#574 set 100 and windsor#577's fit with the
+ * output mix 150), times a gain k =
  * LADDER_FEEDBACK_MAX x p, p the Reso knob's place on its log scale,
  * log2(reso / LADDER_RESONANCE_FLOOR) / log2(LADDER_RESONANCE_SPAN), 0 at
  * 0.5 and 1 at 12. The linear self-oscillation threshold is k = 17, so
  * 16.5 stays short of it, as the stock unit does. The carrier sum enters
  * times LADDER_INPUT_SCALE (the model's 2 V_T unit) and leaves divided by
- * it (1 since windsor#574: the voice's full level, the drive's ceiling, is
- * one 2 V_T unit, where the ACB comparison put it). The cutoff is held
+ * it (0.25 since windsor#577: the voice's full level, the drive's ceiling,
+ * is a quarter of a 2 V_T unit, so the input pair compresses the resonance
+ * less; windsor#574 had set 1 before the output mix). The cutoff is held
  * between LADDER_CUTOFF_MIN_HZ and LADDER_CUTOFF_MAX_HZ, and below LADDER_CUTOFF_CEILING of the sample rate
  * at a low rate. The solver (decision 6): LADDER_NEWTON_STEPS Newton steps
  * a sample on the trapezoidal step, at LADDER_OVERSAMPLE times the sample
  * rate. The shipped candidate is 1x with four steps and the cutoff capped
  * at 10 kHz; the other, 2x with three steps and no cap, stays selectable
  * here for the research bench (`docs/research/2026-10-04-acid-ladder-filter/`).
+ * The output is the ladder's plus the TB-303's second resonance path
+ * (windsor#577): the Reso pot's wiper into the VCA beside the ladder's own
+ * output, LADDER_MIX_GAIN x p times the output through a one-pole
+ * high-pass at LADDER_MIX_HP_HZ, so the level with resonance is the
+ * circuit's two paths. The schematic gives 2.2 (220 kOhm / 100 kOhm) and
+ * 159 Hz (10 nF into 100 kOhm); the ACB comparison's fit ships 2.6 and
+ * 400 Hz, where its lift and bass loss both meet the references.
  * Each value is tacowars's to set by ear.
  */
 const LADDER_BOTTOM_CAP = 0.5;
-const LADDER_FEEDBACK_HP_HZ = 100;
+const LADDER_FEEDBACK_HP_HZ = 150;
 const LADDER_FEEDBACK_MAX = 16.5;
 const LADDER_RESONANCE_FLOOR = 0.5;
 const LADDER_RESONANCE_SPAN = 24;
-const LADDER_INPUT_SCALE = 1;
+const LADDER_INPUT_SCALE = 0.25;
+const LADDER_MIX_GAIN = 2.6;
+const LADDER_MIX_HP_HZ = 400;
 const LADDER_CUTOFF_MIN_HZ = 20;
 const LADDER_CUTOFF_MAX_HZ = 10000;
 const LADDER_CUTOFF_CEILING = 0.45;
@@ -266,6 +278,8 @@ export {
   LADDER_RESONANCE_FLOOR,
   LADDER_RESONANCE_SPAN,
   LADDER_INPUT_SCALE,
+  LADDER_MIX_GAIN,
+  LADDER_MIX_HP_HZ,
   LADDER_CUTOFF_MIN_HZ,
   LADDER_CUTOFF_MAX_HZ,
   LADDER_CUTOFF_CEILING,

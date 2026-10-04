@@ -3,14 +3,21 @@
  * `2026-10-04-acid-ladder-filter-mode` decision 9): the saturator against
  * `Math.tanh`; the shipped solver's linearised chain against Stinchcombe's
  * polynomial; its small-signal magnitude and phase against the analog
- * 1 / (D(s) + k HP(s)) at the bilinear image; the tuning. The large-signal
+ * 1 / (D(s) + k HP(s)) at the bilinear image, and with the output mix
+ * (windsor#577) times 1 + g HP_mix(s); the mix's absence at the Reso
+ * knob's bottom, to the bit; the tuning. The large-signal
  * readings (convergence, bounds, threshold, the high-pass, harmonics, the
  * end of a ring) are `ladderLimits.test.ts`; the voice is
  * `synth/fmProcessorFilterLadder.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
-import { characteristicPolynomial, inverse, ladderResponse } from '../../__fixtures__/ladderAnalog';
+import {
+  characteristicPolynomial,
+  inverse,
+  ladderResponse,
+  mixedLadderResponse,
+} from '../../__fixtures__/ladderAnalog';
 import type { Response } from '../../__fixtures__/ladderAnalog';
 import {
   LADDER_BOTTOM_CAP,
@@ -18,6 +25,9 @@ import {
   LADDER_CUTOFF_MIN_HZ,
   LADDER_FEEDBACK_HP_HZ,
   LADDER_FEEDBACK_MAX,
+  LADDER_INPUT_SCALE,
+  LADDER_MIX_GAIN,
+  LADDER_MIX_HP_HZ,
 } from './fmConstants';
 import { Ladder } from './ladder';
 import { LADDER_SATURATOR } from './ladderTables';
@@ -138,10 +148,10 @@ function measured(ladder: Ladder, hz: number): Response {
   };
 }
 
-/** Probe frequencies from 100 Hz to 2 f_c (or near Nyquist), log-spaced and on the 4 Hz grid, with f_c among them. */
-function probes(cutoffHz: number): number[] {
+/** Probe frequencies from `lowHz` (100 Hz) to 2 f_c (or near Nyquist), log-spaced and on the 4 Hz grid, with f_c among them. */
+function probes(cutoffHz: number, lowHz = 100): number[] {
   const top = Math.min(2 * cutoffHz, 0.46 * RATE);
-  const list = Array.from({ length: 14 }, (_, i) => 100 * (top / 100) ** (i / 13));
+  const list = Array.from({ length: 14 }, (_, i) => lowHz * (top / lowHz) ** (i / 13));
   list.push(cutoffHz, 1.15 * cutoffHz);
   return list.map((hz) => 4 * Math.round(hz / 4));
 }
@@ -171,9 +181,56 @@ describe('the small-signal response (decision 9)', () => {
     expect(worstDegrees).toBeLessThan(0.1);
   });
 
+  it("with the output mix at the Reso knob's top, matches (1 + g HP_mix(s)) / (D(s) + k HP(s)) within 0.5 dB and 5°, 48 Hz to 2 f_c, f_c 300 Hz, 2 kHz and 8 kHz", () => {
+    const mix = { gain: LADDER_MIX_GAIN, hpHz: LADDER_MIX_HP_HZ };
+    let worstDb = 0;
+    for (const cutoff of [300, 2000, 8000]) {
+      const ladder = tuned(cutoff, undefined, 12);
+      expect(ladder.k).toBe(LADDER_FEEDBACK_MAX);
+      expect(ladder.mixGain).toBe(LADDER_MIX_GAIN);
+      for (const hz of probes(cutoff, 48)) {
+        const got = measured(ladder, hz);
+        const want = mixedLadderResponse(
+          hz,
+          { cutoffHz: cutoff, k: LADDER_FEEDBACK_MAX, hpHz: LADDER_FEEDBACK_HP_HZ },
+          mix,
+          RATE,
+        );
+        const label = `f_c ${cutoff}, ${hz} Hz`;
+        expect(Math.abs(got.db - want.db), label).toBeLessThan(0.5);
+        expect(Math.abs(wrap(got.degrees - want.degrees)), label).toBeLessThan(5);
+        worstDb = Math.max(worstDb, Math.abs(got.db - want.db));
+      }
+    }
+    // The mix is a TPT one-pole, the bilinear image of its analog high-pass.
+    expect(worstDb).toBeLessThan(0.01);
+  });
+
   it('is −21.9 dB at the cutoff itself with no feedback, at every cutoff up to the top', () => {
     for (const cutoff of [200, 1000, 5000, LADDER_CUTOFF_MAX_HZ]) {
       expect(measured(tuned(cutoff, 0), cutoff).db).toBeCloseTo(-21.91, 1);
+    }
+  });
+});
+
+describe("the output mix at the Reso knob's bottom (windsor#577)", () => {
+  it("adds nothing: each output is the solve's own x₄, to the bit, while the mix's high-pass runs on", () => {
+    const ladder = tuned(700, undefined, 0.5);
+    expect(ladder.mixGain).toBe(0);
+    let seed = 0x577;
+    for (let i = 0; i < 4800; i++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const out = step(ladder, (seed / 2 ** 31 - 1) * (i < 2400 ? 1 : 0));
+      expect(Object.is(out, -ladder.y * (1 / LADDER_INPUT_SCALE)), `sample ${i}`).toBe(true);
+    }
+    expect(ladder.mixS).not.toBe(0);
+  });
+
+  it('comes in with the Reso knob, its gain LADDER_MIX_GAIN × p', () => {
+    for (const resonance of [0.707, 3, 12]) {
+      const ladder = tuned(1000, undefined, resonance);
+      const p = Math.log2(resonance / 0.5) / Math.log2(24);
+      expect(ladder.mixGain).toBeCloseTo(LADDER_MIX_GAIN * p, 12);
     }
   });
 });
@@ -202,6 +259,8 @@ describe('the tuning (decisions 4 and 5)', () => {
     expect(tuned(-1).h).toBe(tuned(LADDER_CUTOFF_MIN_HZ).h);
     const g = Math.tan((Math.PI * LADDER_FEEDBACK_HP_HZ) / RATE);
     expect(tuned(1000).hpG).toBeCloseTo(g / (1 + g), 15);
+    const gm = Math.tan((Math.PI * LADDER_MIX_HP_HZ) / RATE);
+    expect(tuned(1000).mixG).toBeCloseTo(gm / (1 + gm), 15);
   });
 
   it('works a coefficient out again only when its input changed', () => {

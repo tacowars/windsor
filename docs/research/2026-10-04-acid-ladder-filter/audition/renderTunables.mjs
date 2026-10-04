@@ -1,12 +1,13 @@
 /* global console, process, URL */
 /**
- * The tunables' listen (windsor#574, decision 3): the audition song's
- * first bar for each of its patches, at three values of each of the Acid
- * Ladder's three sound-design tunables, the other two at their shipped
- * values. Nine WAVs, one per value; each plays every part's line twice in
- * slot order, its own patch alone, with half a second between parts. Levels
- * are as rendered, never normalised, so the fall in level with feedback is
- * heard.
+ * The tunables' listen (windsor#574, decision 3; windsor#577): the audition
+ * song's lines at three values of each of the Acid Ladder's sound-design
+ * tunables, the others at their shipped values. One WAV per value; each
+ * plays every part's line twice in slot order, its own patch alone, with
+ * half a second between parts. Then the output mix's pair for each part:
+ * `<patch>-mix-on.wav` (shipped) and `<patch>-mix-off.wav`
+ * (`LADDER_MIX_GAIN` 0), its line alone. Levels are as rendered, never
+ * normalised, so the change in level with feedback is heard.
  *
  *   node renderTunables.mjs <out dir> [--song acid-audition.song.json] [--passes 2]
  *
@@ -39,11 +40,17 @@ const SLIDE_SECONDS_DEFAULT = 0.06;
 const TICKS_PER_WHOLE = 96;
 const PART_GAP_S = 0.5;
 
-/** Decision 3's values, each tunable's shipped value in the middle. */
+/**
+ * Three values of each tunable: windsor#574's three around windsor#577's
+ * shipped values (16.5, 150 Hz and 0.25 in the middle), and the output
+ * mix's two from the schematic's value (2.2, 160 Hz) past the fit's.
+ */
 export const VARIANTS = {
   LADDER_FEEDBACK_MAX: [15.5, 16.5, 17.0],
   LADDER_FEEDBACK_HP_HZ: [100, 150, 250],
-  LADDER_INPUT_SCALE: [1, 2, 4],
+  LADDER_INPUT_SCALE: [0.125, 0.25, 1],
+  LADDER_MIX_GAIN: [2.2, 2.6, 3],
+  LADDER_MIX_HP_HZ: [160, 400, 600],
 };
 
 function noteOf(step, register, harmony) {
@@ -135,6 +142,15 @@ function main() {
     for (const value of values) {
       const samples = renderSong(loadVariant({ [name]: value }), song, passes);
       const path = join(args[0], `${name}-${value}.wav`);
+      writeWav(path, samples);
+      console.log(`${path}  peak ${peakDb(samples).toFixed(1)} dBFS`);
+    }
+  }
+  const pairs = { on: loadVariant(), off: loadVariant({ LADDER_MIX_GAIN: 0 }) };
+  for (const part of song.parts) {
+    for (const [label, variant] of Object.entries(pairs)) {
+      const samples = renderSong(variant, { ...song, parts: [part] }, passes);
+      const path = join(args[0], `${part.preset}-mix-${label}.wav`);
       writeWav(path, samples);
       console.log(`${path}  peak ${peakDb(samples).toFixed(1)} dBFS`);
     }

@@ -157,6 +157,49 @@ function bassError(acb, win, sections) {
   return `RMS ${rms(diffs).toFixed(2)}, mean ${mean(diffs).toFixed(2)}`;
 }
 
+/** One cell's level: the power sum of the harmonics `heard` keeps, dB against its source's reference. */
+function cellLevel(list) {
+  const power = list.reduce((sum, v) => sum + 10 ** (v / 10), 0);
+  return 10 * Math.log10(power);
+}
+
+/**
+ * The acceptance's summaries (windsor#577), each Windsor minus ACB, the
+ * mean over sections and notes, per wave and over both: the emphasis lift
+ * gap at 50, 90 and 100 % resonance, and the level (the power sum of the
+ * harmonics both hold, as the level column's) at every resonance, as read
+ * and as a change from the same cell at 0 %.
+ */
+export function summaryTable(acb, win) {
+  const lines = ['wave    res   lift gap dB   level dB   level change from 0 % dB'];
+  const rows = [...WAVES.map((wave, w) => [wave, [w]]), ['both', WAVES.map((_, w) => w)]];
+  for (const [label, waves] of rows) {
+    RESONANCES.forEach(({ travel }, r) => {
+      const gaps = [];
+      const levels = [];
+      const changes = [];
+      for (const w of waves) {
+        SECTIONS.forEach((_, s) =>
+          NOTES.forEach((_, n) => {
+            const level = (at) => {
+              const pairs = heard(acb[w][at][s][n].rel, win[w][at][s][n].rel, WAVES[w]);
+              return [cellLevel(pairs.map((p) => p[1])), cellLevel(pairs.map((p) => p[2]))];
+            };
+            const [a, b] = level(r);
+            const [a0, b0] = level(0);
+            levels.push(b - a);
+            changes.push(b - b0 - (a - a0));
+            if (r > 0) gaps.push(win[w][r][s][n].emphasis.lift - acb[w][r][s][n].emphasis.lift);
+          }),
+        );
+      }
+      const gap = r > 0 ? fixed(mean(gaps), 8, 2) : '       —';
+      lines.push(`${label.padEnd(7)} ${pct(travel)}  ${gap}      ${fixed(mean(levels), 6, 2)}     ${fixed(mean(changes), 6, 2)}`);
+    });
+  }
+  return lines.join('\n');
+}
+
 /** The errors per wave and resonance, the 0 % shape per section and the bass loss: for comparing variants. */
 export function errorTable(acb, win) {
   const lines = ['wave    res   shape RMS dB (H2–16 vs H1)   level RMS dB (H1–16 vs reference)   (square: odd harmonics)'];

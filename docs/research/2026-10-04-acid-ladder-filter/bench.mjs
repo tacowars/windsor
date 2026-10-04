@@ -12,12 +12,14 @@
  * warm-up rounds. The candidate is set on each voice's ladder before the
  * notes, so both run in the one bundle.
  *
- *   node bench.mjs <repo> <before root> [--rounds 40] [--seconds 5] [--acid 0]
+ *   node bench.mjs <repo> <before root> [--rounds 40] [--seconds 5] [--acid 0] [--beforeAcid 1]
  *
  * `<before root>` holds `origin/main`'s FM bundle from before the change at
  * `packages/engine/src/worklet/generated/fm-processor.js` (`git show`).
  * `--acid 0` leaves the Acid variants out, so the old modes can be read
- * with and without an Acid voice in the run. Reported: the median ns per
+ * with and without an Acid voice in the run; `--beforeAcid 1` runs the
+ * shipped Acid candidate on the before bundle too, for a change to the
+ * ladder itself (windsor#577's output mix). Reported: the median ns per
  * voice per output sample over the rounds, and each variant's median
  * per-round difference from the same bundle's Off (the filter's own cost),
  * with its interquartile range.
@@ -34,7 +36,7 @@ const NOTES = [43, 48, 52, 55, 59, 62, 64, 67];
 const MODES = { off: 0, lp12: 1, bp12: 3, lp24: 1, formant: 5, 'acid 1x4': 6, 'acid 2x3': 6 };
 
 function parseArgs(argv) {
-  const options = { rounds: 40, seconds: 5, acid: 1 };
+  const options = { rounds: 40, seconds: 5, acid: 1, beforeAcid: 0 };
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i].startsWith('--')) options[argv[i].slice(2)] = Number(argv[++i]);
@@ -130,15 +132,16 @@ function bench(list, { rounds, seconds }) {
   }));
 }
 
-function variants(repo, before, { acid }) {
+function variants(repo, before, { acid, beforeAcid }) {
   const patch = basePatch(repo);
   const engine = loadBundle(repo);
   const old = loadBundle(before);
   const oldModes = ['off', 'lp12', 'bp12', 'lp24', 'formant'];
   const engineModes = [...oldModes, ...(acid ? ['acid 1x4', 'acid 2x3'] : [])];
   const list = [];
+  const beforeModes = [...oldModes, ...(beforeAcid ? ['acid 1x4'] : [])];
   for (const [label, bundle, names] of [
-    ['before', old, oldModes],
+    ['before', old, beforeModes],
     ['engine', engine, engineModes],
   ]) {
     const offIndex = list.length;

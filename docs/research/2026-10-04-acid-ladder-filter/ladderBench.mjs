@@ -3,10 +3,11 @@
  * The ladder alone (windsor#573): ns per sample of one `Ladder` from the
  * bundle, on each solver candidate, a 110 Hz saw at peak 1 (carrier units)
  * through a 1 kHz cutoff at k 16.5, a ladder's process() called once a
- * sample as the render loops call it. Research only: the whole voice's
- * reading is `bench.mjs`.
+ * sample as the render loops call it; on a bundle with the output mix
+ * (windsor#577), the mix at the Reso knob's top, its gain 2.6 (`--mix`).
+ * Research only: the whole voice's reading is `bench.mjs`.
  *
- *   node ladderBench.mjs <repo> [--seconds 20]
+ *   node ladderBench.mjs <repo> [--seconds 20] [--mix 2.6]
  */
 import { performance } from 'node:perf_hooks';
 
@@ -14,11 +15,12 @@ import { CANDIDATES, SR, candidate, loadBundle } from './bundle.mjs';
 
 const args = process.argv.slice(2);
 const root = args[0] ?? '.';
-const seconds = Number(args[args.indexOf('--seconds') + 1] || 20);
+const seconds = args.includes('--seconds') ? Number(args[args.indexOf('--seconds') + 1]) : 20;
+const mixGain = args.includes('--mix') ? Number(args[args.indexOf('--mix') + 1]) : 2.6;
 const { Ladder } = loadBundle(root);
 
 for (const name of Object.keys(CANDIDATES)) {
-  const ladder = candidate(new Ladder(), name, { cutoffHz: 1000, k: 16.5 });
+  const ladder = candidate(new Ladder(), name, { cutoffHz: 1000, k: 16.5, mixGain });
   const n = seconds * SR;
   const input = new Float64Array(SR);
   for (let i = 0; i < SR; i++) input[i] = 2 * ((i * 110) / SR - Math.floor((i * 110) / SR)) - 1;
