@@ -21,7 +21,7 @@ import type {
 import { ALGORITHMS } from './algorithms';
 import type { MacroTables } from './voiceMacros';
 import { effectiveMacroMappings } from './macroMappings';
-import { DRIVE_FOLD, DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
+import { DRIVE_FOLD, DRIVE_SOFT, FILT_LADDER, FILT_OFF } from './modeIds';
 import {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
@@ -200,7 +200,8 @@ function normalisePatch(raw: PartialPatch | null | undefined): Patch {
   const filtRaw = raw.filter || {};
   const pd = PATCH_DEFAULTS,
     fd = FILTER_DEFAULTS;
-  // A mode outside the table plays Off, as it always sounded (windsor#331).
+  // A mode outside the table plays Off, as it always sounded (windsor#331);
+  // the last is Acid (windsor#573).
   const mode = num(filtRaw.mode, fd.mode) | 0;
 
   const p = {
@@ -220,7 +221,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): Patch {
     lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
     lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
-      mode: mode < FILT_OFF || mode > FILT_FORMANT ? FILT_OFF : mode,
+      mode: mode < FILT_OFF || mode > FILT_LADDER ? FILT_OFF : mode,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
       slope24: !!filtRaw.slope24,

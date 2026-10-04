@@ -36,6 +36,17 @@ var NOISE_COLOUR_DAMPING = Math.SQRT2;
 var FORMANT_Q_PER_RESONANCE = 8;
 var FORMANT_Q_MAX = 40;
 var FORMANT_MAKEUP = 1.787;
+var LADDER_BOTTOM_CAP = 0.5;
+var LADDER_FEEDBACK_HP_HZ = 150;
+var LADDER_FEEDBACK_MAX = 16.5;
+var LADDER_RESONANCE_FLOOR = 0.5;
+var LADDER_RESONANCE_SPAN = 24;
+var LADDER_INPUT_SCALE = 2;
+var LADDER_CUTOFF_MIN_HZ = 20;
+var LADDER_CUTOFF_MAX_HZ = 1e4;
+var LADDER_CUTOFF_CEILING = 0.45;
+var LADDER_NEWTON_STEPS = 4;
+var LADDER_OVERSAMPLE = 1;
 var STEAL_FADE_SECONDS = 0.03;
 var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
@@ -228,7 +239,7 @@ var ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b |
 
 // packages/engine/src/worklet/fm/modeIds.ts
 var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
-var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4, FILT_FORMANT = 5;
+var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4, FILT_FORMANT = 5, FILT_LADDER = 6;
 var LFO_SINE = 0, LFO_TRI = 1, LFO_SAW_UP = 2, LFO_SAW_DOWN = 3, LFO_SQUARE = 4, LFO_SH = 5, LFO_DRIFT = 6;
 var DRIVE_SOFT = 0, DRIVE_HARD = 1, DRIVE_DIODE = 2, DRIVE_TUBE = 3, DRIVE_FOLD = 4;
 var MACRO_LINEAR = 0, MACRO_EXP = 1, MACRO_LOG = 2, MACRO_S = 3;
@@ -239,7 +250,8 @@ var FILTER_MODE = {
   HIGHPASS: FILT_HP,
   BANDPASS: FILT_BP,
   NOTCH: FILT_NOTCH,
-  FORMANT: FILT_FORMANT
+  FORMANT: FILT_FORMANT,
+  LADDER: FILT_LADDER
 };
 var LFO_SHAPE = {
   SINE: LFO_SINE,
@@ -726,7 +738,7 @@ function normalisePatch(raw) {
     lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
     lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
-      mode: mode < FILT_OFF || mode > FILT_FORMANT ? FILT_OFF : mode,
+      mode: mode < FILT_OFF || mode > FILT_LADDER ? FILT_OFF : mode,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
       slope24: !!filtRaw.slope24,
@@ -1018,6 +1030,173 @@ var Envelope = class {
         this.state = ST_DONE;
         break;
     }
+  }
+};
+
+// packages/engine/src/worklet/fm/ladderTables.ts
+var LADDER_SATURATOR = {
+  numerator: [135135, 17325, 378, 1],
+  denominator: [135135, 62370, 3150, 28],
+  limit: 4.971786858527593
+};
+var LADDER_DECIMATOR = [0.25, 0.5, 0.25];
+
+// packages/engine/src/worklet/fm/ladder.ts
+var INV_BOTTOM_CAP = 1 / LADDER_BOTTOM_CAP;
+var OUTPUT_SCALE = 1 / LADDER_INPUT_SCALE;
+var SAT_P = LADDER_SATURATOR.numerator;
+var SAT_Q = LADDER_SATURATOR.denominator;
+var P0 = SAT_P[0], P1 = SAT_P[1], P2 = SAT_P[2], P3 = SAT_P[3];
+var Q0 = SAT_Q[0], Q1 = SAT_Q[1], Q2 = SAT_Q[2], Q3 = SAT_Q[3];
+var DP1 = 3 * P1, DP2 = 5 * P2, DP3 = 7 * P3;
+var DQ1 = 2 * Q1, DQ2 = 4 * Q2, DQ3 = 6 * Q3;
+var SAT_LIMIT = LADDER_SATURATOR.limit;
+var Ladder = class {
+  constructor() {
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = NaN;
+    this.h = this.k = this.hpG = this.cutoffHz = this.resonance = NaN;
+    this.tunedHz = this.tunedResonance = this.tunedRate = NaN;
+    this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = NaN;
+    this.s1 = this.s2 = this.s3 = this.s4 = this.hpS = this.y = 0;
+    this.h = 0;
+    this.k = 0;
+    this.hpG = 0;
+    this.cutoffHz = 0;
+    this.resonance = 0;
+    this.point = this.lastIn = this.satIn = this.satOut = this.satSlope = 0;
+    this.steps = LADDER_NEWTON_STEPS;
+    this.oversample = LADDER_OVERSAMPLE;
+    this.taps = Float64Array.from(LADDER_DECIMATOR);
+    this.history = new Float64Array(this.taps.length);
+    this.slot = new Float64Array(1);
+    this.chunk = new Float64Array(CTRL_INTERVAL_LONG);
+  }
+  /** A new note: every state from rest, the high-pass's and the decimator's included. The tuning carries over. */
+  reset() {
+    this.s1 = 0;
+    this.s2 = 0;
+    this.s3 = 0;
+    this.s4 = 0;
+    this.hpS = 0;
+    this.y = 0;
+    this.lastIn = 0;
+    this.history.fill(0);
+  }
+  /** Every state under the dormancy floor (#547): the ladder has stopped ringing. */
+  static quiet(ladder) {
+    const floor = DORMANT_FILTER_STATE;
+    return Math.abs(ladder.s1) <= floor && Math.abs(ladder.s2) <= floor && Math.abs(ladder.s3) <= floor && Math.abs(ladder.s4) <= floor && Math.abs(ladder.hpS) <= floor;
+  }
+  /** `satIn` through the rational tanh: its value in `satOut`, its slope in `satSlope`. */
+  saturate() {
+    const x = this.satIn;
+    if (x >= SAT_LIMIT) {
+      this.satOut = 1;
+      this.satSlope = 0;
+      return;
+    }
+    if (x <= -SAT_LIMIT) {
+      this.satOut = -1;
+      this.satSlope = 0;
+      return;
+    }
+    const z = x * x;
+    const p = P0 + z * (P1 + z * (P2 + z * P3));
+    const q = Q0 + z * (Q1 + z * (Q2 + z * Q3));
+    const dp = P0 + z * (DP1 + z * (DP2 + z * DP3));
+    const dq = DQ1 + z * (DQ2 + z * DQ3);
+    const r = 1 / q;
+    this.satOut = x * p * r;
+    this.satSlope = (dp * q - z * p * dq) * r * r;
+  }
+  /**
+   * `point` through the ladder, written back to `point`: `oversample`
+   * trapezoidal steps on the input (at 2×, the first on the midpoint from
+   * the last sample's), each `steps` Newton steps on the four states from
+   * their memories, after which the memories and the high-pass advance;
+   * at 1× the output is the last x₄, at 2× the decimator's sum over them.
+   */
+  // One Newton solve read top to bottom: the residual, the Jacobian and its
+  // elimination share every local, and a helper per part would pass them
+  // through fields each step. It stays one call, too long for V8 to inline
+  // into the render loops, so the kernel's inlining budget is not spent on
+  // it (the Formant lesson, worklet rule 2; `bench.mjs` in the research).
+  // eslint-disable-next-line max-lines-per-function -- one solve, see above
+  process() {
+    const input = this.point * LADDER_INPUT_SCALE;
+    const m = this.oversample;
+    const last = this.lastIn;
+    const steps = this.steps;
+    const h = this.h;
+    const a = h * INV_BOTTOM_CAP;
+    const hpG = this.hpG;
+    const kh = this.k * (1 - hpG);
+    const history = this.history;
+    for (let sub = 1; sub <= m; sub++) {
+      const drive = sub === m ? input : last + (input - last) * sub / m;
+      const hpS = this.hpS;
+      const s1 = this.s1, s2 = this.s2, s3 = this.s3, s4 = this.s4;
+      let x1 = s1, x2 = s2, x3 = s3, x4 = s4;
+      for (let it = 0; it < steps; it++) {
+        this.satIn = x2 - x1;
+        this.saturate();
+        const t01 = this.satOut, d01 = this.satSlope;
+        this.satIn = x3 - x2;
+        this.saturate();
+        const t12 = this.satOut, d12 = this.satSlope;
+        this.satIn = x4 - x3;
+        this.saturate();
+        const t23 = this.satOut, d23 = this.satSlope;
+        this.satIn = x4;
+        this.saturate();
+        const t4 = this.satOut, d4 = this.satSlope;
+        this.satIn = drive + kh * (x4 - hpS);
+        this.saturate();
+        const tu = this.satOut, du = this.satSlope;
+        const r1 = s1 - x1 + a * (t01 - tu);
+        const r2 = s2 - x2 + h * (t12 - t01);
+        const r3 = s3 - x3 + h * (t23 - t12);
+        const r4 = s4 - x4 - h * (t4 + t23);
+        const j11 = 1 + a * d01, j12 = -a * d01, j14 = a * du * kh;
+        const j21 = -h * d01, j22 = 1 + h * (d01 + d12), j23 = -h * d12;
+        const j33 = 1 + h * (d12 + d23), j34 = -h * d23;
+        const j44 = 1 + h * (d23 + d4);
+        const m4 = 1 / j44;
+        const m3 = 1 / (j33 - j34 * j34 * m4);
+        const q3 = r3 - j34 * m4 * r4;
+        const m2 = 1 / (j22 - j23 * j23 * m3);
+        const q2 = r2 - j23 * q3 * m3;
+        const a2 = q2 * m2, b2 = -j21 * m2;
+        const a3 = (q3 - j23 * a2) * m3, b3 = -j23 * b2 * m3;
+        const a4 = (r4 - j34 * a3) * m4, b4 = -j34 * b3 * m4;
+        const dx1 = (r1 - j12 * a2 - j14 * a4) / (j11 + j12 * b2 + j14 * b4);
+        x1 += dx1;
+        x2 += a2 + b2 * dx1;
+        x3 += a3 + b3 * dx1;
+        x4 += a4 + b4 * dx1;
+      }
+      this.s1 = 2 * x1 - s1;
+      this.s2 = 2 * x2 - s2;
+      this.s3 = 2 * x3 - s3;
+      this.s4 = 2 * x4 - s4;
+      const v = (x4 - hpS) * hpG;
+      const lp = v + hpS;
+      this.hpS = lp + v;
+      this.y = x4;
+      if (m !== 1) {
+        for (let j = history.length - 1; j > 0; j--) history[j] = history[j - 1];
+        history[0] = x4;
+      }
+    }
+    this.lastIn = input;
+    if (m === 1) {
+      this.point = -this.y * OUTPUT_SCALE;
+      return;
+    }
+    const taps = this.taps;
+    let sum = 0;
+    for (let j = 0; j < taps.length; j++) sum += taps[j] * history[j];
+    this.point = -sum * OUTPUT_SCALE;
   }
 };
 
@@ -1748,6 +1927,78 @@ function updateVoiceFormant(voice) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceLadder.ts
+var LADDER_STEP_SCALE = Math.sqrt(Math.SQRT1_2);
+var LADDER_SPAN_SLOT = new Float64Array(1);
+LADDER_SPAN_SLOT[0] = LADDER_RESONANCE_SPAN;
+log2InPlace(LADDER_SPAN_SLOT, 0);
+var LADDER_LOG2_SPAN = LADDER_SPAN_SLOT[0];
+var LADDER_RESONANCE_TOP = LADDER_RESONANCE_FLOOR * LADDER_RESONANCE_SPAN;
+function tuneLadder(ladder, rate) {
+  const slot = ladder.slot;
+  const stepRate = rate * ladder.oversample;
+  if (rate !== ladder.tunedRate) {
+    slot[0] = Math.PI * LADDER_FEEDBACK_HP_HZ / stepRate;
+    tanInPlace(slot, 0);
+    const g = slot[0];
+    ladder.hpG = g / (1 + g);
+    ladder.tunedRate = rate;
+    ladder.tunedHz = NaN;
+  }
+  let fc = ladder.cutoffHz;
+  const ceiling = LADDER_CUTOFF_CEILING * rate;
+  const top = ceiling < LADDER_CUTOFF_MAX_HZ ? ceiling : LADDER_CUTOFF_MAX_HZ;
+  if (fc > top) fc = top;
+  if (!(fc >= LADDER_CUTOFF_MIN_HZ)) fc = LADDER_CUTOFF_MIN_HZ;
+  if (fc !== ladder.tunedHz) {
+    slot[0] = Math.PI * fc / stepRate;
+    tanInPlace(slot, 0);
+    ladder.h = slot[0] * LADDER_STEP_SCALE;
+    ladder.tunedHz = fc;
+  }
+  const reso = ladder.resonance;
+  if (reso !== ladder.tunedResonance) {
+    let p;
+    if (!(reso > LADDER_RESONANCE_FLOOR)) p = 0;
+    else if (reso >= LADDER_RESONANCE_TOP) p = 1;
+    else {
+      slot[0] = reso / LADDER_RESONANCE_FLOOR;
+      log2InPlace(slot, 0);
+      p = slot[0] / LADDER_LOG2_SPAN;
+      if (p > 1) p = 1;
+    }
+    ladder.k = LADDER_FEEDBACK_MAX * p;
+    ladder.tunedResonance = reso;
+  }
+}
+function updateVoiceLadder(voice) {
+  const ladder = voice.ladder;
+  ladder.resonance = voice.liveValues[VT_RESONANCE];
+  tuneLadder(ladder, voice.sr);
+}
+function renderVoiceLadder(voice, outL, outR, off, n) {
+  const ladder = voice.ladder;
+  const input = ladder.chunk;
+  const panL = voice.panL, panR = voice.panR;
+  const fadeInc = voice.fadeInc;
+  let fade = voice.fade;
+  for (let s = 0; s < n; s++) {
+    ladder.point = input[s];
+    ladder.process();
+    let sig = ladder.point;
+    if (fadeInc !== 0) {
+      fade += fadeInc;
+      if (fade <= 0) {
+        fade = 0;
+      }
+      sig *= fade;
+    }
+    const k = off + s;
+    outL[k] += sig * panL;
+    outR[k] += sig * panR;
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceControlInterval.ts
 var CONTROL_INTERVALS = {
   fine: CTRL_INTERVAL,
@@ -2142,6 +2393,11 @@ function updateVoiceFilter(voice, n) {
     return;
   }
   const cutoff = live[VT_CUTOFF] * Math.pow(2, octaves);
+  if (f.mode === FILT_LADDER) {
+    voice.ladder.cutoffHz = cutoff;
+    updateVoiceLadder(voice);
+    return;
+  }
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;
@@ -2535,7 +2791,10 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
     }
     if (mode !== FILT_OFF) {
-      if (mode === FILT_FORMANT) {
+      if (mode < FILT_FORMANT) {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      } else if (mode === FILT_FORMANT) {
         const x = sig;
         let p = voice.svfA;
         let v3 = x - p.ic2;
@@ -2559,8 +2818,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         p.ic2 = 2 * v2 - p.ic2;
         sig += p.gain * v1;
       } else {
-        sig = voice.svfA.process(sig, mode);
-        if (slope24) sig = voice.svfB.process(sig, mode);
+        voice.ladder.chunk[s] = sig;
+        sig = 0;
       }
     }
     if (fadeInc !== 0) {
@@ -2614,6 +2873,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   settleSkipped(voice, B, liveB, n);
   settleSkipped(voice, C, liveC, n);
   settleSkipped(voice, D, liveD, n);
+  if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
@@ -2653,6 +2913,7 @@ function voiceFilterQuiet(voice) {
   if (Math.abs(voice.drive.toneState) > DORMANT_FILTER_STATE) return false;
   const f = voice.patch.filter;
   if (f.mode === FILT_OFF) return true;
+  if (f.mode === FILT_LADDER) return Ladder.quiet(voice.ladder);
   if (!Svf.quiet(voice.svfA)) return false;
   if (f.mode === FILT_FORMANT) return Svf.quiet(voice.svfB) && Svf.quiet(voice.svfC);
   return !f.slope24 || Svf.quiet(voice.svfB);
@@ -2834,7 +3095,10 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       }
     }
     if (mode !== FILT_OFF) {
-      if (mode === FILT_FORMANT) {
+      if (mode < FILT_FORMANT) {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      } else if (mode === FILT_FORMANT) {
         const x = sig;
         let p = voice.svfA;
         let v3 = x - p.ic2;
@@ -2858,8 +3122,8 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         p.ic2 = 2 * v2 - p.ic2;
         sig += p.gain * v1;
       } else {
-        sig = voice.svfA.process(sig, mode);
-        if (slope24) sig = voice.svfB.process(sig, mode);
+        voice.ladder.chunk[s] = sig;
+        sig = 0;
       }
     }
     if (fadeInc !== 0) {
@@ -2873,6 +3137,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
     outL[k] += sig * voice.panL;
     outR[k] += sig * voice.panR;
   }
+  if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
@@ -2978,6 +3243,7 @@ var Voice = class {
     this.svfA = new Svf();
     this.svfB = new Svf();
     this.svfC = new Svf();
+    this.ladder = new Ladder();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
@@ -3090,11 +3356,16 @@ var Voice = class {
     this.pitchEnv.noteOn();
     this.lfo.reset(patch.lfo.retrigger || patch.lfo.oneShot);
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
+    this.resetFilter();
+    this.drive.reset();
+    startStepMod(this, patch, stepMod);
+  }
+  /** A note's filter from rest: the three sections and the Acid mode's ladder (windsor#573). */
+  resetFilter() {
     this.svfA.reset();
     this.svfB.reset();
     this.svfC.reset();
-    this.drive.reset();
-    startStepMod(this, patch, stepMod);
+    this.ladder.reset();
   }
   /**
    * Re-point a sounding voice at a new patch (the console's live knobs). Phase,

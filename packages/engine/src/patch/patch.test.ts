@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { LFO2_DEFAULTS, LFO_DEFAULTS } from '../worklet/fm/patchDefaults';
-import { ALGORITHMS, WAVE, WAVE_NAMES, makePatch } from './patch';
+import { ALGORITHMS, FILTER_MODE, FILTER_MODE_NAMES, WAVE, WAVE_NAMES, makePatch } from './patch';
 import type { Patch } from './patch';
 import { serialisePatchFile } from './patchFileSerialise';
 import { loadPatchFile } from './patchLibrary';
@@ -119,6 +119,13 @@ describe('makePatch', () => {
     expect(makePatch().filter.modWheelDepth).toBe(0);
     expect(makePatch().lfo.modWheelDepth).toBe(1);
     expect(makePatch({ filter: { modWheelDepth: -3 } }).filter.modWheelDepth).toBe(-3);
+  });
+
+  it('carries the Acid mode, and leaves a mode past it for the normaliser to play as Off (windsor#573)', () => {
+    expect(makePatch({ filter: { mode: FILTER_MODE.LADDER } }).filter.mode).toBe(6);
+    expect(FILTER_MODE_NAMES[FILTER_MODE.LADDER]).toBe('Acid');
+    // `normalisePatch` plays 7 as Off (`patchNormalise.test.ts`); makePatch copies what it is given.
+    expect(makePatch({ filter: { mode: 7 } }).filter.mode).toBe(7);
   });
 
   it('does not share nested state between two patches', () => {

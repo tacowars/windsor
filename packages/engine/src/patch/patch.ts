@@ -64,7 +64,7 @@ export const LFO_SHAPE_NAMES = [
   'Drift',
 ] as const;
 
-export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant'] as const;
+export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant', 'Acid'] as const;
 
 export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
 

@@ -16,7 +16,8 @@
  * knot counter and knot slot are locals, stepped as the generic loop steps
  * them and stored back at the end. A Noise operator's colour (windsor#362)
  * is the generic loop's call on its sample, behind a hoisted flag per
- * operator. This function is not sliced
+ * operator. The Acid mode (windsor#573) leaves each sample in the ladder's `chunk`
+ * for `renderVoiceLadder` after the loop, as the generic loop does. This function is not sliced
  * finer, whatever `max-lines-per-function` says: a helper per operator would
  * reload the state through the voice and give the saving back
  * (docs/research/2026-09-15-548-fm-voice-loop-specialisation).
@@ -34,7 +35,8 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
+import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
+import { renderVoiceLadder } from './voiceLadder';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
@@ -506,7 +508,11 @@ function renderVoiceKernel(
     }
 
     if (mode !== FILT_OFF) {
-      if (mode === FILT_FORMANT) {
+      // The serial modes first, as in the generic loop (windsor#573).
+      if (mode < FILT_FORMANT) {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      } else if (mode === FILT_FORMANT) {
         // Three bandpass peaks from the same input, summed A, B, C by their
         // gains (windsor#331): the generic loop's lines, `Svf.process`'s
         // bandpass written out for each, so no call is inlined for them.
@@ -533,8 +539,10 @@ function renderVoiceKernel(
         p.ic2 = 2 * v2 - p.ic2;
         sig += p.gain * v1;
       } else {
-        sig = voice.svfA.process(sig, mode);
-        if (slope24) sig = voice.svfB.process(sig, mode);
+        // Acid (windsor#573): the generic loop's lines; the ladder runs over
+        // the chunk after the loop, and the fade below runs on a 0.
+        voice.ladder.chunk[s] = sig;
+        sig = 0;
       }
     }
 
@@ -599,6 +607,7 @@ function renderVoiceKernel(
   settleSkipped(voice, C, liveC, n);
   settleSkipped(voice, D, liveD, n);
 
+  if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {

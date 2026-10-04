@@ -18,13 +18,18 @@ const LOOP_NONE = 0,
   LOOP_LOOP = 1,
   LOOP_TRIGGER = 2;
 
-/** Filter modes (`svf.ts`); Formant runs three bandpass peaks in parallel (`voiceFormant.ts`, windsor#331). */
+/**
+ * Filter modes (`svf.ts`); Formant runs three bandpass peaks in parallel
+ * (`voiceFormant.ts`, windsor#331), and Acid the TB-303's diode ladder in
+ * place of the sections (`ladder.ts`, windsor#573).
+ */
 const FILT_OFF = 0,
   FILT_LP = 1,
   FILT_HP = 2,
   FILT_BP = 3,
   FILT_NOTCH = 4,
-  FILT_FORMANT = 5;
+  FILT_FORMANT = 5,
+  FILT_LADDER = 6;
 
 /** LFO shapes (`lfo.ts`). */
 const LFO_SINE = 0,
@@ -60,6 +65,7 @@ const FILTER_MODE = {
   BANDPASS: FILT_BP,
   NOTCH: FILT_NOTCH,
   FORMANT: FILT_FORMANT,
+  LADDER: FILT_LADDER,
 } as const;
 
 const LFO_SHAPE = {
@@ -97,6 +103,7 @@ export {
   FILT_BP,
   FILT_NOTCH,
   FILT_FORMANT,
+  FILT_LADDER,
   LFO_SINE,
   LFO_TRI,
   LFO_SAW_UP,

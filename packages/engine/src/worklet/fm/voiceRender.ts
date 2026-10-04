@@ -7,7 +7,9 @@
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
  * allocation free, no per-sample call beyond `voice.noise()`, a Noise
- * operator's colour (windsor#362), the drive and the filter;
+ * operator's colour (windsor#362), the drive and the filter (the Acid
+ * mode's ladder runs over the chunk after the loop, `renderVoiceLadder`,
+ * windsor#573, so no call sits in the loop for it);
  * a helper per operator would reload the locals through the voice and cost
  * more than it saves. Width (#55): an operator whose width is exactly 1 and
  * still takes the old read, untouched; one squeezed reads its wave at
@@ -33,7 +35,8 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
+import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
+import { renderVoiceLadder } from './voiceLadder';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
@@ -273,7 +276,12 @@ function renderVoiceGeneric(
     }
 
     if (mode !== FILT_OFF) {
-      if (mode === FILT_FORMANT) {
+      // The serial modes first, so they test the mode as often as before
+      // Acid joined (windsor#573).
+      if (mode < FILT_FORMANT) {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      } else if (mode === FILT_FORMANT) {
         // Three bandpass peaks from the same input, summed A, B, C by their
         // gains (windsor#331). Each is `Svf.process`'s bandpass written out,
         // its operations in its order, so the loop inlines no call for them;
@@ -301,8 +309,11 @@ function renderVoiceGeneric(
         p.ic2 = 2 * v2 - p.ic2;
         sig += p.gain * v1;
       } else {
-        sig = voice.svfA.process(sig, mode);
-        if (slope24) sig = voice.svfB.process(sig, mode);
+        // Acid (windsor#573): the ladder runs over the chunk after the loop
+        // (`renderVoiceLadder`), so no call sits in this one; the fade below
+        // runs on as ever, on a 0.
+        voice.ladder.chunk[s] = sig;
+        sig = 0;
       }
     }
 
@@ -322,6 +333,7 @@ function renderVoiceGeneric(
     outR[k] += sig * voice.panR;
   }
 
+  if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {

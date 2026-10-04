@@ -60,6 +60,20 @@ export interface FmPartEvent {
  */
 export type FmPartPath = 'held' | 'stolen' | 'released' | 'dormant' | 'ended' | 'silent';
 
+/**
+ * The Acid patch the allocation test plays (windsor#573): the filter it
+ * writes over its pad's, the diode ladder near the top of its Reso with its
+ * cutoff between whole hertz and swept by the filter envelope; and song
+ * lanes on its two controls, toggled with the part's own parameters, so the
+ * ladder retunes on ringing voices.
+ */
+export const ACID_FILTER = { mode: 6, cutoff: 1200.5, resonance: 9.5, envAmount: 1.5 };
+export const ACID_SLOTS = ['filter.cutoff', 'filter.resonance'];
+export const ACID_LANE_TOGGLES: [string, number][] = [
+  ['voiceSlot0', 0.3],
+  ['voiceSlot1', -0.2],
+];
+
 export interface FmPartChangeConfig {
   /** The cycle's events, in order of `at`. */
   events: FmPartEvent[];

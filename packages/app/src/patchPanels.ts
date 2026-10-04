@@ -267,11 +267,14 @@ export function buildDrive(editor: PatchEditor): void {
 /**
  * What the filter section shows in a mode (windsor#334): Formant tunes its
  * peaks from the vowel, so Cutoff and Slope do nothing there and give way to
- * Vowel; every other mode is the reverse. The modulation amounts stay in all.
+ * Vowel; Acid, the diode ladder (windsor#573), has one slope of its own and
+ * no vowel, so it shows Cutoff alone; every other mode is the reverse of
+ * Formant. The modulation amounts stay in all.
  */
 export const filterModeShows = (
   mode: number,
 ): { cutoff: boolean; slope: boolean; vowel: boolean } => {
+  if (mode === FILTER_MODE.LADDER) return { cutoff: true, slope: false, vowel: false };
   const formant = mode === FILTER_MODE.FORMANT;
   return { cutoff: !formant, slope: !formant, vowel: formant };
 };

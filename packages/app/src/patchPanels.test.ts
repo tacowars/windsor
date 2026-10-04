@@ -219,8 +219,9 @@ describe('the LFO Range segment (windsor#56)', () => {
 });
 
 describe('the filter section in Formant mode (windsor#334)', () => {
-  it('offers Off, LP, HP, BP, Notch and Formant, the sixth writing mode 5 through a push', () => {
-    expect(FILTER_MODE_NAMES).toEqual(['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant']);
+  it('offers Off, LP, HP, BP, Notch, Formant and Acid, the sixth writing mode 5 through a push', () => {
+    // windsor#573 appended Acid, the diode ladder, after Formant.
+    expect(FILTER_MODE_NAMES).toEqual(['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant', 'Acid']);
     expect(FILTER_MODE_NAMES.indexOf('Formant')).toBe(FILTER_MODE.FORMANT);
     const pushed: number[] = [];
     const editor: PatchEditor = {
@@ -236,14 +237,20 @@ describe('the filter section in Formant mode (windsor#334)', () => {
     expect(imported.filter.mode).toBe(5);
   });
 
-  it('shows Vowel and hides Cutoff and Slope in Formant, and the reverse in every other mode', () => {
+  it('shows Vowel and hides Cutoff and Slope in Formant, Cutoff alone in Acid, and the reverse of Formant in every other mode', () => {
     expect(filterModeShows(FILTER_MODE.FORMANT)).toEqual({
       cutoff: false,
       slope: false,
       vowel: true,
     });
+    // windsor#573: the ladder has its own slope and no vowel.
+    expect(filterModeShows(FILTER_MODE.LADDER)).toEqual({
+      cutoff: true,
+      slope: false,
+      vowel: false,
+    });
     FILTER_MODE_NAMES.forEach((name, mode) => {
-      if (mode === FILTER_MODE.FORMANT) return;
+      if (mode === FILTER_MODE.FORMANT || mode === FILTER_MODE.LADDER) return;
       expect(filterModeShows(mode), name).toEqual({ cutoff: true, slope: true, vowel: false });
     });
   });

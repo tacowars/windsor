@@ -22,6 +22,7 @@ import {
   DRIVE_SHAPE,
   DRIVE_SOFT,
   FILT_FORMANT,
+  FILT_LADDER,
   FILT_NOTCH,
   FILT_OFF,
   FILTER_MODE,
@@ -51,6 +52,10 @@ describe('mode ids', () => {
     // windsor#331: Formant is the sixth mode, last in the console's list.
     expect(FILTER_MODE.FORMANT).toBe(FILT_FORMANT);
     expect(FILTER_MODE_NAMES[FILT_FORMANT]).toBe('Formant');
+    // windsor#573: Acid, the diode ladder, is the seventh, after it.
+    expect(FILTER_MODE.LADDER).toBe(FILT_LADDER);
+    expect(FILT_LADDER).toBe(6);
+    expect(FILTER_MODE_NAMES[FILT_LADDER]).toBe('Acid');
     expect([LFO_SHAPE.SINE, LFO_SHAPE.DRIFT]).toEqual([LFO_SINE, LFO_DRIFT]);
     expect([DRIVE_SHAPE.SOFT, DRIVE_SHAPE.FOLD]).toEqual([DRIVE_SOFT, DRIVE_FOLD]);
     expect([MACRO_CURVE.LINEAR, MACRO_CURVE.S]).toEqual([MACRO_LINEAR, MACRO_S]);

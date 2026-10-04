@@ -5,7 +5,8 @@
  * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), three filter stages (the third for the Formant
- * mode's three peaks, windsor#331), the steal fade, a step's offsets and
+ * mode's three peaks, windsor#331), the Acid mode's ladder (windsor#573),
+ * the steal fade, a step's offsets and
  * the voice's own and live values by target code (windsor#17, windsor#346,
  * windsor#419) and the feedback ramp — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
@@ -25,6 +26,7 @@ import type { WorkletPatch } from './patchNormalise';
 import { ALGORITHMS, ALG_ORDER } from './algorithms';
 import { Envelope, ST_IDLE } from './envelope';
 import { ENVELOPE_BREAKS_MAX } from './fmConstants';
+import { Ladder } from './ladder';
 import { Lfo, secondLfoSeed } from './lfo';
 import { NoiseColour } from './noiseColour';
 import { randomSeed32 } from './prng';
@@ -75,6 +77,8 @@ class Voice {
   svfB: Svf;
   /** The Formant mode's third peak (windsor#331); A and B are its first two. */
   svfC: Svf;
+  /** The Acid mode's diode ladder (windsor#573), run in place of the sections in that mode. */
+  ladder: Ladder;
   /** Each operator's noise colour (windsor#362): run only for a Noise operator with a field set. */
   noiseColour: NoiseColour[];
   /** Each Noise operator's draw this sample in the generic loop, drawn D..A at its top (windsor#389). */
@@ -196,6 +200,8 @@ class Voice {
     this.svfB = new Svf();
     // Formant (windsor#331): three peaks in parallel, A, B and C.
     this.svfC = new Svf();
+    // Acid (windsor#573): the diode ladder.
+    this.ladder = new Ladder();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     // The generic loop's noise draws (windsor#389): a double store and load
     // are exact, so a Noise operator reads the value `noise()` returned.
@@ -350,14 +356,20 @@ class Voice {
     // A one-shot LFO always starts from the top of its run (#55).
     this.lfo.reset(patch.lfo.retrigger || patch.lfo.oneShot);
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
-    this.svfA.reset();
-    this.svfB.reset();
-    this.svfC.reset();
+    this.resetFilter();
     this.drive.reset();
 
     // The step's offsets (windsor#17) and the song's lanes (windsor#346), and
     // the width ramps from the note's width; the first control block sets their step.
     startStepMod(this, patch, stepMod);
+  }
+
+  /** A note's filter from rest: the three sections and the Acid mode's ladder (windsor#573). */
+  resetFilter(): void {
+    this.svfA.reset();
+    this.svfB.reset();
+    this.svfC.reset();
+    this.ladder.reset();
   }
 
   /**

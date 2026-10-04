@@ -218,6 +218,30 @@ describe('rebinding a sounding voice', () => {
     expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
   });
 
+  // The Acid scenario: a saw through the drive into the ladder at k 16.5,
+  // its envelope and key track moving the cutoff, live edits sweeping the
+  // cutoff past the top and switching to Lowpass (3100) and back.
+  it('matches the generic loop on an Acid saw at k 16.5 as live edits sweep its cutoff and switch the mode to Lowpass and back (windsor#573)', () => {
+    const moved = { resonance: 12, envAmount: 2.5, keyTrack: 0.6 };
+    const acid = (cutoff: number): PartialPatch => ({
+      algorithm: 1,
+      ops: [{ wave: WAVE.SAW }, { level: 0.5 }, { level: 0.3, ratio: 3 }],
+      drive: { gain: 3, on: true },
+      filter: { mode: cutoff === 3100 ? 1 : 6, cutoff, ...moved },
+    });
+    const [generic, kernel] = inStep(makePatch(acid(300)), (p) => {
+      const note: ScheduledEvent = { type: 'noteOn', id: 1, note: 45, velocity: 0.9, frame: 0 };
+      const renders = [render(loaded, p, 10, [note]).samples];
+      for (const cutoff of [650, 1400.5, 3100, 9000, 22000, 180]) {
+        retune(p, acid(cutoff));
+        renders.push(render(loaded, p, 10).samples);
+      }
+      return renders;
+    });
+    expect(generic.flatMap((r) => [...r]).some((s) => s !== 0)).toBe(true);
+    expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
+  });
+
   it('leaves the feedback history the generic loop would after a one-sample idle call', () => {
     const patch = makePatch({ algorithm: 0, ops: [{}, { level: 0.8, feedback: 0.9 }] });
     const [generic, kernel] = inStep(patch, (p) => {

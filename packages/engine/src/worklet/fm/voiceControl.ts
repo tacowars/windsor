@@ -32,12 +32,13 @@ import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_EDGES } from './algorithms';
 import { WIDTH_SNAP } from './fmConstants';
-import { FILT_FORMANT, FILT_OFF } from './modeIds';
+import { FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { bindNoiseColour } from './noiseColour';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
+import { updateVoiceLadder } from './voiceLadder';
 import type { ControlIntervalTable } from './voiceControlInterval';
 import { controlInterval } from './voiceControlInterval';
 import { applyVoiceOffsets } from './voiceOffsets';
@@ -145,7 +146,9 @@ function updateOperatorWidth(voice: Voice, i: number, n: number): void {
  * envelope, and each stage's coefficients for the voice's cutoff moved by
  * the envelope, the wheel, both LFOs and key tracking; a song lane or a step
  * on the cutoff moves the cutoff itself, as the knob does; in the Formant mode the same octaves shift its three peaks
- * instead (`voiceFormant.ts`, windsor#331). The LFO levels are the voice's `lfoLevel` and `lfo2Level`, this
+ * instead (`voiceFormant.ts`, windsor#331), and in the Acid mode the same
+ * cutoff tunes the ladder in place of the sections (`voiceLadder.ts`,
+ * windsor#573). The LFO levels are the voice's `lfoLevel` and `lfo2Level`, this
  * block's, and the wheel and key offset are worked out again as the update
  * works them, so no double is passed in (windsor#233). Allocates nothing.
  */
@@ -175,6 +178,12 @@ function updateVoiceFilter(voice: Voice, n: number): void {
     return;
   }
   const cutoff = live[VT_CUTOFF] * Math.pow(2, octaves);
+  // Acid (windsor#573): the same cutoff, through the ladder's field.
+  if (f.mode === FILT_LADDER) {
+    voice.ladder.cutoffHz = cutoff;
+    updateVoiceLadder(voice);
+    return;
+  }
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;

@@ -48,6 +48,8 @@ function fft(re: Float64Array, im: Float64Array): void {
 export interface PowerSpectrum {
   power: Float64Array;
   binHz: number;
+  /** A response's phase in each bin, radians, where the reading has one (`transfer`'s, windsor#573). */
+  phase?: Float64Array;
 }
 
 /** One windowed segment of `samples` from `from`, transformed in place into `re` and `im`. */
@@ -68,7 +70,8 @@ function segment(
 /**
  * The squared magnitude of the response that took `input` to `output` (two
  * renders of equal length): the averaged cross spectrum over the averaged
- * input power, in segments of `size`.
+ * input power, in segments of `size`; and its phase, the cross spectrum's
+ * (windsor#573).
  */
 export function transfer(
   input: ArrayLike<number>,
@@ -99,10 +102,12 @@ export function transfer(
     }
   }
   const power = new Float64Array(bins);
+  const phase = new Float64Array(bins);
   for (let k = 0; k < bins; k++) {
     power[k] = (crossRe[k]! ** 2 + crossIm[k]! ** 2) / inputPower[k]! ** 2;
+    phase[k] = Math.atan2(crossIm[k]!, crossRe[k]!);
   }
-  return { power, binHz: sampleRate / size };
+  return { power, binHz: sampleRate / size, phase };
 }
 
 /** The squared magnitude of an impulse response `h`, zero-padded to `size`, unwindowed. */

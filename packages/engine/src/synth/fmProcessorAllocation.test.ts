@@ -111,6 +111,10 @@
  * the bound patch, across all five rows and between them, as a live edit of
  * the vowel reaches ringing voices (written in place: a posted patch is
  * normalised into a new object on the message path, by design).
+ * Two more play it through the Acid ladder (windsor#573), in the kernel and
+ * in the generic loop, its Newton solve running a call a sample, while song
+ * lanes on its cutoff and Reso toggle with the part's parameters, so it
+ * retunes on ringing voices.
  *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
  * read 128 KB. The runs read about 6 KB, the eleven readings' own result
@@ -122,6 +126,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { FmPartChangeConfig, FmPartEvent } from '../__fixtures__/fmPartChangeScenario';
+import { ACID_FILTER, ACID_LANE_TOGGLES, ACID_SLOTS } from '../__fixtures__/fmPartChangeScenario';
 import {
   expectAllocationFree,
   probeScenario,
@@ -298,6 +303,9 @@ function formantPad(): Patch {
   patch.filter.vowel = 0.5;
   return patch;
 }
+
+/** The pad through the Acid ladder (windsor#573), its filter the scenario's `ACID_FILTER`. */
+const acidPad = (): Patch => ({ ...pad(), filter: { ...pad().filter, ...ACID_FILTER } });
 
 /** The vowels a live edit sweeps the Formant pad through: across every row, both ends and between. */
 const VOWEL_SWEEP = [0.5, 1.75, 3.25, 4, 2.5, 0, 1.125];
@@ -550,6 +558,15 @@ describe('the FM part on V8', () => {
           vowels: VOWEL_SWEEP,
         }),
       );
+    }
+  }, 240_000);
+
+  it('plays the Acid pad while lanes move its cutoff and Reso, in the kernel and the generic loop, for 8 000 quanta without allocating or changing a field representation (windsor#573)', () => {
+    const toggles = [...TOGGLES, ...ACID_LANE_TOGGLES];
+    const paths: FmPartChangeConfig['paths'] = ['held', 'stolen', 'released', 'ended', 'silent'];
+    const config = { events: PAD_EVENTS, period: 6, toggles, rest: 16, idStride: 64, paths };
+    for (const specialise of [true, false]) {
+      expectClean(probe(acidPad(), 8, specialise, config, { voiceSlots: ACID_SLOTS }));
     }
   }, 240_000);
 

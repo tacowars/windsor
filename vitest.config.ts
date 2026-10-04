@@ -61,10 +61,14 @@ export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
       'scripts/lib/workletBundle.test.mjs',
     ],
   ],
-  // The FM worklet's sources, scanned for the envelope fields they read.
+  // The FM worklet's sources, scanned for the envelope fields they read,
+  // and the ladder's two for the Math calls they must not make (windsor#573).
   [
     'packages/engine/src/worklet/fm/**',
-    ['packages/engine/src/synth/fmProcessorEnvelopeEdges.test.ts'],
+    [
+      'packages/engine/src/synth/fmProcessorEnvelopeEdges.test.ts',
+      'packages/engine/src/synth/fmProcessorFilterLadder.test.ts',
+    ],
   ],
   // Bundled with esbuild from tapeMagneticStage.ts and run in a child process.
   [

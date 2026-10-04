@@ -6,7 +6,8 @@
  * (windsor#346), the drive stage's
  * shape constants and tone curve (windsor#300), a Noise operator's
  * colour filters' ceiling and damping (windsor#362), and the Formant
- * filter's Q scale, cap and makeup (windsor#331), and the steal fade and
+ * filter's Q scale, cap and makeup (windsor#331), the Acid Ladder's
+ * circuit, feedback, level and solver (windsor#573), and the steal fade and
  * reserve (windsor#410). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
@@ -173,6 +174,39 @@ const NOISE_COLOUR_DAMPING = Math.SQRT2;
 const FORMANT_Q_PER_RESONANCE = 8;
 const FORMANT_Q_MAX = 40;
 const FORMANT_MAKEUP = 1.787;
+/*
+ * The Acid Ladder filter mode (windsor#573, `ladder.ts`, record
+ * `2026-10-04-acid-ladder-filter-mode`): the TB-303's four-stage diode
+ * ladder, its bottom capacitor LADDER_BOTTOM_CAP of the others (the
+ * schematic's 18 nF under 33 nF, Stinchcombe's half). Resonance is the
+ * output fed back into the input pair through a one-pole high-pass at
+ * LADDER_FEEDBACK_HP_HZ (Open303's calibrated image of the hardware's
+ * return, a tunable and not a component value), times a gain k =
+ * LADDER_FEEDBACK_MAX x p, p the Reso knob's place on its log scale,
+ * log2(reso / LADDER_RESONANCE_FLOOR) / log2(LADDER_RESONANCE_SPAN), 0 at
+ * 0.5 and 1 at 12. The linear self-oscillation threshold is k = 17, so
+ * 16.5 stays short of it, as the stock unit does. The carrier sum enters
+ * times LADDER_INPUT_SCALE (the model's 2 V_T unit) and leaves divided by
+ * it. The cutoff is held between LADDER_CUTOFF_MIN_HZ and
+ * LADDER_CUTOFF_MAX_HZ, and below LADDER_CUTOFF_CEILING of the sample rate
+ * at a low rate. The solver (decision 6): LADDER_NEWTON_STEPS Newton steps
+ * a sample on the trapezoidal step, at LADDER_OVERSAMPLE times the sample
+ * rate. The shipped candidate is 1x with four steps and the cutoff capped
+ * at 10 kHz; the other, 2x with three steps and no cap, stays selectable
+ * here for the research bench (`docs/research/2026-10-04-acid-ladder-filter/`).
+ * Each value is tacowars's to set by ear.
+ */
+const LADDER_BOTTOM_CAP = 0.5;
+const LADDER_FEEDBACK_HP_HZ = 150;
+const LADDER_FEEDBACK_MAX = 16.5;
+const LADDER_RESONANCE_FLOOR = 0.5;
+const LADDER_RESONANCE_SPAN = 24;
+const LADDER_INPUT_SCALE = 2;
+const LADDER_CUTOFF_MIN_HZ = 20;
+const LADDER_CUTOFF_MAX_HZ = 10000;
+const LADDER_CUTOFF_CEILING = 0.45;
+const LADDER_NEWTON_STEPS = 4;
+const LADDER_OVERSAMPLE = 1;
 
 /*
  * Voice stealing (windsor#410, `voiceSteal.ts`). A voice a full part steals
@@ -224,6 +258,17 @@ export {
   FORMANT_Q_PER_RESONANCE,
   FORMANT_Q_MAX,
   FORMANT_MAKEUP,
+  LADDER_BOTTOM_CAP,
+  LADDER_FEEDBACK_HP_HZ,
+  LADDER_FEEDBACK_MAX,
+  LADDER_RESONANCE_FLOOR,
+  LADDER_RESONANCE_SPAN,
+  LADDER_INPUT_SCALE,
+  LADDER_CUTOFF_MIN_HZ,
+  LADDER_CUTOFF_MAX_HZ,
+  LADDER_CUTOFF_CEILING,
+  LADDER_NEWTON_STEPS,
+  LADDER_OVERSAMPLE,
   STEAL_FADE_SECONDS,
   STEAL_RESERVE_MIN,
   STEAL_STREAMED_RESERVE,

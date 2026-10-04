@@ -69,7 +69,7 @@ from one code path and one patch format.
 | Operators | 4 per voice, 11 algorithms, per-operator bipolar feedback (+ towards sawtooth, − towards square; #529). A modulator at full Level, envelope open, shifts the phase it feeds by 4 cycles ≈ 25 rad (#543) |
 | Waveforms | Sine, saw, square, triangle, noise; unbandlimited "digital" saw/square; 4-bit and 8-bit sine; user-defined harmonics |
 | Envelopes | Per operator, plus filter and pitch: Init/Attack/Peak/Decay/Sustain/Release/End, per-segment curve, key scaling, three loop modes |
-| Filter | Per-voice state-variable (TPT): LP/HP/BP/notch, 12 or 24 dB, resonance, drive, envelope, LFO, key tracking |
+| Filter | Per-voice state-variable (TPT): LP/HP/BP/notch, 12 or 24 dB, resonance, drive, envelope, LFO, key tracking; Formant, three vowel peaks; Acid, a TB-303 diode ladder (four coupled stages, the bottom capacitor half the others, resonance fed back through a 150 Hz high-pass, solved by Newton on the trapezoidal step; at zero resonance its −3 dB point sits three octaves below the Cutoff, and its cutoff stops at 10 kHz; `docs/log/2026-10-04-acid-ladder-filter-mode.md`) |
 | Modulation | Per-voice LFO (7 shapes) to pitch, filter and any operator; pitch envelope; glide; unison spread; mono voicing (one note at a time, with retrigger) |
 
 **Not** a chip emulation. The OPL/OPM register interface, the fixed voice count, the
