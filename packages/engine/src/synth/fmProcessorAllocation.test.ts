@@ -271,9 +271,10 @@ function pad(): Patch {
   patch.ops[1]!.wave = WAVE.PULSE;
   patch.ops[1]!.width = 0.3;
   patch.ops[3]!.wave = WAVE.NOISE;
-  // Its own two sections (windsor#362), at cutoffs that are not whole numbers.
-  patch.ops[3]!.noiseLp = 6100.5;
-  patch.ops[3]!.noiseHp = 1800.25;
+  // Its own two sections (windsor#362), at cutoffs that are not whole numbers,
+  // and the Pulse's lowpass tracking the note (windsor#590).
+  Object.assign(patch.ops[3]!, { opLp: 6100.5, opHp: 1800.25 });
+  Object.assign(patch.ops[1]!, { opLp: 3200.5, opTrack: 0.75 });
   // The drive stage (windsor#300) with a bias and its tone pole running.
   patch.drive = { gain: 1.3, shape: DRIVE_SHAPE.TUBE, bias: 0.2, tone: 0.6, on: true };
   patch.filter.env.attackTime = 0.05;
@@ -311,8 +312,9 @@ const acidPad = (): Patch => ({ ...pad(), filter: { ...pad().filter, ...ACID_FIL
 const VOWEL_SWEEP = [0.5, 1.75, 3.25, 4, 2.5, 0, 1.125];
 
 /**
- * `lead-bell` that falls dormant quickly, with a squeezed saw and a noise
- * operator through its own highpass (windsor#362), through a biased diode
+ * `lead-bell` that falls dormant quickly, with a squeezed saw through its
+ * own tracked lowpass (windsor#590) and a noise operator through its own
+ * highpass (windsor#362), through a biased diode
  * drive and a 24 dB filter and two LFOs.
  */
 function pluck(): Patch {
@@ -320,8 +322,9 @@ function pluck(): Patch {
   for (const op of patch.ops) op.env.decayTime = 0.1;
   patch.ops[2]!.wave = WAVE.SAW;
   patch.ops[2]!.width = 0.6;
+  Object.assign(patch.ops[2]!, { opLp: 2400.25, opTrack: -0.5 });
   patch.ops[3]!.wave = WAVE.NOISE;
-  patch.ops[3]!.noiseHp = 950.75;
+  patch.ops[3]!.opHp = 950.75;
   patch.filter.slope24 = true;
   patch.drive = { gain: 1.4, shape: DRIVE_SHAPE.DIODE, bias: -0.1, tone: 0.8, on: true };
   patch.lfo = { ...patch.lfo, shape: 1, amount: 0.3, toPitch: 0.2 };

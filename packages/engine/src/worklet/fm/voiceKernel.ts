@@ -14,9 +14,13 @@
  * read, and the width ramp runs beside the phase, live or not, as the generic
  * loop's does. The amplitude knots (windsor#301) too: an operator's ramp,
  * knot counter and knot slot are locals, stepped as the generic loop steps
- * them and stored back at the end. A Noise operator's colour (windsor#362)
- * is the generic loop's call on its sample, behind a hoisted flag per
- * operator. The Acid mode (windsor#573) leaves each sample in the ladder's `chunk`
+ * them and stored back at the end. An operator's own filters (windsor#362,
+ * windsor#590) are `OperatorFilter.process` written out on its sample, its
+ * operations in its order, after its wave read and its feedback tap, behind
+ * a hoisted flag per operator: four calls here outran V8's inlining budget,
+ * and a filtered operator past the first cost about twice as much called as
+ * written out (`docs/log/2026-10-04-operator-filters-on-every-wave.md`).
+ * The Acid mode (windsor#573) leaves each sample in the ladder's `chunk`
  * for `renderVoiceLadder` after the loop, as the generic loop does. This function is not sliced
  * finer, whatever `max-lines-per-function` says: a helper per operator would
  * reload the state through the voice and give the saving back
@@ -33,6 +37,7 @@ import {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
+  OP_FILTER_DAMPING,
   TABLE_SIZE,
 } from './fmConstants';
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
@@ -48,9 +53,11 @@ import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
  * ahead (windsor#301) for the whole call contributes ±0 to every sum it is in, so its wave is not computed.
  * Its phase still runs, and its feedback history becomes the ±0 the generic
  * loop would have stored. A noise operator is never skipped: its draws
- * advance the voice's shared noise generator. The operators run D..A, so
- * the Noise operators draw D..A, the order the generic loop draws them in at
- * the top of each sample (windsor#389), whatever the algorithm.
+ * advance the voice's shared noise generator. Nor is one whose own filters
+ * are on (windsor#590): the generic loop runs their state on at any level.
+ * The operators run D..A, so the Noise operators draw D..A, the order the
+ * generic loop draws them in at the top of each sample (windsor#389),
+ * whatever the algorithm.
  */
 // Four operators written out, then the carrier sum, the drive and the filter, over locals
 // hoisted out of the loop. The fixed indices and the locals are the saving
@@ -115,10 +122,30 @@ function renderVoiceKernel(
     kB = kind[B],
     kC = kind[C],
     kD = kind[D];
-  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0;
-  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0;
-  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0;
-  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0;
+  // An operator's own filters (windsor#362, windsor#590), as the generic
+  // loop's `filtered`: its wave through them after the feedback tap. False
+  // for an operator with neither cutoff set. An operator whose filters are
+  // on is never skipped, as a Noise operator is not: the generic loop runs
+  // their state on at any amplitude. The flag is the last term, compared to
+  // `true`: first, or bare, it cost every voice up to 5 ns a sample with no
+  // filter on, the Noise operators most (measured on Node 24, windsor#590).
+  const filters = voice.opFilter;
+  const fltA = filters[A],
+    fltB = filters[B],
+    fltC = filters[C],
+    fltD = filters[D];
+  const filtA = fltA.on,
+    filtB = fltB.on,
+    filtC = fltC.on,
+    filtD = fltD.on;
+  const liveA =
+    kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0 || filtA === true;
+  const liveB =
+    kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0 || filtB === true;
+  const liveC =
+    kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0 || filtC === true;
+  const liveD =
+    kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0 || filtD === true;
   const modBA = liveA && liveB && (edges & EDGE_BA) !== 0;
   const modCA = liveA && liveC && (edges & EDGE_CA) !== 0;
   const modDA = liveA && liveD && (edges & EDGE_DA) !== 0;
@@ -211,18 +238,6 @@ function renderVoiceKernel(
   const sqB = kB !== KIND_NOISE && kB !== KIND_PULSE && (wB !== 1 || rampB);
   const sqC = kC !== KIND_NOISE && kC !== KIND_PULSE && (wC !== 1 || rampC);
   const sqD = kD !== KIND_NOISE && kD !== KIND_PULSE && (wD !== 1 || rampD);
-  // A Noise operator's colour (windsor#362), as the generic loop's `coloured`:
-  // its noise through its own filters, the sample passed in `point`. False
-  // for an operator with neither field set, and for every other wave.
-  const colours = voice.noiseColour;
-  const ncA = colours[A],
-    ncB = colours[B],
-    ncC = colours[C],
-    ncD = colours[D];
-  const colA = ncA.on,
-    colB = ncB.on,
-    colC = ncC.on,
-    colD = ncD.on;
 
   for (let s = 0; s < n; s++) {
     if (liveD) {
@@ -252,14 +267,8 @@ function renderVoiceKernel(
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
-      } else if (kD === KIND_NOISE) {
-        v = voice.noise();
-        if (colD) {
-          ncD.point = v;
-          ncD.process();
-          v = ncD.point;
-        }
-      } else if (kD === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kD === KIND_NOISE) v = voice.noise();
+      else if (kD === KIND_SAW_D) v = ph * 2 - 1;
       else if (kD === KIND_PULSE) {
         let pd = ph + wD;
         pd -= Math.floor(pd);
@@ -274,6 +283,28 @@ function renderVoiceKernel(
       } else v = ph < 0.5 ? 1 : -1;
       f2D = f1D;
       f1D = Math.fround(v * a);
+      if (filtD) {
+        if (fltD.lpOn) {
+          const ic1 = fltD.lp1;
+          const ic2 = fltD.lp2;
+          const v3 = v - ic2;
+          const v1 = fltD.lpA1 * ic1 + fltD.lpA2 * v3;
+          const v2 = ic2 + fltD.lpA2 * ic1 + fltD.lpA3 * v3;
+          fltD.lp1 = 2 * v1 - ic1;
+          fltD.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltD.hpOn) {
+          const ic1 = fltD.hp1;
+          const ic2 = fltD.hp2;
+          const v3 = v - ic2;
+          const v1 = fltD.hpA1 * ic1 + fltD.hpA2 * v3;
+          const v2 = ic2 + fltD.hpA2 * ic1 + fltD.hpA3 * v3;
+          fltD.hp1 = 2 * v1 - ic1;
+          fltD.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oD = Math.fround(v);
       aD = Math.fround(a + aiD);
       if (brD !== 0 && --brD === 0) {
@@ -315,14 +346,8 @@ function renderVoiceKernel(
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
-      } else if (kC === KIND_NOISE) {
-        v = voice.noise();
-        if (colC) {
-          ncC.point = v;
-          ncC.process();
-          v = ncC.point;
-        }
-      } else if (kC === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kC === KIND_NOISE) v = voice.noise();
+      else if (kC === KIND_SAW_D) v = ph * 2 - 1;
       else if (kC === KIND_PULSE) {
         let pd = ph + wC;
         pd -= Math.floor(pd);
@@ -337,6 +362,28 @@ function renderVoiceKernel(
       } else v = ph < 0.5 ? 1 : -1;
       f2C = f1C;
       f1C = Math.fround(v * a);
+      if (filtC) {
+        if (fltC.lpOn) {
+          const ic1 = fltC.lp1;
+          const ic2 = fltC.lp2;
+          const v3 = v - ic2;
+          const v1 = fltC.lpA1 * ic1 + fltC.lpA2 * v3;
+          const v2 = ic2 + fltC.lpA2 * ic1 + fltC.lpA3 * v3;
+          fltC.lp1 = 2 * v1 - ic1;
+          fltC.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltC.hpOn) {
+          const ic1 = fltC.hp1;
+          const ic2 = fltC.hp2;
+          const v3 = v - ic2;
+          const v1 = fltC.hpA1 * ic1 + fltC.hpA2 * v3;
+          const v2 = ic2 + fltC.hpA2 * ic1 + fltC.hpA3 * v3;
+          fltC.hp1 = 2 * v1 - ic1;
+          fltC.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oC = Math.fround(v);
       aC = Math.fround(a + aiC);
       if (brC !== 0 && --brC === 0) {
@@ -379,14 +426,8 @@ function renderVoiceKernel(
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
-      } else if (kB === KIND_NOISE) {
-        v = voice.noise();
-        if (colB) {
-          ncB.point = v;
-          ncB.process();
-          v = ncB.point;
-        }
-      } else if (kB === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kB === KIND_NOISE) v = voice.noise();
+      else if (kB === KIND_SAW_D) v = ph * 2 - 1;
       else if (kB === KIND_PULSE) {
         let pd = ph + wB;
         pd -= Math.floor(pd);
@@ -401,6 +442,28 @@ function renderVoiceKernel(
       } else v = ph < 0.5 ? 1 : -1;
       f2B = f1B;
       f1B = Math.fround(v * a);
+      if (filtB) {
+        if (fltB.lpOn) {
+          const ic1 = fltB.lp1;
+          const ic2 = fltB.lp2;
+          const v3 = v - ic2;
+          const v1 = fltB.lpA1 * ic1 + fltB.lpA2 * v3;
+          const v2 = ic2 + fltB.lpA2 * ic1 + fltB.lpA3 * v3;
+          fltB.lp1 = 2 * v1 - ic1;
+          fltB.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltB.hpOn) {
+          const ic1 = fltB.hp1;
+          const ic2 = fltB.hp2;
+          const v3 = v - ic2;
+          const v1 = fltB.hpA1 * ic1 + fltB.hpA2 * v3;
+          const v2 = ic2 + fltB.hpA2 * ic1 + fltB.hpA3 * v3;
+          fltB.hp1 = 2 * v1 - ic1;
+          fltB.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oB = Math.fround(v);
       aB = Math.fround(a + aiB);
       if (brB !== 0 && --brB === 0) {
@@ -444,14 +507,8 @@ function renderVoiceKernel(
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
-      } else if (kA === KIND_NOISE) {
-        v = voice.noise();
-        if (colA) {
-          ncA.point = v;
-          ncA.process();
-          v = ncA.point;
-        }
-      } else if (kA === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kA === KIND_NOISE) v = voice.noise();
+      else if (kA === KIND_SAW_D) v = ph * 2 - 1;
       else if (kA === KIND_PULSE) {
         let pd = ph + wA;
         pd -= Math.floor(pd);
@@ -466,6 +523,28 @@ function renderVoiceKernel(
       } else v = ph < 0.5 ? 1 : -1;
       f2A = f1A;
       f1A = Math.fround(v * a);
+      if (filtA) {
+        if (fltA.lpOn) {
+          const ic1 = fltA.lp1;
+          const ic2 = fltA.lp2;
+          const v3 = v - ic2;
+          const v1 = fltA.lpA1 * ic1 + fltA.lpA2 * v3;
+          const v2 = ic2 + fltA.lpA2 * ic1 + fltA.lpA3 * v3;
+          fltA.lp1 = 2 * v1 - ic1;
+          fltA.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltA.hpOn) {
+          const ic1 = fltA.hp1;
+          const ic2 = fltA.hp2;
+          const v3 = v - ic2;
+          const v1 = fltA.hpA1 * ic1 + fltA.hpA2 * v3;
+          const v2 = ic2 + fltA.hpA2 * ic1 + fltA.hpA3 * v3;
+          fltA.hp1 = 2 * v1 - ic1;
+          fltA.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oA = Math.fround(v);
       aA = Math.fround(a + aiA);
       if (brA !== 0 && --brA === 0) {

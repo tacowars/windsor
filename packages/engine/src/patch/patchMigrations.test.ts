@@ -5,7 +5,9 @@
  * 2 retired the headroom record and `userKey` (record
  * `2026-09-28-retire-the-headroom-record`); format 3 moved the filter's drive
  * into the voice's drive stage (windsor#300, record
- * `2026-10-01-voice-drive-stage`).
+ * `2026-10-01-voice-drive-stage`); format 4 renamed the operators' `noiseLp`
+ * and `noiseHp` to `opLp` and `opHp` (windsor#590, record
+ * `2026-10-04-operator-filters-on-every-wave`).
  */
 // reads-by-path: packages/engine/src/patches/**
 import { readFileSync } from 'node:fs';
@@ -45,6 +47,27 @@ const formatTwo = (): Record<string, unknown> => {
   return { ...real, format: 2, patch };
 };
 
+/** A library file that carries the operator filters' keys, at this build's format. */
+const acid = (
+  upgradePatchFile(JSON.parse(readFileSync(join(PATCHES, 'acid-saw.json'), 'utf8'))) as {
+    value: Record<string, unknown>;
+  }
+).value;
+
+/** `acid` as format 3 wrote it: `noiseLp` and `noiseHp` where `opLp` and `opHp` stand. */
+const acidFormatThree = (): Record<string, unknown> => {
+  const patch = acid['patch'] as Patch;
+  const ops = patch.ops.map((op) =>
+    Object.fromEntries(
+      Object.entries(op).map(([key, value]) => [
+        key === 'opLp' ? 'noiseLp' : key === 'opHp' ? 'noiseHp' : key,
+        value,
+      ]),
+    ),
+  );
+  return { ...acid, format: 3, patch: { ...patch, ops } };
+};
+
 /** The same file as format 1 wrote it: `userKey` after `userPartials` in every operator, and a headroom record. */
 const formatOne = (): Record<string, unknown> => {
   const two = formatTwo();
@@ -62,9 +85,9 @@ const formatOne = (): Record<string, unknown> => {
 };
 
 describe('patch format upgrades', () => {
-  it('reads format 3: two patch steps, and one file step for 1 → 2', () => {
-    expect(PATCH_FILE_FORMAT).toBe(3);
-    expect(Object.keys(PATCH_MIGRATIONS)).toEqual(['1', '2']);
+  it('reads format 4: three patch steps, and one file step for 1 → 2', () => {
+    expect(PATCH_FILE_FORMAT).toBe(4);
+    expect(Object.keys(PATCH_MIGRATIONS)).toEqual(['1', '2', '3']);
     expect(Object.keys(PATCH_FILE_MIGRATIONS)).toEqual(['1']);
     expect(realPatch.drive).toEqual({ gain: 1.6, shape: 0, bias: 0, tone: 1 });
   });
@@ -78,6 +101,41 @@ describe('patch format upgrades', () => {
     const value = (upgraded as { value: { patch: object } }).value;
     expect(Object.keys(value.patch)).toEqual(Object.keys(realPatch));
     expect(Object.keys((value.patch as Patch).filter)).toEqual(Object.keys(realPatch.filter));
+  });
+
+  it('loads a format-3 file to the same entry, noiseLp and noiseHp renamed opLp and opHp (windsor#590)', () => {
+    const old = acidFormatThree();
+    expect(JSON.stringify(old)).toContain('"noiseLp":0');
+    expect(loadPatchFile('acid-saw', old)).toEqual(loadPatchFile('acid-saw', acid));
+    const upgraded = upgradePatchFile(old);
+    expect(upgraded).toEqual({ value: acid });
+    // Key order kept, so the rewrite through the serialiser moves no byte.
+    const ops = ((upgraded as { value: { patch: Patch } }).value.patch as Patch).ops;
+    expect(ops.map((op) => Object.keys(op))).toEqual(
+      (acid['patch'] as Patch).ops.map((op) => Object.keys(op)),
+    );
+    // Values kept, opTrack left to the normaliser's 0.
+    const op = { wave: 4, noiseLp: 10089.5, noiseHp: 2370.25, level: 0.8 };
+    expect(upgradePatch({ ops: [op, 'junk'], volume: 1 }, 3)).toEqual({
+      value: { ops: [{ wave: 4, opLp: 10089.5, opHp: 2370.25, level: 0.8 }, 'junk'], volume: 1 },
+    });
+    expect(loadPatchFile('acid-saw', old).patch.ops.map((o) => o.opTrack)).toEqual([0, 0, 0, 0]);
+    expect(upgradePatch({ volume: 0.5 }, 3)).toEqual({ value: { volume: 0.5 } });
+  });
+
+  it('zeroes a format-3 non-Noise operator’s hidden noiseLp and noiseHp, which it never heard', () => {
+    const saw = { wave: 1, noiseLp: 3000, noiseHp: 400, level: 0.8 };
+    const noWave = { noiseLp: 3000 }; // the default wave, Sine
+    const noise = { wave: 4, noiseLp: 3000, noiseHp: 400 };
+    expect(upgradePatch({ ops: [saw, noWave, noise] }, 3)).toEqual({
+      value: {
+        ops: [
+          { wave: 1, opLp: 0, opHp: 0, level: 0.8 },
+          { opLp: 0 },
+          { wave: 4, opLp: 3000, opHp: 400 },
+        ],
+      },
+    });
   });
 
   it('keeps a filter-off drive silent: the stage takes unity gain (windsor#300)', () => {
@@ -138,20 +196,20 @@ describe('patch format upgrades', () => {
   });
 
   it('refuses a newer format, naming both', () => {
-    expect(upgradePatchFile({ ...real, format: 4 })).toEqual({
+    expect(upgradePatchFile({ ...real, format: 5 })).toEqual({
       refused: {
         format: 'patch',
-        found: 4,
-        reads: 3,
-        message: 'saved with patch format 4, this build reads 3',
+        found: 5,
+        reads: 4,
+        message: 'saved with patch format 5, this build reads 4',
       },
     });
-    expect(() => loadPatchFile('bass-digital', { ...real, format: 4 })).toThrow(PatchFormatError);
+    expect(() => loadPatchFile('bass-digital', { ...real, format: 5 })).toThrow(PatchFormatError);
   });
 
   it('refuses an older format no upgrade reaches', () => {
     expect(upgradePatchFile({ ...real, format: 0 })).toMatchObject({
-      refused: { found: 0, reads: 3 },
+      refused: { found: 0, reads: 4 },
     });
   });
 
@@ -170,6 +228,6 @@ describe('patch format upgrades', () => {
   it('leaves a format that is not an integer for the validator to report', () => {
     const junk = { ...real, format: 'one' };
     expect(upgradePatchFile(junk)).toEqual({ value: junk });
-    expect(() => loadPatchFile('bass-digital', junk)).toThrow(/format: expected 3, got one/);
+    expect(() => loadPatchFile('bass-digital', junk)).toThrow(/format: expected 4, got one/);
   });
 });

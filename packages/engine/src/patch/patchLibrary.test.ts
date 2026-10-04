@@ -62,7 +62,7 @@ describe('the real library files', () => {
     expect(PRESETS[id]).toBe(PATCH_LIBRARY[id]?.patch);
   });
 
-  it.each(onDisk)('%s is format 3, with no retired key', (id) => {
+  it.each(onDisk)('%s is the current format, with no retired key', (id) => {
     const raw = fileOf(id);
     expect(raw['format']).toBe(PATCH_FILE_FORMAT);
     expect(Object.keys(raw)).toEqual([
@@ -201,12 +201,12 @@ describe('the loader rejects', () => {
   });
 
   it('a format it does not know, as a PatchFormatError naming both formats', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 4 })).toThrow(PatchFormatError);
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 4 })).toThrow(
-      'patches/lead-bell.json: saved with patch format 4, this build reads 3',
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 5 })).toThrow(PatchFormatError);
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 5 })).toThrow(
+      'patches/lead-bell.json: saved with patch format 5, this build reads 4',
     );
-    expect(() => loadPatchFile('lead-bell', { ...real, format: '3' })).toThrow(
-      /format: expected 3, got 3/,
+    expect(() => loadPatchFile('lead-bell', { ...real, format: '4' })).toThrow(
+      /format: expected 4, got 4/,
     );
   });
 });

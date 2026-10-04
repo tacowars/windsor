@@ -6,8 +6,8 @@
  * locals hoisted out of the loop. It is the reference the fixed-index kernel
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
- * allocation free, no per-sample call beyond `voice.noise()`, a Noise
- * operator's colour (windsor#362), the drive and the filter (the Acid
+ * allocation free, no per-sample call beyond `voice.noise()`, an
+ * operator's own filters (windsor#362, windsor#590), the drive and the filter (the Acid
  * mode's ladder runs over the chunk after the loop, `renderVoiceLadder`,
  * windsor#573, so no call sits in the loop for it);
  * a helper per operator would reload the locals through the voice and cost
@@ -24,6 +24,10 @@
  * into `voice.noiseDraw`, and a Noise operator reads its slot where the
  * algorithm's order reaches it. The kernel evaluates D..A and so draws in
  * that order where it stands; the draws are the same in number and order.
+ * An operator's own filters (windsor#590) sit after its wave read, squeezed
+ * or not, and after its feedback tap: `fb1`/`fb2` take the raw wave, `out`
+ * the filtered one, so a filter changes what the operator sends on and never
+ * how its own feedback sounds.
  */
 
 import type { Voice } from './voice';
@@ -103,24 +107,24 @@ function renderVoiceGeneric(
     fbFrom = voice.fbFrom,
     fbRamp = voice.fbRamp;
   const at = CTRL_INTERVAL - voice.ctrlCount;
-  const colours = voice.noiseColour;
+  const filters = voice.opFilter;
   const draws = voice.noiseDraw;
 
   // Width (#55), one bit per operator, hoisted: `ramping` advances its width
   // each sample, `squeezed` reads its wave compressed. Neither is set for a
   // width of exactly 1 that is not ramping, which is every patch before #55.
-  // A Noise operator's colour (windsor#362), one bit per operator, hoisted:
-  // `coloured` passes its noise through its own filters. Never set for an
-  // operator with neither field, or for any other wave. `noisy` marks the
-  // Noise operators, whose draws open each sample (windsor#389).
+  // An operator's own filters (windsor#362, windsor#590), one bit per
+  // operator, hoisted: `filtered` passes its wave through them. Never set
+  // for an operator with neither cutoff. `noisy` marks the Noise operators,
+  // whose draws open each sample (windsor#389).
   let ramping = 0,
     squeezed = 0,
-    coloured = 0,
+    filtered = 0,
     noisy = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
-    if (colours[i].on) coloured |= bit;
+    if (filters[i].on) filtered |= bit;
     const k = kind[i];
     if (k === KIND_NOISE) noisy |= bit;
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
@@ -220,17 +224,16 @@ function renderVoiceGeneric(
           }
         }
       }
-      // A Noise operator's own colour (windsor#362): only a Noise operator
-      // sets its bit, and noise is never squeezed, so this follows its draw.
-      if ((coloured & (1 << i)) !== 0) {
-        const colour = colours[i];
-        colour.point = v;
-        colour.process();
-        v = colour.point;
-      }
-
+      // The feedback taps the raw wave (windsor#590); the operator's own
+      // filters, after it, shape only what it sends on.
       fb2[i] = fb1[i];
       fb1[i] = v * a;
+      if ((filtered & (1 << i)) !== 0) {
+        const filter = filters[i];
+        filter.point = v;
+        filter.process();
+        v = filter.point;
+      }
       out[i] = v;
 
       phase[i] += phaseInc[i];

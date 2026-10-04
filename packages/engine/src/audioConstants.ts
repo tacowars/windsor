@@ -186,13 +186,14 @@ export const FIGURE_SCHEDULE_BARS_MAX = 64;
 export const FIGURE_DRIFT_STEPS_MAX = 4;
 export const FIGURE_TRANSPOSE_MAX = 24;
 /**
- * A document's document-format version: 6 since windsor#300 (the embedded
- * patches are patch format 3, the drive out of the filter). Version 5
- * (windsor#224: Tape's Drive feeds the magnetic core) upgrades to 6 through
+ * A document's document-format version: 7 since windsor#590 (the embedded
+ * patches are patch format 4, the operators' `opLp` and `opHp`). Version 6
+ * (windsor#300: patch format 3, the drive out of the filter) and version 5
+ * (windsor#224: Tape's Drive feeds the magnetic core) upgrade to 7 through
  * `SONG_MIGRATIONS`; versions 2 to 4 are refused (record
  * `2026-09-28-format-versions-refuse-never-destroy`).
  */
-export const ARRANGEMENT_VERSION = 6;
+export const ARRANGEMENT_VERSION = 7;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

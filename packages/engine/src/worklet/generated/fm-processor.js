@@ -31,8 +31,9 @@ var DRIVE_DIODE_LINEAR_BELOW = 1 / 1048576;
 var DRIVE_DIODE_UNITY_FROM = 1048576;
 var DRIVE_TONE_MIN_HZ = 1e3;
 var DRIVE_TONE_OCTAVES = 4.25;
-var NOISE_COLOUR_CEILING = 0.45;
-var NOISE_COLOUR_DAMPING = Math.SQRT2;
+var OP_FILTER_CEILING = 0.45;
+var OP_FILTER_DAMPING = Math.SQRT2;
+var OP_FILTER_TRACK_OCTAVES_MAX = 32;
 var FORMANT_Q_PER_RESONANCE = 8;
 var FORMANT_Q_MAX = 40;
 var FORMANT_MAKEUP = 1.787;
@@ -332,11 +333,14 @@ var OPERATOR_DEFAULTS = {
   phase: 0,
   phaseFree: true,
   /**
-   * A Noise operator's own two-pole lowpass and highpass on its noise, in Hz
-   * (windsor#362, `NOISE_COLOUR_RANGE`); 0 is off. Every other wave ignores them.
+   * The operator's own two-pole lowpass and highpass on its wave, in Hz
+   * (windsor#362, every wave since windsor#590, `OP_FILTER_RANGE`); 0 is off.
+   * `opTrack` moves both cutoffs by that many octaves an octave of the played
+   * note from middle C (`OP_FILTER_TRACK_RANGE`); 0 holds them.
    */
-  noiseLp: 0,
-  noiseHp: 0
+  opLp: 0,
+  opHp: 0,
+  opTrack: 0
 };
 var LEAD_OPERATOR_LEVEL = 1;
 var PATCH_DEFAULTS = {
@@ -406,8 +410,9 @@ var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
 var FEEDBACK_RANGE = { min: -1, max: 1 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
-var NOISE_COLOUR_RANGE = { min: 0, max: 2e4 };
-var NOISE_COLOUR_FLOOR_HZ = 20;
+var OP_FILTER_RANGE = { min: 0, max: 2e4 };
+var OP_FILTER_FLOOR_HZ = 20;
+var OP_FILTER_TRACK_RANGE = { min: -1, max: 2 };
 var MACROS_MAX = 8;
 var MACRO_MAPPINGS_MAX = 8;
 var MACRO_VALUE_RANGE = { min: 0, max: 1 };
@@ -653,9 +658,11 @@ function opDefaults(o, index) {
     phase: num(o.phase, d.phase),
     phaseFree: o.phaseFree !== false,
     // free-running by default (OPERATOR_DEFAULTS.phaseFree)
-    noiseLp: clamp(num(o.noiseLp, d.noiseLp), NOISE_COLOUR_RANGE),
-    // Hz, 0 off; Noise only (windsor#362)
-    noiseHp: clamp(num(o.noiseHp, d.noiseHp), NOISE_COLOUR_RANGE),
+    opLp: clamp(num(o.opLp, d.opLp), OP_FILTER_RANGE),
+    // Hz, 0 off; every wave (windsor#590)
+    opHp: clamp(num(o.opHp, d.opHp), OP_FILTER_RANGE),
+    opTrack: clamp(num(o.opTrack, d.opTrack), OP_FILTER_TRACK_RANGE),
+    // octaves an octave of note
     env: envDefaults(o.env)
   };
 }
@@ -1494,6 +1501,44 @@ var TAPE_PORTABLE_MATH = {
   powersOfTwo: powersOfTwo(POWER_REACH)
 };
 
+// packages/engine/src/worklet/fm/portablePowers.ts
+var LOG_TERM_COUNT = 12;
+var LOG_TERMS = new Float64Array(LOG_TERM_COUNT);
+for (let i = 0; i < LOG_TERM_COUNT; i++) LOG_TERMS[i] = 1 / (2 * i + 1);
+var BITS = new Float64Array(1);
+var WORDS = new Uint32Array(BITS.buffer);
+BITS[0] = 1;
+var HIGH_WORD = WORDS[1] === 1072693248 ? 1 : 0;
+var EXPONENT_BIAS = 1023;
+var MANTISSA_HIGH_MASK = 1048575;
+var EXPONENT_OF_ONE = 1072693248;
+function log2InPlace(values, at) {
+  BITS[0] = values[at];
+  const high = WORDS[HIGH_WORD];
+  let e = (high >>> 20) - EXPONENT_BIAS;
+  WORDS[HIGH_WORD] = high & MANTISSA_HIGH_MASK | EXPONENT_OF_ONE;
+  let m = BITS[0];
+  if (m > Math.SQRT2) {
+    m *= 0.5;
+    e += 1;
+  }
+  const s = (m - 1) / (m + 1);
+  const s2 = s * s;
+  let sum = LOG_TERMS[LOG_TERM_COUNT - 1];
+  for (let i = LOG_TERM_COUNT - 2; i >= 0; i--) sum = sum * s2 + LOG_TERMS[i];
+  values[at] = e + 2 * s * sum * Math.LOG2E;
+}
+function exp2InPlace(values, at) {
+  const table = TAPE_PORTABLE_MATH;
+  const x = values[at];
+  const k = Math.round(x);
+  const r = (x - k) * table.ln2;
+  const terms = table.expm1Terms;
+  let sum = terms[terms.length - 1];
+  for (let i = terms.length - 2; i >= 0; i--) sum = sum * r + terms[i];
+  values[at] = table.powersOfTwo[table.powerReach + k] * (1 + r * sum);
+}
+
 // packages/engine/src/worklet/fm/portableTangent.ts
 function tanInPlace(values, at) {
   const table = TAPE_PORTABLE_MATH;
@@ -1512,8 +1557,10 @@ function tanInPlace(values, at) {
   values[at] = (k & 1) === 0 ? sinR / cosR : -cosR / sinR;
 }
 
-// packages/engine/src/worklet/fm/noiseColour.ts
-var NoiseColour = class {
+// packages/engine/src/worklet/fm/operatorFilter.ts
+var TRACK_CENTRE_NOTE = 60;
+var SEMITONES_PER_OCTAVE = 12;
+var OperatorFilter = class {
   constructor() {
     this.lpHz = this.hpHz = this.lpA1 = this.lpA2 = this.lpA3 = NaN;
     this.hpA1 = this.hpA2 = this.hpA3 = NaN;
@@ -1555,55 +1602,66 @@ var NoiseColour = class {
       const v2 = ic2 + this.hpA2 * ic1 + this.hpA3 * v3;
       this.hp1 = 2 * v1 - ic1;
       this.hp2 = 2 * v2 - ic2;
-      x = x - NOISE_COLOUR_DAMPING * v1 - v2;
+      x = x - OP_FILTER_DAMPING * v1 - v2;
     }
     this.point = x;
   }
 };
 function prewarpInPlace(slot, rate) {
   let fc = slot[0];
-  if (fc < NOISE_COLOUR_FLOOR_HZ) fc = NOISE_COLOUR_FLOOR_HZ;
-  const top = NOISE_COLOUR_CEILING * rate;
+  if (fc < OP_FILTER_FLOOR_HZ) fc = OP_FILTER_FLOOR_HZ;
+  const top = OP_FILTER_CEILING * rate;
   if (fc > top) fc = top;
   slot[0] = Math.PI * fc / rate;
   tanInPlace(slot, 0);
 }
-function bindNoiseColour(voice, i) {
-  const colour = voice.noiseColour[i];
+function trackInPlace(slot, track, note) {
+  let octaves = track * (note - TRACK_CENTRE_NOTE) / SEMITONES_PER_OCTAVE;
+  if (octaves > OP_FILTER_TRACK_OCTAVES_MAX) octaves = OP_FILTER_TRACK_OCTAVES_MAX;
+  if (octaves < -OP_FILTER_TRACK_OCTAVES_MAX) octaves = -OP_FILTER_TRACK_OCTAVES_MAX;
+  slot[0] = octaves;
+  exp2InPlace(slot, 0);
+}
+function bindOperatorFilter(voice, i) {
+  const filter = voice.opFilter[i];
   const op = voice.patch.ops[i];
-  const noise = voice.kind[i] === KIND_NOISE;
-  const lp = noise ? op.noiseLp : 0;
-  const hp = noise ? op.noiseHp : 0;
-  const slot = colour.slot;
-  if (lp !== colour.lpHz) {
-    const was = colour.lpOn;
-    colour.lpHz = lp;
-    colour.lpOn = lp > 0;
-    if (colour.lpOn) {
+  const slot = filter.slot;
+  let lp = op.opLp;
+  let hp = op.opHp;
+  if (op.opTrack !== 0 && (lp > 0 || hp > 0)) {
+    trackInPlace(slot, op.opTrack, voice.note);
+    lp *= slot[0];
+    hp *= slot[0];
+  }
+  if (lp !== filter.lpHz) {
+    const was = filter.lpOn;
+    filter.lpHz = lp;
+    filter.lpOn = lp > 0;
+    if (filter.lpOn) {
       slot[0] = lp;
       prewarpInPlace(slot, voice.sr);
       const g = slot[0];
-      colour.lpA1 = 1 / (1 + g * (g + NOISE_COLOUR_DAMPING));
-      colour.lpA2 = g * colour.lpA1;
-      colour.lpA3 = g * colour.lpA2;
-      if (!was) colour.lp1 = colour.lp2 = 0;
+      filter.lpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
+      filter.lpA2 = g * filter.lpA1;
+      filter.lpA3 = g * filter.lpA2;
+      if (!was) filter.lp1 = filter.lp2 = 0;
     }
   }
-  if (hp !== colour.hpHz) {
-    const was = colour.hpOn;
-    colour.hpHz = hp;
-    colour.hpOn = hp > 0;
-    if (colour.hpOn) {
+  if (hp !== filter.hpHz) {
+    const was = filter.hpOn;
+    filter.hpHz = hp;
+    filter.hpOn = hp > 0;
+    if (filter.hpOn) {
       slot[0] = hp;
       prewarpInPlace(slot, voice.sr);
       const g = slot[0];
-      colour.hpA1 = 1 / (1 + g * (g + NOISE_COLOUR_DAMPING));
-      colour.hpA2 = g * colour.hpA1;
-      colour.hpA3 = g * colour.hpA2;
-      if (!was) colour.hp1 = colour.hp2 = 0;
+      filter.hpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
+      filter.hpA2 = g * filter.hpA1;
+      filter.hpA3 = g * filter.hpA2;
+      if (!was) filter.hp1 = filter.hp2 = 0;
     }
   }
-  colour.on = colour.lpOn || colour.hpOn;
+  filter.on = filter.lpOn || filter.hpOn;
 }
 
 // packages/engine/src/worklet/fm/svf.ts
@@ -1664,44 +1722,6 @@ var Svf = class {
     }
   }
 };
-
-// packages/engine/src/worklet/fm/portablePowers.ts
-var LOG_TERM_COUNT = 12;
-var LOG_TERMS = new Float64Array(LOG_TERM_COUNT);
-for (let i = 0; i < LOG_TERM_COUNT; i++) LOG_TERMS[i] = 1 / (2 * i + 1);
-var BITS = new Float64Array(1);
-var WORDS = new Uint32Array(BITS.buffer);
-BITS[0] = 1;
-var HIGH_WORD = WORDS[1] === 1072693248 ? 1 : 0;
-var EXPONENT_BIAS = 1023;
-var MANTISSA_HIGH_MASK = 1048575;
-var EXPONENT_OF_ONE = 1072693248;
-function log2InPlace(values, at) {
-  BITS[0] = values[at];
-  const high = WORDS[HIGH_WORD];
-  let e = (high >>> 20) - EXPONENT_BIAS;
-  WORDS[HIGH_WORD] = high & MANTISSA_HIGH_MASK | EXPONENT_OF_ONE;
-  let m = BITS[0];
-  if (m > Math.SQRT2) {
-    m *= 0.5;
-    e += 1;
-  }
-  const s = (m - 1) / (m + 1);
-  const s2 = s * s;
-  let sum = LOG_TERMS[LOG_TERM_COUNT - 1];
-  for (let i = LOG_TERM_COUNT - 2; i >= 0; i--) sum = sum * s2 + LOG_TERMS[i];
-  values[at] = e + 2 * s * sum * Math.LOG2E;
-}
-function exp2InPlace(values, at) {
-  const table = TAPE_PORTABLE_MATH;
-  const x = values[at];
-  const k = Math.round(x);
-  const r = (x - k) * table.ln2;
-  const terms = table.expm1Terms;
-  let sum = terms[terms.length - 1];
-  for (let i = terms.length - 2; i >= 0; i--) sum = sum * r + terms[i];
-  values[at] = table.powersOfTwo[table.powerReach + k] * (1 + r * sum);
-}
 
 // packages/engine/src/inserts/tapePortableMath.ts
 function horner(terms, x) {
@@ -2373,7 +2393,7 @@ function bindVoiceConstants(voice, patch) {
     const op = patch.ops[i];
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
-    bindNoiseColour(voice, i);
+    bindOperatorFilter(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
@@ -2513,10 +2533,13 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const at = CTRL_INTERVAL - voice.ctrlCount;
   const edges = voice.edges, carriers = voice.carrierBits;
   const kA = kind[A], kB = kind[B], kC = kind[C], kD = kind[D];
-  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0;
-  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0;
-  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0;
-  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0;
+  const filters = voice.opFilter;
+  const fltA = filters[A], fltB = filters[B], fltC = filters[C], fltD = filters[D];
+  const filtA = fltA.on, filtB = fltB.on, filtC = fltC.on, filtD = fltD.on;
+  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0 || filtA === true;
+  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0 || filtB === true;
+  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0 || filtC === true;
+  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0 || filtD === true;
   const modBA = liveA && liveB && (edges & EDGE_BA) !== 0;
   const modCA = liveA && liveC && (edges & EDGE_CA) !== 0;
   const modDA = liveA && liveD && (edges & EDGE_DA) !== 0;
@@ -2546,9 +2569,6 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const sqB = kB !== KIND_NOISE && kB !== KIND_PULSE && (wB !== 1 || rampB);
   const sqC = kC !== KIND_NOISE && kC !== KIND_PULSE && (wC !== 1 || rampC);
   const sqD = kD !== KIND_NOISE && kD !== KIND_PULSE && (wD !== 1 || rampD);
-  const colours = voice.noiseColour;
-  const ncA = colours[A], ncB = colours[B], ncC = colours[C], ncD = colours[D];
-  const colA = ncA.on, colB = ncB.on, colC = ncC.on, colD = ncD.on;
   for (let s = 0; s < n; s++) {
     if (liveD) {
       const a = aD;
@@ -2577,14 +2597,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
-      } else if (kD === KIND_NOISE) {
-        v = voice.noise();
-        if (colD) {
-          ncD.point = v;
-          ncD.process();
-          v = ncD.point;
-        }
-      } else if (kD === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kD === KIND_NOISE) v = voice.noise();
+      else if (kD === KIND_SAW_D) v = ph * 2 - 1;
       else if (kD === KIND_PULSE) {
         let pd = ph + wD;
         pd -= Math.floor(pd);
@@ -2599,6 +2613,28 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       } else v = ph < 0.5 ? 1 : -1;
       f2D = f1D;
       f1D = Math.fround(v * a);
+      if (filtD) {
+        if (fltD.lpOn) {
+          const ic1 = fltD.lp1;
+          const ic2 = fltD.lp2;
+          const v3 = v - ic2;
+          const v1 = fltD.lpA1 * ic1 + fltD.lpA2 * v3;
+          const v2 = ic2 + fltD.lpA2 * ic1 + fltD.lpA3 * v3;
+          fltD.lp1 = 2 * v1 - ic1;
+          fltD.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltD.hpOn) {
+          const ic1 = fltD.hp1;
+          const ic2 = fltD.hp2;
+          const v3 = v - ic2;
+          const v1 = fltD.hpA1 * ic1 + fltD.hpA2 * v3;
+          const v2 = ic2 + fltD.hpA2 * ic1 + fltD.hpA3 * v3;
+          fltD.hp1 = 2 * v1 - ic1;
+          fltD.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oD = Math.fround(v);
       aD = Math.fround(a + aiD);
       if (brD !== 0 && --brD === 0) {
@@ -2639,14 +2675,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
-      } else if (kC === KIND_NOISE) {
-        v = voice.noise();
-        if (colC) {
-          ncC.point = v;
-          ncC.process();
-          v = ncC.point;
-        }
-      } else if (kC === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kC === KIND_NOISE) v = voice.noise();
+      else if (kC === KIND_SAW_D) v = ph * 2 - 1;
       else if (kC === KIND_PULSE) {
         let pd = ph + wC;
         pd -= Math.floor(pd);
@@ -2661,6 +2691,28 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       } else v = ph < 0.5 ? 1 : -1;
       f2C = f1C;
       f1C = Math.fround(v * a);
+      if (filtC) {
+        if (fltC.lpOn) {
+          const ic1 = fltC.lp1;
+          const ic2 = fltC.lp2;
+          const v3 = v - ic2;
+          const v1 = fltC.lpA1 * ic1 + fltC.lpA2 * v3;
+          const v2 = ic2 + fltC.lpA2 * ic1 + fltC.lpA3 * v3;
+          fltC.lp1 = 2 * v1 - ic1;
+          fltC.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltC.hpOn) {
+          const ic1 = fltC.hp1;
+          const ic2 = fltC.hp2;
+          const v3 = v - ic2;
+          const v1 = fltC.hpA1 * ic1 + fltC.hpA2 * v3;
+          const v2 = ic2 + fltC.hpA2 * ic1 + fltC.hpA3 * v3;
+          fltC.hp1 = 2 * v1 - ic1;
+          fltC.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oC = Math.fround(v);
       aC = Math.fround(a + aiC);
       if (brC !== 0 && --brC === 0) {
@@ -2702,14 +2754,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
-      } else if (kB === KIND_NOISE) {
-        v = voice.noise();
-        if (colB) {
-          ncB.point = v;
-          ncB.process();
-          v = ncB.point;
-        }
-      } else if (kB === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kB === KIND_NOISE) v = voice.noise();
+      else if (kB === KIND_SAW_D) v = ph * 2 - 1;
       else if (kB === KIND_PULSE) {
         let pd = ph + wB;
         pd -= Math.floor(pd);
@@ -2724,6 +2770,28 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       } else v = ph < 0.5 ? 1 : -1;
       f2B = f1B;
       f1B = Math.fround(v * a);
+      if (filtB) {
+        if (fltB.lpOn) {
+          const ic1 = fltB.lp1;
+          const ic2 = fltB.lp2;
+          const v3 = v - ic2;
+          const v1 = fltB.lpA1 * ic1 + fltB.lpA2 * v3;
+          const v2 = ic2 + fltB.lpA2 * ic1 + fltB.lpA3 * v3;
+          fltB.lp1 = 2 * v1 - ic1;
+          fltB.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltB.hpOn) {
+          const ic1 = fltB.hp1;
+          const ic2 = fltB.hp2;
+          const v3 = v - ic2;
+          const v1 = fltB.hpA1 * ic1 + fltB.hpA2 * v3;
+          const v2 = ic2 + fltB.hpA2 * ic1 + fltB.hpA3 * v3;
+          fltB.hp1 = 2 * v1 - ic1;
+          fltB.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oB = Math.fround(v);
       aB = Math.fround(a + aiB);
       if (brB !== 0 && --brB === 0) {
@@ -2766,14 +2834,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
-      } else if (kA === KIND_NOISE) {
-        v = voice.noise();
-        if (colA) {
-          ncA.point = v;
-          ncA.process();
-          v = ncA.point;
-        }
-      } else if (kA === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kA === KIND_NOISE) v = voice.noise();
+      else if (kA === KIND_SAW_D) v = ph * 2 - 1;
       else if (kA === KIND_PULSE) {
         let pd = ph + wA;
         pd -= Math.floor(pd);
@@ -2788,6 +2850,28 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       } else v = ph < 0.5 ? 1 : -1;
       f2A = f1A;
       f1A = Math.fround(v * a);
+      if (filtA) {
+        if (fltA.lpOn) {
+          const ic1 = fltA.lp1;
+          const ic2 = fltA.lp2;
+          const v3 = v - ic2;
+          const v1 = fltA.lpA1 * ic1 + fltA.lpA2 * v3;
+          const v2 = ic2 + fltA.lpA2 * ic1 + fltA.lpA3 * v3;
+          fltA.lp1 = 2 * v1 - ic1;
+          fltA.lp2 = 2 * v2 - ic2;
+          v = v2;
+        }
+        if (fltA.hpOn) {
+          const ic1 = fltA.hp1;
+          const ic2 = fltA.hp2;
+          const v3 = v - ic2;
+          const v1 = fltA.hpA1 * ic1 + fltA.hpA2 * v3;
+          const v2 = ic2 + fltA.hpA2 * ic1 + fltA.hpA3 * v3;
+          fltA.hp1 = 2 * v1 - ic1;
+          fltA.hp2 = 2 * v2 - ic2;
+          v = v - OP_FILTER_DAMPING * v1 - v2;
+        }
+      }
       oA = Math.fround(v);
       aA = Math.fround(a + aiA);
       if (brA !== 0 && --brA === 0) {
@@ -2993,13 +3077,13 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const width = voice.width, widthInc = voice.widthInc;
   const fbAmt = voice.fbTo, fbFrom = voice.fbFrom, fbRamp = voice.fbRamp;
   const at = CTRL_INTERVAL - voice.ctrlCount;
-  const colours = voice.noiseColour;
+  const filters = voice.opFilter;
   const draws = voice.noiseDraw;
-  let ramping = 0, squeezed = 0, coloured = 0, noisy = 0;
+  let ramping = 0, squeezed = 0, filtered = 0, noisy = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
-    if (colours[i].on) coloured |= bit;
+    if (filters[i].on) filtered |= bit;
     const k = kind[i];
     if (k === KIND_NOISE) noisy |= bit;
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
@@ -3084,14 +3168,14 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
           }
         }
       }
-      if ((coloured & 1 << i) !== 0) {
-        const colour = colours[i];
-        colour.point = v;
-        colour.process();
-        v = colour.point;
-      }
       fb2[i] = fb1[i];
       fb1[i] = v * a;
+      if ((filtered & 1 << i) !== 0) {
+        const filter = filters[i];
+        filter.point = v;
+        filter.process();
+        v = filter.point;
+      }
       out[i] = v;
       phase[i] += phaseInc[i];
       if (phase[i] >= 1) phase[i] -= Math.floor(phase[i]);
@@ -3275,7 +3359,7 @@ var Voice = class {
     this.svfB = new Svf();
     this.svfC = new Svf();
     this.ladder = new Ladder();
-    this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
+    this.opFilter = [0, 1, 2, 3].map(() => new OperatorFilter());
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
     this.noiseSeed = randomSeed32(random);
@@ -3376,7 +3460,7 @@ var Voice = class {
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
-      this.noiseColour[i].reset();
+      this.opFilter[i].reset();
     }
     this.bindConstants(patch);
     this.filtEnv.configure(patch.filter.env, this.sr);

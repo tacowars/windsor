@@ -392,14 +392,16 @@ export type { LibraryEntry, PatchFile } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
-// The operator width's bounds and the second LFO's defaults (windsor#54), and a
-// Noise operator's colour range and floor (windsor#362), and a macro's bounds (windsor#559).
+// The operator width's bounds and the second LFO's defaults (windsor#54), an
+// operator's own filters' range, floor and key-tracking range (windsor#362,
+// windsor#590), and a macro's bounds (windsor#559).
 export {
   LFO2_DEFAULTS,
   MACRO_MAPPINGS_MAX,
   MACRO_VALUE_RANGE,
-  NOISE_COLOUR_FLOOR_HZ,
-  NOISE_COLOUR_RANGE,
+  OP_FILTER_FLOOR_HZ,
+  OP_FILTER_RANGE,
+  OP_FILTER_TRACK_RANGE,
   VOWEL_RANGE,
   WIDTH_RANGE,
 } from './worklet/fm/patchDefaults';

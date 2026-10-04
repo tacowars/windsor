@@ -14,7 +14,13 @@
  * and `patchKnobRange.test.ts` holds every knob to its own path's row and
  * pins every range.
  */
-import { NOISE_COLOUR_FLOOR_HZ, NOISE_COLOUR_RANGE, OP_NAMES, makePatch } from '@windsor/engine';
+import {
+  OP_FILTER_FLOOR_HZ,
+  OP_FILTER_RANGE,
+  OP_FILTER_TRACK_RANGE,
+  OP_NAMES,
+  makePatch,
+} from '@windsor/engine';
 import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned, fmtVowel } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
@@ -160,23 +166,29 @@ export const OP_KNOBS: PatchKnobTable = [
 ];
 
 /**
- * A Noise operator's own colour (windsor#362), by sub-field of `ops.<i>`: a
- * two-pole lowpass and highpass on its noise, before its level. The bay shows
- * them on a Noise operator only; every other wave ignores the fields. Zero-end
- * log knobs, as the envelope times' (windsor#324): the bottom of the dial is
- * exact 0, Off, and the log sweep runs from the engine's floor to the top of
- * its range.
+ * An operator's own filters (windsor#362, every wave since windsor#590), by
+ * sub-field of `ops.<i>`: a two-pole lowpass and highpass on its wave, before
+ * its level, and their key tracking. The bay shows them on every wave. LP and
+ * HP are zero-end log knobs, as the envelope times' (windsor#324): the bottom
+ * of the dial is exact 0, Off, and the log sweep runs from the engine's floor
+ * to the top of its range. Key Trk is the voice filter's, signed, over the
+ * engine's range.
  */
-const noiseColourRange: PatchKnobRange = {
-  min: NOISE_COLOUR_RANGE.min,
-  max: NOISE_COLOUR_RANGE.max,
+const opFilterRange: PatchKnobRange = {
+  min: OP_FILTER_RANGE.min,
+  max: OP_FILTER_RANGE.max,
   curve: 'log',
-  logFloor: NOISE_COLOUR_FLOOR_HZ,
+  logFloor: OP_FILTER_FLOOR_HZ,
   fmt: fmtHzOrOff,
 };
-export const NOISE_COLOUR_KNOBS: PatchKnobTable = [
-  { f: 'noiseLp', label: 'Noise LP', o: noiseColourRange },
-  { f: 'noiseHp', label: 'Noise HP', o: noiseColourRange },
+export const OP_FILTER_KNOBS: PatchKnobTable = [
+  { f: 'opLp', label: 'LP', o: opFilterRange },
+  { f: 'opHp', label: 'HP', o: opFilterRange },
+  {
+    f: 'opTrack',
+    label: 'Key Trk',
+    o: { min: OP_FILTER_TRACK_RANGE.min, max: OP_FILTER_TRACK_RANGE.max, fmt: fmtSigned },
+  },
 ];
 
 /**
@@ -247,7 +259,7 @@ export function allPatchKnobs(): PatchKnob[] {
   }
   own([PITCH_ENV_AMOUNT_KNOB]);
   OP_NAMES.forEach((_, i) =>
-    under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS, ...NOISE_COLOUR_KNOBS, OP_PHASE_KNOB]),
+    under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS, ...OP_FILTER_KNOBS, OP_PHASE_KNOB]),
   );
   for (const slot of ENVELOPE_SLOTS) {
     const adv = slot === 'pitchEnv' ? PITCH_ENV_ADV_KNOBS : ENVELOPE_ADV_KNOBS;

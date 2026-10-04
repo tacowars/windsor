@@ -9,8 +9,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
 import {
-  NOISE_COLOUR_FLOOR_HZ,
-  NOISE_COLOUR_RANGE,
+  OP_FILTER_FLOOR_HZ,
+  OP_FILTER_RANGE,
+  OP_FILTER_TRACK_RANGE,
   OP_NAMES,
   VOWEL_RANGE,
   WIDTH_RANGE,
@@ -19,7 +20,7 @@ import {
 import {
   DRIVE_KNOBS,
   FILTER_KNOBS,
-  NOISE_COLOUR_KNOBS,
+  OP_FILTER_KNOBS,
   OP_KNOBS,
   allPatchKnobs,
   lfoKnobs,
@@ -234,34 +235,44 @@ describe('the Drive section (windsor#309)', () => {
   });
 });
 
-describe('the noise colour knobs (windsor#362)', () => {
-  it('are Noise LP and Noise HP, on every operator, after Vel', () => {
-    expect(NOISE_COLOUR_KNOBS.map((k) => [k.f, k.label])).toEqual([
-      ['noiseLp', 'Noise LP'],
-      ['noiseHp', 'Noise HP'],
+describe("an operator's own filter knobs (windsor#590)", () => {
+  it('are LP, HP and Key Trk, on every operator, after Vel', () => {
+    expect(OP_FILTER_KNOBS.map((k) => [k.f, k.label])).toEqual([
+      ['opLp', 'LP'],
+      ['opHp', 'HP'],
+      ['opTrack', 'Key Trk'],
     ]);
     const paths = allPatchKnobs().map((k) => k.path);
     OP_NAMES.forEach((_, i) => {
-      const at = paths.indexOf(`ops.${i}.noiseLp`);
-      expect(paths[at - 1], `ops.${i}`).toBe(`ops.${i}.velSens`);
-      expect(paths[at + 1], `ops.${i}`).toBe(`ops.${i}.noiseHp`);
+      const at = paths.indexOf(`ops.${i}.opLp`);
+      expect(paths.slice(at - 1, at + 3), `ops.${i}`).toEqual(
+        ['velSens', 'opLp', 'opHp', 'opTrack'].map((f) => `ops.${i}.${f}`),
+      );
     });
   });
 
-  it("are zero-end log knobs over the engine's range, starting Off", () => {
-    for (const k of NOISE_COLOUR_KNOBS) {
+  it("are zero-end log cutoffs over the engine's range, starting Off, and the voice filter's Key Trk", () => {
+    for (const k of OP_FILTER_KNOBS.slice(0, 2)) {
       expect(k.o).toMatchObject({
         min: 0,
-        max: NOISE_COLOUR_RANGE.max,
+        max: OP_FILTER_RANGE.max,
         curve: 'log',
-        logFloor: NOISE_COLOUR_FLOOR_HZ,
+        logFloor: OP_FILTER_FLOOR_HZ,
       });
       expect(patchKnobOpts(k, `ops.2.${k.f}`).def).toBe(0);
     }
+    const track = OP_FILTER_KNOBS[2]!;
+    const keyTrack = FILTER_KNOBS.find((k) => k.f === 'filter.keyTrack')!;
+    expect(track.o).toEqual({ ...keyTrack.o });
+    expect([track.o.min, track.o.max]).toEqual([
+      OP_FILTER_TRACK_RANGE.min,
+      OP_FILTER_TRACK_RANGE.max,
+    ]);
+    expect(patchKnobOpts(track, 'ops.2.opTrack').def).toBe(0);
   });
 
   it('read 0 as Off and a cutoff in Hz or kHz', () => {
-    const fmt = NOISE_COLOUR_KNOBS[0]!.o.fmt!;
+    const fmt = OP_FILTER_KNOBS[0]!.o.fmt!;
     expect([fmt(0), fmt(20), fmt(950), fmt(10089.03)]).toEqual(['Off', '20', '950', '10.09k']);
   });
 });

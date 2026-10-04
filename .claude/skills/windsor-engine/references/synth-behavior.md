@@ -88,7 +88,7 @@ establish the contour's direction. Noise is primarily shaped by amplitude
 and filtering; do not describe a noise filter sweep as a pitched oscillator
 sweep. Filter envelope/LFO amounts are in octaves, not semitones.
 
-## Drive, filter and noise colour
+## Drive, filter and operator filters
 
 The voice's signal runs carriers → **drive** → filter (if on) → steal fade
 (windsor#300, record `2026-10-01-voice-drive-stage`; `worklet/fm/voiceDrive.ts`).
@@ -119,16 +119,26 @@ level whatever the resonance, so resonance narrows the vowel rather than
 making it louder. Key track 0 keeps the peaks where the table puts them on
 every note.
 
-A **Noise** operator has its own colour (windsor#362, record
-`2026-10-02-operator-noise-colour`; `worklet/fm/noiseColour.ts`): `noiseLp`
-and `noiseHp`, in Hz, a two-pole Butterworth lowpass then highpass on that
-operator's noise, before its level and envelope, with no resonance; 0 is
-off. A cutoff that is on sounds between 20 Hz and 0.45 of the sample rate.
-Every other wave ignores the fields. They band a snare's or a hat's noise
-per operator, ahead of the voice filter, which stays free for the whole
-voice; windsor#361 measured that a resonant section fitted the snares worse,
-so there is no Q. They are tuned when the voice binds the patch, so a live
-edit is heard from the next block.
+Every operator has its own **LP** and **HP** (windsor#362, every wave
+since windsor#590, record `2026-10-04-operator-filters-on-every-wave`;
+`worklet/fm/operatorFilter.ts`): `opLp` and `opHp`, in Hz, a two-pole
+Butterworth lowpass then highpass on that operator's wave, before its level
+and envelope, with no resonance; 0 is off. A cutoff that is on sounds
+between 20 Hz and 0.45 of the sample rate. `opTrack` (**Key Trk**, -1 to 2)
+moves both cutoffs as the voice filter's key tracking moves its cutoff:
+`cutoff × 2^(opTrack × (note − 60) / 12)`, from the played note, a Fixed
+operator's too, so 1 keeps a tone control in step with the pitch and 0
+holds a fixed band. They band a snare's or a hat's noise, give a Square or
+Pulse the 808 cowbell, cymbal and hat band, or round a Saw per oscillator,
+ahead of the voice filter, which stays free for the whole voice;
+windsor#361 measured that a resonant section fitted the snares worse, so
+there is no Q. The operator's feedback reads its wave before the filter,
+so a saw with feedback sounds the same with its filter on, and only what
+it sends on (to the operators it modulates and the carrier mix) is
+filtered. They are tuned when the voice binds the patch or a slide's new
+note, so a live edit is heard from the next block. A section costs CPU
+while it is on: about 11 ns a sample on a lone Saw carrier in Node on an
+M1, against 20.5 ns for the voice (the record has the measurements).
 
 ## Macros
 

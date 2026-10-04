@@ -45,26 +45,28 @@ describe('patch normalisation', () => {
     expect(normalisePatch(junk).ops[0].width).toBe(1);
   });
 
-  it("fills a Noise operator's colour with 0 (off), keeps a cutoff and clamps it into NOISE_COLOUR_RANGE (windsor#362)", () => {
+  it("fills an operator's own filters with 0 (off, untracked), keeps a value and clamps it into OP_FILTER_RANGE and OP_FILTER_TRACK_RANGE (windsor#590)", () => {
     const empty = normalisePatch({});
-    expect(empty.ops.map((op) => [op.noiseLp, op.noiseHp])).toEqual([
-      [0, 0],
-      [0, 0],
-      [0, 0],
-      [0, 0],
+    expect(empty.ops.map((op) => [op.opLp, op.opHp, op.opTrack])).toEqual([
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
     ]);
     const p = normalisePatch({
       ops: [
-        { noiseLp: 10089.5, noiseHp: 2370.25 },
-        { noiseLp: 50000, noiseHp: -3 },
+        { opLp: 10089.5, opHp: 2370.25, opTrack: 0.75 },
+        { opLp: 50000, opHp: -3, opTrack: 5 },
+        { opTrack: -4 },
       ],
     });
-    expect([p.ops[0].noiseLp, p.ops[0].noiseHp]).toEqual([10089.5, 2370.25]);
-    expect([p.ops[1].noiseLp, p.ops[1].noiseHp]).toEqual([20000, 0]);
-    const junk = { ops: [{ noiseLp: 'bright' }] } as unknown as Parameters<
+    expect([p.ops[0].opLp, p.ops[0].opHp, p.ops[0].opTrack]).toEqual([10089.5, 2370.25, 0.75]);
+    expect([p.ops[1].opLp, p.ops[1].opHp, p.ops[1].opTrack]).toEqual([20000, 0, 2]);
+    expect(p.ops[2].opTrack).toBe(-1);
+    const junk = { ops: [{ opLp: 'bright', opTrack: 'up' }] } as unknown as Parameters<
       typeof normalisePatch
     >[0];
-    expect(normalisePatch(junk).ops[0].noiseLp).toBe(0);
+    expect([normalisePatch(junk).ops[0].opLp, normalisePatch(junk).ops[0].opTrack]).toEqual([0, 0]);
   });
 
   it('fills the LFO fields and an inert LFO 2 that ignores the wheel (windsor#54)', () => {

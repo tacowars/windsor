@@ -2,7 +2,7 @@
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude ramps and their knots (windsor#301), width ramps, six
- * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
+ * envelopes, two LFOs, each operator's own filters (windsor#362, windsor#590) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), three filter stages (the third for the Formant
  * mode's three peaks, windsor#331), the Acid mode's ladder (windsor#573),
@@ -28,7 +28,7 @@ import { Envelope, ST_IDLE } from './envelope';
 import { ENVELOPE_BREAKS_MAX } from './fmConstants';
 import { Ladder } from './ladder';
 import { Lfo, secondLfoSeed } from './lfo';
-import { NoiseColour } from './noiseColour';
+import { OperatorFilter } from './operatorFilter';
 import { randomSeed32 } from './prng';
 import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
@@ -79,8 +79,8 @@ class Voice {
   svfC: Svf;
   /** The Acid mode's diode ladder (windsor#573), run in place of the sections in that mode. */
   ladder: Ladder;
-  /** Each operator's noise colour (windsor#362): run only for a Noise operator with a field set. */
-  noiseColour: NoiseColour[];
+  /** Each operator's own filters (windsor#362, windsor#590): run only for an operator with a cutoff set. */
+  opFilter: OperatorFilter[];
   /** Each Noise operator's draw this sample in the generic loop, drawn D..A at its top (windsor#389). */
   noiseDraw: Float64Array;
   drive: VoiceDrive;
@@ -202,7 +202,7 @@ class Voice {
     this.svfC = new Svf();
     // Acid (windsor#573): the diode ladder.
     this.ladder = new Ladder();
-    this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
+    this.opFilter = [0, 1, 2, 3].map(() => new OperatorFilter());
     // The generic loop's noise draws (windsor#389): a double store and load
     // are exact, so a Noise operator reads the value `noise()` returned.
     this.noiseDraw = new Float64Array(4);
@@ -341,7 +341,7 @@ class Voice {
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
-      this.noiseColour[i].reset();
+      this.opFilter[i].reset();
     }
     this.bindConstants(patch);
 

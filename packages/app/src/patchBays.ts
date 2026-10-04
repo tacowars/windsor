@@ -20,7 +20,7 @@ import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import type { KnobElement } from './knob';
 import {
   FIXED_HZ_KNOB,
-  NOISE_COLOUR_KNOBS,
+  OP_FILTER_KNOBS,
   OP_KNOBS,
   OP_PHASE_KNOB,
   patchKnobOpts,
@@ -42,11 +42,6 @@ export function ensurePulseWidth(patch: Patch, i: number, startWidth = PULSE_STA
   if (target?.wave === WAVE.PULSE && target.width >= WIDTH_RANGE.max) {
     target.width = startWidth;
   }
-}
-
-/** Whether operator `i` shows its noise colour knobs (windsor#362): only a Noise operator hears them. */
-export function showsNoiseColour(patch: Patch, i: number): boolean {
-  return patch.ops[i]?.wave === WAVE.NOISE;
 }
 
 function op(editor: PatchEditor, i: number): { level: number; wave: number; fixed: boolean } {
@@ -155,40 +150,18 @@ function startControls(editor: PatchEditor, i: number, color: string): HTMLEleme
 }
 
 /**
- * A Noise operator's colour knobs (windsor#362), Noise LP and Noise HP: built
- * for every operator, shown only while its wave is Noise. `sync` is what a
- * wave switch calls; it also marks the row, so every row's main group keeps
- * the two columns and the knob columns stay lined up across A–D.
- */
-function noiseColourKnobs(
-  editor: PatchEditor,
-  i: number,
-  color: string,
-): { nodes: HTMLElement[]; sync: (row: HTMLElement) => void } {
-  const nodes = NOISE_COLOUR_KNOBS.map((k) => {
-    const path = `ops.${i}.${k.f}`;
-    return pathKnob(editor, path, k.label, { ...patchKnobOpts(k, path), color });
-  });
-  const sync = (row: HTMLElement): void => {
-    const shown = showsNoiseColour(editor.patch, i);
-    for (const node of nodes) node.style.display = shown ? '' : 'none';
-    row.classList.toggle('op-noise', shown);
-  };
-  return { nodes, sync };
-}
-
-/**
  * The main knobs: the pitch controls first — Coarse, Fine and their readout,
  * or the Fixed knob in the same width, whichever the operator's Pitch toggle
- * selects — then the rest of `OP_KNOBS`, then a Noise operator's colour.
- * `syncPitch` is what the toggle calls to swap them.
+ * selects — then the rest of `OP_KNOBS`, then the operator's own filters,
+ * LP, HP and Key Trk (windsor#590), on every wave. `syncPitch` is what the
+ * toggle calls to swap them.
  */
 function mainKnobs(
   editor: PatchEditor,
   i: number,
   color: string,
   syncActive: () => void,
-): { root: HTMLElement; syncPitch: () => void; syncKnobs: (row: HTMLElement) => void } {
+): { root: HTMLElement; syncPitch: () => void; syncKnobs: () => void } {
   const group = el('div', 'op-group op-main');
   const ratioNodes = ratioControls(editor, i, color);
   for (const node of ratioNodes) group.appendChild(node);
@@ -199,22 +172,18 @@ function mainKnobs(
   });
   fixedNode.classList.add('op-fixed');
   group.appendChild(fixedNode);
-  for (const k of OP_KNOBS) {
+  for (const k of [...OP_KNOBS, ...OP_FILTER_KNOBS]) {
     const path = `ops.${i}.${k.f}`;
     const fade = k.f === 'level' ? { onChange: syncActive } : {};
     group.appendChild(
       pathKnob(editor, path, k.label, { ...patchKnobOpts(k, path), ...fade, color }),
     );
   }
-  const colour = noiseColourKnobs(editor, i, color);
-  for (const node of colour.nodes) group.appendChild(node);
   const syncPitch = (): void => showPitchControls(op(editor, i).fixed, ratioNodes, fixedNode);
   syncPitch();
-  // A wave switch can seed Width (`ensurePulseWidth`), so the group re-reads
-  // the patch, and shows or hides the noise colour.
-  const syncKnobs = (row: HTMLElement): void => {
+  // A wave switch can seed Width (`ensurePulseWidth`), so the group re-reads the patch.
+  const syncKnobs = (): void => {
     for (const knob of group.querySelectorAll<KnobElement>('.knob')) knob.refresh();
-    colour.sync(row);
   };
   return { root: group, syncPitch, syncKnobs };
 }
@@ -280,7 +249,6 @@ function operatorRow(editor: PatchEditor, i: number, isCar: boolean): HTMLElemen
   const harmonics = harmonicEditor(editor, i, color);
   harmonics.root.classList.add('op-harmonics');
   const knobs = mainKnobs(editor, i, color, syncActive);
-  knobs.syncKnobs(row);
   const { canvas, redraw } = envelopeCanvas(editor, i, color);
   const adsr = el('div', 'op-group');
   adsr.appendChild(envKnobs(editor, `ops.${i}.env`, color, redraw));
@@ -300,7 +268,7 @@ function operatorRow(editor: PatchEditor, i: number, isCar: boolean): HTMLElemen
   };
   const onWave = (): void => {
     harmonics.sync();
-    knobs.syncKnobs(row);
+    knobs.syncKnobs();
   };
   const id = el('div', 'op-id');
   id.append(identityHead(i, isCar, onAdv), waveAndPitchLine(editor, i, onWave, knobs.syncPitch));

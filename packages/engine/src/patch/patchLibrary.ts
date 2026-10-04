@@ -6,7 +6,7 @@
  *
  * A file is
  *
- *     { "format": 3, "name", "category", "tags": [], "description",
+ *     { "format": 4, "name", "category", "tags": [], "description",
  *       "patch": { …normalised Patch… } }
  *
  * - `format` is the file format (`patchMigrations.ts`): a file with none is

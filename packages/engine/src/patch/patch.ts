@@ -129,13 +129,20 @@ export interface Operator {
   phase: number;
   phaseFree: boolean;
   /**
-   * A Noise operator's own colour (windsor#362, record
-   * `2026-10-02-operator-noise-colour`): a two-pole Butterworth lowpass and
-   * highpass on its noise, before its level and envelope, in Hz; 0 is off,
-   * and `NOISE_COLOUR_RANGE` bounds both. Every other wave ignores them.
+   * The operator's own filters (windsor#362; every wave since windsor#590,
+   * record `2026-10-04-operator-filters-on-every-wave`): a two-pole
+   * Butterworth lowpass and highpass on its wave, before its level and
+   * envelope and after its feedback tap, in Hz; 0 is off, and
+   * `OP_FILTER_RANGE` bounds both.
    */
-  noiseLp: number;
-  noiseHp: number;
+  opLp: number;
+  opHp: number;
+  /**
+   * Both cutoffs' key tracking: octaves an octave of the played note from
+   * middle C, as the voice filter's `keyTrack` (`OP_FILTER_TRACK_RANGE`); 0
+   * holds them where they are set.
+   */
+  opTrack: number;
   env: Envelope;
 }
 

@@ -2,9 +2,10 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. One upgrade ships, 5 → 6
+ * patch of an unreadable format is refused whole. Two upgrades ship, 5 → 6
  * (windsor#300: the snapshot's patches to patch format 3, pinned by
- * `songDriveUpgrade.test.ts`); versions 2 (#705), 3 (record
+ * `songDriveUpgrade.test.ts`) and 6 → 7 (windsor#590: to patch format 4,
+ * the operators' `noiseLp` and `noiseHp` renamed); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused.
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
@@ -45,8 +46,8 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 describe('upgradeSong', () => {
-  it('ships one upgrade, 5 → 6: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5']);
+  it('ships two upgrades, 5 → 6 and 6 → 7: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
@@ -170,6 +171,38 @@ describe("a song's patch snapshot", () => {
     expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
     expect(result.refused).toEqual(refused);
     expect(result.corrections[0]).toBe(`patches.kick: ${refused?.message}`);
+  });
+
+  it("renames a version-6 song's operator filters, a Noise operator's values kept, any other wave's 0 (windsor#590)", () => {
+    const snare = {
+      ops: [
+        { wave: 1, noiseLp: 5000 },
+        {},
+        { wave: 4, level: 0.8, noiseLp: 10089.5, noiseHp: 2370.25 },
+        {},
+      ],
+    };
+    const declared = { format: 3, ops: [{ noiseHp: 900 }, {}, {}, {}] };
+    const raw: Doc = { ...withPatch(snare), version: 6 };
+    (raw['patches'] as Record<string, Doc>)['hat'] = declared;
+    const { document, refused } = upgradeSong(raw);
+    expect(refused).toBeUndefined();
+    const patches = (document as { patches: Record<string, Doc> }).patches;
+    expect(patches['kick']).toEqual({
+      ops: [{ wave: 1, opLp: 0 }, {}, { wave: 4, level: 0.8, opLp: 10089.5, opHp: 2370.25 }, {}],
+    });
+    // A patch that declares its own format is upgraded from that format
+    // instead; its Sine (default wave) operator never heard the hidden 900.
+    expect(patches['hat']).toEqual({ ops: [{ opHp: 0 }, {}, {}, {}] });
+    const result = makeArrangement(raw);
+    expect(result.corrections).toEqual([]);
+    expect(result.document.version).toBe(ARRANGEMENT_VERSION);
+    expect(result.document.patches?.['kick']?.ops[2]).toMatchObject({
+      opLp: 10089.5,
+      opHp: 2370.25,
+      opTrack: 0,
+    });
+    expect(result.document.patches?.['kick']?.ops[2]).not.toHaveProperty('noiseLp');
   });
 
   it('upgrades an embedded patch through the patch table', () => {

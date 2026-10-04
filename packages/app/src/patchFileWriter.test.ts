@@ -24,7 +24,7 @@ describe('buildPatchFile', () => {
     expect(text).toBe(
       JSON.stringify(
         {
-          format: 3,
+          format: 4,
           name: entry.patch.name,
           category: entry.category,
           tags: [...entry.tags],

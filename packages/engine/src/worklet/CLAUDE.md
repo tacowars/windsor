@@ -217,8 +217,8 @@ build output. The map of `fm/` (#644):
 | `ladderTables.ts` | `LADDER_SATURATOR` (windsor#573): tanh as the [7/6] Lambert rational held at ±1 past its limit, within 1e-4 of `Math.tanh`; and the 2× candidate's decimator taps |
 | `voiceDrive.ts` | `VoiceDrive` and `updateVoiceDrive` (windsor#300): the voice's drive stage between the carriers and the filter, heard with the filter on or off. Its state, its five curves by `DRIVE_SHAPE` id (`soft`, the filter's former soft clip to the bit, then Advanced Drive's `hard`, `diode`, `tube` and `fold` in portable arithmetic) and its control-rate half (the bypass, which is the patch's `drive.on` switch or unity gain with no bias, windsor#309; the bias's offset; the tone pole's coefficient). Both render loops write the per-sample stage out, `soft` and the tone inline. |
 | `portablePowers.ts` | `log2InPlace` and `exp2InPlace` (windsor#300): base-2 log and power in place, from `+ − × ÷` and a double's bits, so the diode curve and the tone's cutoff give the same bits on arm64 and x64 |
-| `noiseColour.ts` | `NoiseColour` and `bindNoiseColour` (windsor#362): a Noise operator's own two-pole Butterworth lowpass and highpass on its noise, from its `noiseLp` and `noiseHp` (0 off), before its level. Four to a voice; `bindVoiceConstants` tunes them when the voice binds a patch, the only time the fields change, retuning a section only when its field did. Both render loops call `process` on a Noise operator's sample, through `point`, only while one is on, so an operator without the fields does no per-sample work |
-| `portableTangent.ts` | `tanInPlace` (windsor#362): the tangent in place over `tapePortableMathTables.ts`, for the noise colour's prewarp, the same bits on arm64 and x64 |
+| `operatorFilter.ts` | `OperatorFilter` and `bindOperatorFilter` (windsor#362; every wave since windsor#590, record `2026-10-04-operator-filters-on-every-wave`): an operator's own two-pole Butterworth lowpass and highpass on its wave, from its `opLp` and `opHp` (0 off), each moved by `opTrack` octaves an octave of the played note from middle C (`2^(opTrack (note − 60) / 12)` through `exp2InPlace`), held to 20 Hz..0.45 fs. Four to a voice; `bindVoiceConstants` tunes them when the voice binds a patch or its note (a note-on, a rebind, a slide's `retarget`), retuning a section only when its effective cutoff changed. The filter sits after the operator's feedback tap: `fb1`/`fb2` take the raw wave, `out` the filtered one. The generic loop calls `process` through `point` while one is on; the kernel writes `process` out per operator, its operations in its order, and never skips an operator whose filter is on |
+| `portableTangent.ts` | `tanInPlace` (windsor#362): the tangent in place over `tapePortableMathTables.ts`, for the operator filters' prewarp, the same bits on arm64 and x64 |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
 | `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
@@ -285,7 +285,10 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    the render, run every quantum, is optimised again within a few hundred.
    The per-sample calls the kernel and the generic loop keep (`Svf.process`
    on `svfA` and `svfB`, `VoiceDrive.curve` for every drive shape but
-   `soft`, `noise`, `NoiseColour.process`) are inlined first by frequency.
+   `soft`, `noise`, and in the generic loop `OperatorFilter.process`) are
+   inlined first by frequency. The kernel writes `OperatorFilter.process`
+   out for each operator (windsor#590): four calls outran its inlining
+   budget, and an operator past the first then paid a real call.
    The Formant mode's three sections (`svfA`, `svfB`, `svfC`, windsor#331)
    are `Svf.process`'s bandpass written out in both loops, not called:
    three more inlined calls spent the kernel's inlining budget, and with a

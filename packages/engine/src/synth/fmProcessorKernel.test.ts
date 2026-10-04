@@ -118,7 +118,7 @@ describe('which voices take the kernel', () => {
     ['two noise operators, a stack and two sines', { algorithm: 6, ops: [{}, {}, NOISE, NOISE] }],
     [
       'three noise operators, a split branch, one coloured',
-      { algorithm: 9, ops: [NOISE, {}, { ...NOISE, noiseHp: 2000 }, NOISE] },
+      { algorithm: 9, ops: [NOISE, {}, { ...NOISE, opHp: 2000 }, NOISE] },
     ],
     [
       'a noise operator at level 0 beside a sounding one, one to three',
@@ -363,7 +363,7 @@ describe('noise drawn D..A in both loops (windsor#389)', () => {
     ['all four Noise, two stacks', { algorithm: 4, ops: allFour }],
     [
       'all four Noise, additive, two coloured',
-      { algorithm: 7, ops: withOp(withOp(allFour, 0, { noiseLp: 3000 }), 2, { noiseHp: 900 }) },
+      { algorithm: 7, ops: withOp(withOp(allFour, 0, { opLp: 3000 }), 2, { opHp: 900 }) },
     ],
     [
       'a Noise operator at level 0 between two, additive',

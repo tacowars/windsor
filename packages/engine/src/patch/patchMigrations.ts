@@ -17,15 +17,19 @@
 import type { FormatRefusal, MigrationTable } from '../song/formatUpgrade';
 import { declaredVersion, formatRefusal, runUpgrades } from '../song/formatUpgrade';
 import { DRIVE_SOFT, FILT_OFF } from '../worklet/fm/modeIds';
+import { OPERATOR_DEFAULTS } from '../worklet/fm/patchDefaults';
+import { WAVE } from '../worklet/fm/waveIds';
 
 /**
  * The patch file format this build reads and writes (#561). 2 retired the
  * headroom record and the operators' `userKey` (windsor#60, record
  * `2026-09-28-retire-the-headroom-record`); 3 moved the filter's drive into
  * the voice's own drive stage (windsor#300, record
- * `2026-10-01-voice-drive-stage`).
+ * `2026-10-01-voice-drive-stage`); 4 renamed a Noise operator's `noiseLp`
+ * and `noiseHp` to `opLp` and `opHp`, heard on every wave (windsor#590,
+ * record `2026-10-04-operator-filters-on-every-wave`).
  */
-export const PATCH_FILE_FORMAT = 3;
+export const PATCH_FILE_FORMAT = 4;
 
 /** The format of a file that declares none: every file written before the check. */
 export const PATCH_FORMAT_ABSENT = 1;
@@ -80,9 +84,50 @@ function moveDriveOutOfFilter(patch: RawPatch): RawPatch {
   };
 }
 
+/** `record` with `from` renamed `to`, its value and place kept; one without `from` is returned as it is. */
+function renameKey(
+  record: Record<string, unknown>,
+  from: string,
+  to: string,
+): Record<string, unknown> {
+  if (!Object.hasOwn(record, from)) return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) out[key === from ? to : key] = value;
+  return out;
+}
+
+/** The operator's wave as the normaliser reads it (`num(o.wave, OPERATOR_DEFAULTS.wave) | 0`). */
+function operatorWave(op: Record<string, unknown>): number {
+  const wave = op['wave'];
+  return typeof wave === 'number' && Number.isFinite(wave) ? wave | 0 : OPERATOR_DEFAULTS.wave;
+}
+
+/**
+ * Format 3 → 4 (windsor#590): every operator's `noiseLp` and `noiseHp`
+ * become `opLp` and `opHp`, in place. Format 3 heard them on a Noise
+ * operator only, and the old editor kept a filtered Noise operator's values
+ * when its wave changed, so a Noise operator keeps its values and any other
+ * wave's are written 0: the patch sounds as it did. `opTrack` is left to the
+ * normaliser's 0. A partial patch is upgraded as far as it goes, as
+ * `retireUserKey`'s is: a key it lacks stays absent, at the normaliser's 0.
+ */
+function renameOperatorFilters(patch: RawPatch): RawPatch {
+  if (!Array.isArray(patch['ops'])) return patch;
+  const ops: unknown[] = patch['ops'];
+  const renamed = (op: Record<string, unknown>): Record<string, unknown> => {
+    const out = renameKey(renameKey(op, 'noiseLp', 'opLp'), 'noiseHp', 'opHp');
+    if (operatorWave(op) === WAVE.NOISE) return out;
+    if (Object.hasOwn(op, 'noiseLp')) out['opLp'] = 0;
+    if (Object.hasOwn(op, 'noiseHp')) out['opHp'] = 0;
+    return out;
+  };
+  return { ...patch, ops: ops.map((op) => (isRecord(op) ? renamed(op) : op)) };
+}
+
 export const PATCH_MIGRATIONS: MigrationTable<RawPatch> = {
   1: retireUserKey,
   2: moveDriveOutOfFilter,
+  3: renameOperatorFilters,
 };
 
 /**

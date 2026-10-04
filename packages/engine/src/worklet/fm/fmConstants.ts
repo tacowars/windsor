@@ -152,15 +152,21 @@ const DRIVE_DIODE_UNITY_FROM = 1048576; // 2^20
 const DRIVE_TONE_MIN_HZ = 1000;
 const DRIVE_TONE_OCTAVES = 4.25;
 /*
- * A Noise operator's colour (windsor#362): its two filters are two-pole TPT
- * state-variable sections, Butterworth (damping k = sqrt 2, Q 0.707), tuned by
- * g = tan(pi * fc / sampleRate) in portable arithmetic. A cutoff that is on is
- * held between the patch's floor (`NOISE_COLOUR_FLOOR_HZ`) and this fraction of
- * the sample rate, where tan stays finite and the prewarp well inside Nyquist
- * (the windsor#361 prototype's ceiling).
+ * An operator's own filters (windsor#362, every wave since windsor#590): its
+ * lowpass and highpass are two-pole TPT state-variable sections, Butterworth
+ * (damping k = sqrt 2, Q 0.707), tuned by g = tan(pi * fc / sampleRate) in
+ * portable arithmetic. A cutoff that is on is held between the patch's floor
+ * (`OP_FILTER_FLOOR_HZ`) and this fraction of the sample rate, where tan stays
+ * finite and the prewarp well inside Nyquist (the windsor#361 prototype's
+ * ceiling). Key tracking moves a cutoff by `opTrack` octaves an octave of
+ * note; its exponent is held to OP_FILTER_TRACK_OCTAVES_MAX either way, which
+ * changes no cutoff (20 kHz down 32 octaves is far under the floor, 20 Hz up
+ * 32 far over the ceiling at any rate) and keeps the portable power inside
+ * its table.
  */
-const NOISE_COLOUR_CEILING = 0.45;
-const NOISE_COLOUR_DAMPING = Math.SQRT2;
+const OP_FILTER_CEILING = 0.45;
+const OP_FILTER_DAMPING = Math.SQRT2;
+const OP_FILTER_TRACK_OCTAVES_MAX = 32;
 /*
  * The Formant filter mode (windsor#331, `voiceFormant.ts`): three bandpass
  * peaks share one Q, FORMANT_Q_PER_RESONANCE per unit of the patch's
@@ -276,8 +282,9 @@ export {
   DRIVE_DIODE_UNITY_FROM,
   DRIVE_TONE_MIN_HZ,
   DRIVE_TONE_OCTAVES,
-  NOISE_COLOUR_CEILING,
-  NOISE_COLOUR_DAMPING,
+  OP_FILTER_CEILING,
+  OP_FILTER_DAMPING,
+  OP_FILTER_TRACK_OCTAVES_MAX,
   FORMANT_Q_PER_RESONANCE,
   FORMANT_Q_MAX,
   FORMANT_MAKEUP,

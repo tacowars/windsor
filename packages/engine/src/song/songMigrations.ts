@@ -23,14 +23,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Version 5 → 6 (windsor#300, record `2026-10-01-voice-drive-stage`): the
- * snapshot's patches move from patch format 2 to 3 through the patch table's
- * own step, so the song plays as it did. A patch that declares its own
- * `format` is left for `upgradeSnapshot`, which reads that format instead.
+ * The snapshot's patches through the patch table's step from format `from`,
+ * so the song plays as it did. A patch that declares its own `format` is
+ * left for `upgradeSnapshot`, which reads that format instead.
  */
-function snapshotToPatchFormatThree(doc: RawDocument): RawDocument {
+function snapshotPatchStep(doc: RawDocument, from: number): RawDocument {
   const patches = doc['patches'];
-  const step = PATCH_MIGRATIONS[2];
+  const step = PATCH_MIGRATIONS[from];
   if (!isRecord(patches) || !step) return doc;
   const out: Record<string, unknown> = {};
   for (const [id, entry] of Object.entries(patches)) {
@@ -39,13 +38,31 @@ function snapshotToPatchFormatThree(doc: RawDocument): RawDocument {
   return { ...doc, patches: out };
 }
 
+/** The patch format each song version's snapshot holds, for the versions an upgrade leaves. */
+const SNAPSHOT_PATCH_FORMAT = { versionFive: 2, versionSix: 3 };
+
+/** Version 5 → 6 (windsor#300, record `2026-10-01-voice-drive-stage`): patch format 2 to 3. */
+const snapshotToPatchFormatThree = (doc: RawDocument): RawDocument =>
+  snapshotPatchStep(doc, SNAPSHOT_PATCH_FORMAT.versionFive);
+
 /**
- * One upgrade ships, 5 → 6. Version 2 was retired by #705, version 3 by
- * windsor#238 (record `2026-10-01-retire-song-version-3`) and version 4 by
- * windsor#224, each with no upgrade, so a song saved at any of them is
- * refused.
+ * Version 6 → 7 (windsor#590, record
+ * `2026-10-04-operator-filters-on-every-wave`): patch format 3 to 4, the
+ * operators' `noiseLp` and `noiseHp` renamed `opLp` and `opHp`.
  */
-export const SONG_MIGRATIONS: MigrationTable<RawDocument> = { 5: snapshotToPatchFormatThree };
+const snapshotToPatchFormatFour = (doc: RawDocument): RawDocument =>
+  snapshotPatchStep(doc, SNAPSHOT_PATCH_FORMAT.versionSix);
+
+/**
+ * Two upgrades ship, 5 → 6 and 6 → 7. Version 2 was retired by #705,
+ * version 3 by windsor#238 (record `2026-10-01-retire-song-version-3`) and
+ * version 4 by windsor#224, each with no upgrade, so a song saved at any of
+ * them is refused.
+ */
+export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
+  5: snapshotToPatchFormatThree,
+  6: snapshotToPatchFormatFour,
+};
 
 /** The tables `upgradeSong` runs; a test hands its own. */
 export interface FormatMigrations {

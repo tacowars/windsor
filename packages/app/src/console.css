@@ -5475,9 +5475,9 @@ input.field {
 /* windsor#523, record `2026-10-03-parts-tab-layout` decisions 6, 7 and 9 and
    its mockup's layout B: four rows of today's knob cells at the mockup's
    44 px. Every row's main group keeps one width — the Fixed knob takes the
-   Coarse/Fine/Ratio width, and a Noise operator in any row gives every row
-   the two colour columns — so each knob column lines up across A–D, and
-   only the envelope's width changes. There is no screen-width media query:
+   Coarse/Fine/Ratio width, and every row holds its own filters' LP, HP and
+   Key Trk on every wave (windsor#590) — so each knob column lines up across
+   A–D, and only the envelope's width changes. There is no screen-width media query:
    the body's flex wrap alone puts the Adv group beside the core or under it,
    at any window size or zoom. */
 
@@ -5488,7 +5488,7 @@ input.field {
   --op-core-gap: 14px;
   --op-env: 560px;
   --op-env-min: 140px;
-  --op-cols: 7;
+  --op-cols: 10;
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -5567,16 +5567,14 @@ input.field {
   gap: 6px 14px;
   min-width: 0;
 }
-.op-rows:has(.op-noise) {
-  --op-cols: 9;
-}
 /* Narrow rows (a 1366 px window, with the right column still beside the
-   deck) can't hold a Noise operator's knobs at the full gaps: they need
-   about 864 px. There the frame closes up instead (the knob gaps, the gap
-   between the knob groups and the identity column's gap), so Coarse through
-   Release stay on one line and the knob cells keep their size. This queries
-   the rows' own width, not the screen. */
-@container (width < 880px) {
+   deck) can't hold the main knobs, the operator's own filters included
+   (windsor#590), at the full gaps: they need 912 px. There the frame closes
+   up instead (the knob gaps, the gap between the knob groups and the
+   identity column's gap, 876 px in all), so Coarse through Release stay on
+   one line and the knob cells keep their size. This queries the rows' own
+   width, not the screen. */
+@container (width < 920px) {
   .op-row {
     column-gap: 8px;
   }

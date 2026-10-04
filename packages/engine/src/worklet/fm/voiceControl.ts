@@ -2,7 +2,8 @@
 /**
  * The voice's control-rate work (#645): `bindVoiceConstants`, the routing
  * flags and per-note `Math.pow` results computed once per note (#548) and
- * each Noise operator's colour (windsor#362), and
+ * each operator's own filters, key tracking included (windsor#362,
+ * windsor#590), and
  * `updateVoiceControl`, which advances every envelope and both LFOs by
  * the voice's control interval (`updateVoiceControlBlock` asks the voice for
  * it, 32 or 128 samples: windsor#326), glides the pitch, refreshes the drive stage
@@ -33,7 +34,7 @@ import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_EDGES } from './algorithms';
 import { WIDTH_SNAP } from './fmConstants';
 import { FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
-import { bindNoiseColour } from './noiseColour';
+import { bindOperatorFilter } from './operatorFilter';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
@@ -67,9 +68,11 @@ const PART_BEND = 0,
  * Routing and per-note constants for the bound patch, after `kind` and
  * `order` are set:
  * called by `start` and `rebind`, so a live retune of the algorithm, a wave
- * or a detune reaches the next control block. Each Noise operator's colour
- * is tuned here too (windsor#362): the fields change only with the bound
- * patch, so binding them is the per-block update at no per-block cost.
+ * or a detune reaches the next control block. Each operator's own filters
+ * are tuned here too (windsor#362, windsor#590): their fields change only
+ * with the bound patch and their key tracking only with the note (a slide's
+ * `retarget` rebinds), so binding them is the per-block update at no
+ * per-block cost.
  * Allocates nothing.
  */
 function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
@@ -79,7 +82,7 @@ function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
     const op = patch.ops[i];
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
-    bindNoiseColour(voice, i);
+    bindOperatorFilter(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];

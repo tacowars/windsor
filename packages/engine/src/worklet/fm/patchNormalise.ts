@@ -40,7 +40,8 @@ import {
   MACRO_DEFAULTS,
   MACRO_VALUE_RANGE,
   MACROS_MAX,
-  NOISE_COLOUR_RANGE,
+  OP_FILTER_RANGE,
+  OP_FILTER_TRACK_RANGE,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
@@ -110,8 +111,9 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
     levelKeyScale: num(o.levelKeyScale, d.levelKeyScale),
     phase: num(o.phase, d.phase),
     phaseFree: o.phaseFree !== false, // free-running by default (OPERATOR_DEFAULTS.phaseFree)
-    noiseLp: clamp(num(o.noiseLp, d.noiseLp), NOISE_COLOUR_RANGE), // Hz, 0 off; Noise only (windsor#362)
-    noiseHp: clamp(num(o.noiseHp, d.noiseHp), NOISE_COLOUR_RANGE),
+    opLp: clamp(num(o.opLp, d.opLp), OP_FILTER_RANGE), // Hz, 0 off; every wave (windsor#590)
+    opHp: clamp(num(o.opHp, d.opHp), OP_FILTER_RANGE),
+    opTrack: clamp(num(o.opTrack, d.opTrack), OP_FILTER_TRACK_RANGE), // octaves an octave of note
     env: envDefaults(o.env),
   };
 }

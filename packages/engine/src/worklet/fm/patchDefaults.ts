@@ -65,11 +65,14 @@ const OPERATOR_DEFAULTS = {
   phase: 0,
   phaseFree: true,
   /**
-   * A Noise operator's own two-pole lowpass and highpass on its noise, in Hz
-   * (windsor#362, `NOISE_COLOUR_RANGE`); 0 is off. Every other wave ignores them.
+   * The operator's own two-pole lowpass and highpass on its wave, in Hz
+   * (windsor#362, every wave since windsor#590, `OP_FILTER_RANGE`); 0 is off.
+   * `opTrack` moves both cutoffs by that many octaves an octave of the played
+   * note from middle C (`OP_FILTER_TRACK_RANGE`); 0 holds them.
    */
-  noiseLp: 0,
-  noiseHp: 0,
+  opLp: 0,
+  opHp: 0,
+  opTrack: 0,
 };
 
 /** Operator A's level: the one operator an empty patch hears. */
@@ -200,15 +203,18 @@ const FEEDBACK_RANGE = { min: -1, max: 1 };
 const WIDTH_RANGE = { min: 0.05, max: 1 };
 
 /**
- * A Noise operator's `noiseLp` and `noiseHp`, clamped here by the worklet: 0
- * is off, and any cutoff above 0 sounds at `NOISE_COLOUR_FLOOR_HZ` or more
- * (windsor#362, the ranges of
+ * An operator's `opLp` and `opHp`, clamped here by the worklet: 0 is off, and
+ * any cutoff above 0 sounds at `OP_FILTER_FLOOR_HZ` or more, key tracking
+ * included (windsor#362, windsor#590, the ranges of
  * `docs/research/2026-10-01-tom-noise-colour-prototype/`).
  */
-const NOISE_COLOUR_RANGE = { min: 0, max: 20000 };
+const OP_FILTER_RANGE = { min: 0, max: 20000 };
 
-/** The lowest cutoff a noise filter that is on sounds at: the bottom of the knob's log sweep. */
-const NOISE_COLOUR_FLOOR_HZ = 20;
+/** The lowest cutoff an operator filter that is on sounds at: the bottom of the knob's log sweep. */
+const OP_FILTER_FLOOR_HZ = 20;
+
+/** An operator's `opTrack`, clamped here by the worklet: the voice filter's Key Trk knob's range (windsor#590). */
+const OP_FILTER_TRACK_RANGE = { min: -1, max: 2 };
 
 /**
  * The patch's macros (windsor#559, record `2026-10-04-patch-macro-knobs`
@@ -253,8 +259,9 @@ export {
   MACRO_MAPPINGS_MAX,
   MACRO_VALUE_RANGE,
   MACROS_MAX,
-  NOISE_COLOUR_FLOOR_HZ,
-  NOISE_COLOUR_RANGE,
+  OP_FILTER_FLOOR_HZ,
+  OP_FILTER_RANGE,
+  OP_FILTER_TRACK_RANGE,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,

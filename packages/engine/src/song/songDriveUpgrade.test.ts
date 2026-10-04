@@ -40,8 +40,8 @@ const play = (patch: Patch): Float32Array =>
   render(loaded, loaded.create(patch), 200, NOTE).samples;
 
 describe('a version-5 song (windsor#300)', () => {
-  it('opens at version 6 with no correction, its drive out of the filter', () => {
-    expect(ARRANGEMENT_VERSION).toBe(6);
+  it('opens at version 7, through 6, with no correction, its drive out of the filter', () => {
+    expect(ARRANGEMENT_VERSION).toBe(7);
     expect(KICK_PATCH.drive.gain).not.toBe(1); // the case is a driven patch
     const result = makeArrangement(versionFive());
     expect(result.refused).toBeUndefined();

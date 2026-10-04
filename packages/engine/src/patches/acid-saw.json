@@ -1,5 +1,5 @@
 {
-  "format": 3,
+  "format": 4,
   "name": "Acid Saw",
   "category": "Basses",
   "tags": ["acid", "bass", "303", "mono"],
@@ -31,8 +31,8 @@
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
-        "noiseLp": 0,
-        "noiseHp": 0,
+        "opLp": 0,
+        "opHp": 0,
         "env": {
           "initLevel": 0,
           "attackTime": 0.001,
@@ -62,8 +62,8 @@
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
-        "noiseLp": 0,
-        "noiseHp": 0,
+        "opLp": 0,
+        "opHp": 0,
         "env": {
           "initLevel": 0,
           "attackTime": 0.002,
@@ -93,8 +93,8 @@
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
-        "noiseLp": 0,
-        "noiseHp": 0,
+        "opLp": 0,
+        "opHp": 0,
         "env": {
           "initLevel": 0,
           "attackTime": 0.002,
@@ -124,8 +124,8 @@
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
-        "noiseLp": 0,
-        "noiseHp": 0,
+        "opLp": 0,
+        "opHp": 0,
         "env": {
           "initLevel": 0,
           "attackTime": 0.002,

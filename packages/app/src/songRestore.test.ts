@@ -5,7 +5,7 @@
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { ARRANGEMENT_VERSION } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, PATCH_FILE_FORMAT } from '@windsor/engine';
 import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { openSessionConsole, songText } from './__fixtures__/songSessionConsole';
 import { loadBuiltIns } from './builtInLibrary';
@@ -129,7 +129,7 @@ describe('offerRestore', () => {
       const refusal = songRefusal(JSON.stringify(doc));
       expect(refusal?.patch).toBe(id);
       expect(refusal?.message).toBe(
-        `saved with patch format 99 in patch "${id}", this build reads 3`,
+        `saved with patch format 99 in patch "${id}", this build reads ${PATCH_FILE_FORMAT}`,
       );
     });
 

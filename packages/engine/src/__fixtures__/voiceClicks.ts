@@ -56,8 +56,9 @@ const op = (level: number, feedback: number, attackTime: number): Patch['ops'][n
   levelKeyScale: 0,
   phase: 0,
   phaseFree: true,
-  noiseLp: 0,
-  noiseHp: 0,
+  opLp: 0,
+  opHp: 0,
+  opTrack: 0,
   env: env({ attackTime }),
 });
 

@@ -241,7 +241,7 @@ describe("the user's library", () => {
 
   describe('a patch in a format this build cannot read', () => {
     /** Save's bytes with the format bumped, spacing and all: what Export must hand back. */
-    const future = (name: string): string => mine(name).replace('"format": 3,', '"format": 99,');
+    const future = (name: string): string => mine(name).replace('"format": 4,', '"format": 99,');
 
     it('is listed as old format, never as an entry, and nothing is refused or dropped', async () => {
       const text = future('Future Kick');
@@ -259,8 +259,8 @@ describe("the user's library", () => {
           refusal: {
             format: 'patch',
             found: 99,
-            reads: 3,
-            message: 'saved with patch format 99, this build reads 3',
+            reads: 4,
+            message: 'saved with patch format 99, this build reads 4',
           },
         },
       ]);
@@ -306,7 +306,7 @@ describe("the user's library", () => {
       await connectLibrary(model, memoryFolder(files));
       expect(model.oldFormat.map((entry) => entry.id)).toEqual(['future-kick']);
       // Read as format 1 and upgraded on the way in.
-      expect(model.entries['plain-kick']?.format).toBe(3);
+      expect(model.entries['plain-kick']?.format).toBe(4);
       expect(model.problems).toEqual([]);
     });
   });
