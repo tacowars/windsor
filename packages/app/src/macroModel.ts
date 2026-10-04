@@ -6,19 +6,10 @@
  * target picker offers, what a mapping plays at the macro's value, and which
  * Parts-tab knob a mapping holds.
  *
- * The shaping arithmetic is the app's own copy of the record's decision 4,
- * pinned by `macroModel.test.ts` to values worked from that decision and to
- * the voice's own (`worklet/fm/voiceMacros.ts`, windsor#560) over a sweep.
- * The voice's compiles only under the worklet's flags, so the engine's index
- * cannot export it to the main thread.
+ * What a mapping plays is the engine's `macroMappedValue` (windsor#566), the
+ * voice's own shaping as one scalar, so the card and the voice agree.
  */
-import type {
-  Macro,
-  MacroMapping,
-  VoiceAutomationRow,
-  VoiceTargetPath,
-  VoiceTargetRow,
-} from '@windsor/engine';
+import type { Macro, MacroMapping, VoiceAutomationRow, VoiceTargetPath } from '@windsor/engine';
 import {
   MACRO_CURVE,
   MACRO_MAPPINGS_MAX,
@@ -27,6 +18,7 @@ import {
   VOICE_AUTOMATION_ROWS,
   makeMacro,
   makeMacroMapping,
+  macroMappedValue,
   macroTargetProblem,
   voiceTargetRow,
 } from '@windsor/engine';
@@ -208,48 +200,10 @@ export function mappingPickerGroups(
   return [...groups].map(([label, options]) => ({ label, options }));
 }
 
-/** The macro's travel `x` (0..1) through a curve: inverted first, then Linear, Exp, Log or S. */
-export function shapeMacro(x: number, curve: number, inverted: boolean): number {
-  const clamped = Math.min(1, Math.max(0, x));
-  const t = inverted ? 1 - clamped : clamped;
-  switch (curve) {
-    case MACRO_CURVE.EXP:
-      return t * t * t;
-    case MACRO_CURVE.LOG: {
-      const u = 1 - t;
-      return 1 - u * u * u;
-    }
-    case MACRO_CURVE.S:
-      // x²(3 − 2x), written as x²(1 + 2(1 − x)).
-      return t * t * (1 + 2 * (1 - t));
-    default:
-      return t;
-  }
-}
-
-/**
- * What `mapping` plays at macro value `x` on its target's `row`: `min..max`
- * clamped to the row's bounds, a ratio row's ends raised to its floor, then
- * interpolated by the shaped travel, geometrically on a ratio row (a cutoff
- * sweeps in octaves) and linearly on an add row.
- */
-export function mappedValue(mapping: MacroMapping, x: number, row: VoiceTargetRow): number {
-  const t = shapeMacro(x, mapping.curve, mapping.inverted);
-  const bound = (v: number): number => Math.min(row.max, Math.max(row.min, v));
-  let lo = bound(mapping.min);
-  let hi = bound(mapping.max);
-  if (row.curve === 'ratio') {
-    lo = Math.max(lo, row.floor);
-    hi = Math.max(hi, row.floor);
-    if (lo > 0 && hi > 0) return lo * Math.exp(t * Math.log(hi / lo));
-  }
-  return lo + t * (hi - lo);
-}
-
 /** What `mapping` plays at macro value `x`, or undefined for a target the voice table lacks. */
 export function mappingPlays(mapping: MacroMapping, x: number): number | undefined {
   const row = voiceTargetRow(mapping.target);
-  return row ? mappedValue(mapping, x, row) : undefined;
+  return row ? macroMappedValue(row, mapping, x) : undefined;
 }
 
 /** What holds a mapped knob: the macro's name and the value the mapping plays now. */

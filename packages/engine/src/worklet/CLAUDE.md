@@ -224,6 +224,7 @@ build output. The map of `fm/` (#644):
 | `voiceTargets.ts` | `layoutVoiceTargets` (windsor#419): the patch's value for every target, by code, into an array; the one place on the audio thread that maps a path to a code |
 | `voiceStepMod.ts` | `loadStepOffsets` and `bindOwnValues`: a note-on's step array (one value per target, 0 past its end, junk 0) into the voice's preallocated `stepOffsets`, and `ownValues`, the patch's values by code with each step value moved in its row's curve; the note-on, retarget and rebind entry points |
 | `macroMappings.ts` | `effectiveMacroMappings`, `macroMapsTarget` (windsor#560): the mappings the voice applies for a patch (the first `MACROS_MAX` macros, the first `MACRO_MAPPINGS_MAX` mappings of each, voice targets that are not macros, the first mapping per target), normalised; `normalisePatch` builds the macros' mappings from it and the main thread reads the same list |
+| `macroShape.ts` | `macroMappedValue` (windsor#566): what a mapping plays at a macro value, the voice's shaping as one scalar for the main thread (the index exports it), held to `voiceMacros.ts` over a sweep by `macroShape.test.ts` |
 | `voiceMacros.ts` | a patch's macros on the voice (windsor#560, record `2026-10-04-patch-macro-knobs`): `compileMacros`, the mappings as typed arrays on the normalised patch (`MacroTables`, so `WorkletPatch` is `Patch & MacroTables`), at construction and at each `patch` message, a ratio row's ends raised to its floor and `log2(max / min)` worked out there; and `applyMacroBases`, each mapped target's base from its macro's shaped value (Linear, Exp, Log, S, inverted first; geometric on a ratio row through `exp2InPlace`) with the step's push over it, ignoring any lane on it. `bindOwnValues` and `bindLiveValues` call it after the macro rows resolve; a patch with no mappings never does |
 | `voiceOffsets.ts` | the song lanes on the voice (windsor#346, windsor#347): `VOICE_SLOT_COUNT` and the slots' parameter names, `mapVoiceSlots` (a slot map to target codes, at a message; the cutoff is a slot like any other since windsor#419), `latchVoiceOffsets` (the slots into the part's offsets, each quantum), `applyVoiceOffsets` (each control block: `liveValues`, the own value where no lane moves a target and otherwise the lane's absolute value with the step's push over it, then the feedback ramp's ends, the LFOs' absolute `rate`, and the decays into the envelopes, a changed curve through `Envelope.reshapeDecay`), and `primeVoiceOffsets` / `keepVoiceOffsets` + `rebindVoiceOffsets` for a note-on and a live retune. Only a lane's offset changing reshapes a decay, never a rebind: a curve a lane holds over an edited base stays as it plays until the lane resyncs (`decayRebound`). An offset of 0 changes nothing, to the bit, except that a decay time or an LFO rate a slot maps plays at least its row's floor, 1 ms or 0.02 Hz (`partFloors`); a part with no slot mapped floors nothing |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
@@ -317,7 +318,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change,
    and the test's guard says so in one failure before it renders (windsor#6).
-5. **Ten modules are read by the main thread too** (#656): `algorithms.ts`,
+5. **Eleven modules are read by the main thread too** (#656): `algorithms.ts`,
    `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
    `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`),
    `patchDefaults.ts` (#670: `makePatch()` fills from it, and
@@ -329,11 +330,13 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `formantTables.ts` (windsor#331: the index exports the vowels the
    Formant mode reads), and `macroMappings.ts` (windsor#560: the
    normaliser keeps a patch's mappings by it, and the main thread's
-   inert-lane check and the pickers ask it which targets are mapped).
+   inert-lane check and the pickers ask it which targets are mapped), and
+   `macroShape.ts` (windsor#566: the Macros card shows what a mapping
+   plays with it; `macroShape.test.ts` pins it to `voiceMacros.ts`).
    `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The ten are listed in the
+   is one table and one curve, and no pin test. The eleven are listed in the
    engine project's `files` (`packages/engine/tsconfig.json`) and compile
    under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch

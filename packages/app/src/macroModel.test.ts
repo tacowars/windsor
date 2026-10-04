@@ -1,8 +1,8 @@
 /**
- * The Macros card's rules (windsor#561): the list edits, the picker, and the
- * shaping arithmetic, pinned to values worked by hand from record
- * `2026-10-04-patch-macro-knobs` decision 4 (the mockup's readouts) and to
- * the voice's own shaping (windsor#560) over a sweep.
+ * The Macros card's rules (windsor#561): the list edits, the picker, and what
+ * a mapping plays, pinned to the mockup's readouts worked by hand from record
+ * `2026-10-04-patch-macro-knobs` decision 4. The engine's `macroShape.test.ts`
+ * holds the shaping to the voice's (windsor#566).
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,14 +10,8 @@ import {
   MACRO_CURVE_NAMES,
   MACRO_MAPPINGS_MAX,
   MACROS_MAX,
-  VOICE_TARGET_COUNT,
-  VOICE_TARGET_PATHS,
-  VT_MACRO_BASE,
   makeMacro,
-  makeMacroMapping,
-  voiceTargetRow,
   type Macro,
-  type MacroMapping,
   type VoiceTargetPath,
 } from '@windsor/engine';
 import {
@@ -27,15 +21,14 @@ import {
   canAddMapping,
   mappedKnob,
   macroTileNames,
-  mappedValue,
   mappingPickerGroups,
+  mappingPlays,
   nextMacroName,
   removeMacro,
   removeMapping,
   renameMacro,
   setMacroValue,
   setMappingField,
-  shapeMacro,
 } from './macroModel';
 import { CURVE_GLYPH_PATHS, CURVE_SEGMENT_LABELS } from './macroTables';
 
@@ -58,25 +51,8 @@ const WOBBLE = makeMacro({
 });
 const MACROS: readonly Macro[] = [ACCENT, WOBBLE];
 
-/** The two calls of the voice's `voiceMacros.ts` this test pins the app's copy to. */
-interface VoiceMacros {
-  compileMacros(patch: { macros: readonly Macro[] }): unknown;
-  applyMacroBases(patch: unknown, src: Float64Array, dst: Float64Array, push: Float64Array): void;
-}
-const NO_PUSH = new Float64Array(VOICE_TARGET_COUNT);
-
-/** Rows the pin sweeps: an add row, a ratio row, and a ratio row mapped up from below its floor. */
-const PIN_ROWS: readonly (readonly [VoiceTargetPath, number, number])[] = [
-  ['ops.0.level', 0.4, 0.9],
-  ['lfo2.amount', 0, 0.6],
-  ['filter.cutoff', 400, 3200],
-  ['ops.1.env.decayTime', 0, 1.2],
-];
-
-const plays = (macro: Macro, at: number): number => {
-  const m = macro.mappings[at]!;
-  return mappedValue(m, macro.value, voiceTargetRow(m.target)!);
-};
+const plays = (macro: Macro, at: number): number | undefined =>
+  mappingPlays(macro.mappings[at]!, macro.value);
 
 describe('the macro list', () => {
   it('adds `Macro <n>` at value 0 until eight, at the lowest free number', () => {
@@ -166,51 +142,13 @@ describe('the target picker', () => {
   });
 });
 
-describe('the shaping (record decision 4)', () => {
-  it('shapes the travel: Linear, Exp x³, Log 1 − (1 − x)³, S x²(3 − 2x), inverted first', () => {
-    expect([0, 1, 2, 3].map((c) => shapeMacro(0.5, c, false))).toEqual([0.5, 0.125, 0.875, 0.5]);
-    expect(shapeMacro(0.25, MACRO_CURVE.EXP, true)).toBeCloseTo(0.421875, 12);
-    expect(shapeMacro(1.5, MACRO_CURVE.LINEAR, false)).toBe(1);
-  });
-
+describe('what a mapping plays (record decision 4)', () => {
   it('plays the mockup’s values: linear on an add row, in octaves on a ratio row', () => {
     expect(plays(ACCENT, 0)).toBeCloseTo(0.575, 12);
     expect(plays(ACCENT, 1)).toBeCloseTo(437.3, 1);
     expect(plays(ACCENT, 2)).toBeCloseTo(0.0851, 4);
     expect(plays(WOBBLE, 0)).toBeCloseTo(0.4059, 4);
     expect(plays(WOBBLE, 1)).toBeCloseTo(1.0876, 4);
-  });
-
-  it('raises a ratio row’s end to its floor: a decay mapped from 0 plays 1 ms at the bottom', () => {
-    const decay = makeMacro({ mappings: [{ target: 'ops.1.env.decayTime', min: 0, max: 1 }] });
-    expect(plays(decay, 0)).toBe(voiceTargetRow('ops.1.env.decayTime')!.floor);
-  });
-
-  it('plays what the voice plays: the engine’s own shaping, every curve, both polarities', async () => {
-    // The voice's shaping (windsor#560) compiles only under the worklet's own
-    // flags, so it cannot ride the engine's index; a runtime import reaches
-    // it here without pulling it into the app's type check.
-    const at = '@windsor/engine/worklet/fm/voiceMacros';
-    const voice = (await import(/* @vite-ignore */ at)) as VoiceMacros;
-    const voicePlays = (mapping: MacroMapping, x: number): number => {
-      const values = new Float64Array(VOICE_TARGET_COUNT);
-      values[VT_MACRO_BASE] = x;
-      const macro = { name: '', value: 0, mappings: [mapping] };
-      voice.applyMacroBases(voice.compileMacros({ macros: [macro] }), values, values, NO_PUSH);
-      return values[VOICE_TARGET_PATHS.indexOf(mapping.target)] ?? NaN;
-    };
-    for (const [target, min, max] of PIN_ROWS) {
-      for (const curve of [0, 1, 2, 3]) {
-        for (const inverted of [false, true]) {
-          const m = makeMacroMapping({ target, min, max, curve, inverted });
-          for (const x of [0, 0.25, 0.35, 0.5, 0.62, 1]) {
-            const want = voicePlays(m, x);
-            const got = mappedValue(m, x, voiceTargetRow(target)!);
-            expect(Math.abs(got - want)).toBeLessThanOrEqual(1e-12 * Math.max(1, Math.abs(want)));
-          }
-        }
-      }
-    }
   });
 
   it('finds the mapped knob by path, at a lane’s value where one holds the macro', () => {
