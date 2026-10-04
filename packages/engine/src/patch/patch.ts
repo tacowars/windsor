@@ -33,6 +33,7 @@ import {
   PITCH_ENV_DEFAULTS,
 } from '../worklet/fm/patchDefaults';
 import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
+import { voiceTargetRow } from '../worklet/fm/voiceTargetTables';
 
 export const WAVE_NAMES = [
   'Sine',
@@ -296,9 +297,18 @@ export function makeOperator(o: PartialOperator = {}): Operator {
   };
 }
 
-/** A mapping over its defaults; its `target` is its own, since it has none. */
+/**
+ * A mapping over its defaults; its `target` is its own, since it has none.
+ * `min` and `max` are clamped to the target row's bounds, as the worklet's
+ * `normalisePatch` clamps them, so an omitted end fills alike on both
+ * threads (a cutoff mapping's default 0 is the row's 30 Hz; windsor#560).
+ */
 export function makeMacroMapping(o: PartialMacroMapping): MacroMapping {
-  return { ...MACRO_MAPPING_DEFAULTS, ...o };
+  const mapping = { ...MACRO_MAPPING_DEFAULTS, ...o };
+  const row = voiceTargetRow(mapping.target);
+  if (!row) return mapping;
+  const clamp = (v: number): number => Math.max(row.min, Math.min(row.max, v));
+  return { ...mapping, min: clamp(mapping.min), max: clamp(mapping.max) };
 }
 
 /** A macro over its defaults, each mapping completed and one with no `target` dropped. */

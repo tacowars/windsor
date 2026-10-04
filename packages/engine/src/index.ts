@@ -103,6 +103,9 @@ export type {
   VoiceTargetRow,
 } from './worklet/fm/voiceTargetTables';
 export { stepModValue, voiceTargetValue } from './worklet/fm/voiceTargetValue';
+// The mappings the voice applies for a patch (windsor#560): the one rule both sides read.
+export { effectiveMacroMappings, macroMapsTarget } from './worklet/fm/macroMappings';
+export type { EffectiveMacroMapping } from './worklet/fm/macroMappings';
 // Song automation lanes (windsor#341, record `2026-10-01-song-automation-lanes`): the pure core.
 export type {
   AutomationLane,

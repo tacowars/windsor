@@ -555,6 +555,44 @@ function macroTargetProblem(target, taken) {
   return void 0;
 }
 
+// packages/engine/src/worklet/fm/macroMappings.ts
+var mappingNumber = (v, d) => typeof v === "number" && isFinite(v) ? v : d;
+var clampToRow = (v, range) => Math.max(range.min, Math.min(range.max, v));
+function effectiveMapping(raw, taken) {
+  const o = raw || {};
+  const row = voiceTargetRow(o.target);
+  if (!row || macroTargetProblem(o.target, taken) !== void 0) return null;
+  taken.add(row.path);
+  const d = MACRO_MAPPING_DEFAULTS;
+  const curve = mappingNumber(o.curve, d.curve) | 0;
+  return {
+    target: row.path,
+    min: clampToRow(mappingNumber(o.min, d.min), row),
+    max: clampToRow(mappingNumber(o.max, d.max), row),
+    curve: curve < MACRO_LINEAR || curve > MACRO_S ? MACRO_LINEAR : curve,
+    inverted: !!o.inverted
+  };
+}
+var rawMappingsOf = (macro) => {
+  const mappings = (macro || {}).mappings;
+  return Array.isArray(mappings) ? mappings : [];
+};
+function effectiveMacroMappings(patch) {
+  const raw = (patch || {}).macros;
+  const list = Array.isArray(raw) ? raw : [];
+  const taken = /* @__PURE__ */ new Set();
+  const out = [];
+  for (let i = 0; i < list.length && i < MACROS_MAX; i++) {
+    const mappings = rawMappingsOf(list[i]);
+    for (let k = 0; k < mappings.length && k < MACRO_MAPPINGS_MAX; k++) {
+      const mapping = effectiveMapping(mappings[k], taken);
+      if (mapping) out.push({ macro: i, mapping });
+    }
+  }
+  return out;
+}
+var macroMapsTarget = (patch, path) => effectiveMacroMappings(patch).some(({ mapping }) => mapping.target === path);
+
 // packages/engine/src/worklet/fm/patchNormalise.ts
 function envDefaults(o, d = ENVELOPE_DEFAULTS) {
   o = o || {};
@@ -645,38 +683,19 @@ function driveDefaults(raw) {
   drive.on = typeof raw.on === "boolean" ? raw.on : driveOnByDefault(gain, bias);
   return drive;
 }
-function macroMappingDefaults(raw, taken) {
-  const o = raw || {};
-  const row = voiceTargetRow(o.target);
-  if (!row || macroTargetProblem(o.target, taken) !== void 0) return null;
-  taken.add(row.path);
-  const d = MACRO_MAPPING_DEFAULTS;
-  const curve = num(o.curve, d.curve) | 0;
-  return {
-    target: row.path,
-    min: clamp(num(o.min, d.min), row),
-    max: clamp(num(o.max, d.max), row),
-    curve: curve < MACRO_LINEAR || curve > MACRO_S ? MACRO_LINEAR : curve,
-    inverted: !!o.inverted
-  };
-}
 function macrosDefaults(raw) {
   const list = Array.isArray(raw) ? raw : [];
-  const taken = /* @__PURE__ */ new Set();
   const out = [];
   for (let i = 0; i < list.length && i < MACROS_MAX; i++) {
     const o = list[i] || {};
-    const rawMappings = Array.isArray(o.mappings) ? o.mappings : [];
-    const mappings = [];
-    for (let k = 0; k < rawMappings.length && k < MACRO_MAPPINGS_MAX; k++) {
-      const mapping = macroMappingDefaults(rawMappings[k], taken);
-      if (mapping) mappings.push(mapping);
-    }
     out.push({
       name: typeof o.name === "string" ? o.name : MACRO_DEFAULTS.name,
       value: clamp(num(o.value, MACRO_DEFAULTS.value), MACRO_VALUE_RANGE),
-      mappings
+      mappings: []
     });
+  }
+  for (const { macro, mapping } of effectiveMacroMappings({ macros: list })) {
+    out[macro].mappings.push(mapping);
   }
   return out;
 }
@@ -1789,6 +1808,97 @@ function controlInterval(voice, table = CONTROL_INTERVALS) {
   return table.long;
 }
 
+// packages/engine/src/worklet/fm/voiceMacros.ts
+var MACRO_MAP_CAPACITY = MACROS_MAX * MACRO_MAPPINGS_MAX;
+var powerSlot = new Float64Array(1);
+function compileMacros(patch) {
+  const tables = {
+    macroMapTarget: new Int32Array(MACRO_MAP_CAPACITY),
+    macroMapMacro: new Int32Array(MACRO_MAP_CAPACITY),
+    macroMapMin: new Float64Array(MACRO_MAP_CAPACITY),
+    macroMapMax: new Float64Array(MACRO_MAP_CAPACITY),
+    macroMapSpan: new Float64Array(MACRO_MAP_CAPACITY),
+    macroMapCurve: new Uint8Array(MACRO_MAP_CAPACITY),
+    macroMapInverted: new Uint8Array(MACRO_MAP_CAPACITY),
+    macroMapCount: 0,
+    macroMapped: new Uint8Array(VOICE_TARGET_COUNT)
+  };
+  const macros = patch.macros;
+  let n = 0;
+  for (let i = 0; i < macros.length && i < MACROS_MAX; i++) {
+    const mappings = macros[i].mappings;
+    for (let j = 0; j < mappings.length && n < MACRO_MAP_CAPACITY; j++) {
+      const m = mappings[j];
+      const code = voiceTargetCode(m.target);
+      if (code < 0 || code >= VT_MACRO_BASE || tables.macroMapped[code] !== 0) continue;
+      writeMapping(tables, n, code, m);
+      tables.macroMapMacro[n] = VT_MACRO_BASE + i;
+      tables.macroMapped[code] = 1;
+      n++;
+    }
+  }
+  tables.macroMapCount = n;
+  return Object.assign(patch, tables);
+}
+function writeMapping(tables, n, code, m) {
+  let lo = m.min;
+  let hi = m.max;
+  tables.macroMapTarget[n] = code;
+  tables.macroMapCurve[n] = m.curve;
+  tables.macroMapInverted[n] = m.inverted ? 1 : 0;
+  if (VOICE_TARGET_RATIO[code] === 0) {
+    tables.macroMapMin[n] = lo;
+    tables.macroMapMax[n] = hi;
+    tables.macroMapSpan[n] = hi - lo;
+    return;
+  }
+  const floor = VOICE_TARGET_FLOOR[code] > 0 ? VOICE_TARGET_FLOOR[code] : VOICE_TARGET_MIN[code];
+  if (lo < floor) lo = floor;
+  if (hi < floor) hi = floor;
+  tables.macroMapMin[n] = lo;
+  tables.macroMapMax[n] = hi;
+  powerSlot[0] = hi / lo;
+  log2InPlace(powerSlot, 0);
+  tables.macroMapSpan[n] = powerSlot[0];
+}
+function applyMacroBases(patch, src, dst, pushes) {
+  const count = patch.macroMapCount;
+  const targets = patch.macroMapTarget;
+  for (let j = 0; j < count; j++) {
+    const k = targets[j];
+    let x = src[patch.macroMapMacro[j]];
+    if (patch.macroMapInverted[j] !== 0) x = 1 - x;
+    const curve = patch.macroMapCurve[j];
+    let s = x;
+    if (curve === MACRO_EXP) s = x * x * x;
+    else if (curve === MACRO_LOG) s = 1 - (1 - x) * (1 - x) * (1 - x);
+    else if (curve === MACRO_S) s = x * x * (3 - 2 * x);
+    const ratio = VOICE_TARGET_RATIO[k] !== 0;
+    let y;
+    if (ratio) {
+      powerSlot[0] = patch.macroMapSpan[j] * s;
+      exp2InPlace(powerSlot, 0);
+      y = patch.macroMapMin[j] * powerSlot[0];
+    } else {
+      y = patch.macroMapMin[j] + patch.macroMapSpan[j] * s;
+    }
+    const push = pushes[k];
+    if (push !== 0) {
+      const d = push * VOICE_TARGET_SPAN[k];
+      if (ratio) {
+        powerSlot[0] = d;
+        exp2InPlace(powerSlot, 0);
+        y *= powerSlot[0];
+      } else {
+        y += d;
+      }
+    }
+    const min = VOICE_TARGET_MIN[k];
+    const max = VOICE_TARGET_MAX[k];
+    dst[k] = y < min ? min : y > max ? max : y;
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceTargets.ts
 function layoutVoiceTargets(patch, out) {
   const f = patch.filter;
@@ -1882,6 +1992,8 @@ function bindLiveValues(voice) {
     }
     live[k] = y;
   }
+  const patch = voice.patch;
+  if (patch.macroMapCount !== 0) applyMacroBases(patch, live, live, pushes);
 }
 function applyLiveDecays(voice, reshape) {
   const v = voice.liveValues;
@@ -1944,9 +2056,10 @@ function rebindVoiceOffsets(voice, slotTargets) {
   const v = voice.liveValues;
   const kept = keptTargets;
   kept.fill(0);
+  const mapped = voice.patch.macroMapped;
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = slotTargets[s];
-    if (code >= 0) kept[code] = 1;
+    if (code >= 0 && mapped[code] === 0) kept[code] = 1;
   }
   bindLiveValues(voice);
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
@@ -1955,6 +2068,8 @@ function rebindVoiceOffsets(voice, slotTargets) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY_CURVE;
     if (kept[k] !== 0 && keptOwn[k] !== voice.ownValues[k]) {
       voice.decayRebound[i] = voice.partOffsets[k];
+    } else if (mapped[k] !== 0) {
+      voice.decayRebound[i] = NaN;
     }
   }
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -2789,6 +2904,7 @@ function bindOwnValues(voice, patch) {
     const x = VOICE_TARGET_RATIO[k] !== 0 ? (base < floor ? floor : base) * Math.pow(2, d) : base + d;
     own[k] = x < VOICE_TARGET_MIN[k] ? VOICE_TARGET_MIN[k] : x > VOICE_TARGET_MAX[k] ? VOICE_TARGET_MAX[k] : x;
   }
+  if (patch.macroMapCount !== 0) applyMacroBases(patch, own, own, o);
 }
 function startStepMod(voice, patch, stepMod) {
   loadStepOffsets(voice, stepMod, false);
@@ -3256,7 +3372,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.slideIn = false;
     this.stepModIn = null;
     this.voices = buildVoicePool(this, maxVoices, sampleRate);
-    this.patch = normalisePatch(opts.patch);
+    this.patch = compileMacros(normalisePatch(opts.patch));
     this.waveSets = [null, null, null, null];
     this.rebuildWaves();
     this.events = new EventQueue();
@@ -3288,7 +3404,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
   onMessage(msg) {
     switch (msg.type) {
       case "patch": {
-        this.patch = normalisePatch(msg.patch);
+        this.patch = compileMacros(normalisePatch(msg.patch));
         this.rebuildWaves();
         if (this.liveRetune) {
           const slots = this.slotTargets;

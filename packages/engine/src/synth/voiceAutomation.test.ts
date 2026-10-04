@@ -11,7 +11,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { lane, point } from '../__fixtures__/automationRig';
+import { RIG_BPM, RIG_SONG_TICKS, lane, point } from '../__fixtures__/automationRig';
 import type { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeContext } from '../__fixtures__/fakeAudioContext';
 import type { FakeParam } from '../__fixtures__/fakeAudioNodes';
@@ -19,6 +19,7 @@ import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from '../__fixtures__/fullArrangement';
 import { installWorklet, rig } from '../__fixtures__/stripRig';
 import type { AutomationHandle } from '../automation/automationHandles';
+import { AutomationPlayer } from '../automation/automationPlayer';
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import {
   VOICE_TARGET_IDS,
@@ -26,8 +27,9 @@ import {
   voiceTargetId,
 } from '../automation/automationTargets';
 import type { PartStrip } from '../mixer/channelStrip';
-import { makeEnvelope, makePatch, type Patch } from '../patch/patch';
+import { makeEnvelope, makeMacro, makePatch, type Patch } from '../patch/patch';
 import { renderPass } from '../render/renderPass';
+import { TickTransport } from '../sequencing/scheduler';
 import { planFor } from '../render/renderSong';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { musicPartName } from '../song/documentParts';
@@ -191,6 +193,42 @@ describe('a voice lane on its part (windsor#346)', () => {
     expect(automationResolver(() => stripOf(rebuilt))(0, 'voice.ops.1.width')!.handle).not.toBe(
       first,
     );
+  });
+
+  it('has no handle on a target the patch maps from a macro, and plays from the playhead once the mapping goes (windsor#560)', async () => {
+    const { part } = await rig();
+    const unmapped = part.patch;
+    const mapped = {
+      ...unmapped,
+      macros: [makeMacro({ mappings: [{ target: 'filter.cutoff' }] })],
+    };
+    const resolve = automationResolver(() => stripOf(part));
+    const handle = resolve(0, 'voice.filter.cutoff')!.handle;
+    const player = new AutomationPlayer({
+      transport: new TickTransport(RIG_BPM),
+      now: () => 0,
+      resolve,
+      songTicks: RIG_SONG_TICKS,
+      restTick: 48,
+    });
+    player.setLanes(0, [lane('voice.filter.cutoff', [point(0, 400), point(96, 1600)])]);
+    expect(part.voiceSlotOf('filter.cutoff')).toBe(0);
+    part.setPatch(mapped);
+    player.resync();
+    expect(resolve(0, 'voice.filter.cutoff')).toBeUndefined();
+    expect(part.voiceSlotOf('filter.cutoff')).toBeUndefined();
+    expect(lastPosted(part)).toEqual({ type: 'voiceSlots', slots: slotMap() });
+    expect(resolve(0, 'voice.ops.0.level')).toBeDefined();
+    part.setPatch(unmapped);
+    player.resync();
+    expect(resolve(0, 'voice.filter.cutoff')!.handle).toBe(handle);
+    expect(part.voiceSlotOf('filter.cutoff')).toBe(0);
+    // Held at the playhead, tick 48, halfway up the lane: 800 Hz over the patch's cutoff.
+    expect(fake(part.voiceSlotParams[0]!).automation.at(-1)!.value).toBeCloseTo(
+      Math.log2(800 / unmapped.filter.cutoff),
+      6,
+    );
+    player.dispose();
   });
 
   it('has a handle for every voice row, the nine decay rows included (windsor#347)', async () => {

@@ -65,6 +65,8 @@ describe('the patch defaults (#670)', () => {
         ],
       },
     ],
+    // windsor#560: a mapping that omits its ends, on a row whose minimum is not 0 (30 Hz).
+    ['a mapping with no ends', { macros: [{ mappings: [{ target: 'filter.cutoff' }] }] }],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });

@@ -26,6 +26,13 @@
  * lane (`system/songAutomation.ts`), so the lane's absolute value still wins
  * on new voices and on voices a live retune rebinds.
  *
+ * A target the part's patch maps from a macro has no handle (windsor#560):
+ * the macro's mapping is its base, so a lane's absolute value could not
+ * hold over it. The lane stays in the document and plays again when the
+ * mapping goes; the worklet ignores a slot on a target its voice's patch
+ * maps, for the quantum before the resync and for a held voice on an older
+ * patch.
+ *
  * A part hands out one handle per target, so a resync finds the same one.
  * The nine decay rows have handles too (windsor#347): the worklet reshapes a
  * decay already running from its level. `fmProcessorAutomation.test.ts` and
@@ -36,6 +43,7 @@ import type { AutomationHandle, AutomationHow } from '../automation/automationHa
 import type { AutomationTargetRow } from '../automation/automationLane';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { Patch } from '../patch/patch';
+import { macroMapsTarget } from '../worklet/fm/macroMappings';
 import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import type { AudioPart } from './audioPart';
 
@@ -140,7 +148,13 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
  */
 const handles = new WeakMap<AudioPart, Map<string, AutomationHandle>>();
 
-/** The handle for `target` on `strip`'s part, or undefined when there is none. */
+/**
+ * The handle for `target` on `strip`'s part, or undefined when there is
+ * none: a target the part's patch maps from a macro has none while the
+ * mapping stands (record `2026-10-04-patch-macro-knobs` decision 6), so the
+ * player releases its slot at the patch edit's resync, and takes it back
+ * through the same handle once the mapping is gone.
+ */
 export function voiceAutomationHandle(
   strip: PartStrip,
   target: VoiceTarget,
@@ -148,6 +162,7 @@ export function voiceAutomationHandle(
 ): AutomationHandle | undefined {
   const { path } = target;
   const part = strip.part;
+  if (macroMapsTarget(part.patch, path)) return undefined;
   let byPath = handles.get(part);
   if (!byPath) handles.set(part, (byPath = new Map()));
   const known = byPath.get(path);

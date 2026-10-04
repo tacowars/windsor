@@ -7,8 +7,10 @@
  * move, a step can move too. The offsets are fixed at note-on and held for
  * the note's whole life; a legato retarget takes the new step's, except the
  * rows marked `slideKeeps`, and keeps the decay curves its envelopes play
- * (windsor#405). The song's lanes go over `ownValues` into `liveValues`
- * (`voiceOffsets.ts`), which every consumer reads.
+ * (windsor#405). A target the patch's macros map takes its macro's value,
+ * shaped, as its base (`voiceMacros.ts`, windsor#560). The song's lanes go
+ * over `ownValues` into `liveValues` (`voiceOffsets.ts`), which every
+ * consumer reads.
  *
  * Invariant: a step value of exactly 0 leaves the patch's value untouched,
  * neither floored nor clamped, so a note without step offsets renders bit
@@ -24,6 +26,7 @@ import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { OPERATOR_COUNT } from './patchDefaults';
 import { restingWidth } from './voiceControl';
+import { applyMacroBases } from './voiceMacros';
 import { keepVoiceOffsets, primeVoiceOffsets, rebindVoiceOffsets } from './voiceOffsets';
 import {
   VOICE_TARGET_COUNT,
@@ -63,8 +66,11 @@ function loadStepOffsets(
 /**
  * The voice's own values: the bound patch's, by code, and each target with a
  * step offset moved by `offset × span` in its row's curve, clamped to its
- * bounds. A target without one keeps the patch's value. Called by `start`,
- * `rebind` and `retarget`.
+ * bounds. A target without one keeps the patch's value. Then each target the
+ * patch's macros map takes its base from its macro's own value, pushed
+ * already, with its step's push over that (`applyMacroBases`, windsor#560);
+ * a patch without mappings skips it. Called by `start`, `rebind` and
+ * `retarget`.
  */
 function bindOwnValues(voice: Voice, patch: WorkletPatch): void {
   const own = voice.ownValues;
@@ -85,6 +91,7 @@ function bindOwnValues(voice: Voice, patch: WorkletPatch): void {
           ? VOICE_TARGET_MAX[k]
           : x;
   }
+  if (patch.macroMapCount !== 0) applyMacroBases(patch, own, own, o);
 }
 
 /**

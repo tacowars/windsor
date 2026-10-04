@@ -15,7 +15,7 @@
  * the patch does not define reads the macro default's value (windsor#559).
  */
 
-import type { WorkletPatch } from './patchNormalise';
+import type { Patch } from '../../patch/patch';
 import { MACRO_DEFAULTS, MACROS_MAX, OPERATOR_COUNT } from './patchDefaults';
 import {
   VT_CUTOFF,
@@ -39,7 +39,7 @@ import {
 } from './voiceTargetTables';
 
 /** Write `patch`'s value for every target into `out`, by code. Allocates nothing. */
-function layoutVoiceTargets(patch: WorkletPatch, out: Float64Array): void {
+function layoutVoiceTargets(patch: Patch, out: Float64Array): void {
   const f = patch.filter;
   out[VT_CUTOFF] = f.cutoff;
   out[VT_ENV_AMOUNT] = f.envAmount;

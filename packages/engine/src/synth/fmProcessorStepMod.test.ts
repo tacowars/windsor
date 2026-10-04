@@ -4,7 +4,9 @@
  * voice target moves its value and the render, per operator, a note
  * without offsets plays the patch, a slide takes the new step's offsets but
  * for the `slideKeeps` rows, and a live retune keeps them over the new patch.
- * All-zero offsets render exactly as none; the goldens pin none.
+ * A macro row moves the render through what its macro maps, and only a
+ * macro that maps nothing leaves it as it was (windsor#560). All-zero
+ * offsets render exactly as none; the goldens pin none.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -14,7 +16,7 @@ import type {
   ScheduledEvent,
 } from '../__fixtures__/workletHarness';
 import { loadProcessor, render } from '../__fixtures__/workletHarness';
-import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
+import { FILTER_MODE, WAVE, makeEnvelope, makeMacro, makePatch, type Patch } from '../patch/patch';
 import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 import {
   VOICE_TARGET_COUNT,
@@ -80,8 +82,23 @@ const FORMANT: Patch = {
   filter: { ...PATCH.filter, mode: FILTER_MODE.FORMANT, vowel: 1.2 },
 };
 
-/** The patch a parameter is heard on. */
-const patchFor = (param: VoiceTargetPath): Patch => (param === 'filter.vowel' ? FORMANT : PATCH);
+/** `PATCH` with macro `i` defined at 0.5, mapping the cutoff when `mapped` (windsor#560). */
+const withMacro = (i: number, mapped: boolean): Patch => ({
+  ...PATCH,
+  macros: Array.from({ length: i + 1 }, (_, m) =>
+    makeMacro({
+      value: 0.5,
+      mappings: m === i && mapped ? [{ target: 'filter.cutoff', min: 300, max: 4800 }] : [],
+    }),
+  ),
+});
+
+/** The patch a parameter is heard on: a macro's maps the cutoff. */
+const patchFor = (param: VoiceTargetPath): Patch => {
+  const macro = macroIndexOf(param);
+  if (macro >= 0) return withMacro(macro, true);
+  return param === 'filter.vowel' ? FORMANT : PATCH;
+};
 
 /** The patch's own value at a parameter's path; a macro the patch does not define is at 0 (windsor#559). */
 function base(patch: Patch, param: VoiceTargetPath): number {
@@ -134,9 +151,8 @@ describe('step offsets in the voice (windsor#17)', () => {
     expect(renderWith(new Array<number>(VOICE_TARGET_COUNT).fill(0))).toEqual(renderWith());
   });
 
-  // A macro moves nothing audible until the voice resolves its mappings (windsor#558).
-  const audible = VOICE_TARGET_PATHS.filter((p) => macroIndexOf(p) < 0);
-  it.each(audible.map((p) => [p]))('%s moves its target and the render', (param) => {
+  // Every row, a macro's through the cutoff it maps (windsor#560).
+  it.each(VOICE_TARGET_PATHS.map((p) => [p]))('%s moves its target and the render', (param) => {
     const row = voiceTargetRow(param)!;
     const patch = patchFor(param);
     const plain = renderWith(undefined, true, patch);
@@ -148,6 +164,16 @@ describe('step offsets in the voice (windsor#17)', () => {
       expect(got).not.toBe(base(patch, param));
       expect(renderWith(offsets(param, value), true, patch)).not.toEqual(plain);
     }
+  });
+
+  it('a step on a macro that maps nothing moves the macro and not the render: the one row that may not', () => {
+    const patch = withMacro(0, false);
+    const processor = loaded.create(patch, 4);
+    play(processor, noteOn(1, 0, { stepMod: offsets('macros.0.value', 0.5) }));
+    expect(played(voiceOf(processor, 1), 'macros.0.value')).toBe(1);
+    expect(renderWith(offsets('macros.0.value', 0.5), true, patch)).toEqual(
+      renderWith(undefined, true, patch),
+    );
   });
 
   it('the kernel and the generic loop agree to the bit with offsets', () => {

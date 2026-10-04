@@ -73,6 +73,7 @@ import {
   VT_OP_STRIDE,
   voiceTargetCode,
 } from './voiceTargetTables';
+import { applyMacroBases } from './voiceMacros';
 import { layoutVoiceTargets } from './voiceTargets';
 
 /** The automation slots on one part: its k-rate parameters, each mapped to one target (`FM_LANES_MAX`). */
@@ -144,7 +145,11 @@ const patchValues = new Float64Array(VOICE_TARGET_COUNT);
  * the offset the main thread sends for a lane at or below the floor over a
  * patch below it; without a lane a decay or rate of 0 stays 0. The curve is
  * written out, not called, since no double crosses a call each control
- * block (rule 2).
+ * block (rule 2). The macro rows resolve in the same pass, as ordinary
+ * rows; then every target the bound patch's macros map is derived afresh
+ * from its macro's live value with its step's push, ignoring any lane on it
+ * (`applyMacroBases`, windsor#560, record `2026-10-04-patch-macro-knobs`
+ * decisions 3 and 6), so a mapped target follows its macro each block.
  */
 function bindLiveValues(voice: Voice): void {
   const live = voice.liveValues;
@@ -178,6 +183,8 @@ function bindLiveValues(voice: Voice): void {
     }
     live[k] = y;
   }
+  const patch = voice.patch!;
+  if (patch.macroMapCount !== 0) applyMacroBases(patch, live, live, pushes);
 }
 
 /**
@@ -297,15 +304,18 @@ function keepVoiceOffsets(voice: Voice): void {
  * which holds until its lane's offset changes (`decayRebound`), so a
  * resync's rounding never starts the decay again. Nothing here reshapes a
  * decay. A target no lane moves takes the new patch's value at once, as
- * before. Allocates nothing.
+ * before, and so does a target the new patch's macros map, derived from
+ * its mapping at once (windsor#560): a lane on it is inert. Allocates
+ * nothing.
  */
 function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
   const v = voice.liveValues;
   const kept = keptTargets;
   kept.fill(0);
+  const mapped = voice.patch!.macroMapped;
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = slotTargets[s];
-    if (code >= 0) kept[code] = 1;
+    if (code >= 0 && mapped[code] === 0) kept[code] = 1;
   }
   bindLiveValues(voice);
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
@@ -316,6 +326,8 @@ function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY_CURVE;
     if (kept[k] !== 0 && keptOwn[k] !== voice.ownValues[k]) {
       voice.decayRebound[i] = voice.partOffsets[k];
+    } else if (mapped[k] !== 0) {
+      voice.decayRebound[i] = NaN;
     }
   }
   for (let i = 0; i < OPERATOR_COUNT; i++) {

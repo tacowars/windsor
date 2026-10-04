@@ -66,6 +66,16 @@ describe('adding and removing lanes', () => {
     expect(laneLabel('filter.cutoff', patch)).toBe('Cutoff');
   });
 
+  it("omits a target the part's patch maps from a macro (windsor#560)", () => {
+    const patch = makePatch({
+      macros: [{ name: 'Accent', mappings: [{ target: 'filter.cutoff' }] }],
+    });
+    const free = freeParams([], patch);
+    expect(free).not.toContain('filter.cutoff');
+    expect(free).toContain('macros.0.value');
+    expect(free).toHaveLength(VOICE_TARGET_PATHS.length - MACROS_MAX - 1 + 1);
+  });
+
   it('refuses the same parameter twice', () => {
     const lanes = addLane([], 'ops.1.level', 4)!;
     expect(addLane(lanes, 'ops.1.level', 4)).toBeNull();

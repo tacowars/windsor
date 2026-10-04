@@ -24,6 +24,7 @@ import {
   VOICE_AUTOMATION_ROWS,
   requireCatalogRow,
   formatTargetId,
+  makePatch,
   targetKind,
   type AutomationLane,
   type AutomationTargetId,
@@ -103,6 +104,22 @@ describe('the picker', () => {
         r.target,
       ).toHaveLength(1);
     }
+  });
+
+  it("omits a target the part's patch maps from a macro, and offers the macro (windsor#560)", () => {
+    const patch = makePatch({
+      macros: [
+        { name: 'Accent', mappings: [{ target: 'filter.cutoff' }, { target: 'ops.0.level' }] },
+      ],
+    });
+    const targets = pickerGroups(AUTOMATION_PART, patch).flatMap((g) =>
+      g.options.map((o) => o.target),
+    );
+    expect(targets).not.toContain('voice.filter.cutoff');
+    expect(targets).not.toContain('voice.ops.0.level');
+    expect(targets).toContain('voice.macros.0.value');
+    expect(targets).toContain('voice.filter.resonance');
+    expect(targets.filter(isVoice)).toHaveLength(UNMACROED.length - 2 + 1);
   });
 
   it('lists Vowel last in Voice · Filter, whatever the filter mode (windsor#406)', () => {

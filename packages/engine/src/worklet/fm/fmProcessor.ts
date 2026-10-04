@@ -32,6 +32,7 @@ import { makeRandom } from './prng';
 import { LoadSampler } from '../loadSampler';
 import type { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
+import { compileMacros } from './voiceMacros';
 import { buildVoicePool } from './voiceSteal';
 import type { ControlIntervalOverrides, ControlIntervalTable } from './voiceControlInterval';
 import { controlIntervalTable } from './voiceControlInterval';
@@ -148,7 +149,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // while its replacement is already sounding (`voiceSteal.ts`, windsor#410).
     this.voices = buildVoicePool(this, maxVoices, sampleRate);
 
-    this.patch = normalisePatch(opts.patch);
+    // The first patch arrives here, with no message, so its macro mappings
+    // are compiled here too (windsor#560).
+    this.patch = compileMacros(normalisePatch(opts.patch));
     this.waveSets = [null, null, null, null];
     this.rebuildWaves();
 
@@ -205,7 +208,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   onMessage(msg: WorkletMessage): void {
     switch (msg.type) {
       case 'patch': {
-        this.patch = normalisePatch(msg.patch);
+        this.patch = compileMacros(normalisePatch(msg.patch));
         this.rebuildWaves();
         // By default live voices keep their old patch reference until they
         // finish, which avoids clicks when a preset swaps under a ringing note.

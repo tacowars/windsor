@@ -13,14 +13,15 @@ import type {
   Envelope as EnvelopeParams,
   LfoSettings,
   Macro,
-  MacroMapping,
   Operator,
   PartialOperator,
   PartialPatch,
   Patch,
 } from '../../patch/patch';
 import { ALGORITHMS } from './algorithms';
-import { DRIVE_FOLD, DRIVE_SOFT, FILT_FORMANT, FILT_OFF, MACRO_LINEAR, MACRO_S } from './modeIds';
+import type { MacroTables } from './voiceMacros';
+import { effectiveMacroMappings } from './macroMappings';
+import { DRIVE_FOLD, DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
 import {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
@@ -37,8 +38,6 @@ import {
   LFO_TO_OP_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
   MACRO_DEFAULTS,
-  MACRO_MAPPING_DEFAULTS,
-  MACRO_MAPPINGS_MAX,
   MACRO_VALUE_RANGE,
   MACROS_MAX,
   NOISE_COLOUR_RANGE,
@@ -50,13 +49,13 @@ import {
   VOWEL_RANGE,
   WIDTH_RANGE,
 } from './patchDefaults';
-import { macroTargetProblem, voiceTargetRow } from './voiceTargetTables';
 
 /**
- * The patch the voice reads: every field filled. The per-operator feedback
+ * The patch the voice reads: every field filled, and its macro mappings
+ * compiled onto it (`compileMacros`, windsor#560). The per-operator feedback
  * the loops read is the voice's own since windsor#17 (`Voice.opFeedback`).
  */
-export type WorkletPatch = Patch;
+export type WorkletPatch = Patch & MacroTables;
 
 /* ------------------------------------------------------------------ *
  * Patch normalisation
@@ -172,50 +171,28 @@ function driveDefaults(raw: Partial<DriveSettings> | null | undefined): DriveSet
 }
 
 /**
- * One mapping (windsor#559, record `2026-10-04-patch-macro-knobs`), or null
- * to drop it: its target must be a voice target, not a macro, and not one
- * `taken` holds (one mapping per target, first wins). `min` and `max` are
- * clamped to the target row's bounds, and a curve outside the ids is Linear.
+ * The macros: at most `MACROS_MAX`, each value in 0..1, each with the
+ * mappings `effectiveMacroMappings` keeps for it (the one rule the main
+ * thread reads too, windsor#560).
  */
-function macroMappingDefaults(raw: unknown, taken: Set<string>): MacroMapping | null {
-  const o = (raw || {}) as Partial<MacroMapping>;
-  const row = voiceTargetRow(o.target);
-  if (!row || macroTargetProblem(o.target, taken) !== undefined) return null;
-  taken.add(row.path);
-  const d = MACRO_MAPPING_DEFAULTS;
-  const curve = num(o.curve, d.curve) | 0;
-  return {
-    target: row.path,
-    min: clamp(num(o.min, d.min), row),
-    max: clamp(num(o.max, d.max), row),
-    curve: curve < MACRO_LINEAR || curve > MACRO_S ? MACRO_LINEAR : curve,
-    inverted: !!o.inverted,
-  };
-}
-
-/** The macros: at most `MACROS_MAX`, each value in 0..1, each with at most `MACRO_MAPPINGS_MAX` mappings. */
 function macrosDefaults(raw: unknown): Macro[] {
   const list = Array.isArray(raw) ? (raw as unknown[]) : [];
-  const taken = new Set<string>();
   const out: Macro[] = [];
   for (let i = 0; i < list.length && i < MACROS_MAX; i++) {
     const o = (list[i] || {}) as Partial<Macro>;
-    const rawMappings = Array.isArray(o.mappings) ? (o.mappings as unknown[]) : [];
-    const mappings: MacroMapping[] = [];
-    for (let k = 0; k < rawMappings.length && k < MACRO_MAPPINGS_MAX; k++) {
-      const mapping = macroMappingDefaults(rawMappings[k], taken);
-      if (mapping) mappings.push(mapping);
-    }
     out.push({
       name: typeof o.name === 'string' ? o.name : MACRO_DEFAULTS.name,
       value: clamp(num(o.value, MACRO_DEFAULTS.value), MACRO_VALUE_RANGE),
-      mappings,
+      mappings: [],
     });
+  }
+  for (const { macro, mapping } of effectiveMacroMappings({ macros: list })) {
+    out[macro]!.mappings.push(mapping);
   }
   return out;
 }
 
-function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
+function normalisePatch(raw: PartialPatch | null | undefined): Patch {
   raw = raw || {};
   const ops: Operator[] = [];
   for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
