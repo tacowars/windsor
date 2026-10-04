@@ -347,6 +347,9 @@ export const FIGURE_KNOBS: readonly SequencerKnobEntry[] = [
   })),
 ];
 
+/** The Roll device's table knob (windsor#602): Vel, the part's velocity, which scales every note's own. */
+export const ROLL_KNOBS: readonly SequencerKnobEntry[] = [VELOCITY_KNOB];
+
 /** The Figure's Length: the Grid's range over the Figure's own default, one bar. */
 export const FIGURE_LENGTH_KNOB: CardKnobSpec = {
   ...GRID_LENGTH_KNOB,

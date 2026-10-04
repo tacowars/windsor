@@ -20,6 +20,7 @@ import type { CardBody } from './sequencerDevice';
 import { euclidCard } from './euclidCard';
 import { figureCard } from './figureCard';
 import { gridCard } from './gridCard';
+import { rollCard } from './rollCard';
 
 /**
  * What every card is: the body of one part's section, built from the
@@ -35,14 +36,6 @@ export type SequencerCard = (ctx: AppCtx, slot: number, region?: number) => Card
 const noneCard: SequencerCard = () =>
   el('p', 'hint', 'No sequencer: this part plays only from the keyboard.');
 
-/** A Roll part until its device lands (windsor#602): the engine plays its notes (windsor#600), with nothing yet to show them. */
-const rollStandIn: SequencerCard = () =>
-  el(
-    'p',
-    'hint',
-    'Roll: this part plays its notes. The Roll device, to see and edit them, is on its way.',
-  );
-
 /** One card per kind. A kind added to the engine is an appended entry here. */
 export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   none: noneCard,
@@ -52,5 +45,5 @@ export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   arp: arpCard,
   bass: bassCard,
   figure: figureCard,
-  roll: rollStandIn,
+  roll: rollCard,
 };

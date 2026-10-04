@@ -7,6 +7,7 @@
  * number is written once, here.
  */
 import { PERC_COLOR, PITCH_COLOR } from './consoleColors';
+import { ROLL_DEVICE_PX } from './rollTables';
 import type { LaneTone } from './songViewTables';
 
 /** The Grid's step rows, top down, in px: the step number, note, degree, Oct, A, S, ratchet. */
@@ -180,6 +181,9 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--figure-row-knob-w': 56,
   /** One choice in the tone picker, square. */
   '--figure-pick': 30,
+  /* The Roll's own sizes (windsor#602), off tacowars's mockup (roll.html),
+     written once in `rollTables.ts`. */
+  ...ROLL_DEVICE_PX,
 };
 
 /** A part's accent on its device (the mockup's `--kc`): the dot, the knob arcs, the lit cells. */
