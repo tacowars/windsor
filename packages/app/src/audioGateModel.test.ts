@@ -5,6 +5,7 @@ import { buildDate, buildLine } from './audioGateBuildLine';
 import {
   GATE_HIDDEN,
   audioGateView,
+  gateClosed,
   stepAudioGate,
   type AudioGate,
   type AudioGateEvent,
@@ -63,6 +64,12 @@ describe('the audio gate', () => {
     expect(step(BACK, context(true))).toEqual(GATE_HIDDEN);
     expect(step(BACK, context(false))).toEqual(BACK);
     expect(step(BACK, { type: 'press' }, { type: 'resolved', running: true })).toEqual(GATE_HIDDEN);
+  });
+
+  it('counts a context that comes back after an enable left the gate up as closing it', () => {
+    const back = step(STARTING, { type: 'resolved', running: false });
+    expect(gateClosed(STARTING, back)).toBe(false);
+    expect(gateClosed(back, step(back, context(true)))).toBe(true);
   });
 
   it('lets only the press decide while starting, before audio and after a failure', () => {

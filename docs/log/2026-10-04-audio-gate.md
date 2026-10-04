@@ -74,6 +74,10 @@ become.
 - The gate's mark is also the favicon (`packages/app/public/favicon.svg`).
 - The *starting* state shows on a resume as well as on the first press. A
   resume is quick, so it is a flash at most.
-- Every other modal (the restore question on reload, the metadata dialog)
-  can open over the gate; the top layer stacks them in opening order, and
-  the gate is still there when they close.
+- The restore question on reload waits for the gate's first pass
+  (windsor#581): `mountAudioGate` returns a `passed` promise that resolves
+  the first time an enable resolves with audio running, and the question
+  opens only then. It is asked once per page load; the *back* state never
+  brings it back. Other modals (the metadata dialog) can still open over
+  the gate; the top layer stacks them in opening order, and the gate is
+  still there when they close.

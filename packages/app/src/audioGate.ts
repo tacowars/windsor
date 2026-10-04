@@ -17,6 +17,7 @@ import { buildLine } from './audioGateBuildLine';
 import {
   GATE_HIDDEN,
   audioGateView,
+  gateClosed,
   stepAudioGate,
   type AudioGate,
   type AudioGateEvent,
@@ -31,6 +32,18 @@ export interface AudioGateOptions {
   readonly enable: () => Promise<void>;
   /** An enable resolved: the console re-renders over live audio. */
   readonly onEnabled: () => void;
+}
+
+/** What the mounted gate tells the rest of the boot. */
+export interface MountedAudioGate {
+  /**
+   * Resolves the first time the gate goes from open to closed, whatever event
+   * closed it (an enable that resolved with audio running, or a context that
+   * came back running after one that did not), and never rejects: while the
+   * gate is up it stays pending. The restore question waits on it so it never
+   * opens over the gate (windsor#581).
+   */
+  readonly passed: Promise<void>;
 }
 
 /** The gate's parts in `index.html`. */
@@ -59,7 +72,7 @@ function paint(parts: GateParts, gate: AudioGate): void {
 }
 
 /** Open the gate in its first-load state and keep it on the context from then on. */
-export function mountAudioGate(options: AudioGateOptions): void {
+export function mountAudioGate(options: AudioGateOptions): MountedAudioGate {
   const parts: GateParts = {
     dialog: $('audioGate') as HTMLDialogElement,
     power: $('gatePower') as HTMLButtonElement,
@@ -68,9 +81,13 @@ export function mountAudioGate(options: AudioGateOptions): void {
   };
   const { host } = options;
   let gate = GATE_HIDDEN;
+  let pass = (): void => {};
+  const passed = new Promise<void>((resolve) => (pass = resolve));
   const dispatch = (event: AudioGateEvent): void => {
+    const before = gate;
     gate = stepAudioGate(gate, event);
     paint(parts, gate);
+    if (gateClosed(before, gate)) pass();
   };
 
   $('gateBuild').textContent = buildLine(__WINDSOR_BUILD__);
@@ -98,4 +115,5 @@ export function mountAudioGate(options: AudioGateOptions): void {
     }),
   );
   dispatch({ type: 'load' });
+  return { passed };
 }

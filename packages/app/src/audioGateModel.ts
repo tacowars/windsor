@@ -77,6 +77,15 @@ export function stepAudioGate(gate: AudioGate, event: AudioGateEvent): AudioGate
   }
 }
 
+/**
+ * Whether the step from `before` to `after` closed the gate, whatever event
+ * did it: a press that resolved with audio running, or a context that came
+ * back by itself after an enable left the gate up (windsor#581).
+ */
+export function gateClosed(before: AudioGate, after: AudioGate): boolean {
+  return before.kind !== 'hidden' && after.kind === 'hidden';
+}
+
 /** What the gate shows: whether it is open, its words, and the button's look. */
 export interface AudioGateView {
   readonly open: boolean;

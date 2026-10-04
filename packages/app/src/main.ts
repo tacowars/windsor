@@ -75,13 +75,16 @@ void midi.resume();
 // The gate's button is the gesture that starts or resumes audio (windsor#578);
 // the header's power button shows up as the CPU meter once audio is on.
 const power = wirePowerButton($('power'), ctx);
-mountAudioGate({
+const gate = mountAudioGate({
   host,
   enable: () => host.enable(ctx.model.doc),
   onEnabled: () => power.audioOn(),
 });
 // The user's patches and autosaved song (IndexedDB), and a remembered library
 // folder whose grant still stands; the row's button re-grants a dropped one.
-bootUserState(ctx).catch((error: unknown) => notify(`your library: ${String(error)}`, 'error'));
+// The restore question waits until the gate has first been passed.
+bootUserState(ctx, gate.passed).catch((error: unknown) =>
+  notify(`your library: ${String(error)}`, 'error'),
+);
 // The scheduler's look-ahead pump: a timer, since the console has no frame loop to drive it.
 setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
