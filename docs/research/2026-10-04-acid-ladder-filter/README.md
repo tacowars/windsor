@@ -542,3 +542,244 @@ median [IQR]):
   threshold with the high-pass at the bilinear image (17.6) and grows to a
   held oscillation at 1.1 ×; k 16.5 decays after an impulse at 100 Hz,
   500 Hz, 2 kHz, 5 kHz and 10 kHz.
+
+## The sound-design pass (windsor#574)
+
+Three factory acid patches, an audition song, a comparison rig against
+Roland's TB-303 software instrument, and the three sound-design tunables
+set from it: `LADDER_FEEDBACK_MAX` stays **16.5**, `LADDER_FEEDBACK_HP_HZ`
+moves from 150 to **100** Hz and `LADDER_INPUT_SCALE` from 2 to **1**.
+The sections above were read at 150 Hz and scale 2 (their conversions to
+the carrier's units divide by 2). Sound calibration stays provisional until
+tacowars has listened against the references. Every number below is
+measured on the shipped bundle under Node 24.21.0 from seeded renders; none
+is a performance reading.
+
+### The patches
+
+`packages/engine/src/patches/acid-*.json`, category Basses, tags `acid`,
+`bass`, `303`, `mono`. Each is one carrier into the Acid mode (mode 6),
+`mono`, the amp envelope a 1 ms attack, a 1.6 s decay to 0.55 and a 20 ms
+release, key track 0, Drive on with the `soft` shape:
+
+| patch | carrier | Cutoff | Reso (knob travel) | env amount | wheel | filter decay | drive gain | volume | velSens |
+|---|---|---|---|---|---|---|---|---|---|
+| `acid-saw` | `SAW` | 300 Hz | 5.0 (72 %) | 3 oct | 1.5 oct | 0.25 s | 3 | 0.35 | 0.35 |
+| `acid-square` | `SQUARE` | 260 Hz | 5.5 (75 %) | 3.5 oct | 1.5 oct | 0.30 s | 3 | 0.35 | 0.35 |
+| `acid-accent` | `SAW` | 220 Hz | 6.0 (78 %) | 2 oct | 3.5 oct | 0.15 s | 4 | 0.40 | 0.6 |
+
+The filter envelope has no attack and no sustain. A Grid accent sends a mod
+of 1, which adds `filter.modWheelDepth` to the envelope amount, so an accent
+opens the sweep as the wheel does; `acid-accent` keeps its plain notes dark
+(2 octaves) and lets an accent open 3.5 octaves further.
+
+**Glide is 0, not the brief's 60–120 ms.** A patch's `glide` is portamento
+on every note in `mono` (`fmProcessor.ts`: each new voice starts from the
+last note when `glide > 0`), so a TB-303 line with a glide would bend into
+every step, slid or not. With `glide` 0 only a Grid slide glides, over the
+engine's `SLIDE_SECONDS_DEFAULT` (60 ms, the low end of the brief's range),
+and a plain step jumps, as the TB-303's does. `extra-acid-saw-glide-0.08.wav`
+in the listen folder plays the other choice.
+
+**Level.** C2 and C3 held 1 s at velocity 1 peak at −18.5 (`acid-saw`),
+−16.3 (`acid-square`) and −17.1 dBFS (`acid-accent`) over four seeds, far
+from a clip (the acceptance's check). That is quiet: the saw line's RMS is
+about 9 dB under `score-dockside-bass` playing the same line. The ladder's
+passband falls with resonance (record decision 7, no makeup) and the
+drive's `soft` shape holds the ladder's input to ±1 whatever the volume,
+so the patch cannot be louder without less resonance; the song's strips
+carry +6 dB (level 2).
+
+**The voice's end.** An Acid voice ends 0.31–0.55 s after the note-off
+(the ladder's feedback loop through its high-pass has a mode of about
+20 ms, and the voice ends when every ladder state is under the dormancy
+floor, about −180 dB). `patch/patchLibraryEnvelope.test.ts` gave a
+released note 0.1 s past its release, which no Acid patch with resonance
+meets at any of the tunables' values (0.31–0.43 s at the record's), so the
+test now allows an Acid patch 0.6 s more.
+
+**The sweep.** `audition/sweep.mjs` plays A2 at velocity 0.8, plain and
+accented, and reads the resonance's emphasis (the neighbouring harmonics
+that rose most against the same note with Reso at its bottom) in 43 ms
+windows. The peak moves with the envelope, and an accent starts it higher
+(Hz, every other window):
+
+| ms | saw | saw, accent | square | square, accent | `acid-accent` | `acid-accent`, accent |
+|---|---|---|---|---|---|---|
+| 21 | 2403 | 6600 | 2970 | 8030 | 922 | 7920 |
+| 64 | 2178 | 5709 | 2750 | 7150 | 805 | 5940 |
+| 107 | 1941 | 4607 | 2310 | 6050 | 592 | 3278 |
+| 149 | 1512 | 3287 | 2090 | 4730 | 339 | 701 |
+| 192 | 1149 | 2063 | 1650 | 3410 | 228 | 228 |
+| 235 | 586 | 820 | 1210 | 2090 | 228 | 228 |
+| 277 | 339 | 339 | 549 | 761 | 228 | 228 |
+
+The lift is 9–12 dB at the top of the sweep and 5–7 dB at its foot, where
+the feedback's high-pass damps the resonance (the low-cutoff thinning the
+record describes).
+
+### The audition song
+
+`audition/acid-audition.song.json`, for the Settings tab's Import on the
+PR preview: 8 bars at 128 BPM in A natural minor, three Grid parts of 16
+sixteenths at register octave 1 (A1 = MIDI 33), each line in the first and
+second octaves with accents, slides and ties, part velocity 0.8, accent
+velocity +0.2 and accent mod 1:
+
+1. **Acid Saw**, bars 1–2 alone, then bars 7–8.
+2. **Acid Square**, bars 3–4 alone, then bars 7–8 with the saw.
+3. **Acid Accent**, bars 5–6 alone: nine accents in sixteen steps.
+
+`audition/acid-saw.patch.json`, `acid-square.patch.json` and
+`acid-accent.patch.json` are the patches alone, for the Parts tab's JSON
+dialog. The song carries a snapshot of each.
+
+### The ACB comparison
+
+`reference/compare.mjs <303-filter folder>` reads the eight recordings
+tacowars made from Roland's TB-303 software instrument (ACB 1.0.9; the
+recipe, the note timeline and the SHA-256 of every file are in that
+folder's `settings.txt`). It refuses a file whose hash is not
+`settings.txt`'s, reads each in place and copies nothing. For every
+recording, note and Cut Off section it measures a window 0.5–1.8 s into the
+held note: harmonics 1–16 in dB against the same waveform's 0 % resonance,
+24.78 % Cut Off, note 33 fundamental (nothing normalised), the resonance's
+emphasis (the up to three neighbouring harmonics that rose most against
+0 % resonance: their power-weighted frequency and their lift) and the
+spectral centroid. It renders Windsor's `acid-saw` and `acid-square`
+reduced to the recipe (one carrier, drive off, envelope amount 0, the amp
+envelope held, velocity sensitivity 0, the carrier's peak 1 into the
+ladder) through `scripts/sound-match/render.mjs`, at the same notes with a
+2 s gate and the Reso knob at 0, 50, 90 and 100 % of its travel, which on
+its log sweep (0.5 × 24^t) is reso 0.5, 2.45, **8.74** and 12 (the brief's
+9.5 is 93 %). `--set NAME=value` renders a tunable variant through
+`audition/bundleVariant.mjs`, the shipped bundle's text with that one
+number changed (with no override it renders as `render.mjs` does, to the
+bit). `reference/compare.txt` is its output on the shipped values with
+`--cells`: the side-by-side table for every wave, section, note and
+resonance.
+
+**The Cut Off map.** Each section's Windsor cutoff is the one whose
+emphasis at reso 12 on note 33 falls where the ACB's does at 100 %
+resonance (the geometric mean of saw and square):
+
+| ACB Cut Off | ACB emphasis | Windsor cutoff (shipped values) |
+|---|---|---|
+| 24.78 % | 279 Hz | 199 Hz |
+| 49.38 % | 397 Hz | 314 Hz |
+| 75.05 % | 773 Hz | 630 Hz |
+| 100 % | 1713 Hz | 1465 Hz |
+
+**The emphasis** on the shipped values, its lift in dB against 0 %
+resonance, the mean of notes 33, 45 and 57:
+
+| wave | Cut Off | ACB at 50 / 90 / 100 % | Windsor at 50 / 90 / 100 % |
+|---|---|---|---|
+| saw | 24.78 % | 6.8 / 12.4 / 13.6 | 3.5 / 5.6 / 6.0 |
+| saw | 49.38 % | 7.4 / 15.8 / 17.9 | 3.9 / 7.4 / 8.4 |
+| saw | 75.05 % | 9.1 / 18.3 / 20.5 | 5.3 / 10.3 / 11.7 |
+| saw | 100 % | 10.6 / 22.9 / 27.2 | 6.0 / 13.1 / 15.9 |
+| square | 24.78 % | 6.3 / 12.4 / 13.7 | 1.0 / 3.7 / 4.3 |
+| square | 49.38 % | 7.0 / 15.5 / 17.7 | 2.5 / 4.9 / 5.8 |
+| square | 75.05 % | 8.2 / 17.9 / 20.6 | 4.9 / 10.4 / 11.5 |
+| square | 100 % | 10.6 / 22.6 / 27.8 | 5.7 / 13.7 / 15.7 |
+
+**Every tunable, one at a time from the record's values** (16.5, 150 Hz,
+2), then the shipped set and two of its neighbours. The lift gap is
+Windsor's emphasis lift minus the ACB's, the mean over waves, sections and
+notes. Shape is harmonics 2–16 against each note's own fundamental, and
+level harmonics 1–16 against the reference, Windsor minus ACB, RMS dB over
+the harmonics both hold above −90 dB (the square's odd harmonics only: the
+ACB's square carries even harmonics, H2 16 dB under H1, and Windsor's
+`SQUARE` none). Bass is each note's fundamental at 50, 90 and 100 %
+resonance against its own 0 %, Windsor minus ACB, notes 33 and 45, RMS and
+mean dB:
+
+| variant | Cut Off map, Hz | lift gap at 50 / 90 / 100 % | shape at 0 %, saw / square | shape at 100 %, saw / square | level at 100 %, saw / square | bass, 24.78 and 49.38 % | bass, every section |
+|---|---|---|---|---|---|---|---|
+| record (16.5, 150, 2) | 235, 311, 641, 1473 | −4.1 / −10.3 / −11.9 | 7.68 / 6.98 | 15.70 / 12.04 | 20.16 / 13.91 | 4.31, +3.91 | 3.42, +2.21 |
+| max 15.5 | 224, 318, 669, 1514 | −4.5 / −10.8 / −12.6 | 7.54 / 7.09 | 15.75 / 12.27 | 19.36 / 13.50 | 4.67, +4.33 | 3.66, +2.57 |
+| max 17 | 197, 311, 637, 1463 | −4.0 / −10.2 / −11.8 | 8.16 / 6.74 | 16.33 / 12.75 | 19.65 / 13.69 | 4.62, +4.30 | 3.61, +2.31 |
+| high-pass 100 | 223, 333, 665, 1483 | −3.6 / −9.6 / −11.1 | 7.47 / 7.09 | 13.84 / 10.31 | 19.32 / 13.01 | 2.93, +2.46 | 2.85, +0.40 |
+| high-pass 250 | 230, 291, 612, 1463 | −5.0 / −11.3 / −13.2 | 8.11 / 6.76 | 18.22 / 15.04 | 20.37 / 15.02 | 6.36, +6.02 | 5.34, +4.79 |
+| input 1 | 201, 296, 624, 1436 | −4.5 / −9.6 / −11.2 | 6.50 / 7.15 | 13.24 / 9.84 | 17.93 / 13.60 | 2.62, +2.42 | 2.41, +0.50 |
+| input 4 | 229, 337, 668, 560 | −4.6 / −11.0 / −12.9 | 14.18 / 9.38 | 24.31 / 19.13 | 25.92 / 17.78 | 7.34, +6.87 | 6.96, +6.46 |
+| **shipped (16.5, 100, 1)** | 199, 314, 630, 1465 | −4.1 / −8.6 / −10.0 | 6.37 / 7.31 | 11.49 / 8.65 | 17.50 / 13.29 | 1.33, +0.86 | 2.94, −1.34 |
+| shipped, max 17 | 201, 314, 635, 1449 | −4.0 / −8.2 / −9.6 | 6.34 / 7.33 | 11.21 / 8.47 | 17.46 / 13.44 | 1.19, +0.63 | 3.05, −1.57 |
+| shipped, high-pass 50 | 233, 339, 655, 1478 | −3.6 / −7.3 / −8.5 | 5.88 / 7.85 | 8.22 / 6.94 | 17.34 / 13.46 | 2.22, −1.81 | 4.79, −3.93 |
+
+(Input 4's top section fitted on a lower peak: with the ladder that hot the
+emphasis at reso 12 never reaches the target, and the fit lands at 560 Hz.)
+
+**The proposal, tunable by tunable.**
+
+- **The Reso pot law: keep it.** In dB, the ACB's lift at 50 % travel is
+  43 % (saw) and 40 % (square) of its lift at 100 %, and at 90 % it is 88 %
+  and 86 %; Windsor's `p` gives 45 % and 38 %, 87 % and 88 % (the means
+  over sections in the emphasis table). The proportions agree within three
+  points; what differs is the scale, below, which neither the law nor the
+  ceiling carries.
+- **The feedback ceiling: keep 16.5**, the record's value: the table is
+  silent. 17 against 16.5 moves the lift gap by 0.4 dB and the errors by
+  0.3 dB at most, and 15.5 the other way by as little. The ACB's 100 %
+  lifts 1.2–5.2 dB more than its 90 %, Windsor's 0.4–2.8 dB, and no
+  ceiling short of oscillation closes that.
+- **The high-pass corner: 100 Hz** (from 150). From the record's values,
+  100 Hz takes the bass error at the 24.78 and 49.38 % sections, where the
+  corner matters, from 4.3 to 2.9 dB RMS (1.3 with input 1), narrows the
+  lift gap by 0.5–0.8 dB and the 100 % shape error by about 2 dB. Below
+  100 Hz the lift keeps rising but the bass loss overshoots the ACB's (50 Hz
+  on the shipped set: −1.8 dB at the low sections, −3.9 dB over every
+  section), and 250 Hz is worse on every column. 100 is the lowest of the
+  listen's three values.
+- **The input scale: 1** (from 2). With the carrier's full level, the
+  drive's ceiling, at one 2 V_T unit, the shape and level errors fall at
+  every resonance (saw at 0 %: shape 7.7 → 6.5 dB; at 100 %: 15.7 → 13.2)
+  and the bass error is lowest; 4 is worse everywhere. The rig fixes the
+  level, and level and scale trade one for one (the rig at level 0.5 and
+  scale 2 reads exactly as at level 1 and scale 1), so what this measures
+  is that the ACB behaves like a ladder fed one unit at its oscillator's
+  full level, which scale 1 puts at the patches' ceiling. The ladder then
+  saturates mildly (H3 about −67 dB for a full-level sine at k 12, the
+  large-signal table above): the squelch comes from the drive and the
+  resonance more than from the ladder's own diodes.
+
+**What no tunable reaches.** On the shipped values Windsor's resonance
+lifts 8.6 and 10.0 dB less than the ACB's at 90 and 100 % (7.3–13.2 dB
+across every variant tried). At a matched emphasis Windsor's 0 % resonance
+is also 8–10 dB darker an octave above the fundamental (saw, 24.78 %,
+note 45: H1 −6.5 dB against the ACB's +1.8, H2 −22.7 against −13.1,
+`compare.txt`): the ACB's zero-resonance roll-off starts within about an
+octave of its emphasis, the ladder's three octaves under its cutoff (record
+decision 5). That is the model's shape, not a tunable's; the record's
+deferred circuit reduction of the resonance return is where it would be
+looked at. The upper sections also lose 3–6 dB more bass with resonance
+than the ACB's (the passband's 1 / (1 + k) at high cutoffs). The
+recordings are the whole Roland voice, so some of this is its oscillator
+and VCA: they are behavioural references, never goldens.
+
+### The tunables' listen
+
+`audition/renderTunables.mjs <out dir>` renders, for each tunable at each
+of the brief's three values with the other two at the shipped values, the
+song's three lines one after another (each line twice, its own patch alone,
+half a second apart), as the Grid plays them, levels as rendered. The nine
+files went to `~/Desktop/acid-tunables/` for tacowars's listen, never into
+the repository. Per part (saw / square / `acid-accent`), the RMS level and
+the median spectral centroid:
+
+| file | RMS dBFS | centroid Hz | against the shipped values |
+|---|---|---|---|
+| `LADDER_FEEDBACK_MAX-15.5.wav` | −29.3 / −24.6 / −26.3 | 670 / 835 / 1536 | 0.4 dB louder, a touch less resonant |
+| `LADDER_FEEDBACK_MAX-16.5.wav` (shipped) | −29.7 / −25.0 / −26.7 | 695 / 871 / 1635 | |
+| `LADDER_FEEDBACK_MAX-17.wav` | −29.9 / −25.2 / −26.9 | 709 / 890 / 1686 | a touch more resonant |
+| `LADDER_FEEDBACK_HP_HZ-100.wav` (shipped) | −29.7 / −25.0 / −26.7 | 695 / 871 / 1635 | the leanest bass, the resonance most forward |
+| `LADDER_FEEDBACK_HP_HZ-150.wav` | −27.7 / −22.7 / −24.6 | 628 / 776 / 1456 | 2 dB louder, more fundamental |
+| `LADDER_FEEDBACK_HP_HZ-250.wav` | −24.6 / −19.3 / −21.6 | 526 / 639 / 1189 | 5 dB louder, the bass back, the resonance thinner |
+| `LADDER_INPUT_SCALE-1.wav` (shipped) | −29.7 / −25.0 / −26.7 | 695 / 871 / 1635 | the cleanest, the resonance brightest |
+| `LADDER_INPUT_SCALE-2.wav` | −29.5 / −25.1 / −26.3 | 577 / 719 / 1294 | darker: the ladder compresses the peak |
+| `LADDER_INPUT_SCALE-4.wav` | −29.1 / −25.2 / −26.3 | 461 / 569 / 978 | darkest and most saturated |
+
+`extra-acid-saw-glide-0.wav` and `extra-acid-saw-glide-0.08.wav` are the
+saw's line with the patch's glide at 0 (shipped: only the slides glide) and
+at 0.08 s (every note bends from the last).

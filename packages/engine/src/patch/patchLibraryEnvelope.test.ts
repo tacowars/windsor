@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { loadProcessor, render } from '../__fixtures__/workletHarness';
+import { FILTER_MODE, type Patch } from './patch';
 import { PATCH_LIBRARY } from './presets';
 
 const dsp = loadProcessor();
@@ -27,6 +28,19 @@ const sustained = LIBRARY.filter(
   (entry) => SUSTAINED.includes(entry.category) && !isLegacy(entry.tags),
 );
 const rest = LIBRARY.filter((entry) => !sustained.includes(entry));
+/**
+ * The Acid mode's ring after the envelopes end (windsor#574): with
+ * resonance, the ladder's feedback loop through its high-pass has a slow
+ * mode (about 20 ms), and the voice ends only when every ladder state is
+ * under the dormancy floor (about −180 dB), 0.31–0.55 s after the note-off
+ * on the factory acid patches (`docs/research/2026-10-04-acid-ladder-filter/`).
+ */
+const LADDER_RING_S = 0.6;
+/** How long a released note may take to end: its longest release, a margin, and the ladder's ring. */
+const tailSeconds = (patch: Patch): number =>
+  Math.max(...patch.ops.map((op) => op.env.releaseTime)) +
+  0.1 +
+  (patch.filter.mode === FILTER_MODE.LADDER ? LADDER_RING_S : 0);
 
 describe('every other patch', () => {
   it.each(rest)('$id is finite, audible and releases', ({ patch }) => {
@@ -35,7 +49,7 @@ describe('every other patch', () => {
       patch.filter.env.attackTime + patch.filter.env.decayTime,
       2,
     );
-    const tail = Math.max(...patch.ops.map((op) => op.env.releaseTime)) + 0.1;
+    const tail = tailSeconds(patch);
     const processor = dsp.create(patch, 16, 0xa204);
     const result = render(
       dsp,
@@ -65,7 +79,7 @@ describe('sustained patches through the envelope and release', () => {
         patch.filter.env.attackTime + patch.filter.env.decayTime,
         2,
       );
-      const tail = Math.max(...patch.ops.map((op) => op.env.releaseTime)) + 0.1;
+      const tail = tailSeconds(patch);
       const frames = Math.ceil(hold * dsp.sampleRate);
       const blocks = Math.ceil(((hold + tail) * dsp.sampleRate) / BLOCK);
       const notes = category === 'Basses' ? [24, 36, 48] : [36, 60, 84];

@@ -180,15 +180,17 @@ const FORMANT_MAKEUP = 1.787;
  * ladder, its bottom capacitor LADDER_BOTTOM_CAP of the others (the
  * schematic's 18 nF under 33 nF, Stinchcombe's half). Resonance is the
  * output fed back into the input pair through a one-pole high-pass at
- * LADDER_FEEDBACK_HP_HZ (Open303's calibrated image of the hardware's
- * return, a tunable and not a component value), times a gain k =
+ * LADDER_FEEDBACK_HP_HZ (a one-pole image of the hardware's return, a
+ * tunable and not a component value: Open303's calibration is 150 Hz, and
+ * the ACB comparison of windsor#574 set 100), times a gain k =
  * LADDER_FEEDBACK_MAX x p, p the Reso knob's place on its log scale,
  * log2(reso / LADDER_RESONANCE_FLOOR) / log2(LADDER_RESONANCE_SPAN), 0 at
  * 0.5 and 1 at 12. The linear self-oscillation threshold is k = 17, so
  * 16.5 stays short of it, as the stock unit does. The carrier sum enters
  * times LADDER_INPUT_SCALE (the model's 2 V_T unit) and leaves divided by
- * it. The cutoff is held between LADDER_CUTOFF_MIN_HZ and
- * LADDER_CUTOFF_MAX_HZ, and below LADDER_CUTOFF_CEILING of the sample rate
+ * it (1 since windsor#574: the voice's full level, the drive's ceiling, is
+ * one 2 V_T unit, where the ACB comparison put it). The cutoff is held
+ * between LADDER_CUTOFF_MIN_HZ and LADDER_CUTOFF_MAX_HZ, and below LADDER_CUTOFF_CEILING of the sample rate
  * at a low rate. The solver (decision 6): LADDER_NEWTON_STEPS Newton steps
  * a sample on the trapezoidal step, at LADDER_OVERSAMPLE times the sample
  * rate. The shipped candidate is 1x with four steps and the cutoff capped
@@ -197,11 +199,11 @@ const FORMANT_MAKEUP = 1.787;
  * Each value is tacowars's to set by ear.
  */
 const LADDER_BOTTOM_CAP = 0.5;
-const LADDER_FEEDBACK_HP_HZ = 150;
+const LADDER_FEEDBACK_HP_HZ = 100;
 const LADDER_FEEDBACK_MAX = 16.5;
 const LADDER_RESONANCE_FLOOR = 0.5;
 const LADDER_RESONANCE_SPAN = 24;
-const LADDER_INPUT_SCALE = 2;
+const LADDER_INPUT_SCALE = 1;
 const LADDER_CUTOFF_MIN_HZ = 20;
 const LADDER_CUTOFF_MAX_HZ = 10000;
 const LADDER_CUTOFF_CEILING = 0.45;

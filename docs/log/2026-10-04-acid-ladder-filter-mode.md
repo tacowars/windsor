@@ -60,9 +60,13 @@ are not touched, and every factory preset renders bit for bit as before.
    `tanh`, so input and feedback saturate together. The high-pass stands
    for the hardware's resonance return, two coupling stages (0.1 µF, then
    1 µF) into the 50 kΩ pot and 47 kΩ on the service notes' schematic; its
-   corner, `LADDER_FEEDBACK_HP_HZ` at **150 Hz**, is Open303's calibrated
-   one-pole image of that return (as TapTools attributes it), not a
-   component value, and tacowars sets it by ear. A circuit reduction of
+   corner, `LADDER_FEEDBACK_HP_HZ`, is a calibrated one-pole image of
+   that return, not a component value: the plan started it at 150 Hz
+   (Open303's value, as TapTools attributes it), and windsor#574's fit
+   against Roland's ACB recordings moved it to **100 Hz**, where the bass
+   loss at the two low Cut Off sections is nearest the reference
+   (`docs/research/2026-10-04-acid-ladder-filter/README.md`, "The
+   sound-design pass"); tacowars's listen may move it again. A circuit reduction of
    the return is later work, not assumed. The feedback gain k is
    `LADDER_FEEDBACK_MAX × p`, with p the Reso knob's position on its log
    scale (`log₂(reso / 0.5) / log₂(24)`, 0 at 0.5 and 1 at 12; the default
@@ -131,6 +135,9 @@ are not touched, and every factory preset renders bit for bit as before.
    (the model's 2V_T unit; the research gives H3 at −67 dB for 1 and
    −55 dB for 2 at full scale, k 12) and leaves divided by it, with the
    ladder's inversion undone so the mode has the Lowpass mode's polarity.
+   The plan started the scale at 2; windsor#574's fit ships **1**, where
+   the shape and level errors against the ACB recordings are lowest at
+   every resonance.
    The passband falls with resonance as the circuit's does, 1 / (1 + k)
    at high cutoffs and less at low ones where the high-pass returns the
    bass; no makeup. Both values are tacowars's to set by ear; the voice's
@@ -191,7 +198,7 @@ are not touched, and every factory preset renders bit for bit as before.
   cutoff. Both are the instrument's; a patch compensates with the knob.
 - Factory acid patches add rows to the golden, which the sound-design
   ticket refreshes and says so.
-- The one-pole 150 Hz high-pass is a calibration of the hardware's
+- The one-pole high-pass (100 Hz shipped) is a calibration of the hardware's
   return, so the resonance thinning at low cutoffs is the model's claim,
   to be confirmed by ear and, if wanted, by a circuit reduction later.
 - Deferred: an extended-resonance option; a Reso readout in pot percent

@@ -3,6 +3,9 @@
   "seed": 41476,
   "sampleRate": 48000,
   "hashes": {
+    "acid-accent": "cfaeabbae9b0d511c41585f3f23044e85f07a28c6529f24b4deeee38671916d3",
+    "acid-saw": "dfffec4ea32ad304437c10f76f9f20455037d434694e5005ad7061195fbc832c",
+    "acid-square": "a18b302f067db0ec1c516ac3e5bbd430115053e7edb3351317e75f334b51b2af",
     "ai-voice": "76e48ec49b8a03b35aa3b2ede04f308bf12ebf5fcb2573b51ba34aad1dff2f59",
     "bass-digital": "a962fc2e918b77fa25de3b4c98a96cc4764ae17f08fccabaf1e63fd1c53bd89b",
     "build-thunk": "8eb9265d4f86acbf55cce298d75b65eff426d094d3a6349c1e0915dc3609d07d",
