@@ -109,7 +109,12 @@ What the engine had:
    have, on mapped targets too.
 7. **A lane on a macro the patch does not define is kept and silent**, as a
    vowel lane on a patch not in Formant is today. A patch swap keeps the
-   lane (`2026-10-01-song-automation-lanes` decision 14).
+   lane (`2026-10-01-song-automation-lanes` decision 14). Removing a macro
+   in the Macros card is the one exception (windsor#561, PR #565): a lane
+   names a macro by its position, so the card deletes the removed macro's
+   song and step lanes and moves every later macro's lanes down one, on
+   every part that plays the patch, in the same undo step. Lanes follow
+   their macro; nothing is left pointing at the wrong one.
 8. **Slides.** A macro row is not `slideKeeps`. A macro mapped to a
    `slideKeeps` row (feedback, a decay curve) therefore moves it on a
    slide, which may click; accepted for version 1.
