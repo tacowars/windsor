@@ -40,7 +40,7 @@ const GRID_HTML = `
   <div class="parts-grid">
     <aside class="rail">
       <div class="section">
-        <div class="section-title"><span>Output</span></div>
+        <div class="section-title"><span>Output</span><span class="scope-view" data-scope-view>Scope</span></div>
         <canvas class="scope" id="scope" width="420" height="124"></canvas>
       </div>
       <div class="section">

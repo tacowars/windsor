@@ -5776,6 +5776,13 @@ body.env-dragging .env-canvas {
   background: var(--inset);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  cursor: pointer;
+}
+/* The Output display's current view (windsor#586), at the title's right end:
+   a tap on the display moves Scope → Cycle → Spectrum. */
+.section-title > .scope-view {
+  flex: none;
+  order: 3;
 }
 
 .keys {

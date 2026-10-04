@@ -301,7 +301,7 @@ export class EngineHost {
     this.context.onstatechange = this.audioChanged;
     this.urls = urls;
     this.analyser = this.context.createAnalyser();
-    this.analyser.fftSize = 2048;
+    this.analyser.fftSize = 8192;
     await this.build(document);
   }
 

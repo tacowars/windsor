@@ -1,16 +1,44 @@
-/** The output scope: draws the analyser tap on the engine master (#70). */
-import { CARRIER_COLOR, HOT_COLOR, LINE_COLOR } from './consoleColors';
-import { SCOPE_CLIP_PEAK, SCOPE_TRACE_WIDTH } from './scopeConstants';
+/**
+ * The Output display: draws the analyser tap on the engine master (#70) in
+ * one of three views (windsor#586): Scope, Cycle and Spectrum, a tap on the
+ * canvas moving to the next. This file is the canvas's frame loop and the
+ * view switch; `scopeTrace.ts` draws Scope and Cycle, `scopeSpectrum.ts`
+ * Spectrum, and each view does only its own reading. Every load starts on
+ * Scope, and nothing remembers the view. The loop draws nothing while the
+ * canvas is hidden.
+ */
+import { LINE_COLOR } from './consoleColors';
+import type { ScopeView } from './scopeConstants';
+import { SCOPE_VIEW_LABELS, SCOPE_VIEWS } from './scopeConstants';
+import { createSpectrumDrawer } from './scopeSpectrum';
+import { createTraceDrawer } from './scopeTrace';
+
+/** The view after `view`, round again past the last. */
+export const nextScopeView = (view: ScopeView): ScopeView =>
+  SCOPE_VIEWS[(SCOPE_VIEWS.indexOf(view) + 1) % SCOPE_VIEWS.length]!;
 
 export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNode | null): void {
   const g = canvas.getContext('2d');
   if (!g) return;
   const dpr = window.devicePixelRatio || 1;
-  let buffer: Float32Array<ArrayBuffer> | null = null;
+  // The view's name at the right end of the section's title.
+  const label = canvas.parentElement?.querySelector<HTMLElement>('[data-scope-view]') ?? null;
+  const trace = createTraceDrawer();
+  const spectrum = createSpectrumDrawer();
+  let view: ScopeView = SCOPE_VIEWS[0];
+  const show = (): void => {
+    if (label) label.textContent = SCOPE_VIEW_LABELS[view];
+  };
+  canvas.addEventListener('click', () => {
+    view = nextScopeView(view);
+    show();
+  });
+  show();
 
   const tick = (): void => {
     if (!canvas.isConnected) return;
     requestAnimationFrame(tick);
+    if (canvas.closest('[hidden]') !== null) return;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (!w || !h) return;
@@ -20,41 +48,18 @@ export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNo
     }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
+    const node = analyser();
+    if (view === 'spectrum') {
+      if (node) spectrum.draw(g, node, w, h);
+      return;
+    }
     g.strokeStyle = LINE_COLOR;
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, h / 2);
     g.lineTo(w, h / 2);
     g.stroke();
-
-    const node = analyser();
-    if (!node) return;
-    if (!buffer || buffer.length !== node.fftSize) buffer = new Float32Array(node.fftSize);
-    node.getFloatTimeDomainData(buffer);
-
-    // Trigger on a rising zero crossing so the trace holds still.
-    let start = 0;
-    const half = buffer.length >> 1;
-    for (let i = 1; i < half; i++) {
-      if ((buffer[i - 1] ?? 0) <= 0 && (buffer[i] ?? 0) > 0) {
-        start = i;
-        break;
-      }
-    }
-    let peak = 0;
-    for (let i = 0; i < buffer.length; i++) peak = Math.max(peak, Math.abs(buffer[i] ?? 0));
-
-    g.strokeStyle = peak > SCOPE_CLIP_PEAK ? HOT_COLOR : CARRIER_COLOR;
-    g.lineWidth = SCOPE_TRACE_WIDTH;
-    g.beginPath();
-    for (let i = 0; i < half; i++) {
-      const v = buffer[start + i] ?? 0;
-      const x = (i / half) * w;
-      const y = h / 2 - v * (h / 2 - 2);
-      if (i === 0) g.moveTo(x, y);
-      else g.lineTo(x, y);
-    }
-    g.stroke();
+    if (node) trace.draw(g, node, view === 'cycle', w, h);
   };
   tick();
 }
