@@ -186,6 +186,13 @@ export const FIGURE_SCHEDULE_BARS_MAX = 64;
 export const FIGURE_DRIFT_STEPS_MAX = 4;
 export const FIGURE_TRANSPOSE_MAX = 24;
 /**
+ * The Roll (windsor#599, record `2026-10-04-roll-sequencer`): a part holds
+ * at most this many notes. Its loop's bound, `BARS_MAX` bars of 4/4 in
+ * ticks, is `ROLL_LOOP_TICKS_MAX` in `sequencing/rollSequencer.ts`, beside
+ * the tick grid it is counted on.
+ */
+export const ROLL_NOTES_MAX = 2048;
+/**
  * A document's document-format version: 7 since windsor#590 (the embedded
  * patches are patch format 4, the operators' `opLp` and `opHp`). Version 6
  * (windsor#300: patch format 3, the drive out of the filter) and version 5

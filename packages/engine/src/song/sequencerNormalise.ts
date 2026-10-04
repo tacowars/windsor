@@ -16,6 +16,7 @@ import type {
 } from './arrangement';
 import { arpDriver, bassDriver } from './performerNormalise';
 import { figureDriver } from './figureNormalise';
+import { rollDriver } from './rollNormalise';
 import {
   cycledStepModLanes,
   drawnLane,
@@ -92,6 +93,8 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       return { kind, ...bassDriver(driver, path, n) };
     case 'figure':
       return { kind, ...figureDriver(driver, path, n) };
+    case 'roll':
+      return { kind, ...rollDriver(driver, path, n) };
     default:
       n.dropUnknown(driver, [], path);
       return { kind: 'none' };

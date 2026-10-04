@@ -44,6 +44,7 @@ import type { Patch } from '../patch/patch';
 import type { ResolveOptions } from './arrangementValidate';
 import type { FormatRefusal } from './formatUpgrade';
 import { upgradeSong } from './songMigrations';
+import { buildsNoGenerator } from './partGenerators';
 
 export { FALLBACK_ARRANGEMENT };
 
@@ -180,14 +181,16 @@ export function makeArrangement(raw: unknown, options: ResolveOptions = {}): Mak
 
 /**
  * The verify gate's predicate: usable, naming nothing the code does not
- * define, and with something to play. A `none` part is inert and allowed
- * (#597), but a song of nothing but `none` parts is silent and must not ship.
+ * define, and with something to play. A part plays only when its kind builds
+ * a generator (`buildsNoGenerator`): a `none` part is inert and allowed (#597),
+ * and so is a `roll` part until its performer lands (windsor#600), but a song
+ * of nothing but such parts is silent and must not ship.
  */
 export function isShippable(result: MakeArrangementResult): boolean {
   return (
     result.usable &&
     result.dangling.length === 0 &&
-    result.document.parts.some((part) => part.sequencer.kind !== 'none')
+    result.document.parts.some((part) => !buildsNoGenerator(part.sequencer.kind))
   );
 }
 

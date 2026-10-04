@@ -19,6 +19,7 @@ export type CurrentDocumentFile =
   | 'figure-part'
   | 'figure-process'
   | 'nothing-usable'
+  | 'roll-part'
   | 'silent-song';
 
 /** A file under `arrangementDocuments/`, parsed and otherwise untouched. */

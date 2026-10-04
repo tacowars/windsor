@@ -172,6 +172,18 @@ describe('the per-kind tables', () => {
     ).toBe('figure ← Mallets I -2');
   });
 
+  it("summarises a Roll by its notes and its loop in the meter's bars, and cycles at the loop", () => {
+    const note = { tick: 0, ticks: 6, pitch: 60 };
+    const roll = {
+      kind: 'roll' as const,
+      loopTicks: 4 * TICKS_PER_BAR,
+      notes: Array(41).fill(note),
+    };
+    expect(forKind(REGION_SUMMARY, roll)).toBe('roll · 41 notes · 4 bar loop');
+    expect(forKind(REGION_SUMMARY, roll, '7/8')).toBe('roll · 41 notes · 4.6 bar loop');
+    expect(forKind(CYCLE_TICKS, roll)).toBe(4 * TICKS_PER_BAR);
+  });
+
   it('summarises a region from the spec, naming the step count and the rate', () => {
     const grid = { ...DEFAULT_GRID_CONFIG, kind: 'grid' as const, length: 7, divisor: 6 };
     expect(forKind(REGION_SUMMARY, grid)).toBe('grid · 7 steps · 1/16');

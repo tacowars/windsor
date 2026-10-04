@@ -11,7 +11,7 @@
  * Since #597 a song is a list of 1 to `MUSIC_PARTS_MAX` parts, each identified
  * by its `slot` (0 to `MUSIC_SLOT_MAX`) and carrying any sequencer: a
  * Euclidean fixed-note trigger, the written grid (#602), the Chord Player (#606), the arpeggiator and bass
- * (#706, #707), the Figure (windsor#484), or `none` — an inert part the keyboard can still play but
+ * (#706, #707), the Figure (windsor#484), the Roll (windsor#599), or `none` — an inert part the keyboard can still play but
  * nothing sequences. A part's name is a label and keys nothing (record
  * `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -29,6 +29,7 @@ import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
 import { FIGURE_OPTIONAL_KEYS, type FigureSequencerConfig } from '../sequencing/figureSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
+import type { RollSequencerConfig } from '../sequencing/rollSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { Meter } from '../sequencing/meterTables';
 import type { Region } from '../sequencing/regionClock';
@@ -49,12 +50,14 @@ export type ChordDriver = ChordSequencerConfig;
 export type ArpDriver = ArpSequencerConfig;
 export type BassDriver = BassSequencerConfig;
 export type FigureDriver = FigureSequencerConfig;
+export type RollDriver = RollSequencerConfig;
 
 /**
  * What may drive a part (#597, #705). `none` is inert: allowed anywhere,
  * skipped by every sequencing path. `arp` and `bass` are normalised in full
- * here and performed by #706 / #707. `figure` (windsor#484) is normalised in
- * full and builds no generator until its performer lands (windsor#485).
+ * here and performed by #706 / #707, `figure` (windsor#484) by windsor#485.
+ * `roll` (windsor#599) is normalised in full and builds no generator until
+ * its performer lands (windsor#600).
  */
 export const SEQUENCER_KINDS = [
   'none',
@@ -64,10 +67,11 @@ export const SEQUENCER_KINDS = [
   'arp',
   'bass',
   'figure',
+  'roll',
 ] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
-/** The kinds that draw from a stream and so carry a `seed` (decision 16); the Chord Player draws nothing. */
+/** The kinds that draw from a stream and so carry a `seed` (decision 16); the Chord Player and the Roll draw nothing. */
 export const SEEDED_KINDS: readonly SequencerKind[] = [
   'euclidean',
   'grid',
@@ -98,9 +102,11 @@ export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
 export type BassSpec = { readonly kind: 'bass' } & BassDriver;
 /** The Figure (windsor#484): a written line of chord-tone cells with a schedule, a drift and a source. */
 export type FigureSpec = { readonly kind: 'figure' } & FigureDriver;
+/** The Roll (windsor#599): absolute notes with a free onset, length and velocity over a loop. */
+export type RollSpec = { readonly kind: 'roll' } & RollDriver;
 
 export type SequencerSpec =
-  NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec | FigureSpec;
+  NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec | FigureSpec | RollSpec;
 
 /** `Omit` applied to each member of a union, so the kind still discriminates. */
 type WithoutSeed<S> = S extends unknown ? Omit<S, 'seed'> : never;

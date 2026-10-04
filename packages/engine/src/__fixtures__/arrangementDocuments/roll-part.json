@@ -1,0 +1,99 @@
+{
+  "transport": {
+    "bpm": 120,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 0,
+    "scale": "major"
+  },
+  "patches": {
+    "init-0": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Roll",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "roll",
+        "loopTicks": 96,
+        "notes": []
+      }
+    },
+    {
+      "slot": 1,
+      "name": "Chords",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 192
+        },
+        {
+          "start": 192,
+          "duration": 192,
+          "pattern": {
+            "kind": "roll",
+            "loopTicks": 384,
+            "notes": [
+              {
+                "tick": 96,
+                "ticks": 96,
+                "pitch": 62,
+                "velocity": 0.5
+              }
+            ]
+          }
+        }
+      ],
+      "sequencer": {
+        "kind": "roll",
+        "loopTicks": 192,
+        "notes": [
+          {
+            "tick": 0,
+            "ticks": 24,
+            "pitch": 60
+          },
+          {
+            "tick": 0,
+            "ticks": 24,
+            "pitch": 64,
+            "velocity": 0.75
+          },
+          {
+            "tick": 0,
+            "ticks": 24,
+            "pitch": 67,
+            "velocity": 0.5
+          },
+          {
+            "tick": 24,
+            "ticks": 12,
+            "pitch": 0
+          },
+          {
+            "tick": 48,
+            "ticks": 48,
+            "pitch": 127,
+            "velocity": 0.25
+          },
+          {
+            "tick": 300,
+            "ticks": 6,
+            "pitch": 72
+          }
+        ]
+      }
+    }
+  ]
+}

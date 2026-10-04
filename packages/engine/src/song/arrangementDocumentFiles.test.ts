@@ -19,6 +19,7 @@ const CURRENT: readonly CurrentDocumentFile[] = [
   'dangling-return',
   'figure-part',
   'nothing-usable',
+  'roll-part',
   'silent-song',
 ];
 
@@ -34,6 +35,12 @@ describe('the JSON test songs', () => {
 
   it('plays a silent song, which is usable but not shippable', () => {
     const result = makeArrangement(currentDocument('silent-song'));
+    expect(result.usable).toBe(true);
+    expect(isShippable(result)).toBe(false);
+  });
+
+  it('does not ship a song of only Roll parts, which build no generator yet', () => {
+    const result = makeArrangement(currentDocument('roll-part'));
     expect(result.usable).toBe(true);
     expect(isShippable(result)).toBe(false);
   });

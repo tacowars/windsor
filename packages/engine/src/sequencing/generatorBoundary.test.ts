@@ -72,6 +72,8 @@ const PURE_FILES = [
   // Where the schedule and the drift put its line (windsor#486).
   'figureLine.ts',
   '../harmony/figureTones.ts',
+  // The Roll's config and check (windsor#599): its notes, loop and bounds.
+  'rollSequencer.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',

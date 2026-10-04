@@ -34,6 +34,8 @@ export type {
   BassSpec,
   FigureDriver,
   FigureSpec,
+  RollDriver,
+  RollSpec,
   Transport,
   ArrangementPartial,
   DeepPartial,
@@ -266,6 +268,7 @@ export {
   FIGURE_SCHEDULE_BARS_MAX,
   FIGURE_TONE_MAX,
   FIGURE_TRANSPOSE_MAX,
+  ROLL_NOTES_MAX,
 } from './audioConstants';
 export type {
   ApplyResult,
@@ -528,6 +531,14 @@ export type {
   FigureStage,
 } from './sequencing/figureSequencer';
 export { figureNote } from './harmony/figureTones';
+// The Roll (windsor#599): its config, defaults, bound and check.
+export {
+  DEFAULT_ROLL_CONFIG,
+  ROLL_LOOP_TICKS_MAX,
+  assertRollConfig,
+  defaultRollConfig,
+} from './sequencing/rollSequencer';
+export type { RollNote, RollSequencerConfig } from './sequencing/rollSequencer';
 export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';

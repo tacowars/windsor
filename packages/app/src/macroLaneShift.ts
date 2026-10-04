@@ -94,7 +94,8 @@ function stepLanesOf(
   spec: RegionPattern,
 ): { key: StepLaneKey; lanes: readonly StepModLane[] } | undefined {
   if (spec.kind === 'euclidean') return { key: 'modLanes', lanes: spec.modLanes ?? [] };
-  if (spec.kind === 'chord' || spec.kind === 'none') return undefined;
+  // A Chord Player and a Roll carry no step lanes.
+  if (spec.kind === 'chord' || spec.kind === 'none' || spec.kind === 'roll') return undefined;
   return { key: 'lanes', lanes: spec.lanes };
 }
 

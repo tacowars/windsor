@@ -122,7 +122,8 @@ export function knobRow(
 
 export function divisorPicker(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const spec = driverOf(ctx.model.doc, slot, region);
-  const divisor = spec && spec.kind !== 'none' ? spec.divisor : DEFAULT_EUCLIDEAN_CONFIG.divisor;
+  // A Roll has no step (windsor#599); no Roll card shows this picker.
+  const divisor = spec && 'divisor' in spec ? spec.divisor : DEFAULT_EUCLIDEAN_CONFIG.divisor;
   return select('Step', divisorOptions(ctx.model.doc.transport.meter), String(divisor), (v) => {
     if (changePattern(ctx, slot, region, { divisor: Number(v) })) ctx.render();
   });

@@ -320,6 +320,7 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   arp: 'pitch',
   bass: 'pitch',
   figure: 'pitch',
+  roll: 'pitch',
 };
 
 /** A part's name by slot, for a table that names another part (a Figure's leader, windsor#490). */
@@ -362,6 +363,10 @@ export function forKind<T>(
 
 const signedOffset = (n: number): string => (n > 0 ? `+${n}` : String(n));
 
+/** A Roll's loop in the meter's bars, to one decimal: `4`, `1.5`. */
+const loopBars = (ticks: number, meter?: Meter): number =>
+  Math.round((ticks / ticksPerBar(meter)) * 10) / 10;
+
 /** The summary a region block shows in small caps, after the kind's name, its step named in the song's meter. */
 export const REGION_SUMMARY: KindTable<string> = {
   none: () => 'no sequencer',
@@ -378,6 +383,8 @@ export const REGION_SUMMARY: KindTable<string> = {
     spec.source
       ? `figure ← ${names?.(spec.source.slot) ?? `slot ${spec.source.slot}`} ${signedOffset(spec.source.offset)}`
       : `figure · ${lineSummary(spec.cells, spec.length)} ${divisorLabel(spec.divisor, meter)}`,
+  roll: (spec, meter) =>
+    `roll · ${spec.notes.length} notes · ${loopBars(spec.loopTicks, meter)} bar loop`,
 };
 
 /**
@@ -385,7 +392,8 @@ export const REGION_SUMMARY: KindTable<string> = {
  * 1): the loop length for a grid and a Basslead strip (windsor#371; a part
  * with no strip loads as one bar of plain notes), the steps' durations and
  * repeats for a Chord Player, `steps` for a Euclidean line, a Figure's
- * schedule in bars or else its line (windsor#490); null for the kind that
+ * schedule in bars or else its line (windsor#490), a Roll's loop
+ * (windsor#599); null for the kind that
  * has none (arp, a Figure canon) or a cycle with nothing in it.
  */
 export const CYCLE_TICKS: KindTable<number | null> = {
@@ -405,4 +413,5 @@ export const CYCLE_TICKS: KindTable<number | null> = {
     if (bars > 0) return bars * ticksPerBar(meter);
     return spec.length > 0 ? spec.length * spec.divisor : null;
   },
+  roll: (spec) => spec.loopTicks,
 };

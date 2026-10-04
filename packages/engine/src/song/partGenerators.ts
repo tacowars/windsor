@@ -65,16 +65,22 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
  * rebuilds that generator or reconfigures it (`partBinding.ts`).
  */
 export function generatorSig(spec: SequencerSpec): string {
-  if (spec.kind === 'none' || spec.kind === 'chord') return sig([spec.kind]);
+  if (spec.kind === 'none' || spec.kind === 'chord' || spec.kind === 'roll')
+    return sig([spec.kind]);
   return sig([spec.kind, spec.divisor, spec.seed]);
 }
 
-/** The kinds that build no generator, so a part of one has no binding: `none` alone. */
-export const buildsNoGenerator = (kind: SequencerKind): boolean => kind === 'none';
+/**
+ * The kinds that build no generator, so a part of one has no binding: `none`,
+ * and `roll` until its performer lands (windsor#600), so a Roll part loads
+ * and plays nothing (windsor#599).
+ */
+export const buildsNoGenerator = (kind: SequencerKind): boolean =>
+  kind === 'none' || kind === 'roll';
 
 /**
  * The generator a spec builds — a part's `sequencer`, or one region's
- * pattern (`regionPattern`, windsor#74) — or null for `none`. A Figure
+ * pattern (`regionPattern`, windsor#74) — or null for `none` and `roll`. A Figure
  * counts its schedule and drift in bars of `barTicks`, the song meter's bar,
  * and a canon finds its leader through `figureOf` (windsor#487).
  */
@@ -98,6 +104,8 @@ export function buildGenerator(
       return new BassSequencer(sampler, driver as BassDriver);
     case 'figure':
       return new FigureSequencer(sampler, driver as FigureDriver, barTicks, figureOf);
+    case 'roll':
+      return null;
     default:
       return null;
   }
