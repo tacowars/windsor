@@ -70,6 +70,14 @@ export interface SongViewScale {
   readonly automationLanePx: number;
   /** The "+ Add lane" row after a part's lanes. */
   readonly automationAddRowPx: number;
+  /**
+   * A group member's inset in the frozen column (windsor#615 decision 4),
+   * taken from its number tab so its fold and mixer strip stay in line with
+   * every other row's. The folder's rail runs down the inset.
+   */
+  readonly folderIndentPx: number;
+  /** The rail down a folder's left edge, from its header past its last member. */
+  readonly folderRailPx: number;
 }
 
 export const SONG_VIEW: SongViewScale = {
@@ -91,6 +99,8 @@ export const SONG_VIEW: SongViewScale = {
   rowGapPx: 4,
   automationLanePx: 56,
   automationAddRowPx: 30,
+  folderIndentPx: 6,
+  folderRailPx: 2,
 };
 
 /**

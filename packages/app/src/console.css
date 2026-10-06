@@ -4236,6 +4236,81 @@ body.chord-dragging {
   line-height: var(--lane-h);
   color: #14181a;
 }
+/* A group's folder (windsor#615): its header, the folder tab in the
+   group's Mixer accent (--group-accent, set per row group by
+   songLaneColumn.ts) beside the member fold over the group's name and
+   count, and its outline lane; then its members' blocks, inset by --indent
+   from the number tab's side so their fold and strip stay in line, with the
+   folder's rail down the inset and through the gap above each. */
+.lane-folder {
+  display: grid;
+  grid-template-columns: var(--tab) minmax(0, 1fr);
+  column-gap: var(--tab-gap);
+  cursor: default;
+}
+.folder-tab {
+  border-radius: 2px;
+  background: var(--group-accent, var(--modulator));
+}
+.folder-row {
+  display: grid;
+  grid-template-columns: var(--fold) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--fold-gap);
+  height: var(--lane-h);
+  padding: 0 var(--row-pad);
+  border-radius: var(--r);
+  background: var(--panel);
+}
+.folder-row .nm {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+  font-family: var(--f-panel);
+}
+.folder-row .nm b {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--group-accent, var(--ink));
+}
+.folder-row .nm small {
+  font-family: var(--f-num);
+  font-size: 9px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+.lane-group.in-folder > .lane-col {
+  grid-template-columns: calc(var(--tab) - var(--indent)) minmax(0, 1fr);
+  padding-left: var(--indent);
+}
+.lane-group.in-folder > .lane-col::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--row-gap));
+  bottom: 0;
+  left: 0;
+  width: var(--rail);
+  background: var(--group-accent, var(--modulator));
+}
+/* The outline: read only, so no cursor of the editing lanes' and no press. */
+.lane.lane-outline {
+  cursor: default;
+}
+.lane-outline .fspan {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  border: 1px solid color-mix(in srgb, var(--group-accent, var(--modulator)) 45%, transparent);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--group-accent, var(--modulator)) 16%, transparent);
+  pointer-events: none;
+}
 /* A part's row: ▸ over the lane badge, then its mixer strip. */
 .lane-part {
   display: grid;

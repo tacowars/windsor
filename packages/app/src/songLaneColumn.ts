@@ -14,6 +14,10 @@
  *   lane and the add row; beside them its lane of regions, its curves and
  *   the add row's empty stretch.
  *
+ * - **a group** (windsor#615): its folder header (`songGroupRow.ts`) beside
+ *   the outline of where it plays, then its members' blocks, each inset
+ *   with the folder's rail down the inset, in the order `songRows` gives.
+ *
  * The part's name and kind are the part strip's (windsor#520), so the
  * column repeats neither. The selected part's block is outlined whole
  * (decision 8), and a press on its tab, its row or a lane label, anywhere
@@ -21,12 +25,15 @@
  */
 import type { DocumentPart } from '@windsor/engine';
 import { el } from './dom';
+import { groupAccent } from './consoleColors';
 import type { LoopBraceRow } from './loopBrace';
 import { chipLabel } from './partStripModel';
 import { automationRows, type Readout } from './songAutomationLane';
+import type { SongRow } from './songFolderModel';
+import { groupRow } from './songGroupRow';
 import { partLane, partRow, partSelected } from './songLanes';
 import type { MixerToggle } from './songMixerCell';
-import { EXPANDED_KNOB_COUNT, mixerHeaderCell } from './songMixerCell';
+import { EXPANDED_KNOB_COUNT, mixerHeaderCell, partMixerCell } from './songMixerCell';
 import type { SongView } from './songTab';
 import {
   SONG_VIEW,
@@ -60,6 +67,8 @@ export function sizeLaneColumn(lanes: HTMLElement, expanded: boolean): void {
     '--lane-h': SONG_VIEW.partLanePx,
     '--auto-lane-h': SONG_VIEW.automationLanePx,
     '--auto-add-h': SONG_VIEW.automationAddRowPx,
+    '--indent': SONG_VIEW.folderIndentPx,
+    '--rail': SONG_VIEW.folderRailPx,
   };
   for (const [name, value] of Object.entries(px)) lanes.style.setProperty(name, `${value}px`);
   lanes.style.setProperty('--mix-knobs', String(EXPANDED_KNOB_COUNT));
@@ -135,4 +144,49 @@ export function partGroup(
     view.select({ kind: 'part', slot: part.slot, region: null });
   });
   return laneGroup(block, [partLane(view, part), ...folded.map((row) => row.timeline)]);
+}
+
+/**
+ * Set a folder's accent on its row group: the group's colour on the Mixer
+ * tab, by its place in the list (`groupAccent`), for its tab, rail and outline.
+ */
+function tintFolder(view: SongView, group: HTMLElement, id: number): void {
+  const index = (view.ctx.model.doc.groups ?? []).findIndex((g) => g.id === id);
+  group.style.setProperty('--group-accent', groupAccent(Math.max(0, index)));
+}
+
+/**
+ * The rows under the harmony lane, in `rows`' order (windsor#615): a
+ * group's header beside its outline, and each part's block, inset under its
+ * folder when it is a member.
+ */
+export function bodyGroups(
+  view: SongView,
+  rows: readonly SongRow[],
+  readouts: Readout[],
+): HTMLElement[] {
+  const { doc } = view.ctx.model;
+  const groups: HTMLElement[] = [];
+  for (const row of rows) {
+    if (row.kind === 'group') {
+      const header = groupRow(view, row);
+      if (!header) continue;
+      const group = laneGroup(header[0], [header[1]]);
+      group.classList.add('folder-head');
+      tintFolder(view, group, row.id);
+      groups.push(group);
+      continue;
+    }
+    const index = doc.parts.findIndex((p) => p.slot === row.slot);
+    const part = doc.parts[index];
+    if (!part) continue;
+    const strip = partMixerCell(view.ctx, part, view.state.mixerExpanded);
+    const group = partGroup(view, part, index, strip, readouts);
+    if (row.group !== null) {
+      group.classList.add('in-folder');
+      tintFolder(view, group, row.group);
+    }
+    groups.push(group);
+  }
+  return groups;
 }
