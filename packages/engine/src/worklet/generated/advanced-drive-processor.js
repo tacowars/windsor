@@ -256,6 +256,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/inserts/advancedDriveCurves.ts
 var DriveShaper = class {
   constructor() {
@@ -759,12 +787,15 @@ var DriveRouting = class {
 // packages/engine/src/worklet/advancedDrive/advancedDriveDsp.ts
 var DISCRETE_KEY = /^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/;
 var DISCRETE = DRIVE_KEYS.flatMap((k, slot) => DISCRETE_KEY.test(k) ? [slot] : []);
-var CONTINUOUS = DRIVE_KEYS.flatMap((k, slot) => DISCRETE_KEY.test(k) ? [] : [slot]);
+var CONTINUOUS = DRIVE_KEYS.flatMap(
+  (k, slot) => DISCRETE_KEY.test(k) || slot === DRIVE_SLOT.enabled ? [] : [slot]
+);
 var AdvancedDriveDsp = class {
   constructor(rate, params) {
     this.rate = rate;
     this.smooth = 1 - Math.exp(-1 / (rate * DRIVE_DSP.smoothSeconds));
     this.step = 1 / (rate * DRIVE_DSP.transitionSeconds);
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.controls = new Float64Array(DRIVE_KEYS.length);
     this.targets = new Float64Array(DRIVE_KEYS.length);
     ADVANCED_DRIVE_PARAMETERS.forEach((p, slot) => {
@@ -796,6 +827,15 @@ var AdvancedDriveDsp = class {
     this.pending = false;
     for (let i = 0; i < DISCRETE.length; i++)
       if (t[DISCRETE[i]] !== s[DISCRETE[i]]) this.pending = true;
+    if (s[DRIVE_SLOT.enabled] === 0 && t[DRIVE_SLOT.enabled] !== 0) this.clear();
+  }
+  /** Back on from fully off: the graph and the oversamplers start from rest. */
+  clear() {
+    this.graph.reset();
+    for (let i = 0; i < this.up.length; i++) {
+      this.up[i].buffer.fill(0);
+      this.down[i].buffer.fill(0);
+    }
   }
   /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
   update() {
@@ -805,6 +845,9 @@ var AdvancedDriveDsp = class {
       s[k] += this.smooth * (t[k] - s[k]);
       if (Math.abs(s[k] - t[k]) < DRIVE_DSP.silence) s[k] = t[k];
     }
+    const enabled = s[DRIVE_SLOT.enabled];
+    if (enabled !== t[DRIVE_SLOT.enabled])
+      s[DRIVE_SLOT.enabled] = t[DRIVE_SLOT.enabled] > enabled ? Math.min(t[DRIVE_SLOT.enabled], enabled + this.switchStep) : Math.max(t[DRIVE_SLOT.enabled], enabled - this.switchStep);
     this.transition = Math.max(
       0,
       Math.min(1, this.transition + (this.pending ? -this.step : this.step))
@@ -834,11 +877,12 @@ var AdvancedDriveDsp = class {
   tick() {
     this.update();
     const left = this.inputLeft, right = this.inputRight, s = this.controls, graph = this.graph, upLeft = this.up[0], upRight = this.up[1], downLeft = this.down[0], downRight = this.down[1];
+    const heardLeft = left * s[DRIVE_SLOT.enabled], heardRight = right * s[DRIVE_SLOT.enabled];
     let l = 0, r = 0;
     for (let phase = 0; phase < DRIVE_DSP.oversample; phase++) {
-      upLeft.input = phase === 0 ? left * DRIVE_DSP.oversample : 0;
+      upLeft.input = phase === 0 ? heardLeft * DRIVE_DSP.oversample : 0;
       upLeft.tick();
-      upRight.input = phase === 0 ? right * DRIVE_DSP.oversample : 0;
+      upRight.input = phase === 0 ? heardRight * DRIVE_DSP.oversample : 0;
       upRight.tick();
       const a = upLeft.output, b = upRight.output;
       graph.inputLeft = a;

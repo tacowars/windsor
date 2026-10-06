@@ -8,7 +8,16 @@
  * frame to `input` and calls `step`, a channel leaves its sample in `sample`, the EQ and the motion read
  * and write their own fields, and every double field (the controls' too) is first written as NaN
  * (rule 7). Pinned by `inserts/tapeAllocation.test.ts`.
+ * The on/off switch moves `enabled` linearly over `INSERT_SWITCH_FADE_S` (windsor#630), not along the
+ * other controls' smoothing, and lands on its target exactly. A switch-on from fully off clears the EQ,
+ * the core's oversampling pair, the DC block and the transport delay's line in place on its first
+ * quantum, where the wet gain is still 0: the fade-in starts from rest, so nothing heard before the
+ * switch-on comes out after it. The wet path hears its input through the switch, as Delay's lines do,
+ * so a restart from rest takes the input in over the fade rather than as a step into cold filters
+ * (fully on, the input times 1 is the input to the bit). The dry ring, the motion and the hiss keep
+ * running.
  */
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import {
   TAPE_BOUNDS,
   TAPE_DEFAULTS,
@@ -91,6 +100,8 @@ class TapeDsp {
   /** Test-only: skip the Bias and model EQ (`bypassEq`); not a parameter, never set from a song. */
   eqBypassed = false;
   smooth: number;
+  /** How far `enabled` moves a frame. */
+  switchStep = NaN;
   dcPole: number;
   noiseHp: number;
   noiseLp: number;
@@ -150,6 +161,7 @@ class TapeDsp {
         : null,
     );
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.dcPole = Math.exp(-(2 * Math.PI * C.dcHz) / rate);
     this.noiseHp = 1 - Math.exp(-(2 * Math.PI * C.hissHighpassHz) / rate);
     this.noiseLp =
@@ -158,6 +170,7 @@ class TapeDsp {
   }
   configure(params: TapeParams, frames: number): void {
     this.targets.read(params);
+    if (this.controls.enabled === 0 && this.targets.enabled !== 0) this.clear();
     // Preserve the running legacy macro when its dials are first separated.
     if (!this.controls.split && this.targets.split) {
       this.controls.wow = this.controls.wear;
@@ -197,6 +210,16 @@ class TapeDsp {
       this.noiseTones[model].configure(model);
     }
   }
+  /** Back on from fully off: the wet path starts from rest. The dry ring is the bypass. */
+  clear(): void {
+    // Indexed: `clear` runs too rarely for V8 to optimise away a `for…of`'s iterator.
+    for (let i = 0; i < this.tones.length; i++) this.tones[i].reset();
+    for (let i = 0; i < this.magnetic.active.length; i++) this.magnetic.active[i].reset();
+    this.dcInput.fill(0);
+    this.dcOutput.fill(0);
+    this.buffers[0].fill(0);
+    this.buffers[1].fill(0);
+  }
   /** Test-only: one frame through `step`, which the processor calls with `input` written. */
   tick(left: number, right: number): void {
     this.input[0] = left;
@@ -218,7 +241,10 @@ class TapeDsp {
     s.hiss += k * (t.hiss - s.hiss);
     s.trim += k * (t.trim - s.trim);
     s.mix += k * (t.mix - s.mix);
-    s.enabled += k * (t.enabled - s.enabled);
+    s.enabled =
+      t.enabled > s.enabled
+        ? Math.min(t.enabled, s.enabled + this.switchStep)
+        : Math.max(t.enabled, s.enabled - this.switchStep);
     this.updateGains();
     this.mix = s.mix * s.enabled;
     const motion = this.motion;
@@ -283,11 +309,13 @@ class TapeDsp {
   /** One channel's sample, from `input[channel]` into `sample`. */
   channel(channel: number): void {
     const input = this.input[channel];
-    let tone = this.eqBypassed ? input : 0;
+    // Through the switch: from rest, the wet path takes the input in over the fade (see the header).
+    const heard = input * this.controls.enabled;
+    let tone = this.eqBypassed ? heard : 0;
     for (let model = 0; model < TAPE_MODELS.length && !this.eqBypassed; model++) {
       if (this.weights[model] === 0) continue;
       const eq = this.tones[model * 2 + channel];
-      eq.value = input;
+      eq.value = heard;
       eq.advance();
       tone += this.weights[model] * eq.value;
     }

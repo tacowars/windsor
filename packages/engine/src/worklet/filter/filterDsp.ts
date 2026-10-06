@@ -13,8 +13,14 @@
  * - **Output:** `dry * (1 - mix) + wet * mix`.
  * - **Sweeps:** retuned every `CTRL_INTERVAL` frames along `filterGlide.ts`.
  * - **Changes:** a new mode, or a new slope outside Acid, resets the
- *   incoming path's states with no crossfade; so does turning it back on.
- *   Each reset snaps the next quantum's glide. Off copies the input.
+ *   incoming path's states with no crossfade. Each reset snaps the next
+ *   quantum's glide.
+ * - **The switch** (windsor#630): on and off crossfade the dry signal and
+ *   the output above linearly over `INSERT_SWITCH_FADE_S`, a step a sample
+ *   from `level`. Fully off copies the input to the bit. Turned back on from
+ *   fully off, the path resets at the start of the fade-in, so it rises from
+ *   rest; turned back on mid fade-out, the fade turns round with the states
+ *   it has.
  * - **Rest:** a silent block with every state in use quiet (`Svf.quiet`,
  *   `Ladder.quiet`) writes zeros without running the filters, and zeroes
  *   those states once on the way in.
@@ -27,6 +33,7 @@
  * by `inserts/filterDsp.test.ts` and `filterBundle.test.ts` beside this.
  */
 import { FILTER_DSP, FILTER_MODE_VOICE_IDS } from '../../inserts/filterConstants';
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { CTRL_INTERVAL } from '../fm/fmConstants';
 import { Ladder } from '../fm/ladder';
 import { tuneLadder } from '../fm/ladderTune';
@@ -62,6 +69,9 @@ class FilterDsp {
   slope24: boolean;
   enabled: boolean;
   mix: number;
+  /** The switch's fade: 0 dry, 1 the filter's output; `levelStep` a sample. */
+  level: number;
+  readonly levelStep: number;
   /** False until a quantum sets the glide's ends: the first after construction or a reset snaps. */
   primed: boolean;
   /** Whether the last block wrote silence without running the filters. */
@@ -69,8 +79,9 @@ class FilterDsp {
 
   constructor(rate: number, params: FilterParams) {
     // Rule 7: each double field is born a double (NaN), before its start value.
-    this.rate = this.mix = NaN;
+    this.rate = this.mix = this.level = this.levelStep = NaN;
     this.rate = rate;
+    this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.svfA = [];
     this.svfB = [];
     this.ladder = [];
@@ -88,6 +99,7 @@ class FilterDsp {
     this.slope24 = params.slope24[0] >= FILTER_DSP.switchOn;
     this.enabled = params.enabled[0] >= FILTER_DSP.switchOn;
     this.mix = params.mix[0];
+    this.level = this.enabled ? 1 : 0;
     this.primed = false;
     this.resting = false;
   }
@@ -98,7 +110,8 @@ class FilterDsp {
     const mode = modeOf(params.mode[0]);
     const slope24 = params.slope24[0] >= FILTER_DSP.switchOn;
     const newPath = mode !== this.mode || (slope24 !== this.slope24 && mode !== FILT_LADDER);
-    const reenabled = enabled && !this.enabled;
+    // Back on from fully off: the states were left as the switch found them.
+    const reenabled = enabled && this.level === 0;
     this.enabled = enabled;
     this.mode = mode;
     this.slope24 = slope24;
@@ -127,13 +140,23 @@ class FilterDsp {
     }
   }
 
-  /** `frames` samples of `input` through the path into `output`. */
+  /** `frames` samples of `input` through the path into `output`, the switch's fade over them. */
   render(frames: number): void {
-    const glide = this.glide;
-    if (!this.enabled) {
+    const level = this.level;
+    if (!this.enabled && level === 0) {
       this.bypass(frames);
       this.resting = false;
-    } else if (this.settled(frames)) {
+    } else {
+      this.filter(frames);
+      if (!this.enabled || level !== 1) this.fade(frames);
+    }
+    landGlide(this.glide);
+  }
+
+  /** The path over the block: silence at rest, else the sections or the ladder piece by piece. */
+  filter(frames: number): void {
+    const glide = this.glide;
+    if (this.settled(frames)) {
       if (!this.resting) this.resetPath();
       this.silence(frames);
       this.resting = true;
@@ -151,7 +174,23 @@ class FilterDsp {
         }
       }
     }
-    landGlide(glide);
+  }
+
+  /** The switch's linear crossfade from `input` to `output`, in place, `level` stepped a sample at a time. */
+  fade(frames: number): void {
+    const from = this.level;
+    const step = this.enabled ? this.levelStep : -this.levelStep;
+    for (let c = 0; c < CHANNELS; c++) {
+      const input = this.input[c],
+        output = this.output[c];
+      for (let s = 0; s < frames; s++) {
+        const at = from + step * (s + 1);
+        const g = at < 0 ? 0 : at > 1 ? 1 : at;
+        output[s] = input[s] + g * (output[s] - input[s]);
+      }
+    }
+    const to = from + step * frames;
+    this.level = to < 0 ? 0 : to > 1 ? 1 : to;
   }
 
   /** Channel `c`'s SVF sections tuned to the glide's piece, then its samples [from, to). */

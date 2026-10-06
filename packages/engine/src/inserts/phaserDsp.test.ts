@@ -23,21 +23,33 @@ const rms = (values: number[]): number =>
   Math.sqrt(values.reduce((sum, x) => sum + x * x, 0) / values.length);
 const lateRms = (values: number[]): number => rms(values.slice(values.length / 2));
 
-it('keeps wet history running during bypass without crossing stereo audio channels', () => {
+it('restarts its wet history from rest when switched back on, and never crosses stereo audio channels', () => {
   const live = phaserParams({ stereo: 120, feedback: 0.7 });
-  const bypass = phaserParams({ stereo: 120, feedback: 0.7, enabled: false });
+  const switched = phaserParams({ stereo: 120, feedback: 0.7 });
   const a = loadPhaser(48000, live),
-    b = loadPhaser(48000, bypass);
-  const input = [[new Float32Array(128).fill(0.2), new Float32Array(128)]];
+    b = loadPhaser(48000, switched);
+  const sound = [[new Float32Array(128).fill(0.2), new Float32Array(128)]];
+  const silence = [[new Float32Array(128), new Float32Array(128)]];
   const outA = [[new Float32Array(128), new Float32Array(128)]];
   const outB = [[new Float32Array(128), new Float32Array(128)]];
-  for (let block = 0; block < 800; block++) {
-    if (block === 400) bypass.enabled![0] = 1;
+  let liveTail = 0,
+    switchedTail = 0;
+  for (let block = 0; block < 140; block++) {
+    // Off at 100, fully off two quanta later, and back on at 110 in silence.
+    if (block === 100) switched.enabled![0] = 0;
+    if (block === 110) switched.enabled![0] = 1;
+    const input = block < 100 ? sound : silence;
     a.process(input, outA, live);
-    b.process(input, outB, bypass);
+    b.process(input, outB, switched);
+    expect(outA[0]![1]).toEqual(new Float32Array(128));
+    expect(outB[0]![1]).toEqual(new Float32Array(128));
+    if (block < 110) continue;
+    for (const x of outA[0]![0]!) liveTail = Math.max(liveTail, Math.abs(x));
+    for (const x of outB[0]![0]!) switchedTail = Math.max(switchedTail, Math.abs(x));
   }
-  expect(outA).toEqual(outB);
-  expect(outA[0]![1]).toEqual(new Float32Array(128));
+  // Left on, the feedback still rings; switched off and back on, nothing before the switch-on returns.
+  expect(liveTail).toBeGreaterThan(0);
+  expect(switchedTail).toBe(0);
 });
 
 it.each([44100, 48000, 96000])('has the classic four-stage two-notch response at %i Hz', (rate) => {

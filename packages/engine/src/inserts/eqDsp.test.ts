@@ -15,8 +15,9 @@ import {
   setEqParams,
   sine,
 } from '../__fixtures__/eqHarness';
-import { EQ_BAND_TYPES, EQ_BOUNDS, EQ_DSP, EQ_SLOPES, EQ_TYPE_ID } from './eqConstants';
+import { EQ_BAND_TYPES, EQ_BOUNDS, EQ_SLOPES, EQ_TYPE_ID } from './eqConstants';
 import { designEqBand, eqResponseDb } from './eqCoefficients';
+import { INSERT_SWITCH_FADE_S } from './insertConstants';
 import { DEFAULT_EQ } from './eqSpec';
 import type { EqBand, EqSpec } from './eqSpec';
 
@@ -168,7 +169,7 @@ describe('transparency', () => {
       if (q === off) setEqParams(params, { ...PAD, enabled: false });
       if (q === back) setEqParams(params, PAD);
     });
-    const faded = off * QUANTUM + Math.ceil(EQ_DSP.enableFadeSeconds * RATE) + QUANTUM;
+    const faded = off * QUANTUM + Math.ceil(INSERT_SWITCH_FADE_S * RATE) + QUANTUM;
     expect(left.subarray(faded, back * QUANTUM)).toEqual(input[0].subarray(faded, back * QUANTUM));
     expect(right.subarray(faded, back * QUANTUM)).toEqual(input[1].subarray(faded, back * QUANTUM));
     // Back on: the tail matches a fresh EQ once the fade and the filters have settled.

@@ -109,6 +109,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/worklet/delay/delaySlots.ts
 var DELAY_KEYS = [
   "leftMs",
@@ -141,7 +169,7 @@ var DELAY_SLOT = {
 // packages/engine/src/worklet/delay/delayDsp.ts
 var DelayDsp = class {
   constructor(rate, _params) {
-    this.rate = this.smooth = this.timeSmooth = NaN;
+    this.rate = this.smooth = this.timeSmooth = this.switchStep = NaN;
     this.inputLeft = this.inputRight = this.value = this.left = this.right = NaN;
     this.rate = rate;
     const length = Math.ceil(rate * DELAY_DSP.maxSeconds) + 2;
@@ -149,6 +177,7 @@ var DelayDsp = class {
     this.filter = new Float64Array(DELAY_DSP.filterStates);
     this.smooth = 1 - Math.exp(-1 / (rate * DELAY_DSP.smoothSeconds));
     this.timeSmooth = 1 - Math.exp(-1 / (rate * DELAY_DSP.timeSmoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.controls = new Float64Array(DELAY_KEYS.length);
     for (let k = 0; k < DELAY_KEYS.length; k++) {
       const key = DELAY_KEYS[k];
@@ -158,6 +187,7 @@ var DelayDsp = class {
     this.position = 0;
     this.left = this.right = 0;
     this.first = true;
+    this.cleared = true;
   }
   configure(params, _frames) {
     const t = this.targets;
@@ -174,6 +204,15 @@ var DelayDsp = class {
       for (let k = 0; k < DELAY_KEYS.length; k++) this.controls[k] = t[k];
       this.first = false;
     }
+    if (this.controls[DELAY_SLOT.enabled] !== 0) this.cleared = false;
+    else if (!this.cleared) this.clear();
+  }
+  /** Fully off: the tail goes, so the lines and their filters start from silence. */
+  clear() {
+    this.buffer[0].fill(0);
+    this.buffer[1].fill(0);
+    this.filter.fill(0);
+    this.cleared = true;
   }
   /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
   pole(slot2) {
@@ -195,7 +234,8 @@ var DelayDsp = class {
     s[DELAY_SLOT.drive] += k * (t[DELAY_SLOT.drive] - s[DELAY_SLOT.drive]);
     s[DELAY_SLOT.mix] += k * (t[DELAY_SLOT.mix] - s[DELAY_SLOT.mix]);
     s[DELAY_SLOT.outputDb] += k * (t[DELAY_SLOT.outputDb] - s[DELAY_SLOT.outputDb]);
-    s[DELAY_SLOT.enabled] += k * (t[DELAY_SLOT.enabled] - s[DELAY_SLOT.enabled]);
+    const enabled = s[DELAY_SLOT.enabled];
+    s[DELAY_SLOT.enabled] = t[DELAY_SLOT.enabled] > enabled ? Math.min(t[DELAY_SLOT.enabled], enabled + this.switchStep) : Math.max(t[DELAY_SLOT.enabled], enabled - this.switchStep);
     s[DELAY_SLOT.ping] += k * (t[DELAY_SLOT.ping] - s[DELAY_SLOT.ping]);
     s[DELAY_SLOT.mid] += k * (t[DELAY_SLOT.mid] - s[DELAY_SLOT.mid]);
     this.read(0, DELAY_SLOT.leftMs);

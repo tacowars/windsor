@@ -3,7 +3,8 @@
  * path its render takes, over and over. A cycle is stereo noise with one
  * parameter changed every `period` quanta (size, decay, tone, diffusion,
  * pre-delay, character, mix, duration, the gated and reverse modes and the
- * enable, so the finite field, the pre-delay line and the mix glide all run),
+ * enable, so the finite field, the pre-delay line, the mix glide, the
+ * switch's fade and its cleared, dormant off (windsor#630) all run),
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
  * the pre-delay is off and the mix has settled; then mono noise and no input
@@ -38,6 +39,9 @@ interface RetroState {
   preDelay: number;
   mix: number;
   targetMix: number;
+  level: number;
+  targetLevel: number;
+  dormant: boolean;
   wetToneLeft: number;
   wetToneRight: number;
 }
@@ -62,8 +66,11 @@ const TOGGLES: [string, number][] = [
   ['enabled', 0],
 ];
 
-/** Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled, mono, no input. */
-const PATHS = 9;
+/**
+ * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
+ * mono, no input, the switch fading, switched off and dormant.
+ */
+const PATHS = 11;
 
 type Phase = 'loud' | 'quiet' | 'mono' | 'none';
 
@@ -144,6 +151,8 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
     seen[dsp.mix === dsp.targetMix ? 6 : 5] = 1;
     if (phase === 'mono') seen[7] = 1;
     if (phase === 'none') seen[8] = 1;
+    if (dsp.level !== dsp.targetLevel) seen[9] = 1;
+    if (dsp.dormant) seen[10] = 1;
   };
   return { step, note, seen };
 }

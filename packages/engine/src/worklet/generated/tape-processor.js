@@ -230,6 +230,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/inserts/tapePortableMathTables.ts
 function factorial(n) {
   let f = 1;
@@ -1100,6 +1128,8 @@ var TapeDsp = class {
     this.dcOutput = new Float64Array(2);
     /** Test-only: skip the Bias and model EQ (`bypassEq`); not a parameter, never set from a song. */
     this.eqBypassed = false;
+    /** How far `enabled` moves a frame. */
+    this.switchStep = NaN;
     this.noiseLow = NaN;
     this.noiseHigh = NaN;
     this.position = 0;
@@ -1150,6 +1180,7 @@ var TapeDsp = class {
       } : null
     );
     this.smooth = 1 - Math.exp(-1 / (rate * TAPE_DSP.smoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.dcPole = Math.exp(-(2 * Math.PI * TAPE_DSP.dcHz) / rate);
     this.noiseHp = 1 - Math.exp(-(2 * Math.PI * TAPE_DSP.hissHighpassHz) / rate);
     this.noiseLp = 1 - Math.exp(-(2 * Math.PI * Math.min(TAPE_DSP.hissLowpassHz, rate * TAPE_DSP.maxFrequencyRatio)) / rate);
@@ -1157,6 +1188,7 @@ var TapeDsp = class {
   }
   configure(params, frames) {
     this.targets.read(params);
+    if (this.controls.enabled === 0 && this.targets.enabled !== 0) this.clear();
     if (!this.controls.split && this.targets.split) {
       this.controls.wow = this.controls.wear;
       this.controls.flutter = this.controls.wear;
@@ -1194,6 +1226,15 @@ var TapeDsp = class {
       this.noiseTones[model2].configure(model2);
     }
   }
+  /** Back on from fully off: the wet path starts from rest. The dry ring is the bypass. */
+  clear() {
+    for (let i = 0; i < this.tones.length; i++) this.tones[i].reset();
+    for (let i = 0; i < this.magnetic.active.length; i++) this.magnetic.active[i].reset();
+    this.dcInput.fill(0);
+    this.dcOutput.fill(0);
+    this.buffers[0].fill(0);
+    this.buffers[1].fill(0);
+  }
   /** Test-only: one frame through `step`, which the processor calls with `input` written. */
   tick(left, right) {
     this.input[0] = left;
@@ -1213,7 +1254,7 @@ var TapeDsp = class {
     s.hiss += k * (t.hiss - s.hiss);
     s.trim += k * (t.trim - s.trim);
     s.mix += k * (t.mix - s.mix);
-    s.enabled += k * (t.enabled - s.enabled);
+    s.enabled = t.enabled > s.enabled ? Math.min(t.enabled, s.enabled + this.switchStep) : Math.max(t.enabled, s.enabled - this.switchStep);
     this.updateGains();
     this.mix = s.mix * s.enabled;
     const motion = this.motion;
@@ -1277,11 +1318,12 @@ var TapeDsp = class {
   /** One channel's sample, from `input[channel]` into `sample`. */
   channel(channel) {
     const input = this.input[channel];
-    let tone = this.eqBypassed ? input : 0;
+    const heard = input * this.controls.enabled;
+    let tone = this.eqBypassed ? heard : 0;
     for (let model = 0; model < TAPE_MODELS.length && !this.eqBypassed; model++) {
       if (this.weights[model] === 0) continue;
       const eq = this.tones[model * 2 + channel];
-      eq.value = input;
+      eq.value = heard;
       eq.advance();
       tone += this.weights[model] * eq.value;
     }

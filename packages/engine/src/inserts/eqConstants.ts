@@ -78,8 +78,6 @@ export const EQ_DSP = {
   refreshFrames: 16,
   /** A type, slope or on change fades the band out, switches, and fades in: this long each way. */
   bandFadeSeconds: 0.005,
-  /** The rail's enable crossfades the whole EQ against the dry input over this long. */
-  enableFadeSeconds: 0.01,
   /** Filter state below this is flushed to zero once per render quantum. */
   flushThreshold: 1e-20,
   /** A glide is settled (and snaps to its target) once within this, in log units or dB. */

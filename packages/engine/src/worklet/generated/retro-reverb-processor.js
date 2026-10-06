@@ -101,6 +101,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/worklet/retro/retroDelay.ts
 var RetroDelay = class {
   constructor(capacity) {
@@ -307,7 +335,7 @@ var RetroReverbDsp = class {
     this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
-    this.convertInput = this.converted = NaN;
+    this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
@@ -326,7 +354,10 @@ var RetroReverbDsp = class {
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
-    this.mix = this.targetMix = params.enabled[0] ? params.mix[0] : 0;
+    this.mix = this.targetMix = params.mix[0];
+    this.level = this.targetLevel = params.enabled[0] ? 1 : 0;
+    this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
+    this.dormant = false;
     this.smooth = 1 - Math.exp(-1 / (RETRO_REVERB_DSP.smoothSeconds * rate));
     this.wetToneLeft = this.wetToneRight = 0;
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
@@ -344,10 +375,32 @@ var RetroReverbDsp = class {
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
-    this.targetMix = params.enabled[0] ? params.mix[0] : 0;
+    this.targetMix = params.mix[0];
+    this.targetLevel = params.enabled[0] ? 1 : 0;
+    if (this.level !== 0) this.dormant = false;
+    else if (!this.dormant) this.clear();
+    if (this.targetLevel !== 0) this.dormant = false;
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
     this.tank.configure(this);
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) this.reflections.configure(this);
+  }
+  /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
+  clear() {
+    const tank = this.tank;
+    for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
+    for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
+    tank.damping.fill(0);
+    tank.values.fill(0);
+    tank.left = tank.right = 0;
+    this.reflections.delay.buffer.fill(0);
+    this.reflections.left = this.reflections.right = 0;
+    this.pre.buffer.fill(0);
+    this.inputFilter.z.fill(0);
+    this.leftFilter.z.fill(0);
+    this.rightFilter.z.fill(0);
+    this.previousInput = this.heldLeft = this.heldRight = 0;
+    this.wetToneLeft = this.wetToneRight = 0;
+    this.dormant = true;
   }
   /** `convertInput` through the converter's clip and quantiser, into `converted`. */
   convert() {
@@ -398,6 +451,11 @@ var RetroReverbDsp = class {
   /** One host sample: `inputLeft`/`inputRight` in, `left`/`right` out. */
   tick() {
     const left = this.inputLeft, right = this.inputRight;
+    if (this.dormant) {
+      this.left = left;
+      this.right = right;
+      return;
+    }
     this.inputFilter.input = (left + right) / 2;
     this.inputFilter.tick();
     const input = this.inputFilter.output;
@@ -418,8 +476,12 @@ var RetroReverbDsp = class {
     const wetR = this.rightFilter.output;
     this.mix += this.smooth * (this.targetMix - this.mix);
     if (Math.abs(this.targetMix - this.mix) < RETRO_REVERB_DSP.silenceFloor) this.mix = this.targetMix;
-    this.left = left + this.mix * (wetL - left);
-    this.right = right + this.mix * (wetR - right);
+    const level = this.level;
+    if (level !== this.targetLevel)
+      this.level = this.targetLevel > level ? Math.min(this.targetLevel, level + this.levelStep) : Math.max(this.targetLevel, level - this.levelStep);
+    const wet = this.mix * this.level;
+    this.left = left + wet * (wetL - left);
+    this.right = right + wet * (wetR - right);
   }
 };
 

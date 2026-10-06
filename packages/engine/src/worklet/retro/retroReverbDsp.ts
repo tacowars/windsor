@@ -6,7 +6,14 @@
  * networks, lines and filters have fields of their own. Every double field is first written as
  * NaN, then its start value, so none changes representation (rule 7).
  * `inserts/retroReverbAllocation.test.ts` holds it to both on V8.
+ *
+ * The on/off switch (windsor#630) is `level`, moved linearly over `INSERT_SWITCH_FADE_S` and landing
+ * on its target exactly; the wet share is the smoothed Mix times it, so fully off is the input to
+ * the bit. The first quantum that starts fully off clears the networks, lines and filters in place,
+ * and while the switch stays off they do not run: the tail is cut, never resumed, and switching back
+ * on starts from silence.
  */
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import {
   RETRO_REVERB_DSP as C,
   RETRO_REVERB_BOUNDS as B,
@@ -40,6 +47,12 @@ class RetroReverbDsp {
   character: number;
   mix: number;
   targetMix: number;
+  /** The switch's fade (0 off, 1 on), its target and its step a sample. */
+  level: number;
+  targetLevel: number;
+  levelStep: number;
+  /** Fully off with the networks cleared: `tick` copies the input and runs nothing. */
+  dormant: boolean;
   duration: number;
   finite: number;
   reverse: number;
@@ -60,7 +73,7 @@ class RetroReverbDsp {
     this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
-    this.convertInput = this.converted = NaN;
+    this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
@@ -79,7 +92,10 @@ class RetroReverbDsp {
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
-    this.mix = this.targetMix = params.enabled[0] ? params.mix[0] : 0;
+    this.mix = this.targetMix = params.mix[0];
+    this.level = this.targetLevel = params.enabled[0] ? 1 : 0;
+    this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
+    this.dormant = false;
     this.smooth = 1 - Math.exp(-1 / (C.smoothSeconds * rate));
     this.wetToneLeft = this.wetToneRight = 0;
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
@@ -98,10 +114,34 @@ class RetroReverbDsp {
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
-    this.targetMix = params.enabled[0] ? params.mix[0] : 0;
+    this.targetMix = params.mix[0];
+    this.targetLevel = params.enabled[0] ? 1 : 0;
+    if (this.level !== 0) this.dormant = false;
+    else if (!this.dormant) this.clear();
+    // Back on: the networks run again from the silence `clear` left.
+    if (this.targetLevel !== 0) this.dormant = false;
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
     this.tank.configure(this);
     if (this.finite > C.silenceFloor) this.reflections.configure(this);
+  }
+
+  /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
+  clear(): void {
+    const tank = this.tank;
+    for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
+    for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
+    tank.damping.fill(0);
+    tank.values.fill(0);
+    tank.left = tank.right = 0;
+    this.reflections.delay.buffer.fill(0);
+    this.reflections.left = this.reflections.right = 0;
+    this.pre.buffer.fill(0);
+    this.inputFilter.z.fill(0);
+    this.leftFilter.z.fill(0);
+    this.rightFilter.z.fill(0);
+    this.previousInput = this.heldLeft = this.heldRight = 0;
+    this.wetToneLeft = this.wetToneRight = 0;
+    this.dormant = true;
   }
 
   /** `convertInput` through the converter's clip and quantiser, into `converted`. */
@@ -159,6 +199,11 @@ class RetroReverbDsp {
   tick(): void {
     const left = this.inputLeft,
       right = this.inputRight;
+    if (this.dormant) {
+      this.left = left;
+      this.right = right;
+      return;
+    }
     this.inputFilter.input = (left + right) / 2;
     this.inputFilter.tick();
     const input = this.inputFilter.output;
@@ -179,8 +224,15 @@ class RetroReverbDsp {
     const wetR = this.rightFilter.output;
     this.mix += this.smooth * (this.targetMix - this.mix);
     if (Math.abs(this.targetMix - this.mix) < C.silenceFloor) this.mix = this.targetMix;
-    this.left = left + this.mix * (wetL - left);
-    this.right = right + this.mix * (wetR - right);
+    const level = this.level;
+    if (level !== this.targetLevel)
+      this.level =
+        this.targetLevel > level
+          ? Math.min(this.targetLevel, level + this.levelStep)
+          : Math.max(this.targetLevel, level - this.levelStep);
+    const wet = this.mix * this.level;
+    this.left = left + wet * (wetL - left);
+    this.right = right + wet * (wetR - right);
   }
 }
 

@@ -7,7 +7,14 @@
  * which V8 boxes across a call it does not inline, and every double field is
  * first written as a double (worklet rules 2 and 7, windsor#232).
  * inserts/delayAllocation.test.ts pins that on V8.
+ *
+ * The on/off switch moves `enabled` linearly over `INSERT_SWITCH_FADE_S`
+ * (windsor#630), not along the other controls' smoothing, and lands on its
+ * target exactly, so fully off is the input to the bit. The first quantum
+ * that starts fully off clears the lines and filters, in place: the tail is
+ * cut, never resumed, and switching back on starts from silence.
  */
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { DELAY_DSP as C, DELAY_DEFAULTS, DELAY_MODE_IDS } from '../../inserts/delayConstants';
 import { DELAY_KEYS as KEYS, DELAY_SLOT as S } from './delaySlots';
 import type { DelayControls } from './delaySlots';
@@ -20,10 +27,14 @@ class DelayDsp {
   readonly filter: Float64Array;
   readonly smooth: number;
   readonly timeSmooth: number;
+  /** How far `enabled` moves a sample. */
+  readonly switchStep: number;
   readonly controls: DelayControls;
   readonly targets: DelayControls;
   position: number;
   first: boolean;
+  /** The lines and filters hold nothing since the switch last reached off. */
+  cleared: boolean;
   /** The host sample `tick` reads. */
   inputLeft: number;
   inputRight: number;
@@ -35,7 +46,7 @@ class DelayDsp {
 
   constructor(rate: number, _params: DelayParams) {
     // Doubles first written as doubles (worklet rule 7).
-    this.rate = this.smooth = this.timeSmooth = NaN;
+    this.rate = this.smooth = this.timeSmooth = this.switchStep = NaN;
     this.inputLeft = this.inputRight = this.value = this.left = this.right = NaN;
     this.rate = rate;
     const length = Math.ceil(rate * C.maxSeconds) + 2;
@@ -43,6 +54,7 @@ class DelayDsp {
     this.filter = new Float64Array(C.filterStates);
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
     this.timeSmooth = 1 - Math.exp(-1 / (rate * C.timeSmoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.controls = new Float64Array(KEYS.length);
     // The defaults, the switch as 1 and the mode's crossfades at 0, read in place:
     // a spread of the defaults would build a record whose `enabled` changes type.
@@ -54,6 +66,7 @@ class DelayDsp {
     this.position = 0;
     this.left = this.right = 0;
     this.first = true;
+    this.cleared = true;
   }
 
   configure(params: DelayParams, _frames: number): void {
@@ -72,6 +85,16 @@ class DelayDsp {
       for (let k = 0; k < KEYS.length; k++) this.controls[k] = t[k];
       this.first = false;
     }
+    if (this.controls[S.enabled] !== 0) this.cleared = false;
+    else if (!this.cleared) this.clear();
+  }
+
+  /** Fully off: the tail goes, so the lines and their filters start from silence. */
+  clear(): void {
+    this.buffer[0].fill(0);
+    this.buffer[1].fill(0);
+    this.filter.fill(0);
+    this.cleared = true;
   }
 
   /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
@@ -96,7 +119,11 @@ class DelayDsp {
     s[S.drive] += k * (t[S.drive] - s[S.drive]);
     s[S.mix] += k * (t[S.mix] - s[S.mix]);
     s[S.outputDb] += k * (t[S.outputDb] - s[S.outputDb]);
-    s[S.enabled] += k * (t[S.enabled] - s[S.enabled]);
+    const enabled = s[S.enabled];
+    s[S.enabled] =
+      t[S.enabled] > enabled
+        ? Math.min(t[S.enabled], enabled + this.switchStep)
+        : Math.max(t[S.enabled], enabled - this.switchStep);
     s[S.ping] += k * (t[S.ping] - s[S.ping]);
     s[S.mid] += k * (t[S.mid] - s[S.mid]);
     this.read(0, S.leftMs);

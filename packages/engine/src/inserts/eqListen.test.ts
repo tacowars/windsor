@@ -4,7 +4,8 @@
  * the EQ plays only a band-pass at that band's frequency and Q, every change
  * crossfades without a click, and once it ends the output is the full EQ's to
  * the bit. With Listen never used the render is the one windsor#198 shipped,
- * pinned by a hash taken from that bundle before this ticket changed it.
+ * pinned by a hash taken from that bundle before this ticket changed it, and
+ * refreshed once since, by windsor#630's switch fade.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -100,9 +101,12 @@ function scenario(extra?: (q: number, p: EqProcessorLike) => void): [Float32Arra
 /**
  * The hash of `scenario()` through the windsor#198 bundle, before Listen
  * existed (read with the generated file at the commit this ticket branched
- * from). Listen off must leave every sample where it was.
+ * from). Listen off must leave every sample where it was. Refreshed by
+ * windsor#630, whose linear 5 ms switch fade replaced the 10 ms smoothstep:
+ * against the previous bundle, only the samples of the two enable fades
+ * (from quanta 180 and 260) moved.
  */
-const BEFORE_LISTEN = 'c219ecd0bc1daf52a61ab00b4c27f62b0237d760c5333fafc21d4d4fe55ae40d';
+const BEFORE_LISTEN = 'f96a9cef1c302d386659af513a7da205330d8a27c6bd57acaa3b1f4391051b13';
 
 describe('with Listen never used', () => {
   it('renders bit for bit what the EQ rendered before Listen existed', () => {

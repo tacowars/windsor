@@ -89,6 +89,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/worklet/phaser/phaserDsp.ts
 var KEYS = Object.keys(PHASER_DEFAULTS);
 var SLOT = {
@@ -107,10 +135,11 @@ var LEFT = 0;
 var RIGHT = 1;
 var PhaserDsp = class {
   constructor(rate, params) {
-    this.rate = this.smooth = this.attack = this.release = this.bassPole = NaN;
+    this.rate = this.smooth = this.attack = this.release = this.bassPole = this.switchStep = NaN;
     this.phase = this.follower = this.feedbackPole = this.mix = NaN;
     this.rate = rate;
     this.smooth = 1 - Math.exp(-1 / (rate * PHASER_DSP.smoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.attack = 1 - Math.exp(-1 / (rate * PHASER_DSP.attackSeconds));
     this.release = 1 - Math.exp(-1 / (rate * PHASER_DSP.releaseSeconds));
     this.bassPole = 1 - Math.exp(-(2 * Math.PI * PHASER_DSP.bassHz) / rate);
@@ -133,6 +162,14 @@ var PhaserDsp = class {
   configure(params, _frames) {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
+    if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
+  }
+  /** Back on from fully off: the all-passes and the feedback start from rest. */
+  clear() {
+    this.state.fill(0);
+    this.bass.fill(0);
+    this.feedbackLow.fill(0);
+    this.feedbackOut.fill(0);
   }
   /** One stereo sample: `input` in, `output` out. */
   tick() {
@@ -148,7 +185,8 @@ var PhaserDsp = class {
     s[SLOT.envelope] += k * (t[SLOT.envelope] - s[SLOT.envelope]);
     s[SLOT.bassKeep] += k * (t[SLOT.bassKeep] - s[SLOT.bassKeep]);
     s[SLOT.mix] += k * (t[SLOT.mix] - s[SLOT.mix]);
-    s[SLOT.enabled] += k * (t[SLOT.enabled] - s[SLOT.enabled]);
+    const enabled = s[SLOT.enabled], to = t[SLOT.enabled];
+    s[SLOT.enabled] = to > enabled ? Math.min(to, enabled + this.switchStep) : Math.max(to, enabled - this.switchStep);
     const left = this.input[LEFT];
     const right = this.input[RIGHT];
     const level = Math.min(1, Math.max(Math.abs(left), Math.abs(right)) * PHASER_DSP.envelopeGain);

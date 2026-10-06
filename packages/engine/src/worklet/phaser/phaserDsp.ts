@@ -8,7 +8,17 @@
  * slots rather than a record keyed by name; and every double field is first
  * written as a double (NaN), so none changes representation (rule 7). Pinned by
  * inserts/phaserAllocation.test.ts.
+ *
+ * The on/off switch moves `enabled` linearly over `INSERT_SWITCH_FADE_S`
+ * (windsor#630), not along the other controls' smoothing, and lands on its
+ * target exactly, so fully off is the input to the bit. A switch-on from fully
+ * off zeroes the all-pass, bass and feedback state in place on its first
+ * quantum, where the wet gain is still 0: the fade-in starts from rest, so
+ * nothing heard before the switch-on, before the switch-off or while off, comes
+ * out after it. The envelope follower and the sweep's phase keep running; they
+ * carry no audio.
  */
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { PHASER_DEFAULTS, PHASER_DSP as C } from '../../inserts/phaserConstants';
 
 type PhaserParams = Record<string, Float32Array>;
@@ -33,6 +43,8 @@ const RIGHT = 1;
 class PhaserDsp {
   readonly rate: number;
   readonly smooth: number;
+  /** How far `enabled` moves a sample. */
+  readonly switchStep: number;
   readonly attack: number;
   readonly release: number;
   readonly bassPole: number;
@@ -55,10 +67,11 @@ class PhaserDsp {
 
   constructor(rate: number, params: PhaserParams) {
     // Every double field is first written as a double (rule 7).
-    this.rate = this.smooth = this.attack = this.release = this.bassPole = NaN;
+    this.rate = this.smooth = this.attack = this.release = this.bassPole = this.switchStep = NaN;
     this.phase = this.follower = this.feedbackPole = this.mix = NaN;
     this.rate = rate;
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.attack = 1 - Math.exp(-1 / (rate * C.attackSeconds));
     this.release = 1 - Math.exp(-1 / (rate * C.releaseSeconds));
     this.bassPole = 1 - Math.exp(-(2 * Math.PI * C.bassHz) / rate);
@@ -82,6 +95,15 @@ class PhaserDsp {
   configure(params: PhaserParams, _frames: number): void {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
+    if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
+  }
+
+  /** Back on from fully off: the all-passes and the feedback start from rest. */
+  clear(): void {
+    this.state.fill(0);
+    this.bass.fill(0);
+    this.feedbackLow.fill(0);
+    this.feedbackOut.fill(0);
   }
 
   /** One stereo sample: `input` in, `output` out. */
@@ -98,7 +120,12 @@ class PhaserDsp {
     s[SLOT.envelope] += k * (t[SLOT.envelope] - s[SLOT.envelope]);
     s[SLOT.bassKeep] += k * (t[SLOT.bassKeep] - s[SLOT.bassKeep]);
     s[SLOT.mix] += k * (t[SLOT.mix] - s[SLOT.mix]);
-    s[SLOT.enabled] += k * (t[SLOT.enabled] - s[SLOT.enabled]);
+    const enabled = s[SLOT.enabled],
+      to = t[SLOT.enabled];
+    s[SLOT.enabled] =
+      to > enabled
+        ? Math.min(to, enabled + this.switchStep)
+        : Math.max(to, enabled - this.switchStep);
     const left = this.input[LEFT];
     const right = this.input[RIGHT];
     const level = Math.min(1, Math.max(Math.abs(left), Math.abs(right)) * C.envelopeGain);

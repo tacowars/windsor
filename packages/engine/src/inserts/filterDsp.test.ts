@@ -1,13 +1,15 @@
 /**
  * The Filter insert's bundle beyond its filter (windsor#622 decisions 4–6):
  * the bypass and the mix's ends to the bit, the sweep's glide, the resets on
- * a mode change and a re-enable, and the rest on silence. That the filter
+ * a mode change and a re-enable (at the start of the switch's fade-in,
+ * windsor#630), and the rest on silence. That the filter
  * itself is the voice's, bit for bit, is `worklet/filter/filterBundle.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { filterNoise, filterParams, loadFilter, runFilter } from '../__fixtures__/filterHarness';
 import type { FilterProcessorLike } from '../__fixtures__/filterHarness';
 import { FILTER_MODES } from './filterConstants';
+import { INSERT_SWITCH_FADE_S } from './insertConstants';
 import type { FilterSpec } from './filterSpec';
 
 const joined = (noise: Float32Array[][], channel: number): Float32Array => {
@@ -93,7 +95,7 @@ describe('the Filter insert, around its filter', () => {
     expect(switched).toEqual(runFilter(loadFilter(48000, freshParams), after, freshParams));
   });
 
-  it('starts from rest when turned back on', () => {
+  it('starts from rest when turned back on, fading in over the switch', () => {
     const params = filterParams({ cutoff: 500, resonance: 6, slope24: true });
     const processor = loadFilter(48000, params);
     runFilter(processor, noise.slice(0, 6), params);
@@ -101,9 +103,33 @@ describe('the Filter insert, around its filter', () => {
     runFilter(processor, noise.slice(6, 8), params);
     write(params, { cutoff: 500, resonance: 6, slope24: true });
     const fresh = filterParams({ cutoff: 500, resonance: 6, slope24: true });
-    expect(runFilter(processor, noise.slice(8), params)).toEqual(
-      runFilter(loadFilter(48000, fresh), noise.slice(8), fresh),
-    );
+    const after = noise.slice(8);
+    const [left, right] = runFilter(processor, after, params);
+    const [freshLeft, freshRight] = runFilter(loadFilter(48000, fresh), after, fresh);
+    // The fade-in: a fresh filter's output, crossfaded linearly from the dry.
+    const fade = INSERT_SWITCH_FADE_S * 48000;
+    const dry = joined(after, 0);
+    for (let s = 0; s < fade; s++) {
+      const g = (s + 1) / fade;
+      expect(left[s]).toBeCloseTo(dry[s]! + g * (freshLeft[s]! - dry[s]!), 6);
+    }
+    // Then the fresh filter's output to the bit.
+    expect(left.subarray(fade)).toEqual(freshLeft.subarray(fade));
+    expect(right.subarray(fade)).toEqual(freshRight.subarray(fade));
+  });
+
+  it('turns round mid fade-out with the states it has', () => {
+    const params = filterParams({ cutoff: 500, resonance: 6 });
+    const processor = loadFilter(48000, params);
+    runFilter(processor, noise.slice(0, 6), params);
+    write(params, { cutoff: 500, resonance: 6, enabled: false });
+    runFilter(processor, noise.slice(6, 7), params);
+    write(params, { cutoff: 500, resonance: 6 });
+    const [left] = runFilter(processor, noise.slice(7), params);
+    const steady = filterParams({ cutoff: 500, resonance: 6 });
+    const [never] = runFilter(loadFilter(48000, steady), noise, steady);
+    // Back to the never-switched filter once the fade has climbed back: no reset happened.
+    expect(left.subarray(128)).toEqual(never.subarray(8 * 128));
   });
 
   it.each(FILTER_MODES)('%s: rests on silence once its states settle, and writes zeros', (mode) => {

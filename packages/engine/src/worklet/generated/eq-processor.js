@@ -55,8 +55,6 @@ var EQ_DSP = {
   refreshFrames: 16,
   /** A type, slope or on change fades the band out, switches, and fades in: this long each way. */
   bandFadeSeconds: 5e-3,
-  /** The rail's enable crossfades the whole EQ against the dry input over this long. */
-  enableFadeSeconds: 0.01,
   /** Filter state below this is flushed to zero once per render quantum. */
   flushThreshold: 1e-20,
   /** A glide is settled (and snaps to its target) once within this, in log units or dB. */
@@ -493,6 +491,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/worklet/eq/eqBand.ts
 var PER2 = EQ_DSP.coefficientsPerSection;
 var ST = EQ_DSP.statePerSection;
@@ -887,7 +913,7 @@ var EqDsp = class {
     this.bypassed = false;
     this.mix = NaN;
     this.mixDir = 0;
-    this.mixStep = 1 / (EQ_DSP.enableFadeSeconds * sampleRate2);
+    this.mixStep = 1 / (INSERT_SWITCH_FADE_S * sampleRate2);
     this.clear = true;
     this.started = false;
   }
@@ -1004,8 +1030,7 @@ var EqDsp = class {
     const step = this.mixDir * this.mixStep;
     for (let i = 0; i < frames; i++) {
       const phase = this.mix + step * (i + 1);
-      const t = phase < 0 ? 0 : phase > 1 ? 1 : phase;
-      const g = t * t * (EQ_MATH.three - 2 * t);
+      const g = phase < 0 ? 0 : phase > 1 ? 1 : phase;
       outL[at + i] = this.inL[at + i] + g * (wL[i] - this.inL[at + i]);
       outR[at + i] = this.inR[at + i] + g * (wR[i] - this.inR[at + i]);
     }

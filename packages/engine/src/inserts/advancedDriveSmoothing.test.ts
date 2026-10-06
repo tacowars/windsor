@@ -21,7 +21,7 @@ function fullLoopReference(rate: number, params: Params): AdvancedDriveProcessor
   const reference = loadAdvancedDrive(rate, params) as ReferenceProcessor;
   const configure = reference.dsp.configure.bind(reference.dsp);
   const slots = KEYS.filter(
-    (key) => !/^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
+    (key) => !/^(route|wave|enabled)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
   ).map(slot);
   reference.dsp.configure = (p, frames): void => {
     configure(p, frames);
@@ -102,7 +102,7 @@ interface SmoothingDsp {
   update(): void;
 }
 const continuous = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name).filter(
-  (key) => !/^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
+  (key) => !/^(route|wave|enabled)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
 );
 const SENSITIVITY = slot('sensitivity');
 /** The names of the slots still smoothing. */

@@ -41,6 +41,34 @@ var COMPRESSOR_DSP = {
   meterCeilingDb: 24
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/inserts/compressorDsp.ts
 var coeff = (seconds, rate) => -Math.expm1(-1 / (seconds * rate));
 function feedbackStep(over, previous, slope, speed) {
@@ -62,7 +90,7 @@ var CompressorDsp = class {
     this.threshold = this.makeup = this.mix = this.range = this.enabled = this.ratio = NaN;
     this.highpass = this.attack = this.release = NaN;
     this.attackSpeed = this.releaseSpeed = this.hpSpeed = NaN;
-    this.rate = this.smoothing = this.slowCharge = this.slowRelease = NaN;
+    this.rate = this.smoothing = this.slowCharge = this.slowRelease = this.switchStep = NaN;
     this.reductionDb = 0;
     this.gain = 1;
     this.keyLeft = this.keyRight = 0;
@@ -76,6 +104,7 @@ var CompressorDsp = class {
     this.enabled = params.enabled[0];
     this.ratio = params.ratio[0];
     this.smoothing = coeff(COMPRESSOR_DSP.smoothSeconds, rate);
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.slowCharge = coeff(COMPRESSOR_DSP.autoChargeSeconds, rate);
     this.slowRelease = coeff(COMPRESSOR_DSP.autoSlowSeconds, rate);
     this.configure(params, true);
@@ -144,10 +173,10 @@ var CompressorDsp = class {
     this.makeup += a * (p.makeup[0] - this.makeup);
     this.mix += a * (p.mix[0] - this.mix);
     this.range += a * (p.range[0] - this.range);
-    this.enabled += a * (p.enabled[0] - this.enabled);
     this.ratio += a * (p.ratio[0] - this.ratio);
     if (Math.abs(this.mix - p.mix[0]) < COMPRESSOR_DSP.floor) this.mix = p.mix[0];
-    if (Math.abs(this.enabled - p.enabled[0]) < COMPRESSOR_DSP.floor) this.enabled = p.enabled[0];
+    const enabled = p.enabled[0];
+    this.enabled = enabled > this.enabled ? Math.min(enabled, this.enabled + this.switchStep) : Math.max(enabled, this.enabled - this.switchStep);
   }
 };
 

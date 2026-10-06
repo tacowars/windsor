@@ -10,7 +10,8 @@
  * pieces: one refresh step (`EQ_DSP.refreshFrames`) while a band, the output
  * or the enable moves, so coefficients follow the glides, or the whole block
  * once settled. State below `EQ_DSP.flushThreshold` is flushed after each
- * block.
+ * block. The enable crossfade is linear over `INSERT_SWITCH_FADE_S`
+ * (windsor#630), the one fade every insert's switch takes.
  *
  * Invariants: nothing allocates after the constructor; the output of the
  * copy paths is the input's own samples; a double field is first written as
@@ -22,6 +23,7 @@
  * through the shipped bundle.
  */
 import { EQ_DSP as D, EQ_MATH as M } from '../../inserts/eqConstants';
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { EqBand } from './eqBand';
 import { EqListen } from './eqListen';
 import { glideSections, mixFade, runSections } from './eqSections';
@@ -76,7 +78,7 @@ export class EqDsp {
     this.bypassed = false;
     this.mix = NaN;
     this.mixDir = 0;
-    this.mixStep = 1 / (D.enableFadeSeconds * sampleRate);
+    this.mixStep = 1 / (INSERT_SWITCH_FADE_S * sampleRate);
     this.clear = true;
     this.started = false;
   }
@@ -201,10 +203,8 @@ export class EqDsp {
     }
     const step = this.mixDir * this.mixStep;
     for (let i = 0; i < frames; i++) {
-      // The smoothstep of the phase, as a band's fade (`mixFade`).
       const phase = this.mix + step * (i + 1);
-      const t = phase < 0 ? 0 : phase > 1 ? 1 : phase;
-      const g = t * t * (M.three - 2 * t);
+      const g = phase < 0 ? 0 : phase > 1 ? 1 : phase;
       outL[at + i] = this.inL[at + i] + g * (wL[i] - this.inL[at + i]);
       outR[at + i] = this.inR[at + i] + g * (wR[i] - this.inR[at + i]);
     }

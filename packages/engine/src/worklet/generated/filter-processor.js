@@ -119,6 +119,34 @@ var LoadSampler = class {
   }
 };
 
+// packages/engine/src/inserts/insertConstants.ts
+var MAX_INSERTS = 8;
+var GAIN_EXPONENT_PER_DB = Math.LN10 / 20;
+var DRIVE_GAIN_MIN_DB = 0;
+var DRIVE_GAIN_MAX_DB = 36;
+var DRIVE_GAIN_DEFAULT_DB = 12;
+var DRIVE_TONE_MIN_HZ = 500;
+var DRIVE_TONE_MAX_HZ = 16e3;
+var DRIVE_TONE_DEFAULT_HZ = 8e3;
+var DRIVE_MIX_DEFAULT = 1;
+var DRIVE_REFERENCE_LEVEL = 0.25;
+var DRIVE_CURVE_RANGE = 8;
+var DRIVE_CURVE_POINTS = 4097;
+var CHORUS_RATE_MIN_HZ = 0.05;
+var CHORUS_RATE_MAX_HZ = 10;
+var CHORUS_RATE_DEFAULT_HZ = 0.6;
+var CHORUS_DEPTH_MIN_MS = 0;
+var CHORUS_DEPTH_MAX_MS = 4;
+var CHORUS_DEPTH_DEFAULT_MS = 2;
+var CHORUS_SPREAD_DEFAULT = 0.7;
+var CHORUS_MIX_DEFAULT = 0.5;
+var CHORUS_VOICE_CENTRES_MS = [11, 17];
+var CHORUS_VOICE_RATIOS = [1, 1.37];
+var CHORUS_ENABLED_DEFAULT = true;
+var CHORUS_DELAY_MAX_SECONDS = 0.05;
+var INSERT_FADE_SECONDS = 0.012;
+var INSERT_SWITCH_FADE_S = 5e-3;
+
 // packages/engine/src/worklet/fm/fmConstants.ts
 var TABLE_BITS = 11;
 var TABLE_SIZE = 1 << TABLE_BITS;
@@ -147,7 +175,7 @@ var DRIVE_DIODE_ORDER = 2 / DRIVE_DIODE_KNEE;
 var DRIVE_DIODE_ROOT = DRIVE_DIODE_KNEE / 2;
 var DRIVE_DIODE_LINEAR_BELOW = 1 / 1048576;
 var DRIVE_DIODE_UNITY_FROM = 1048576;
-var DRIVE_TONE_MIN_HZ = 1e3;
+var DRIVE_TONE_MIN_HZ2 = 1e3;
 var DRIVE_TONE_OCTAVES = 4.25;
 var OP_FILTER_CEILING = 0.45;
 var OP_FILTER_DAMPING = Math.SQRT2;
@@ -622,8 +650,9 @@ function modeOf(value) {
 }
 var FilterDsp = class {
   constructor(rate, params) {
-    this.rate = this.mix = NaN;
+    this.rate = this.mix = this.level = this.levelStep = NaN;
     this.rate = rate;
+    this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.svfA = [];
     this.svfB = [];
     this.ladder = [];
@@ -641,6 +670,7 @@ var FilterDsp = class {
     this.slope24 = params.slope24[0] >= FILTER_DSP.switchOn;
     this.enabled = params.enabled[0] >= FILTER_DSP.switchOn;
     this.mix = params.mix[0];
+    this.level = this.enabled ? 1 : 0;
     this.primed = false;
     this.resting = false;
   }
@@ -650,7 +680,7 @@ var FilterDsp = class {
     const mode = modeOf(params.mode[0]);
     const slope24 = params.slope24[0] >= FILTER_DSP.switchOn;
     const newPath = mode !== this.mode || slope24 !== this.slope24 && mode !== FILT_LADDER;
-    const reenabled = enabled && !this.enabled;
+    const reenabled = enabled && this.level === 0;
     this.enabled = enabled;
     this.mode = mode;
     this.slope24 = slope24;
@@ -677,13 +707,22 @@ var FilterDsp = class {
       }
     }
   }
-  /** `frames` samples of `input` through the path into `output`. */
+  /** `frames` samples of `input` through the path into `output`, the switch's fade over them. */
   render(frames) {
-    const glide = this.glide;
-    if (!this.enabled) {
+    const level = this.level;
+    if (!this.enabled && level === 0) {
       this.bypass(frames);
       this.resting = false;
-    } else if (this.settled(frames)) {
+    } else {
+      this.filter(frames);
+      if (!this.enabled || level !== 1) this.fade(frames);
+    }
+    landGlide(this.glide);
+  }
+  /** The path over the block: silence at rest, else the sections or the ladder piece by piece. */
+  filter(frames) {
+    const glide = this.glide;
+    if (this.settled(frames)) {
       if (!this.resting) this.resetPath();
       this.silence(frames);
       this.resting = true;
@@ -701,7 +740,21 @@ var FilterDsp = class {
         }
       }
     }
-    landGlide(glide);
+  }
+  /** The switch's linear crossfade from `input` to `output`, in place, `level` stepped a sample at a time. */
+  fade(frames) {
+    const from = this.level;
+    const step = this.enabled ? this.levelStep : -this.levelStep;
+    for (let c = 0; c < CHANNELS; c++) {
+      const input = this.input[c], output = this.output[c];
+      for (let s = 0; s < frames; s++) {
+        const at = from + step * (s + 1);
+        const g = at < 0 ? 0 : at > 1 ? 1 : at;
+        output[s] = input[s] + g * (output[s] - input[s]);
+      }
+    }
+    const to = from + step * frames;
+    this.level = to < 0 ? 0 : to > 1 ? 1 : to;
   }
   /** Channel `c`'s SVF sections tuned to the glide's piece, then its samples [from, to). */
   runSvf(c, from, to) {

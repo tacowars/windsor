@@ -5,6 +5,9 @@
  * avoiding a one-sample feedback instability at 0.01 ms / 10:1. This is a
  * behavioral model, not a circuit simulation. Range caps the control
  * voltage; Auto adds a slowly charging/releasing baseline to fast recovery.
+ * The on/off switch moves `enabled` linearly over `INSERT_SWITCH_FADE_S`
+ * (windsor#630), a crossfade of the dry and the compressed signal, and fully
+ * off is a gain of exactly 1.
  * No objects are allocated by configure(), advance(), or feedbackStep(), and no
  * double crosses a call on the worklet's path: the sample and its gain travel
  * through fields, and every field is `declare`d (this file also compiles in the
@@ -13,6 +16,7 @@
  * compressorAllocation.test.ts; compressorDsp.test.ts pins the behaviour.
  */
 import { COMPRESSOR_DSP as C } from './compressorConstants';
+import { INSERT_SWITCH_FADE_S } from './insertConstants';
 
 export type CompressorParams = Record<string, Float32Array>;
 const coeff = (seconds: number, rate: number): number => -Math.expm1(-1 / (seconds * rate));
@@ -58,6 +62,8 @@ export class CompressorDsp {
   declare private hpSpeed: number;
   declare private readonly rate: number;
   declare private readonly smoothing: number;
+  /** How far `enabled` moves a sample: across 0..1 in `INSERT_SWITCH_FADE_S`. */
+  declare private readonly switchStep: number;
   declare private readonly slowCharge: number;
   declare private readonly slowRelease: number;
   declare private params: CompressorParams;
@@ -70,7 +76,7 @@ export class CompressorDsp {
     this.threshold = this.makeup = this.mix = this.range = this.enabled = this.ratio = NaN;
     this.highpass = this.attack = this.release = NaN;
     this.attackSpeed = this.releaseSpeed = this.hpSpeed = NaN;
-    this.rate = this.smoothing = this.slowCharge = this.slowRelease = NaN;
+    this.rate = this.smoothing = this.slowCharge = this.slowRelease = this.switchStep = NaN;
     this.reductionDb = 0;
     this.gain = 1;
     this.keyLeft = this.keyRight = 0;
@@ -84,6 +90,7 @@ export class CompressorDsp {
     this.enabled = params.enabled![0]!;
     this.ratio = params.ratio![0]!;
     this.smoothing = coeff(C.smoothSeconds, rate);
+    this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.slowCharge = coeff(C.autoChargeSeconds, rate);
     this.slowRelease = coeff(C.autoSlowSeconds, rate);
     this.configure(params, true);
@@ -161,10 +168,14 @@ export class CompressorDsp {
     this.makeup += a * (p.makeup![0]! - this.makeup);
     this.mix += a * (p.mix![0]! - this.mix);
     this.range += a * (p.range![0]! - this.range);
-    this.enabled += a * (p.enabled![0]! - this.enabled);
     this.ratio += a * (p.ratio![0]! - this.ratio);
     // Settle exact endpoints: a dry/bypassed insert eventually is bit-identical.
     if (Math.abs(this.mix - p.mix![0]!) < C.floor) this.mix = p.mix![0]!;
-    if (Math.abs(this.enabled - p.enabled![0]!) < C.floor) this.enabled = p.enabled![0]!;
+    // The switch: a straight line to its target, which it lands on exactly.
+    const enabled = p.enabled![0]!;
+    this.enabled =
+      enabled > this.enabled
+        ? Math.min(enabled, this.enabled + this.switchStep)
+        : Math.max(enabled, this.enabled - this.switchStep);
   }
 }
