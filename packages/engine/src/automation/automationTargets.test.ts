@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INSERT_KIND_NAMES } from '../inserts/insertRegistry';
-import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { insertKindFields } from './automationInsertFields';
 import { SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import type { ParsedTarget } from './automationLane';
 import {
@@ -19,7 +19,7 @@ import {
 import { GROUP_STRIP_TARGETS } from './automationTargetTables';
 
 const INSERT_IDS = INSERT_KIND_NAMES.flatMap((kind) =>
-  INSERT_AUTOMATION_FIELDS[kind].map((row) => `insert.k3x9a0q2.${row.target}`),
+  insertKindFields(kind).map((row) => `insert.k3x9a0q2.${row.target}`),
 );
 const SEQ_IDS = SEQ_AUTOMATION_ROWS.map((row) => row.target);
 const EVERY_ID = [...STRIP_TARGET_IDS, ...VOICE_TARGET_IDS, ...INSERT_IDS, ...SEQ_IDS];
@@ -55,7 +55,6 @@ describe('parseTargetId and formatTargetId', () => {
       'insert.ab12cd34',
       'insert..mix',
       'insert.ab12cd34.kind',
-      'insert.ab12cd34.enabled',
       'insert.ab12cd34.bands.8.freq',
       'master.level',
       'seq.divisor',
@@ -79,11 +78,7 @@ describe('parseTargetId and formatTargetId', () => {
 
 describe('an insert id with dots', () => {
   const FIELDS = [
-    ...new Set(
-      INSERT_KIND_NAMES.flatMap((k) =>
-        INSERT_AUTOMATION_FIELDS[k].map((row: { target: string }) => row.target),
-      ),
-    ),
+    ...new Set(INSERT_KIND_NAMES.flatMap((k) => insertKindFields(k).map((row) => row.target))),
   ];
   const ODD_IDS = [
     'echo.main',
@@ -93,6 +88,7 @@ describe('an insert id with dots', () => {
     '..',
     'mix',
     'a.mix',
+    'a.enabled',
     'x.bands.3',
     'bands.3',
     'x.stages.0',

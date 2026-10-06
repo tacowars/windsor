@@ -73,3 +73,12 @@ export const CHORUS_DELAY_MAX_SECONDS = 0.05;
  * enough that the edit feels immediate; the strip is silent for twice this.
  */
 export const INSERT_FADE_SECONDS = 0.012;
+
+/**
+ * The fade an insert's on/off switch crosses, in seconds (record
+ * `2026-10-06-insert-switch-lanes`): switching off cuts the effect, its tail
+ * included, over this fade, and switching on brings it back over the same.
+ * One constant for every insert, chosen by tacowars on 2026-10-06. Unread
+ * until the click-free switch lands (windsor#629, windsor#630).
+ */
+export const INSERT_SWITCH_FADE_S = 0.005;

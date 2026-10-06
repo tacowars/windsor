@@ -1,7 +1,8 @@
 /**
  * The automation lanes' tunables (windsor#341, record
  * `2026-10-01-song-automation-lanes`): the de-click ramp on a vertical step,
- * the sampler's grain and the bend's base. Data only.
+ * the sampler's grain, the bend's base and where a switch turns on. Data
+ * only.
  */
 
 /**
@@ -19,3 +20,10 @@ export const AUTOMATION_GRAIN_TICKS = 1;
  * bend of ±1 is an exponent of 1/5 or 5 and a bend of 0 is a straight line.
  */
 export const AUTOMATION_BEND_BASE = 5;
+
+/**
+ * A switch lane's threshold (windsor#628): a value at or above it is on (1),
+ * below it off (0). The normaliser snaps a switch lane's values with it, and
+ * display space reads a height with it.
+ */
+export const AUTOMATION_SWITCH_ON_AT = 0.5;

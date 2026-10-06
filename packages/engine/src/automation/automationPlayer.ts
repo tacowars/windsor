@@ -13,6 +13,8 @@
  *   or logarithmic segment is cut every tick and the curve is scheduled as
  *   it enters the look-ahead. A step, two breakpoints on one tick, is
  *   `set(prev)` then a ramp to the new value over `AUTOMATION_STEP_RAMP_SECONDS`.
+ * - **A switch lane** (windsor#628) only ever `set`s: each point, a step's
+ *   two included, is a jump at its time, never a ramp.
  * - **Discontinuities.** A tick that does not follow the last one (a start,
  *   the loop's jump back, the song's wrap) cancels each lane from its time,
  *   holds the value at its position there, and schedules on. A live lane edit
@@ -224,7 +226,10 @@ export class AutomationPlayer {
       // After a jump the hold is already the value at `pos`, a step's included.
       if (!(jump && ramp.tick === pos)) {
         const at = Math.max(lane.last, time + (ramp.tick - pos) * interval);
-        if (prev?.tick === ramp.tick) {
+        if (lane.row.scale === 'switch') {
+          lane.handle.schedule(ramp.value, at, 'set');
+          lane.last = at;
+        } else if (prev?.tick === ramp.tick) {
           lane.handle.schedule(prev.value, at, 'set');
           lane.handle.schedule(ramp.value, at + this.stepSeconds, 'ramp');
           lane.last = at + this.stepSeconds;

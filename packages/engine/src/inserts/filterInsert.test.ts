@@ -36,7 +36,7 @@ class FilterNode extends FakeNode {
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('writes the mode as its index and the switches as 0 or 1, and hands lanes only the sweep', () => {
+it('writes the mode as its index and the switches as 0 or 1, and hands lanes the sweep and the switch', () => {
   vi.stubGlobal(
     'AudioWorkletNode',
     function (context: FakeContext, name: string, options: AudioWorkletNodeOptions) {
@@ -61,10 +61,9 @@ it('writes the mode as its index and the switches as 0 or 1, and hands lanes onl
   expect([value('mode'), value('slope24'), value('enabled'), value('cutoff')]).toEqual([
     4, 1, 0, 440,
   ]);
-  for (const field of ['cutoff', 'resonance', 'mix'])
+  for (const field of ['cutoff', 'resonance', 'mix', 'enabled'])
     expect(stage.param!(field), field).toBeDefined();
-  for (const field of ['mode', 'slope24', 'enabled'])
-    expect(stage.param!(field), field).toBeUndefined();
+  for (const field of ['mode', 'slope24']) expect(stage.param!(field), field).toBeUndefined();
   stage.dispose();
   expect(node.posted).toEqual([{ type: 'stop' }]);
   expect(node.port.close).toHaveBeenCalledOnce();

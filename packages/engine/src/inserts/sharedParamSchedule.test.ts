@@ -188,3 +188,34 @@ describe('a shared param follows both lanes at once', () => {
     for (const t of [0, 1, 2, 3]) expectShared(lane, shared, t, want(aSpec, linear(points, t)));
   });
 });
+
+describe("a native kind's switch shares the wet and dry gains with Mix (windsor#628)", () => {
+  const SWITCHED = ['drive', 'chorus', 'ensemble', 'echo'] as const;
+
+  it.each(SWITCHED)('%s: the switch steps off at 1 and on at 2 while Mix ramps across', (kind) => {
+    const spec = openSpec(kind);
+    const mixRow = INSERT_AUTOMATION_FIELDS[kind].find((r) => r.target === 'mix')!;
+    const mix: Point[] = [0.2, 0.5, 0.8, 0.4].map((share, t) => [t, otherValue(mixRow, -1, share)]);
+    const lane = build(spec);
+    const toggle = lane.stage.param!('enabled')!;
+    toggle.hold(1, 0);
+    toggle.schedule(0, 1, 'set');
+    toggle.schedule(1, 2, 'set');
+    const gains = touched(lane);
+    playLane(lane, 'mix', mix);
+    /** What `set` writes to the switch's gains at `mixValue`, switched `on` or off. */
+    const want = (mixValue: number, on: boolean): Map<string, number> => {
+      const knob = build({ ...withField(spec, 'mix', mixValue), enabled: on } as typeof spec);
+      return new Map(gains.map((name) => [name, knob.params.get(name)!.value]));
+    };
+    const expectAt = (t: number, on: boolean) => {
+      for (const [name, value] of want(linear(mix, t), on)) {
+        expect(lane.params.get(name)!.valueAt(t), `${name} at ${t}`).toBeCloseTo(value, DIGITS);
+      }
+    };
+    expect(gains.length).toBeGreaterThan(1);
+    for (const t of [0, 0.5, 0.9]) expectAt(t, true);
+    for (const t of [1, 1.5, 1.9]) expectAt(t, false);
+    for (const t of [2, 2.5, 3]) expectAt(t, true);
+  });
+});

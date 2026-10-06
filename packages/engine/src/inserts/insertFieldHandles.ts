@@ -12,10 +12,17 @@
  * a knob edit never fights the lane. The release writes the stage's current
  * spec value back.
  *
- * Where one param mixes two fields (a Drive's wet gain is its mix times the
- * drive's compensation), neither field's target lists it: the stage names it
- * in `shared`, and its schedule is written from both fields' own values at
- * each breakpoint either has (`sharedParamSchedule.ts`).
+ * Where one param mixes two or more fields (a Drive's wet gain is its mix
+ * times the drive's compensation, and nothing while it is off), no field's
+ * target lists it: the stage names it in `shared`, and its schedule is
+ * written from every field's own value at each breakpoint any of them has
+ * (`sharedParamSchedule.ts`). `set` writes them through `writeShared`, never
+ * itself: a knob edit is the field's new resting value, so where another
+ * field's lane holds the param the schedule is written again from now.
+ *
+ * Every kind's `enabled` is a field too (windsor#628): a worklet kind's
+ * `paramOf` names its `enabled` param, and a native kind folds it into the
+ * gains `set` writes for it, shared with Mix where Mix writes them too.
  */
 import type { AutomationHandle, KnobHandle, KnobTarget } from '../automation/automationHandles';
 import { knobHandle, sameValue } from '../automation/automationHandles';
@@ -29,9 +36,16 @@ export interface FieldHandles {
   param(field: string): AutomationHandle | undefined;
   /** Whether a lane holds `field`'s params now: `set` leaves them alone. */
   automated(field: string): boolean;
+  /**
+   * Writes every shared param from its fields' values now, for `set` after
+   * the spec changed: directly where no lane holds any of its fields, and
+   * through its schedule from now where one does, so a knob is heard at
+   * once beside another field's lane (windsor#628, fix round for PR #632).
+   */
+  writeShared(): void;
 }
 
-/** The params two fields share, and the audio clock their schedules prune by. */
+/** The params fields share, and the audio clock their schedules prune by. */
 export interface SharedParams {
   readonly params: readonly SharedParam[];
   readonly now: () => number;
@@ -39,8 +53,8 @@ export interface SharedParams {
 
 /**
  * Handles over `target`, which says what one field alone writes, or
- * undefined for none, and over `shared`, the params two fields write
- * together. A field in a shared pair has a target, if only an empty one.
+ * undefined for none, and over `shared`, the params fields write together.
+ * A field a shared param reads has a target, if only an empty one.
  */
 export function fieldHandles(
   target: (field: string) => KnobTarget | undefined,
@@ -56,8 +70,9 @@ export function fieldHandles(
     }
     return found;
   };
+  const automated = (field: string): boolean => handles.get(field)?.engaged === true;
   const schedules = (shared?.params ?? []).map(
-    (p) => new SharedSchedule(p, timeline(p.fields[0]), timeline(p.fields[1])),
+    (p) => new SharedSchedule(p, p.fields.map(timeline)),
   );
   return {
     param(field) {
@@ -72,7 +87,12 @@ export function fieldHandles(
       handles.set(field, handle);
       return handle;
     },
-    automated: (field) => handles.get(field)?.engaged === true,
+    automated,
+    writeShared() {
+      if (!shared) return;
+      const now = shared.now();
+      shared.params.forEach((p, i) => schedules[i]!.restAt(now, p.fields.some(automated)));
+    },
   };
 }
 
@@ -111,8 +131,14 @@ export function workletFieldParams(
   };
 }
 
-/** A field that names its own param, when it is one of `numbers`. */
+/** The on/off field every kind's spec has, and every worklet kind's param of the same name. */
+export const SWITCH_FIELD = 'enabled';
+
+/** A field that names its own param, when it is one of `numbers` or the switch. */
 export const ownParam =
   (numbers: object) =>
   (field: string): string | undefined =>
-    Object.hasOwn(numbers, field) ? field : undefined;
+    Object.hasOwn(numbers, field) || field === SWITCH_FIELD ? field : undefined;
+
+/** A native kind's switch, as `set` writes it: 1 on, 0 off. */
+export const switchOf = (spec: { readonly enabled: boolean }): number => Number(spec.enabled);

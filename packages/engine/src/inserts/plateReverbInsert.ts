@@ -9,7 +9,8 @@
  * exactly (wet 1, dry 0) and Mix 0 is its dry path alone. Off closes `send`
  * and `gate` and opens `bypass`: the input passes unchanged, and the plate,
  * hearing silence, goes to sleep (#547). The plate is built by
- * `mixer/returnEffects.ts`, the return's own builder.
+ * `mixer/returnEffects.ts`, the return's own builder. A switch lane
+ * (windsor#628) writes the same three gains.
  */
 import { REVERB_SPACE_RANGES } from '../audioConstants';
 import type { PlateMix } from '../mixer/returnEffects';
@@ -20,7 +21,7 @@ import type { FieldNormaliser } from '../song/arrangementFields';
 import type { KnobTarget } from '../automation/automationHandles';
 import { sameValue } from '../automation/automationHandles';
 import type { FieldHandles } from './insertFieldHandles';
-import { fieldHandles } from './insertFieldHandles';
+import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import { PLATE_REVERB_MIX_DEFAULT, PLATE_REVERB_SPACE_DEFAULT } from './plateReverbConstants';
 
@@ -76,13 +77,31 @@ function normalise(
 const isSpaceField = (field: string): field is keyof ReverbSpace =>
   (PLATE_SPACE_FIELDS as readonly string[]).includes(field);
 
+/** The switch's three gains: what `set` writes for `enabled`, on (1) or off (0). */
+interface PlateSwitch {
+  readonly send: AudioParam;
+  readonly gate: AudioParam;
+  readonly bypass: AudioParam;
+}
+
+const switchGains = (on: number): [number, number, number] => [on, on, 1 - on];
+
 /**
  * Each knob's lane (windsor#345): a space field on the plate's param of its
- * name, Mix on the plate's own `wet` and `dry`. The plate reads `decay` and
- * `wet` once per block, unsmoothed, so a fast lane there steps every 128 samples.
+ * name, Mix on the plate's own `wet` and `dry`, the switch on the send, gate
+ * and bypass gains (windsor#628). The plate reads `decay` and `wet` once per
+ * block, unsmoothed, so a fast lane there steps every 128 samples.
  */
-function plateHandles(plate: AudioWorkletNode, spec: () => PlateReverbSpec): FieldHandles {
+function plateHandles(
+  plate: AudioWorkletNode,
+  gains: PlateSwitch,
+  spec: () => PlateReverbSpec,
+): FieldHandles {
   return fieldHandles((field): KnobTarget | undefined => {
+    if (field === SWITCH_FIELD) {
+      const params = [gains.send, gains.gate, gains.bypass];
+      return { params, write: switchGains, resting: () => switchOf(spec()) };
+    }
     const resting = (): number => spec()[field as keyof ReverbSpace | 'mix'];
     if (field === 'mix') {
       const params = [plate.parameters.get('wet')!, plate.parameters.get('dry')!];
@@ -122,14 +141,17 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
   bypass.connect(output);
 
   let current = spec;
-  const knobs = plateHandles(plate, () => current);
+  const knobs = plateHandles(
+    plate,
+    { send: send.gain, gate: gate.gain, bypass: bypass.gain },
+    () => current,
+  );
   const set = (next: PlateReverbSpec): void => {
     current = next;
     writePlate(plate, unheld(plateSpace(next), knobs));
     if (!knobs.automated('mix')) writePlate(plate, plateMix(next));
-    send.gain.value = Number(next.enabled);
-    gate.gain.value = Number(next.enabled);
-    bypass.gain.value = Number(!next.enabled);
+    if (knobs.automated(SWITCH_FIELD)) return;
+    [send.gain.value, gate.gain.value, bypass.gain.value] = switchGains(switchOf(next));
   };
   set(spec);
 

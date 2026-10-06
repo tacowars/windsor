@@ -6,6 +6,9 @@
  * cutoff lane an even sweep in octaves.
  *
  * - `linear`: `(v − min) / (max − min)`.
+ * - `switch` (windsor#628): off at the bottom, on at the top; a height at
+ *   or above `AUTOMATION_SWITCH_ON_AT` reads back as on. A switch value
+ *   reads `Off` or `On` (`switchReading`).
  * - `db`, `octaves`, `log`: `log(v / lo) / log(max / lo)`, `lo` the row's
  *   `floor` or else its `min`. A level in dB is the log of its gain, so the
  *   `db` row is the same map from its floor in dB to its max in dB; a value
@@ -16,6 +19,7 @@
  * Values outside the row clamp to its ends. `automationDisplay.test.ts`
  * pins the round trip on every scale.
  */
+import { AUTOMATION_SWITCH_ON_AT } from './automationConstants';
 import type { AutomationTargetRow } from './automationLane';
 
 /** The identity row: display space itself, a linear 0..1. */
@@ -35,6 +39,7 @@ const logBottom = (row: AutomationTargetRow): number => row.floor ?? row.min;
 
 /** `value`, in the row's units, as a height in 0..1. */
 export function toDisplay(row: AutomationTargetRow, value: number): number {
+  if (row.scale === 'switch') return switchValue(value);
   if (row.scale === 'linear') return clampUnit((value - row.min) / (row.max - row.min));
   const lo = logBottom(row);
   if (value <= lo) return 0;
@@ -45,7 +50,18 @@ export function toDisplay(row: AutomationTargetRow, value: number): number {
 export function fromDisplay(row: AutomationTargetRow, y: number): number {
   if (y <= 0) return row.min;
   if (y >= 1) return row.max;
+  if (row.scale === 'switch') return switchValue(y) === 1 ? row.max : row.min;
   if (row.scale === 'linear') return row.min + y * (row.max - row.min);
   const lo = logBottom(row);
   return lo * Math.exp(y * Math.log(row.max / lo));
+}
+
+/** A switch's value, 0 or 1: 1 at or above `onAt`. */
+export function switchValue(value: number, onAt = AUTOMATION_SWITCH_ON_AT): 0 | 1 {
+  return value >= onAt ? 1 : 0;
+}
+
+/** What a switch value reads: `On` at or above `onAt`, `Off` below. */
+export function switchReading(value: number, onAt = AUTOMATION_SWITCH_ON_AT): 'Off' | 'On' {
+  return switchValue(value, onAt) === 1 ? 'On' : 'Off';
 }

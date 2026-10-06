@@ -16,6 +16,8 @@
  * the transport, as a chorus's should.
  *
  * `enabled` false is Mix 0 (#695), so a switched-off chain is the dry signal.
+ * A switch lane (windsor#628) writes the same wet and dry gains, from the
+ * switch and Mix together.
  *
  * `set` is param writes only: the voice count is the kind's, so no setting
  * re-wires. `dispose` stops every oscillator — a running source keeps its
@@ -39,7 +41,7 @@ import {
 } from './insertConstants';
 import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldHandles } from './insertFieldHandles';
-import { fieldHandles } from './insertFieldHandles';
+import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface ChorusSpec {
@@ -126,26 +128,34 @@ const swingOf = (depth: number): number => depth / MS_PER_SECOND;
 /** The right side's LFO gain: `1 − 2·spread` of the left's. */
 const rightSwing = (depth: number, spread: number): number => swingOf(depth) * (1 - 2 * spread);
 /** The voices sum into the merger, so each carries its share of the wet level. */
-const mixGains = (spec: ChorusSpec, mix: number, voices: number): [number, number] => {
-  const heard = spec.enabled ? mix : 0;
+const mixGains = (mix: number, on: number, voices: number): [number, number] => {
+  const heard = on ? mix : 0;
   return [heard / voices, 1 - heard];
 };
 
 /**
  * Each knob's lane (windsor#345): Rate on every voice's LFO, Depth on the
- * left side's swing, Mix on the wet and dry gains. The right side's swing
- * (the depth times the spread's share) follows Depth and Spread both, from
- * each one's own value at every breakpoint either has.
+ * left side's swing. The right side's swing (the depth times the spread's
+ * share) follows Depth and Spread both, and the wet and dry gains follow Mix
+ * and the switch (windsor#628), each from every field's own value at every
+ * breakpoint any of them has.
  */
 function chorusHandles(p: ChorusParams, spec: () => ChorusSpec, now: () => number): FieldHandles {
   const { voices } = p;
   const each = (value: number): number[] => voices.map(() => value);
   const rights = {
     params: voices.map((v) => v.depthR.gain),
-    fields: ['depth', 'spread'] as const,
+    fields: ['depth', 'spread'],
     value: rightSwing,
   };
+  const mixed = (params: AudioParam[], side: 0 | 1) => ({
+    params,
+    fields: ['mix', SWITCH_FIELD],
+    value: (mix: number, on: number) => mixGains(mix, on, voices.length)[side],
+  });
   const target = (field: string): KnobTarget | undefined => {
+    if (field === SWITCH_FIELD)
+      return { params: [], write: () => [], resting: () => switchOf(spec()) };
     const resting = (): number => spec()[field as 'rate' | 'depth' | 'spread' | 'mix'];
     if (field === 'rate') {
       const write = (v: number) => voices.map((_, i) => voiceRate(v, i));
@@ -155,13 +165,12 @@ function chorusHandles(p: ChorusParams, spec: () => ChorusSpec, now: () => numbe
       const write = (v: number) => each(swingOf(v));
       return { params: voices.map((v) => v.depthL.gain), write, resting };
     }
-    // Spread writes only the right side's swing, which it shares with Depth.
-    if (field === 'spread') return { params: [], write: () => [], resting };
-    if (field !== 'mix') return undefined;
-    const write = (v: number) => mixGains(spec(), v, voices.length);
-    return { params: [p.wet, p.dry], write, resting };
+    // Spread and Mix write only params they share: the right swing, the wet and dry gains.
+    return field === 'spread' || field === 'mix'
+      ? { params: [], write: () => [], resting }
+      : undefined;
   };
-  return fieldHandles(target, { params: [rights], now });
+  return fieldHandles(target, { params: [rights, mixed([p.wet], 0), mixed([p.dry], 1)], now });
 }
 
 function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<ChorusSpec> {
@@ -191,12 +200,9 @@ function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<Chorus
     voices.forEach((v, i) => {
       if (!lane('rate')) v.lfo.frequency.value = voiceRate(next.rate, i);
       if (!lane('depth')) v.depthL.gain.value = swingOf(next.depth);
-      if (!lane('depth') && !lane('spread')) {
-        v.depthR.gain.value = rightSwing(next.depth, next.spread);
-      }
     });
-    if (lane('mix')) return;
-    [wet.gain.value, dry.gain.value] = mixGains(next, next.mix, voices.length);
+    // The right swings and the wet and dry gains, which fields share.
+    knobs.writeShared();
   };
   set(spec);
 

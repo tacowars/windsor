@@ -5,18 +5,46 @@ import type { EqBand, EqSpec } from '../inserts/eqSpec';
 import { INSERT_KINDS, INSERT_KIND_NAMES, type InsertSpec } from '../inserts/insertRegistry';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
 import type { TapeSpec } from '../inserts/tapeSpec';
-import { automatableInsertFields } from './automationInsertFields';
-import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { automatableInsertFields, insertKindFields } from './automationInsertFields';
+import { INSERT_AUTOMATION_FIELDS, INSERT_SWITCH_ROW } from './automationInsertTables';
 
 const fields = (spec: InsertSpec): string[] => automatableInsertFields(spec).map((r) => r.target);
 const defaults = <S extends InsertSpec>(kind: S['kind']): S => INSERT_KINDS[kind].defaults as S;
 
-describe('automatableInsertFields', () => {
-  it("keeps the catalog's order and only its rows", () => {
+describe('insertKindFields', () => {
+  it('appends the switch, On on a switch scale, to all thirteen kinds', () => {
+    expect(INSERT_KIND_NAMES).toHaveLength(13);
+    expect(INSERT_SWITCH_ROW).toMatchObject({ target: 'enabled', label: 'On', min: 0, max: 1 });
+    expect(INSERT_SWITCH_ROW.scale).toBe('switch');
     for (const kind of INSERT_KIND_NAMES) {
-      const all = INSERT_AUTOMATION_FIELDS[kind].map((r) => r.target);
+      expect(insertKindFields(kind), kind).toEqual([
+        ...INSERT_AUTOMATION_FIELDS[kind],
+        INSERT_SWITCH_ROW,
+      ]);
+    }
+  });
+
+  it('lists no switch in the continuous table', () => {
+    for (const rows of Object.values(INSERT_AUTOMATION_FIELDS)) {
+      expect(rows.some((r) => r.target === 'enabled' || r.scale === 'switch')).toBe(false);
+    }
+  });
+});
+
+describe('automatableInsertFields', () => {
+  it("keeps the catalog's order and only its rows, the switch last", () => {
+    for (const kind of INSERT_KIND_NAMES) {
+      const all = insertKindFields(kind).map((r) => r.target);
       const kept = fields(INSERT_KINDS[kind].defaults);
       expect(kept, kind).toEqual(all.filter((t) => kept.includes(t)));
+      expect(kept.at(-1), kind).toBe('enabled');
+    }
+  });
+
+  it('offers the switch while the insert is off', () => {
+    for (const kind of INSERT_KIND_NAMES) {
+      const off = { ...INSERT_KINDS[kind].defaults, enabled: false } as InsertSpec;
+      expect(fields(off), kind).toContain('enabled');
     }
   });
 
@@ -30,7 +58,7 @@ describe('automatableInsertFields', () => {
       'plate',
       'echo',
     ] as const) {
-      expect(fields(defaults(kind)), kind).toHaveLength(INSERT_AUTOMATION_FIELDS[kind].length);
+      expect(fields(defaults(kind)), kind).toHaveLength(insertKindFields(kind).length);
     }
   });
 

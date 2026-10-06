@@ -1,9 +1,9 @@
 /**
  * The Filter insert's fixed graph (windsor#622): one stereo worklet node
  * running the voice's `Svf` and `Ladder` (`worklet/filter/`). The stage owns
- * the DSP's lifetime and the mixer owns its output edges. Cutoff, Reso and
- * Mix are k-rate params a lane may hold; the mode, the slope and the switch
- * are params `set` writes and no lane reaches.
+ * the DSP's lifetime and the mixer owns its output edges. Cutoff, Reso, Mix
+ * and the switch (windsor#628) are k-rate params a lane may hold; the mode
+ * and the slope are params `set` writes and no lane reaches.
  */
 import { FILTER_BOUNDS, FILTER_MODES, FILTER_NAME } from './filterConstants';
 import { DEFAULT_FILTER, FILTER_FIELDS, FILTER_NUMBERS, normaliseFilter } from './filterSpec';

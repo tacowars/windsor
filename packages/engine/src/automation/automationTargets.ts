@@ -8,7 +8,8 @@
  * A target id is relative to the part that owns the lane:
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
  * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`)
- *   and a field one of the kinds automates, `bands.3.freq` among them;
+ *   and a field one of the kinds automates, `bands.3.freq` among them, or
+ *   its `enabled` switch (windsor#628);
  * - `voice.<patch path>`, one of the 38 voice rows;
  * - `seq.<field>`, a field of the part's sequencer (windsor#488), offered by
  *   kind (`SEQ_AUTOMATION_FIELDS`); the region gate reads it, not the graph.
@@ -32,6 +33,7 @@
 import type { InsertKindName } from '../inserts/insertRegistry';
 import type { SequencerKind } from '../song/arrangement';
 import type { SeqField } from '../sequencing/regionGate';
+import { insertKindFields } from './automationInsertFields';
 import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
 import { SEQ_AUTOMATION_FIELDS, SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
@@ -86,14 +88,14 @@ const SEQ_ROWS = byTarget(SEQ_AUTOMATION_ROWS);
 const SEQ_FIELDS: ReadonlyMap<string, SeqField> = new Map(
   SEQ_AUTOMATION_ROWS.map((row) => [row.target, row.field]),
 );
-const INSERT_ROWS = new Map(
-  Object.entries(INSERT_AUTOMATION_FIELDS).map(([kind, rows]) => [kind, byTarget(rows)]),
+/** Each insert kind's rows, its switch included (`insertKindFields`). */
+const INSERT_KIND_ROWS = (Object.keys(INSERT_AUTOMATION_FIELDS) as InsertKindName[]).map(
+  (kind) => [kind, insertKindFields(kind)] as const,
 );
+const INSERT_ROWS = new Map(INSERT_KIND_ROWS.map(([kind, rows]) => [kind, byTarget(rows)]));
 /** Every field some insert kind automates, longest first, so `bands.3.freq` wins over a `freq`. */
 const INSERT_FIELDS_LONGEST_FIRST: readonly string[] = [
-  ...new Set(
-    Object.values(INSERT_AUTOMATION_FIELDS).flatMap((rows) => rows.map((row) => row.target)),
-  ),
+  ...new Set(INSERT_KIND_ROWS.flatMap(([, rows]) => rows.map((row) => row.target))),
 ].sort((a, b) => b.length - a.length);
 const INSERT_FIELDS: ReadonlySet<string> = new Set(INSERT_FIELDS_LONGEST_FIRST);
 

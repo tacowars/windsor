@@ -7,6 +7,12 @@
  * compressor's attack, ratio and release), tempo-synced divisions, Tape's
  * seed and its optional core override are not targets.
  *
+ * The one switch that is a target, each insert's own on/off (windsor#628,
+ * record `2026-10-06-insert-switch-lanes`), is not listed per kind:
+ * `INSERT_SWITCH_ROW` is the row, and `insertKindFields`
+ * (`automationInsertFields.ts`) appends it to every kind whose spec has
+ * `enabled`.
+ *
  * A field nested in a list is spelled with its index, `bands.3.freq` or
  * `stages.0.amount`, so it sits after the insert's id in
  * `insert.<insertId>.<field>`.
@@ -318,6 +324,9 @@ const FILTER_ROWS = [
   row('resonance', 'Resonance', FILTER_BOUNDS.resonance, 'log'),
   row('mix', 'Mix', FILTER_BOUNDS.mix),
 ];
+
+/** An insert's on/off switch (windsor#628): `enabled`, 0 off and 1 on, held between points. */
+export const INSERT_SWITCH_ROW: InsertFieldRow = row('enabled', 'On', UNIT, 'switch');
 
 /** Each insert kind's continuous fields, the targets a lane may move on it. */
 export const INSERT_AUTOMATION_FIELDS: {

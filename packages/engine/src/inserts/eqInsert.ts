@@ -10,7 +10,7 @@
  * the program path; and Listen on drag, a `listen` message naming the band
  * the processor plays alone. Pinned by `eqInsert.test.ts`.
  */
-import { workletFieldParams } from './insertFieldHandles';
+import { SWITCH_FIELD, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import { EQ_BAND_COUNT, EQ_LISTEN, EQ_NAME, EQ_SPECTRUM } from './eqConstants';
 import type { EqBandParam } from './eqParameters';
@@ -51,9 +51,9 @@ function spectrumTap(
 const BAND_FIELD = /^bands\.(\d+)\.(freq|gain|q)$/;
 const BAND_PARAM: Readonly<Record<string, EqBandParam>> = { freq: 'Freq', gain: 'Gain', q: 'Q' };
 
-/** A lane field's param: `bands.3.freq` as `b4Freq`, and `scale` and `output` themselves. */
+/** A lane field's param: `bands.3.freq` as `b4Freq`, and `scale`, `output` and `enabled` themselves. */
 function eqParamOf(field: string): string | undefined {
-  if (field === 'scale' || field === 'output') return field;
+  if (field === 'scale' || field === 'output' || field === SWITCH_FIELD) return field;
   const band = BAND_FIELD.exec(field);
   if (!band || Number(band[1]) >= EQ_BAND_COUNT) return undefined;
   return eqParamName(Number(band[1]), BAND_PARAM[band[2]!]!);

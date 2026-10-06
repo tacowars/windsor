@@ -8,9 +8,10 @@
  * The loop is `mixer/returnEffects.ts`'s `attachDelay`, the return's own
  * builder, so Mix 1 (dry 0, wet 1) is the return's line exactly. Off closes
  * `send` and `wet` and opens `dry`: the input passes unchanged and the loop
- * empties.
+ * empties. A switch lane (windsor#628) writes the same: `send` on its own,
+ * and `wet` and `dry` from the switch and Mix together.
  */
-import type { DelayLineSettings } from '../mixer/returnEffects';
+import type { DelayLine, DelayLineSettings } from '../mixer/returnEffects';
 import {
   attachDelay,
   DELAY_LINE_FIELDS,
@@ -21,7 +22,7 @@ import {
 import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
-import { fieldHandles } from './insertFieldHandles';
+import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface EchoSpec extends DelayLineSettings {
@@ -61,8 +62,26 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
 const isLineField = (field: string): field is keyof DelayLineSettings =>
   (DELAY_LINE_FIELDS as readonly string[]).includes(field);
 
-const wetGain = (spec: EchoSpec, mix: number): number => (spec.enabled ? mix : 0);
-const dryGain = (spec: EchoSpec, mix: number): number => (spec.enabled ? 1 - mix : 1);
+/** The wet and dry gains at `mix`, with the switch `on` (1) or off (0). */
+const wetGain = (mix: number, on: number): number => (on ? mix : 0);
+const dryGain = (mix: number, on: number): number => (on ? 1 - mix : 1);
+
+/** What one field's lane writes on its own: a loop field its param, the switch the send. */
+function echoTarget(
+  field: string,
+  line: DelayLine,
+  send: AudioParam,
+  spec: () => EchoSpec,
+): KnobTarget | undefined {
+  if (field === SWITCH_FIELD) {
+    return { params: [send], write: (v) => [v], resting: () => switchOf(spec()) };
+  }
+  // Mix writes only the wet and dry gains, which it shares with the switch.
+  if (field === 'mix') return { params: [], write: () => [], resting: () => spec().mix };
+  if (!isLineField(field)) return undefined;
+  const { param, value } = delayLineParam(line, field);
+  return { params: [param], write: (v) => [value(v)], resting: () => spec()[field] };
+}
 
 function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
   const input = context.createGain();
@@ -78,25 +97,25 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
   dry.connect(output);
 
   let current = spec;
-  // Each lane (windsor#345): a loop field on its own param, Mix on the wet and dry gains.
-  const knobs = fieldHandles((field): KnobTarget | undefined => {
-    if (field === 'mix') {
-      const write = (v: number) => [wetGain(current, v), dryGain(current, v)];
-      return { params: [wet.gain, dry.gain], write, resting: () => current.mix };
-    }
-    if (!isLineField(field)) return undefined;
-    const { param, value } = delayLineParam(line, field);
-    return { params: [param], write: (v) => [value(v)], resting: () => current[field] };
+  // Each lane (windsor#345, windsor#628): a loop field on its own param, the
+  // switch on the send, and the wet and dry gains from Mix and the switch both.
+  const mixed = (params: AudioParam[], value: (mix: number, on: number) => number) => ({
+    params,
+    fields: ['mix', SWITCH_FIELD],
+    value,
+  });
+  const knobs = fieldHandles((field) => echoTarget(field, line, send.gain, () => current), {
+    params: [mixed([wet.gain], wetGain), mixed([dry.gain], dryGain)],
+    now: () => context.currentTime,
   });
   const set = (next: EchoSpec): void => {
     current = next;
+    const lane = (field: string): boolean => knobs.automated(field);
     const loop: Partial<Record<keyof DelayLineSettings, number>> = {};
-    for (const field of DELAY_LINE_FIELDS) if (!knobs.automated(field)) loop[field] = next[field];
+    for (const field of DELAY_LINE_FIELDS) if (!lane(field)) loop[field] = next[field];
     writeDelay(line, loop);
-    send.gain.value = Number(next.enabled);
-    if (knobs.automated('mix')) return;
-    wet.gain.value = wetGain(next, next.mix);
-    dry.gain.value = dryGain(next, next.mix);
+    if (!lane(SWITCH_FIELD)) send.gain.value = switchOf(next);
+    knobs.writeShared();
   };
   set(spec);
 

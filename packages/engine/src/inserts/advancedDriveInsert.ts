@@ -1,5 +1,5 @@
 /** Fixed one-worklet graph: live edits preserve the insert and transport; disposal owns its node. */
-import { workletFieldParams } from './insertFieldHandles';
+import { SWITCH_FIELD, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import {
   ADVANCED_DRIVE_BOUNDS,
@@ -14,10 +14,14 @@ import { advancedDriveParameters } from './advancedDriveParameters';
 /** A stage's field, `stages.<i>.<field>`, as the catalog spells it. */
 const STAGE_FIELD = /^stages\.(\d+)\.(\w+)$/;
 
-/** A lane field's param: `drive` itself, `stages.1.amount` as `s1_amount`. */
+/** A lane field's param: `drive` and `enabled` themselves, `stages.1.amount` as `s1_amount`. */
 function driveParamOf(field: string): string | undefined {
   const stage = STAGE_FIELD.exec(field);
-  if (!stage) return Object.hasOwn(ADVANCED_DRIVE_BOUNDS, field) ? field : undefined;
+  if (!stage) {
+    return Object.hasOwn(ADVANCED_DRIVE_BOUNDS, field) || field === SWITCH_FIELD
+      ? field
+      : undefined;
+  }
   const [, index, name] = stage;
   const known = Number(index) < DRIVE_DSP.stages && Object.hasOwn(DRIVE_STAGE_BOUNDS, name!);
   return known ? `s${index}_${name}` : undefined;

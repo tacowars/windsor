@@ -29,6 +29,9 @@
  * Width; with the lines modulated apart the summed power still rises a little
  * toward Width 1 (≈ 2 dB on noise at the defaults, per review).
  *
+ * Off is Mix 0, the dry signal; a switch lane (windsor#628) writes the same
+ * wet and dry gains, from the switch, Mix and Width together.
+ *
  * `set` is param writes only: the line count and the weights are the kind's.
  * `dispose` stops all four oscillators and both rate sources, and disconnects what the stage built,
  * never the edge out of `output`.
@@ -36,7 +39,7 @@
 import type { KnobTarget } from '../automation/automationHandles';
 import { sameValue } from '../automation/automationHandles';
 import type { FieldHandles } from './insertFieldHandles';
-import { fieldHandles } from './insertFieldHandles';
+import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import {
   ENSEMBLE_DSP,
@@ -150,9 +153,9 @@ function placeLines(lineCount: number, width: number): { gains: number[]; perSid
   return { gains, perSide };
 }
 
-/** The wet and dry gains at `mix`, the wet over the lines' per-side sum. */
-const mixGains = (spec: EnsembleSpec, mix: number, perSide: number): [number, number] => {
-  const heard = spec.enabled ? mix : 0;
+/** The wet and dry gains at `mix`, switched `on` (1) or off (0), the wet over the lines' per-side sum. */
+const mixGains = (mix: number, on: number, perSide: number): [number, number] => {
+  const heard = on ? mix : 0;
   return [heard / perSide, 1 - heard];
 };
 
@@ -167,11 +170,12 @@ const BASES = [
 
 /**
  * Param writes only: one write per rate, into the source both oscillators of
- * its pair follow. A field a lane holds (windsor#345) is left to it; the wet
- * gain belongs to both Width and Mix.
+ * its pair follow. A field a lane holds (windsor#345) is left to it. The wet
+ * and dry gains are shared (Width, Mix and the switch), so `writeShared`
+ * writes them.
  */
 function write(p: Params, next: EnsembleSpec, lane: (field: string) => boolean): void {
-  const { lines, tone, wet, dry } = p;
+  const { lines, tone } = p;
   p.bases.forEach((b, i) => {
     const [rate, depth] = BASES[i]!;
     if (!lane(rate)) b.rate.offset.value = next[rate];
@@ -179,7 +183,7 @@ function write(p: Params, next: EnsembleSpec, lane: (field: string) => boolean):
     b.sinDepth.gain.value = next[depth] / MS;
     b.cosDepth.gain.value = next[depth] / MS;
   });
-  const { gains, perSide } = placeLines(lines.length, next.width);
+  const { gains } = placeLines(lines.length, next.width);
   lines.forEach((l, i) => {
     if (!lane('delay')) l.delay.delayTime.value = next.delay / MS;
     if (lane('width')) return;
@@ -187,17 +191,15 @@ function write(p: Params, next: EnsembleSpec, lane: (field: string) => boolean):
     l.toRight.gain.value = gains[2 * i + 1]!;
   });
   if (!lane('tone')) tone.frequency.value = next.tone;
-  const [wetGain, dryGain] = mixGains(next, next.mix, perSide);
-  if (!lane('width') && !lane('mix')) wet.gain.value = wetGain;
-  if (!lane('mix')) dry.gain.value = dryGain;
 }
 
 /**
  * Each knob's lane (windsor#345): a rate on its basis's source, a depth on
- * its basis's two gains, Delay on every line, Width on every line's place,
- * Mix on the dry gain. The wet gain (the mix over the width's per-side sum)
- * follows Width and Mix both, from each one's own value at every breakpoint
- * either has.
+ * its basis's two gains, Delay on every line, Width on every line's place.
+ * The wet gain (the mix over the width's per-side sum, while on) follows
+ * Width, Mix and the switch (windsor#628), and the dry gain Mix and the
+ * switch, each from every field's own value at every breakpoint any of them
+ * has.
  */
 function ensembleHandles(p: Params, spec: () => EnsembleSpec, now: () => number): FieldHandles {
   const { lines, bases } = p;
@@ -217,20 +219,28 @@ function ensembleHandles(p: Params, spec: () => EnsembleSpec, now: () => number)
       params: lines.flatMap((l) => [l.toLeft.gain, l.toRight.gain]),
       write: (v) => placeLines(lines.length, v).gains,
     },
-    mix: { params: [p.dry.gain], write: (v) => [mixGains(spec(), v, 1)[1]] },
+    // Mix and the switch write only the wet and dry gains, which they share.
+    mix: { params: [], write: () => [] },
   };
   const wet = {
     params: [p.wet.gain],
-    fields: ['width', 'mix'] as const,
-    value: (width: number, mix: number) =>
-      mixGains(spec(), mix, placeLines(lines.length, width).perSide)[0],
+    fields: ['width', 'mix', SWITCH_FIELD],
+    value: (width: number, mix: number, on: number) =>
+      mixGains(mix, on, placeLines(lines.length, width).perSide)[0],
+  };
+  const dry = {
+    params: [p.dry.gain],
+    fields: ['mix', SWITCH_FIELD],
+    value: (mix: number, on: number) => mixGains(mix, on, 1)[1],
   };
   const target = (field: string): KnobTarget | undefined => {
+    if (field === SWITCH_FIELD)
+      return { params: [], write: () => [], resting: () => switchOf(spec()) };
     const writes = Object.hasOwn(targets, field) ? targets[field] : undefined;
     const resting = (): number => spec()[field as (typeof ENSEMBLE_NUMBERS)[number]];
     return writes && { ...writes, resting };
   };
-  return fieldHandles(target, { params: [wet], now });
+  return fieldHandles(target, { params: [wet, dry], now });
 }
 
 /** The stage's settings and lanes over its params: `set` writes what no lane holds. */
@@ -248,6 +258,7 @@ function ensembleControls(
     set(next): void {
       current = next;
       write(params, next, knobs.automated);
+      knobs.writeShared();
     },
     param: (field) => knobs.param(field),
   };

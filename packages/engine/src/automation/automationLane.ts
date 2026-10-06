@@ -44,9 +44,11 @@ export type ParsedTarget =
  * How a target's value maps onto the lane's height (decision 5):
  * - `db`: a linear gain drawn in decibels, from the row's floor to its max;
  * - `octaves` and `log`: logarithmic in the value;
- * - `linear`: linear.
+ * - `linear`: linear;
+ * - `switch` (windsor#628): 0 off, 1 on, held from each point to the next
+ *   and never ramped (`automationEvaluate.ts`).
  */
-export type AutomationScale = 'db' | 'octaves' | 'log' | 'linear';
+export type AutomationScale = 'db' | 'octaves' | 'log' | 'linear' | 'switch';
 
 /** One target the catalog offers: its bounds, its scale and how it reads. */
 export interface AutomationTargetRow {

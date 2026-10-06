@@ -158,7 +158,13 @@ export {
   voicePathOf,
   voiceTargetId,
 } from './automation/automationTargets';
-export { DISPLAY_ROW, fromDisplay, toDisplay } from './automation/automationDisplay';
+export {
+  DISPLAY_ROW,
+  fromDisplay,
+  switchReading,
+  switchValue,
+  toDisplay,
+} from './automation/automationDisplay';
 export { bendCurve, rampsBetween, valueAt } from './automation/automationEvaluate';
 export type { AutomationRamp, RampWindow } from './automation/automationEvaluate';
 export { replaceRange, stampShape } from './automation/automationShapes';

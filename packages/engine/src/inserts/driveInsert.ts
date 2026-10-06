@@ -11,7 +11,8 @@
  * its own level whatever the drive, so the knob changes colour more than
  * loudness. `oversample: '2x'`, because a driven saw aliases audibly without it.
  * Off is `wet` 0 and `dry` 1, so the input passes unchanged; `enabled` is
- * additive and a spec without it loads as on.
+ * additive and a spec without it loads as on. A switch lane (windsor#628)
+ * writes the same two gains.
  *
  * The fader is the worklet's `gain`, before every stage, so a strip's Level
  * changes how hard it drives this insert; the Drive knob is the trim that
@@ -35,7 +36,7 @@ import {
 } from './insertConstants';
 import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldHandles } from './insertFieldHandles';
-import { fieldHandles } from './insertFieldHandles';
+import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface DriveSpec {
@@ -89,29 +90,33 @@ interface DriveParams {
 
 /** The shaper's input gain for `drive` dB: the curve spans ±RANGE, scaled into [-1, 1]. */
 const preGain = (drive: number): number => fromDb(drive) / DRIVE_CURVE_RANGE;
-const wetGain = (spec: DriveSpec, mix: number, drive: number): number =>
-  spec.enabled ? mix * driveCompensation(drive) : 0;
-const dryGain = (spec: DriveSpec, mix: number): number => (spec.enabled ? 1 - mix : 1);
+/** The wet and dry gains for the drive, the mix and the switch, on (1) or off (0). */
+const wetGain = (drive: number, mix: number, on: number): number =>
+  on ? mix * driveCompensation(drive) : 0;
+const dryGain = (mix: number, on: number): number => (on ? 1 - mix : 1);
 
 /**
- * Each knob's lane (windsor#345): Drive moves the shaper's gain, Mix the dry
- * gain, and the wet gain (the mix times the drive's compensation) follows
- * both, from each one's own value at every breakpoint either has.
+ * Each knob's lane (windsor#345): Drive moves the shaper's gain, Tone the
+ * lowpass. The wet gain (the mix times the drive's compensation, while on)
+ * follows Drive, Mix and the switch (windsor#628), and the dry gain Mix and
+ * the switch, each from every field's own value at every breakpoint any of
+ * them has.
  */
 function driveHandles(p: DriveParams, spec: () => DriveSpec, now: () => number): FieldHandles {
-  const wet = {
-    params: [p.wet],
-    fields: ['drive', 'mix'] as const,
-    value: (drive: number, mix: number) => wetGain(spec(), mix, drive),
-  };
+  const wet = { params: [p.wet], fields: ['drive', 'mix', SWITCH_FIELD], value: wetGain };
+  const dry = { params: [p.dry], fields: ['mix', SWITCH_FIELD], value: dryGain };
   return fieldHandles(
     (field): KnobTarget | undefined => {
+      if (field === SWITCH_FIELD) {
+        return { params: [], write: () => [], resting: () => switchOf(spec()) };
+      }
       const resting = (): number => spec()[field as 'drive' | 'tone' | 'mix'];
       if (field === 'drive') return { params: [p.pre], write: (v) => [preGain(v)], resting };
-      if (field === 'mix') return { params: [p.dry], write: (v) => [dryGain(spec(), v)], resting };
+      // Mix writes only the wet and dry gains, which it shares.
+      if (field === 'mix') return { params: [], write: () => [], resting };
       return field === 'tone' ? { params: [p.tone], write: (v) => [v], resting } : undefined;
     },
-    { params: [wet], now },
+    { params: [wet, dry], now },
   );
 }
 
@@ -149,8 +154,7 @@ function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSp
     const lane = (field: string): boolean => knobs.automated(field);
     if (!lane('drive')) pre.gain.value = preGain(next.drive);
     if (!lane('tone')) tone.frequency.value = next.tone;
-    if (!lane('drive') && !lane('mix')) wet.gain.value = wetGain(next, next.mix, next.drive);
-    if (!lane('mix')) dry.gain.value = dryGain(next, next.mix);
+    knobs.writeShared();
   };
   set(spec);
 

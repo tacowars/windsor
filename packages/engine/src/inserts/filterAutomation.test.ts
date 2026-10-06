@@ -49,7 +49,7 @@ function expectTraced(param: (field: string) => FakeParam): void {
 }
 
 describe('Filter lanes', () => {
-  it('has rows for the sweep alone: Cutoff in Hz and Reso on a log scale, and Mix', () => {
+  it('has rows for the sweep and the switch: Cutoff in Hz, Reso on a log scale, Mix, On', () => {
     expect(insertTargetRow('filter', 'cutoff')).toMatchObject({
       min: 30,
       max: 18000,
@@ -58,7 +58,8 @@ describe('Filter lanes', () => {
     });
     expect(insertTargetRow('filter', 'resonance')).toMatchObject({ scale: 'log' });
     expect(insertTargetRow('filter', 'mix')).toMatchObject({ min: 0, max: 1, scale: 'linear' });
-    for (const field of ['mode', 'slope24', 'enabled'])
+    expect(insertTargetRow('filter', 'enabled')).toMatchObject({ scale: 'switch', label: 'On' });
+    for (const field of ['mode', 'slope24'])
       expect(insertTargetRow('filter', field), field).toBeUndefined();
   });
 

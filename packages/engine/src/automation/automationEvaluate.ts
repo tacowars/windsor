@@ -12,6 +12,9 @@
  *   `y = ya + (yb − ya) · u^k`, `k = BASE^(−a.bend · sign(yb − ya))`: a
  *   positive bend bows the segment up, a negative one down, whichever way it
  *   runs, and a bend of 0 or a flat segment is the straight line exactly.
+ * - A switch row (windsor#628) holds instead: the value is the last point's
+ *   at or before the tick, whatever its bend, and `rampsBetween` gives only
+ *   the points, which the player sets and never ramps to.
  *
  * Pure, and `valueAt` allocates nothing. `automationEvaluate.test.ts` pins
  * both.
@@ -63,7 +66,7 @@ export function segmentValue(
 ): number {
   if (tick <= a.tick) return a.value;
   if (tick >= b.tick) return b.value;
-  if (a.value === b.value) return a.value;
+  if (a.value === b.value || row.scale === 'switch') return a.value;
   const ya = toDisplay(row, a.value);
   const yb = toDisplay(row, b.value);
   const u = (tick - a.tick) / (b.tick - a.tick);
@@ -113,7 +116,8 @@ export interface RampWindow {
  *
  * - Every point in the window, and both points of a step, at one tick.
  * - Inside a curved segment (bent, or on a log, octave or dB row), a cut
- *   every `grainTicks` from its start.
+ *   every `grainTicks` from its start. A switch row's segments hold, and
+ *   add nothing.
  * - A segment that is straight in the row's units adds nothing inside the
  *   window, except where it runs on to `toTick` or past: then it adds one cut, its
  *   last grain boundary before `toTick`.
@@ -141,7 +145,7 @@ export function rampsBetween(
     if (a.tick >= window.toTick) break;
     if (a.tick >= window.fromTick) out.push({ tick: a.tick, value: a.value });
     const b = points[i + 1];
-    if (!b || b.tick === a.tick || a.value === b.value) continue;
+    if (!b || b.tick === a.tick || a.value === b.value || row.scale === 'switch') continue;
     cutSegment(row, a, b, { ...window, grainTicks }, out);
   }
   return out;

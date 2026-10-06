@@ -16,7 +16,9 @@
  *   order. Strip and insert lanes have no cap.
  * - **Points.** A non-finite field drops the point. A tick before 0 is
  *   clamped to 0, the value to the row's range and the bend to −1..1 (a
- *   missing bend is 0). Points are sorted by tick, stably, and a third point
+ *   missing bend is 0). On a switch row (windsor#628) the value then snaps
+ *   to 0 or 1 (`switchValue`) and the bend to 0, since a switch holds and
+ *   never ramps. Points are sorted by tick, stably, and a third point
  *   on one tick is dropped. Points past the song's end are fitted (below).
  * - **Empty.** A lane with no points left is dropped, and a part with no
  *   lanes has no `automation` key.
@@ -56,6 +58,7 @@ import {
   targetKind,
   targetRow,
 } from '../automation/automationTargets';
+import { switchValue } from '../automation/automationDisplay';
 import { valueAt } from '../automation/automationEvaluate';
 import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
 import type { MusicPart, SequencerKind } from './arrangement';
@@ -213,11 +216,24 @@ function readPoint(
     n.correction(`${path}: ${show(raw)} is not a point — dropped`);
     return undefined;
   }
-  return {
+  const point = {
     tick: n.num(o.tick, 0, 0, Infinity, `${path}.tick`),
     value: n.num(o.value, row.min, row.min, row.max, `${path}.value`),
     bend: n.num(o.bend, 0, BEND_MIN, BEND_MAX, `${path}.bend`),
   };
+  return row.scale === 'switch' ? switchPoint(point, path, n) : point;
+}
+
+/** A switch lane's point: its value snapped to 0 or 1 and its bend to 0, each reported. */
+function switchPoint(point: AutomationPoint, path: string, n: FieldNormaliser): AutomationPoint {
+  const value = switchValue(point.value);
+  if (value !== point.value) {
+    n.correction(`${path}.value: ${point.value} on a switch lane — snapped to ${value}`);
+  }
+  if (point.bend !== 0) {
+    n.correction(`${path}.bend: ${point.bend} on a switch lane, which never ramps — set to 0`);
+  }
+  return { tick: point.tick, value, bend: 0 };
 }
 
 /** A lane's points: read, sorted, at most two to a tick, and fitted to the song. */
