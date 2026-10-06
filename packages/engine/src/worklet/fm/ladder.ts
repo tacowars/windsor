@@ -20,7 +20,7 @@
  * the engine's TPT filters' own: each state keeps s = x + h f, the step
  * solves x⁺ = s + h f(x⁺) and then s ← 2x⁺ − s, so the input is read once,
  * at the new endpoint. h is the prewarped half-step over τ,
- * tan(π f_c / f_s) / 2^¼, which `tuneLadder` (`voiceLadder.ts`) sets with
+ * tan(π f_c / f_s) / 2^¼, which `tuneLadder` (`ladderTune.ts`) sets with
  * k and the high-pass's coefficient once per control block. The high-pass
  * is a TPT one-pole on x₄ whose new-endpoint output enters u. Each sample
  * takes a fixed `steps` Newton steps on the four states from s, the 4 × 4

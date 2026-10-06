@@ -227,7 +227,7 @@ function blocksToEnd(patch: Patch): number {
 
 describe('the ladder on every platform (windsor#573)', () => {
   it('calls no Math tanh, exp, pow or tan, so the render is the same bits on arm64 and x64', () => {
-    for (const file of ['ladder.ts', 'voiceLadder.ts']) {
+    for (const file of ['ladder.ts', 'ladderTune.ts', 'voiceLadder.ts']) {
       const source = readFileSync(new URL(`../worklet/fm/${file}`, import.meta.url), 'utf8');
       expect(source, file).not.toMatch(/Math\.(tanh|exp|pow|tan)\b/);
     }

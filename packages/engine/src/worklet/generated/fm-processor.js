@@ -1723,6 +1723,14 @@ var Svf = class {
     }
   }
 };
+function tuneSvfSections(a, b, slope24, rate) {
+  a.setCoeffs(rate);
+  if (slope24) {
+    b.cutoffHz = a.cutoffHz;
+    b.q = SVF24_SECOND_STAGE_Q;
+    b.setCoeffs(rate);
+  }
+}
 
 // packages/engine/src/inserts/tapePortableMath.ts
 function horner(terms, x) {
@@ -1963,7 +1971,7 @@ function updateVoiceFormant(voice) {
   }
 }
 
-// packages/engine/src/worklet/fm/voiceLadder.ts
+// packages/engine/src/worklet/fm/ladderTune.ts
 var LADDER_STEP_SCALE = Math.sqrt(Math.SQRT1_2);
 var LADDER_SPAN_SLOT = new Float64Array(1);
 LADDER_SPAN_SLOT[0] = LADDER_RESONANCE_SPAN;
@@ -2023,6 +2031,8 @@ function tuneLadder(ladder, rate) {
     ladder.tunedResonance = reso;
   }
 }
+
+// packages/engine/src/worklet/fm/voiceLadder.ts
 function updateVoiceLadder(voice) {
   const ladder = voice.ladder;
   ladder.resonance = voice.liveValues[VT_RESONANCE];
@@ -2453,13 +2463,7 @@ function updateVoiceFilter(voice, n) {
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;
-  svfA.setCoeffs(voice.sr);
-  if (f.slope24) {
-    const svfB = voice.svfB;
-    svfB.cutoffHz = cutoff;
-    svfB.q = SVF24_SECOND_STAGE_Q;
-    svfB.setCoeffs(voice.sr);
-  }
+  tuneSvfSections(svfA, voice.svfB, f.slope24, voice.sr);
 }
 function updateVoiceControl(voice, n) {
   applyVoiceOffsets(voice);

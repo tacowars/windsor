@@ -36,7 +36,7 @@ import {
 } from './fmConstants';
 import { Ladder } from './ladder';
 import { LADDER_DECIMATOR, LADDER_SATURATOR } from './ladderTables';
-import { tuneLadder } from './voiceLadder';
+import { tuneLadder } from './ladderTune';
 
 const RATE = 48000;
 

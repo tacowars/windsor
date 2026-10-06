@@ -12,9 +12,12 @@
  * arithmetic. The Formant mode (windsor#331) runs three of these as bandpass
  * peaks, `process`'s bandpass written out in both render loops, and keeps
  * each peak's gain and level here beside its coefficients.
+ * `tuneSvfSections` tunes the serial modes' sections, the 24 dB slope's
+ * second one included (windsor#595); the voice (`updateVoiceFilter`,
+ * `voiceControl.ts`) calls it, and the filter insert shares it.
  */
 
-import { DORMANT_FILTER_STATE } from './fmConstants';
+import { DORMANT_FILTER_STATE, SVF24_SECOND_STAGE_Q } from './fmConstants';
 import { FILT_BP, FILT_HP, FILT_LP, FILT_NOTCH } from './modeIds';
 
 /* ------------------------------------------------------------------ *
@@ -103,4 +106,19 @@ class Svf {
   }
 }
 
-export { Svf };
+/**
+ * The serial modes' sections for `rate` (Hz): `a` from its own `cutoffHz`
+ * and `q`, and at the 24 dB slope `b` too, following `a`'s cutoff at
+ * `SVF24_SECOND_STAGE_Q`, so only the first is resonant (windsor#595).
+ * Control rate; allocates nothing, and no double crosses the call.
+ */
+function tuneSvfSections(a: Svf, b: Svf, slope24: boolean, rate: number): void {
+  a.setCoeffs(rate);
+  if (slope24) {
+    b.cutoffHz = a.cutoffHz;
+    b.q = SVF24_SECOND_STAGE_Q;
+    b.setCoeffs(rate);
+  }
+}
+
+export { Svf, tuneSvfSections };

@@ -24,7 +24,7 @@ import {
   LADDER_OVERSAMPLE,
 } from './fmConstants';
 import { Ladder } from './ladder';
-import { tuneLadder } from './voiceLadder';
+import { tuneLadder } from './ladderTune';
 
 const RATE = 48000;
 /** The two rates the convergence and the tail are read at. */

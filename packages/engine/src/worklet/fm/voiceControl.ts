@@ -32,10 +32,11 @@
 import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_EDGES } from './algorithms';
-import { SVF24_SECOND_STAGE_Q, WIDTH_SNAP } from './fmConstants';
+import { WIDTH_SNAP } from './fmConstants';
 import { FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { bindOperatorFilter } from './operatorFilter';
 import { WIDTH_RANGE } from './patchDefaults';
+import { tuneSvfSections } from './svf';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
@@ -190,15 +191,8 @@ function updateVoiceFilter(voice: Voice, n: number): void {
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;
-  svfA.setCoeffs(voice.sr);
-  // 24 dB: the second section follows the cutoff at a fixed Q, so only the
-  // first is resonant (windsor#595).
-  if (f.slope24) {
-    const svfB = voice.svfB;
-    svfB.cutoffHz = cutoff;
-    svfB.q = SVF24_SECOND_STAGE_Q;
-    svfB.setCoeffs(voice.sr);
-  }
+  // 24 dB: the second section follows the cutoff at a fixed Q (windsor#595).
+  tuneSvfSections(svfA, voice.svfB, f.slope24, voice.sr);
 }
 
 /**
