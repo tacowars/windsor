@@ -9,24 +9,23 @@
  *   on a point deletes it. Shift ignores snap.
  * - **Draw**: a drag writes points on the snap grain over the range drawn.
  *
+ * A switch lane (windsor#631) paints on/off cells and adds and moves steps
+ * instead, and its line does not bend: `laneEdits` picks the rules by the
+ * lane's row.
+ *
  * A gesture previews on the lane alone while the pointer is down and commits
  * once on release, the lane's whole point list as one undo step. Escape, a
  * cancel, a lost capture or a blur put the lane back as the document has it.
- * The rules are `songAutomationEdit.ts`; this file only reads the pointer.
+ * The rules are `songAutomationEdit.ts` and `songAutomationSwitch.ts`, through
+ * `songAutomationRules.ts`; this file only reads the pointer.
  */
 import type { AutomationPoint, AutomationTargetRow } from '@windsor/engine';
 import {
-  addPoint,
-  addPointOnLine,
-  deletePoint,
   displayAtPx,
   draggedBend,
   drawGrain,
-  movePoint,
   pressAt,
   snapTick,
-  strokePoints,
-  strokeTo,
   tickAtPx,
   valueAtPx,
   withBend,
@@ -34,6 +33,7 @@ import {
   type LanePress,
   type StrokePosition,
 } from './songAutomationEdit';
+import { laneEdits } from './songAutomationRules';
 import { AUTOMATION_GESTURES } from './songAutomationTables';
 import { isFieldFocused } from './songAutomationToolbar';
 import type { SongView } from './songTab';
@@ -79,6 +79,7 @@ interface Live {
 // eslint-disable-next-line max-lines-per-function -- one gesture's press, moves, release and cancel share its state and read as one sequence
 export function wireLaneEditing(lane: LaneEditing): void {
   const { view, timeline, row } = lane;
+  const edits = laneEdits(row);
   let live: Live | null = null;
   const frame = (): LaneFrame => ({
     pxPerBar: view.state.pxPerBar,
@@ -126,9 +127,9 @@ export function wireLaneEditing(lane: LaneEditing): void {
     const { x, y } = at(e);
     const position = { tick: tickAtPx(x, frame()), display: displayAtPx(y, frame()) };
     const grain = { ticks: drawGrain(view.state.automationSnap), songTicks: view.songTicks() };
-    strokeTo(live.drag.samples, live.drag.last, position, grain);
+    edits.stroke(live.drag.samples, live.drag.last, position, grain);
     live.drag.last = position;
-    preview(strokePoints(row, live.start, live.drag.samples));
+    preview(edits.drawn(live.start, live.drag.samples, grain));
   };
 
   /** The press's gesture, or null when the press did its whole edit (Alt-click). */
@@ -178,8 +179,8 @@ export function wireLaneEditing(lane: LaneEditing): void {
     const { drag, start } = live;
     if (drag.mode === 'point') {
       const to = { tick: snapped(x, e), value: valueAtPx(row, y, frame()) };
-      preview(movePoint(start, drag.index, to));
-    } else if (drag.press.near && drag.press.segment !== null) {
+      preview(edits.move(start, drag.index, to));
+    } else if (edits.bends && drag.press.near && drag.press.segment !== null) {
       const bend = draggedBend(start[drag.press.segment]!.bend, y - live.y);
       preview(withBend(start, drag.press.segment, bend));
     }
@@ -197,10 +198,9 @@ export function wireLaneEditing(lane: LaneEditing): void {
     if (moved) return draft ? commit(`Bend ${lane.name} line`, draft) : void stop();
     const { x, y } = at(e);
     const tick = snapped(x, e);
-    const added = drag.press.near
-      ? addPointOnLine(row, start, tick)
-      : addPoint(start, tick, valueAtPx(row, y, frame()));
-    return added ? commit(`Add ${lane.name} point`, added.points) : void stop();
+    const value = valueAtPx(row, y, frame());
+    const added = edits.add(start, { tick, value, onLine: drag.press.near });
+    return added ? commit(`Add ${lane.name} point`, added) : void stop();
   });
 
   for (const type of ['pointercancel', 'lostpointercapture'] as const) {
@@ -214,6 +214,6 @@ export function wireLaneEditing(lane: LaneEditing): void {
     const start = lane.points();
     const press = pressAt(row, start, frame(), at(e));
     if (press.kind !== 'point' || start.length <= 1) return;
-    lane.commit(`Delete ${lane.name} point`, deletePoint(start, press.index));
+    lane.commit(`Delete ${lane.name} point`, edits.remove(start, press.index));
   });
 }

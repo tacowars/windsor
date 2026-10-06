@@ -9,6 +9,11 @@
  *   rail, and a click on a folded insert opens it.
  * - The body: a row of tabs when the card has two or more pages, then the
  *   page shown, the only one built. An insert that is off dims its body.
+ * - While a lane on the switch is on (windsor#631, record
+ *   `2026-10-06-insert-switch-lanes` decision 9), the switch locks as an
+ *   automated knob does (`knobLock.ts`): the lane's colour and an AUTO tag,
+ *   the lane's level at the playhead on the button and the body, and a press
+ *   that says to switch the lane off instead of toggling.
  *
  * The page and the fold are session view state (`insertRackModel.ts`), kept
  * here for the life of the page. Paging and folding repaint only the one
@@ -21,6 +26,9 @@ import type { InsertPage } from './insertCards';
 import { INSERT_CARDS } from './insertCards';
 import { moveInsert, removeInsert, setInsertField } from './insertEdits';
 import { INSERT_LABELS } from './insertKnobTables';
+import { insertFieldLock } from './insertKnobs';
+import { lockNotice, type KnobAutomation } from './knobAutomation';
+import { AUTO_TAG_TEXT, followAutomation, paintLock, switchShowsOn } from './knobLock';
 import type { RackView } from './insertRackModel';
 import { emptyRack, insertIdAt, showPage, toggleFold, viewAt } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
@@ -71,20 +79,53 @@ interface ShellParts {
   readonly id: string;
   readonly spec: InsertSpec;
   readonly folded: boolean;
+  /** The insert's box, which the switch dims while the insert is off. */
+  readonly box: HTMLElement;
   /** Redraw this insert in place, then focus what `focus` selects inside it. */
   repaint(focus: string): void;
 }
 
-function rail({ ctx, slot, index, id, spec, folded, repaint }: ShellParts): HTMLElement {
-  const root = el('div', 'insert-rail');
+/** The switch's field, which a lane may hold (windsor#628). */
+const SWITCH_FIELD = 'enabled';
+
+/** The on/off switch and its AUTO tag, lit and following the lane while one holds it. */
+function powerSwitch({ ctx, slot, index, spec, box }: ShellParts): HTMLElement {
   const label = INSERT_LABELS[spec.kind];
-  const power = railButton('⏻', `Turn ${label} ${spec.enabled ? 'off' : 'on'}`, 'insert-power');
-  power.setAttribute('aria-pressed', String(spec.enabled));
+  const root = el('div', 'insert-switch');
+  const power = railButton('⏻', '', 'insert-power');
+  root.append(power, el('span', 'knob-auto', AUTO_TAG_TEXT));
+  const automation = insertFieldLock(ctx, slot, index, SWITCH_FIELD).automation;
+  const lockNow = (): KnobAutomation | null => automation?.() ?? null;
+  const render = (): void => {
+    const lock = lockNow();
+    const on = switchShowsOn(spec.enabled, lock);
+    const title = lock ? `${label} is automated in the song` : `Turn ${label} ${on ? 'off' : 'on'}`;
+    power.title = title;
+    power.setAttribute('aria-label', title);
+    power.setAttribute('aria-pressed', String(on));
+    box.classList.toggle('off', !on);
+    paintLock(root, lock);
+  };
   power.onclick = (): void => {
+    const lock = lockNow();
+    if (lock) return ctx.notify(lockNotice(`${label} On`, lock));
     const now = insertsOf(ctx, slot)[index];
     if (now)
-      commitChain(ctx, slot, setInsertField(insertsOf(ctx, slot), index, 'enabled', !now.enabled));
+      commitChain(
+        ctx,
+        slot,
+        setInsertField(insertsOf(ctx, slot), index, SWITCH_FIELD, !now.enabled),
+      );
   };
+  render();
+  if (automation) followAutomation(root, lockNow, render);
+  return root;
+}
+
+function rail(parts: ShellParts): HTMLElement {
+  const { ctx, slot, index, id, spec, folded, repaint } = parts;
+  const root = el('div', 'insert-rail');
+  const label = INSERT_LABELS[spec.kind];
   const name = el('button', 'insert-name') as HTMLButtonElement;
   name.type = 'button';
   name.setAttribute('aria-label', `${index + 1} ${label}`);
@@ -101,7 +142,7 @@ function rail({ ctx, slot, index, id, spec, folded, repaint }: ShellParts): HTML
   };
   const tools = el('div', 'insert-tools');
   tools.append(moveButton(ctx, slot, index, -1), moveButton(ctx, slot, index, 1), remove);
-  root.append(power, name, tools);
+  root.append(powerSwitch(parts), name, tools);
   return root;
 }
 
@@ -138,7 +179,6 @@ export function insertBox(ctx: AppCtx, slot: InsertTarget, index: number): HTMLE
     pages.map((page) => page.name),
   );
   const box = el('div', 'insert-box');
-  box.classList.toggle('off', !spec.enabled);
   box.classList.toggle('folded', view.folded);
   const parts: ShellParts = {
     ctx,
@@ -147,6 +187,7 @@ export function insertBox(ctx: AppCtx, slot: InsertTarget, index: number): HTMLE
     id,
     spec,
     folded: view.folded,
+    box,
     repaint: (focus) => {
       const next = insertBox(ctx, slot, index);
       box.replaceWith(next);

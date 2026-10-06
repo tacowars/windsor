@@ -252,8 +252,10 @@ const clampTo = (row: AutomationTargetRow, value: number): number =>
 /**
  * The parameter's value now (decision 4): from the strip (a group's own
  * level and pan, windsor#616), the insert's spec, the part's sequencer
- * (windsor#488) or its patch, clamped to the row. A send the strip does not
- * name is silent; anything else unread is the row's minimum.
+ * (windsor#488) or its patch, clamped to the row. An insert's switch reads
+ * its `enabled` as 1 or 0 (windsor#631), so its lane starts at the state the
+ * insert is in. A send the strip does not name is silent; anything else
+ * unread is the row's minimum.
  */
 export function currentValue(
   owner: LaneOwner,
@@ -278,6 +280,7 @@ export function currentValue(
   } else {
     raw = getPath(patch, parsed.path);
   }
+  if (typeof raw === 'boolean') return raw ? row.max : row.min;
   return typeof raw === 'number' && Number.isFinite(raw) ? clampTo(row, raw) : row.min;
 }
 

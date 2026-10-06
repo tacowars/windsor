@@ -1,9 +1,14 @@
 /** An automation target's value as it reads, in its catalog row's units (windsor#348, windsor#424). */
 import { describe, expect, it } from 'vitest';
-import { requireCatalogRow } from '@windsor/engine';
+import { requireCatalogRow, targetRow } from '@windsor/engine';
 import { readout } from './automationReadout';
 
 describe('the readout', () => {
+  it("reads an insert's on/off as On or Off (windsor#631)", () => {
+    const row = targetRow('insert.f.enabled', () => 'filter')!;
+    expect([readout(row, 1), readout(row, 0)]).toEqual(['On', 'Off']);
+  });
+
   it('reads a level in dB, -∞ at the floor', () => {
     expect(readout(requireCatalogRow('strip.level'), 1)).toBe('+0.0 dB');
     // A gain a hair under 1, as a round trip through display space leaves it, still reads +0.0.

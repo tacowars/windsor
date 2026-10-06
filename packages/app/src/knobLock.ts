@@ -12,7 +12,12 @@
  * (`watchPlayhead`): each frame it is on screen it asks its lane again and
  * redraws only when the lock or the lane's value moved, so a play, a seek, a
  * lane switched off or deleted all show without a rebuild.
+ *
+ * An insert's power button locks the same way under a lane on its on/off
+ * switch (windsor#631, record `2026-10-06-insert-switch-lanes` decision 9):
+ * `paintLock` lights it, and it shows the lane's level (`switchShowsOn`).
  */
+import { switchValue } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
 import { sameKnobAutomation } from './knobAutomation';
 import { watchPlayhead, type FrameSource } from './stepStrip';
@@ -32,6 +37,10 @@ export function paintLock(node: HTMLElement, lock: KnobAutomation | null): void 
   if (lock) node.style.setProperty('--lock-color', lock.color);
   else node.style.removeProperty('--lock-color');
 }
+
+/** Whether an insert's power button shows on: the lane's level while one holds it, else `enabled`. */
+export const switchShowsOn = (enabled: boolean, lock: KnobAutomation | null): boolean =>
+  lock ? switchValue(lock.value) === 1 : enabled;
 
 /**
  * Redraw `node` through `render` whenever `automation` answers differently,

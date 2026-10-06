@@ -701,6 +701,26 @@ input {
 .insert-box.off .insert-icon.insert-power {
   color: var(--ink-faint);
 }
+/* The switch and its AUTO tag (windsor#631): while a lane holds the switch,
+   knobLock.ts sets .locked and --lock-color on .insert-switch, and the button
+   takes the locked knob's ring in the lane's colour. Its glyph is lit while
+   the lane holds the insert on, faint while it holds it off. The tag is the
+   knob's, set on end to fit the rail (the locked knob section). */
+.insert-switch {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.insert-switch.locked .insert-icon.insert-power {
+  border-color: var(--lock-color);
+  color: var(--lock-color);
+  cursor: not-allowed;
+}
+.insert-box.off .insert-switch.locked .insert-icon.insert-power {
+  color: var(--ink-faint);
+}
 .insert-name {
   flex: 0 1 auto;
   min-height: 0;
@@ -5367,6 +5387,10 @@ select.field.auto-snap {
 .lanes[data-auto-tool='shape'] .auto-lane {
   cursor: col-resize;
 }
+/* A switch lane takes no shape (windsor#631). */
+.lanes[data-auto-tool='shape'] .auto-lane.switch {
+  cursor: not-allowed;
+}
 .auto-range {
   position: absolute;
   top: 0;
@@ -5985,7 +6009,8 @@ select.field.auto-snap {
 .knob.locked .dial-face {
   stroke: var(--lock-color);
 }
-.knob .knob-auto {
+.knob .knob-auto,
+.insert-switch .knob-auto {
   display: none;
   padding: 0 4px;
   border-radius: 6px;
@@ -5998,8 +6023,15 @@ select.field.auto-snap {
   line-height: 11px;
   pointer-events: none;
 }
-.knob.locked .knob-auto {
+.knob.locked .knob-auto,
+.insert-switch.locked .knob-auto {
   display: block;
+}
+/* The insert switch's tag stands on end in the rail (windsor#631). */
+.insert-switch .knob-auto {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: 4px 0;
 }
 /* The compact knob keeps its 40 px row: the dial spans two lines, the value
    above the tag beside it. */

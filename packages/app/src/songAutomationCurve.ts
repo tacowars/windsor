@@ -11,6 +11,9 @@
  * - A bent segment is sampled every `sampleEveryPx` along the engine's own
  *   `bendCurve`, the evaluator's curve; a straight one is one line, a step
  *   (two points on a tick) a vertical one.
+ * - A switch row's segment (windsor#631) holds its first point's level to
+ *   the next point and steps there, so the fill draws its On stretches as
+ *   blocks.
  * - Before the first point the line holds its value from the lane's left
  *   edge, after the last it holds to the right edge (decision 4).
  * - With more points than px, the interior points draw no dot; the line
@@ -73,6 +76,10 @@ export function curveShape(
     const yb = toDisplay(row, b.value);
     const xa = xOf(a);
     const xb = xOf(b);
+    if (row.scale === 'switch') {
+      parts.push(to(xb, yAt(ya)), to(xb, yAt(yb)));
+      continue;
+    }
     if (b.tick === a.tick || a.bend === 0 || ya === yb) {
       parts.push(to(xb, yAt(yb)));
       continue;

@@ -12,7 +12,9 @@
  *   playhead over an on/off ● and a delete ×; and its curve over the part's
  *   ghosted regions. The toolbar's Edit and Draw tools edit the curve in place
  *   (windsor#349, `songAutomationGesture.ts`), and its Shape tool stamps a
- *   shape over a range (windsor#350, `songShapeRange.ts`).
+ *   shape over a range (windsor#350, `songShapeRange.ts`). An insert's
+ *   on/off lane (windsor#631) is drawn as Off and On blocks, reads `On` or
+ *   `Off`, and takes no shape.
  * - **The add row** is the "+ Add lane" picker beside the voice count
  *   against `FM_LANES_MAX` (a part's only: a group has no voice), and an
  *   empty stretch of timeline.
@@ -146,6 +148,8 @@ function laneTimeline(
   }
   const row = laneRow(owner, lane.target, patchOf(view, owner));
   if (!row) return timeline;
+  const switched = row.scale === 'switch';
+  timeline.classList.toggle('switch', switched);
   const box = svg('svg', { 'aria-hidden': 'true' });
   paintCurve(view, box, row, lane.points);
   timeline.appendChild(box);
@@ -166,6 +170,8 @@ function laneTimeline(
     commit,
   });
   // The Shape tool's range (windsor#350): a drag selects a range, and the popover stamps it.
+  // A switch lane is offered no shape (windsor#631): it holds two levels, and a shape ramps.
+  if (switched) return timeline;
   view.shape.attach({
     view,
     key: `${ownerKey(owner)}:${lane.target}`,

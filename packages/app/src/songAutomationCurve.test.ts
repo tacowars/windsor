@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TICKS_PER_BAR,
   requireCatalogRow,
+  targetRow,
   toDisplay,
   valueAt,
   type AutomationPoint,
@@ -60,6 +61,25 @@ describe('curveShape', () => {
     const xy = coords(curveShape(pan, points, frame(96)).line);
     expect(xy[2]).toEqual([192, PAD + (H - 2 * PAD)]);
     expect(xy[3]).toEqual([192, PAD]);
+  });
+
+  it('draws a switch lane at two levels, holding each to the next point (windsor#631)', () => {
+    const row = targetRow('insert.f.enabled', () => 'filter')!;
+    const points: AutomationPoint[] = [
+      { tick: 0, value: 0, bend: 0 },
+      { tick: BAR, value: 1, bend: 0 },
+      { tick: 3 * BAR, value: 0, bend: 0 },
+    ];
+    const [off, on] = [PAD + (H - 2 * PAD), PAD];
+    expect(coords(curveShape(row, points, frame(96)).line)).toEqual([
+      [0, off],
+      [0, off],
+      [96, off],
+      [96, on],
+      [288, on],
+      [288, off],
+      [384, off],
+    ]);
   });
 
   it('samples a bent segment every few px on the evaluator', () => {

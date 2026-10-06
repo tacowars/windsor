@@ -3,9 +3,11 @@
  * (windsor#348; record `2026-10-01-song-automation-lanes`): a song lane's
  * mixer cell, the shape popover, and a step lane's played value
  * (windsor#424), so a target reads the same wherever it shows. The number
- * rules are `songAutomationTables.ts`'s `READOUT_NUMBERS`.
+ * rules are `songAutomationTables.ts`'s `READOUT_NUMBERS`; an insert's
+ * on/off switch reads `On` or `Off` as the engine reads it (windsor#631).
  */
 import type { AutomationTargetRow } from '@windsor/engine';
+import { switchReading } from '@windsor/engine';
 import { fmtVowel } from './consoleFormat';
 import { READOUT_NUMBERS, type ReadoutNumbers } from './songAutomationTables';
 
@@ -48,6 +50,7 @@ export function readout(
   value: number,
   n: ReadoutNumbers = READOUT_NUMBERS,
 ): string {
+  if (row.scale === 'switch') return switchReading(value);
   switch (row.unit) {
     case 'dB':
       return row.scale === 'db' ? gainDb(row, value, n) : `${signed(value, 1)} dB`;
