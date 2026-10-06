@@ -1,6 +1,7 @@
 /**
  * The Song tab's folder tracks (windsor#615 decision 1): the row order, the
- * fold, and the outline a group header's lane draws.
+ * fold, and the outline a group header's lane draws; and when the lane
+ * toolbar shows, now that a group's own lanes fold open (windsor#616).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -8,7 +9,8 @@ import type { ChannelStrip } from '@windsor/engine';
 import {
   type FolderDoc,
   type SongRow,
-  forgetRemovedGroups,
+  refreshGroupFolds,
+  lanesOpen,
   memberCountLabel,
   outlineSpans,
   songRows,
@@ -155,7 +157,50 @@ describe('the header’s count and the fold’s memory', () => {
 
   it('forgets a removed group, so a new one reusing its id starts open', () => {
     const closed = new Set([0, 2]);
-    forgetRemovedGroups(closed, [{ id: 2 }]);
+    refreshGroupFolds(closed, [{ id: 2 }], false);
     expect([...closed]).toEqual([2]);
+  });
+
+  it('forgets every group when another song opens, even one at a kept id', () => {
+    const closed = new Set([0, 2]);
+    refreshGroupFolds(closed, [{ id: 0 }, { id: 2 }], true);
+    expect([...closed]).toEqual([]);
+  });
+});
+
+describe('the lane toolbar (windsor#616 decision 5)', () => {
+  // Group A (id 0) holds parts 1 and 2; part 0 plays to Master; group B (id 1) is empty.
+  const doc: FolderDoc = {
+    parts: [part(0), part(1, { group: 0 }), part(2, { group: 0 })],
+    groups: [{ id: 0 }, { id: 1 }],
+  };
+  const rows = songRows(doc);
+  const none = new Set<number>();
+
+  it('hides while no part’s or group’s lanes are open', () => {
+    expect(lanesOpen(rows, { parts: none, groups: none })).toBe(false);
+  });
+
+  it('shows while a part’s lanes are open, or a group’s, even an empty group’s', () => {
+    expect(lanesOpen(rows, { parts: new Set([2]), groups: none })).toBe(true);
+    expect(lanesOpen(rows, { parts: none, groups: new Set([0]) })).toBe(true);
+    expect(lanesOpen(rows, { parts: none, groups: new Set([1]) })).toBe(true);
+  });
+
+  it('counts a group’s open lanes while its members are folded, not a hidden part’s', () => {
+    const folded = visibleRows(rows, new Set([0]));
+    expect(lanesOpen(folded, { parts: none, groups: new Set([0]) })).toBe(true);
+    expect(lanesOpen(folded, { parts: new Set([1]), groups: none })).toBe(false);
+  });
+
+  it('keeps the two folds apart: folding the members leaves the header and its lanes', () => {
+    const folded = visibleRows(rows, new Set([0]));
+    expect(short(folded)).toEqual(['0', 'A', 'B']);
+  });
+
+  it('forgets a removed group’s open lanes too, so a new one reusing its id starts folded', () => {
+    const open = new Set([0, 1]);
+    refreshGroupFolds(open, [{ id: 0 }], false);
+    expect([...open]).toEqual([0]);
   });
 });

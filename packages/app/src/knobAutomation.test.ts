@@ -3,7 +3,9 @@
  * `2026-10-01-song-automation-lanes` decision 6), over the automation
  * fixture's hat part: a strip, insert or voice knob is locked while its lane
  * is on, at the lane's value at the playhead, and free while the lane is
- * off, deleted, absent, or on an insert field the insert does not read.
+ * off, deleted, absent, or on an insert field the insert does not read. A
+ * group bus's Level, Pan and insert knobs lock under its own lanes the same
+ * way (windsor#616).
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -12,6 +14,13 @@ import {
   AUTOMATION_PART,
   AUTOMATION_TAPE_ID,
 } from '@windsor/engine/__fixtures__/automationSong';
+import {
+  GROUP_LANES,
+  GROUP_LANES_DOCUMENT,
+  GROUP_PHASER,
+  LANE_GROUP,
+  LANE_GROUP_ID,
+} from '@windsor/engine/__fixtures__/groupAutomationSong';
 import {
   DEFAULT_CHORD_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -24,12 +33,15 @@ import {
   songTicksOf,
   type AutomationLane,
   type DocumentPart,
+  type GroupSpec,
   type InsertSpec,
 } from '@windsor/engine';
+import { groupKey } from './groupModel';
 import {
   automatedValueText,
   catalogKnobAutomation,
   insertKnobAutomation,
+  insertLaneHolder,
   knobSongTick,
   isSeqField,
   lockNotice,
@@ -142,6 +154,44 @@ describe('an insert knob', () => {
     delete anonymous.id;
     expect(insertKnobAutomation(AUTOMATION_PART, anonymous, 'drive', 0)).toBeNull();
     expect(insertKnobAutomation(AUTOMATION_PART, undefined, 'drive', 0)).toBeNull();
+  });
+});
+
+describe('a group’s knobs (windsor#616 decision 4)', () => {
+  it('lock Level at its lane’s value at the playhead, in the mixer colour', () => {
+    expect(catalogKnobAutomation(LANE_GROUP, 'strip.level', 0, COLORS)).toEqual({
+      color: 'teal',
+      value: 0.5,
+    });
+    expect(catalogKnobAutomation(LANE_GROUP, 'strip.level', 2 * BAR)?.value).toBeCloseTo(1.2);
+    expect(catalogKnobAutomation(LANE_GROUP, 'strip.pan', 3 * BAR)?.value).toBe(0);
+  });
+
+  it('are free while the lane is off or gone', () => {
+    const off: GroupSpec = {
+      ...LANE_GROUP,
+      automation: GROUP_LANES.map((l) => (l.target === 'strip.level' ? { ...l, on: false } : l)),
+    };
+    expect(catalogKnobAutomation(off, 'strip.level', 0)).toBeNull();
+    expect(catalogKnobAutomation({ ...LANE_GROUP, automation: [] }, 'strip.pan', 0)).toBeNull();
+  });
+
+  it('lock an insert’s field while its lane is on, and stay free while it is off', () => {
+    const rate = insertKnobAutomation(LANE_GROUP, GROUP_PHASER, 'rate', 0, COLORS);
+    expect(rate).toEqual({ color: 'violet', value: 0.2 });
+    // The Phaser's mix lane is off in the fixture.
+    expect(insertKnobAutomation(LANE_GROUP, GROUP_PHASER, 'mix', BAR)).toBeNull();
+  });
+
+  it('read their lanes from the group a chain’s key names, a part’s from its slot', () => {
+    expect(insertLaneHolder(GROUP_LANES_DOCUMENT, groupKey(LANE_GROUP_ID))).toEqual(LANE_GROUP);
+    const slot = AUTOMATION_PART.slot;
+    expect(insertLaneHolder(GROUP_LANES_DOCUMENT, slot)).toBe(
+      GROUP_LANES_DOCUMENT.parts.find((p) => p.slot === slot),
+    );
+    expect(insertLaneHolder(GROUP_LANES_DOCUMENT, groupKey(99))).toBeUndefined();
+    expect(insertLaneHolder(GROUP_LANES_DOCUMENT, 'a')).toBeUndefined();
+    expect(insertLaneHolder(GROUP_LANES_DOCUMENT, 'master')).toBeUndefined();
   });
 });
 

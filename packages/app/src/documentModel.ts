@@ -109,6 +109,11 @@ export class DocumentModel {
   /** Patch ids this document took from the library rather than carrying (#562). */
   filled: string[] = [];
   usable = true;
+  /**
+   * How many times `open` has replaced the document: a listener comparing it
+   * tells a different song from an edit of this one (the Song tab's folds).
+   */
+  private openCount = 0;
   /** The export as it stood when this document was opened, for "changed since opened". */
   private opened = '';
   /** Called after every open, merge and mutate: the song autosave listens here. */
@@ -122,6 +127,11 @@ export class DocumentModel {
   /** True once any edit has moved the document away from what was opened (#598's New song guard). */
   get changed(): boolean {
     return this.toJson() !== this.opened;
+  }
+
+  /** `openCount`, read-only: it changes on `open` and on nothing else. */
+  get openings(): number {
+    return this.openCount;
   }
 
   /** Listen for every change to the document; returns the unsubscribe. */
@@ -150,6 +160,7 @@ export class DocumentModel {
   open(raw: unknown, amend?: (doc: ArrangementDocument) => unknown): void {
     this.adopt(this.normalise(raw));
     this.opened = this.toJson();
+    this.openCount += 1;
     const partial = amend?.(this.doc);
     if (partial) {
       this.doc = this.normalise(mergeDocument(this.doc, partial)).document;

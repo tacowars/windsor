@@ -18,11 +18,16 @@
  *   sequencer kind offers that field a lane (windsor#491). Changing the kind
  *   drops the lane in the engine, so the knob frees on the next read.
  *
+ * A group bus's Level, Pan and insert knobs on the Mixer tab lock under the
+ * group's own lanes the same way (windsor#616 decision 4): the strip and
+ * insert resolvers take any `LaneHolder`, a part or a group.
+ *
  * The lock is the console's: the engine already ignores a write to a field a
  * lane holds. The knob's look and input are `knob.ts` and `knobLock.ts`.
  */
 import type {
   Arrangement,
+  ArrangementDocument,
   Macro,
   AutomationLane,
   AutomationTargetId,
@@ -39,12 +44,15 @@ import {
   automatableInsertFields,
   catalogRow,
   formatTargetId,
+  partAt,
   seqTargetId,
   songTicksOf,
   targetKind,
   valueAt,
   voiceTargetId,
 } from '@windsor/engine';
+import { groupAt, groupIdOfKey } from './groupModel';
+import type { InsertTarget } from './insertTarget';
 import { macroValuePath, mappedKnob } from './macroModel';
 import { LANE_KIND_COLOR } from './songAutomationTables';
 import { songTickOf } from './transportModel';
@@ -72,9 +80,31 @@ export type KnobLockColors = Readonly<Record<AutomationTargetKind, string>>;
 export const knobSongTick = (doc: Arrangement, position: number): number =>
   songTickOf(position, songTicksOf(doc));
 
-/** The part's lane on `target` while it is on, else undefined. */
+/**
+ * What a knob's lanes are read from: a part, or a group bus (windsor#616),
+ * whose Level, Pan and insert knobs lock under its own lanes as a part's do.
+ */
+export interface LaneHolder {
+  readonly automation?: readonly AutomationLane[];
+}
+
+/**
+ * Whose lanes hold the knobs of an insert chain: the part at a slot, the
+ * group a group key (`group:3`) names, and nothing for a send bus or the
+ * master, which carry no lanes.
+ */
+export function insertLaneHolder(
+  doc: ArrangementDocument,
+  target: InsertTarget,
+): LaneHolder | undefined {
+  if (typeof target === 'number') return partAt(doc, target);
+  const id = groupIdOfKey(target);
+  return id === null ? undefined : groupAt(doc, id);
+}
+
+/** The holder's lane on `target` while it is on, else undefined. */
 function onLane(
-  part: DocumentPart | undefined,
+  part: LaneHolder | undefined,
   target: AutomationTargetId,
 ): AutomationLane | undefined {
   const lane = part?.automation?.find((l) => l.target === target);
@@ -90,11 +120,11 @@ const lockOf = (
 ): KnobAutomation => ({ color, value: valueAt(row, lane.points, tick) });
 
 /**
- * A strip, voice or sequencer knob's lock at `tick`: null unless `part` has a
- * lane on `target` that is on.
+ * A strip, voice or sequencer knob's lock at `tick`: null unless `part` (a
+ * part, or a group for its Level and Pan) has a lane on `target` that is on.
  */
 export function catalogKnobAutomation(
-  part: DocumentPart | undefined,
+  part: LaneHolder | undefined,
   target: AutomationTargetId,
   tick: number,
   colors: KnobLockColors = LANE_KIND_COLOR,
@@ -166,12 +196,12 @@ export const isSeqField = (field: string): field is SeqField =>
 
 /**
  * An insert knob's lock at `tick`: the knob over `field` of `spec`, an insert
- * on `part`'s strip. Null when the insert has no id, its kind does not
+ * in `part`'s chain (a part's strip, or a group's, `insertLaneHolder`). Null when the insert has no id, its kind does not
  * automate the field, its settings leave the field unread (the lane is
  * inert), or no lane on it is on.
  */
 export function insertKnobAutomation(
-  part: DocumentPart | undefined,
+  part: LaneHolder | undefined,
   spec: InsertSpec | undefined,
   field: string,
   tick: number,

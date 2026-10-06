@@ -5,26 +5,26 @@
  * rack stands them in columns of two at its small dial, or one to a column
  * at its big dial (windsor#173 decision 5; the mockup's `.knob.big`).
  *
- * On a part's strip a knob is locked while a lane on its field is on
- * (windsor#351, `knobAutomation.ts`). A lane on a field the insert's settings
- * leave unread is inert and locks nothing; the send buses, the groups and
- * the master carry no lanes.
+ * On a part's strip, and on a group's (windsor#616), a knob is locked while
+ * a lane on its field is on (windsor#351, `knobAutomation.ts`). A lane on a
+ * field the insert's settings leave unread is inert and locks nothing; the
+ * send buses and the master carry no lanes.
  */
-import { partAt } from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { insertChange, insertsOf } from './insertTarget';
+import { insertChange, insertsOf, isGroupTarget } from './insertTarget';
 export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { makeKnob, type KnobSpec } from './knob';
-import { insertKnobAutomation, knobSongTick } from './knobAutomation';
+import { insertKnobAutomation, insertLaneHolder, knobSongTick } from './knobAutomation';
 
 /**
  * The lock on the knob over `field` of the insert at `index` in `target`'s
- * chain, for a part's strip; nothing for a bus, a group or the master.
+ * chain, for a part's strip or a group's (windsor#616); nothing for a send
+ * bus or the master.
  */
 export function insertFieldLock(
   ctx: AppCtx,
@@ -32,13 +32,13 @@ export function insertFieldLock(
   index: number,
   field: string,
 ): Pick<KnobSpec, 'automation'> {
-  if (typeof target !== 'number') return {};
+  if (typeof target !== 'number' && !isGroupTarget(target)) return {};
   return {
     automation: () => {
-      const part = partAt(ctx.model.doc, target);
-      const spec = part?.strip.inserts[index];
+      const holder = insertLaneHolder(ctx.model.doc, target);
+      const spec = insertsOf(ctx, target)[index];
       const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
-      return insertKnobAutomation(part, spec, field, tick);
+      return insertKnobAutomation(holder, spec, field, tick);
     },
   };
 }

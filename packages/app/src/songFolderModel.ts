@@ -10,6 +10,10 @@
  * in slot order; each group's header takes the place of its lowest-slot
  * member; groups no part plays through come after every part, in id order
  * (decision 1).
+ *
+ * A group's header has a second fold for its own automation lanes
+ * (windsor#616): whether any open lanes call for the lane toolbar is
+ * `lanesOpen`.
  */
 import type { ChannelStrip, Region } from '@windsor/engine';
 import { isGroupOutput } from '@windsor/engine';
@@ -102,8 +106,65 @@ export function memberCountLabel(count: number): string {
   return count === 1 ? '1 part' : `${count} parts`;
 }
 
-/** The ids `closed` still holds for groups the song no longer has, so a new group reusing one starts open. */
-export function forgetRemovedGroups(closed: Set<number>, groups: readonly { id: number }[]): void {
+/**
+ * Bring a fold set up to the document after a change. A different song
+ * (`reopened`, `DocumentModel.open`) clears it wholesale, since its group
+ * ids name unrelated groups; any other change drops only the ids the song
+ * no longer has, so a new group reusing one starts at the default: members
+ * shown (`closedGroups`), lanes folded (`openGroups`, windsor#616).
+ */
+export function refreshGroupFolds(
+  folds: Set<number>,
+  groups: readonly { id: number }[],
+  reopened: boolean,
+): void {
+  if (reopened) {
+    folds.clear();
+    return;
+  }
   const ids = new Set(groups.map((group) => group.id));
-  for (const id of [...closed]) if (!ids.has(id)) closed.delete(id);
+  for (const id of [...folds]) if (!ids.has(id)) folds.delete(id);
 }
+
+/** What `followGroupFolds` watches: the document, its change feed and its open count (`DocumentModel`). */
+export interface GroupFoldSource {
+  readonly doc: { readonly groups?: readonly { readonly id: number }[] };
+  readonly openings: number;
+  onChange(listener: () => void): () => void;
+}
+
+/**
+ * Follow the folds on the document change itself, not on the Song tab's
+ * next repaint: only the shown tab draws, and a group added while the tab
+ * is hidden may reuse the id (`nextGroupId`), so a repaint after both would
+ * hand it the old group's folds. Opening another song resets them all.
+ * Returns the unsubscribe.
+ */
+export function followGroupFolds(
+  source: GroupFoldSource,
+  folds: readonly Set<number>[],
+): () => void {
+  let openings = source.openings;
+  return source.onChange(() => {
+    const reopened = source.openings !== openings;
+    openings = source.openings;
+    for (const set of folds) refreshGroupFolds(set, source.doc.groups ?? [], reopened);
+  });
+}
+
+/** The lanes fold's caption under its `▸` while it shows no lane count (windsor#616 decision 1). */
+export const LANES_CAPTION = 'lanes';
+
+/** Which parts (by slot) and which groups (by id) have their automation lanes open. */
+export interface OpenLanes {
+  readonly parts: ReadonlySet<number>;
+  readonly groups: ReadonlySet<number>;
+}
+
+/**
+ * Whether the lane toolbar shows (windsor#616 decision 5): a drawn part's
+ * lanes are open, or a group's. A group's header is always drawn, so its
+ * open lanes count while its members are folded away.
+ */
+export const lanesOpen = (rows: readonly SongRow[], open: OpenLanes): boolean =>
+  rows.some((row) => (row.kind === 'part' ? open.parts.has(row.slot) : open.groups.has(row.id)));

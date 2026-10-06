@@ -12,9 +12,9 @@
  * whether any other edit of the curve touches a held field. Pure over the
  * part and its insert, so a test needs no DOM.
  */
-import type { DocumentPart, EqBand, EqSpec, InsertSpec } from '@windsor/engine';
+import type { EqBand, EqSpec, InsertSpec } from '@windsor/engine';
 import { automatableInsertFields, parseTargetId } from '@windsor/engine';
-import type { KnobAutomation } from './knobAutomation';
+import type { KnobAutomation, LaneHolder } from './knobAutomation';
 import { insertKnobAutomation } from './knobAutomation';
 
 /** The band fields a lane can hold, in the band panel's order. */
@@ -24,9 +24,9 @@ export type EqLaneField = (typeof EQ_LANE_FIELDS)[number];
 /** What a drag on a handle moves: the band's frequency and gain. */
 export const EQ_DRAG_FIELDS: readonly EqLaneField[] = ['freq', 'gain'];
 
-/** Where an EQ's lanes are read: its part, the insert in the part's chain, and the song tick. */
+/** Where an EQ's lanes are read: its part or group (windsor#616), the insert in its chain, and the song tick. */
 export interface EqLanes {
-  readonly part: DocumentPart | undefined;
+  readonly part: LaneHolder | undefined;
   readonly insert: InsertSpec | undefined;
   /** The song tick (`knobSongTick`). */
   readonly tick: number;

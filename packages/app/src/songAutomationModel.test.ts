@@ -3,7 +3,7 @@
  * `2026-10-01-song-automation-lanes`): the picker's groups and what it
  * disables, a new lane flat at the parameter's current value, on/off and
  * delete through the document, the names, the inactive fields and the
- * lane count.
+ * lane count. A group bus's lanes are `songAutomationGroups.test.ts`'s.
  */
 import { describe, expect, it } from 'vitest';
 import {

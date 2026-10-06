@@ -5,7 +5,10 @@
  * under the last. A row's head holds the name as a text field, Level and Pan,
  * M and S, the activity and clip lights, the members line and Remove; beside
  * it is the group's insert chain, drawn by `stripInserts` in the row's own
- * accent (`consoleColors.ts`'s `groupAccent`).
+ * accent (`consoleColors.ts`'s `groupAccent`). While a lane of the group's
+ * is on (windsor#616, the Song tab's folder track), its Level and Pan knobs
+ * and its inserts' knobs lock in the lane's colour, as a part's do
+ * (`knobAutomation.ts`).
  *
  * The rules are `groupModel.ts`'s: every edit is one `ctx.change`, one undo
  * step, applied live to `AudioSystem.groupBus(id)`. The lights are the Song
@@ -14,7 +17,7 @@
  * latched until it is clicked, and active only while a row is on screen in
  * the shown tab.
  */
-import type { GroupSpec } from '@windsor/engine';
+import type { GroupSpec, StripTargetId } from '@windsor/engine';
 import { groupAccent } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
@@ -34,7 +37,8 @@ import {
   renameGroup,
   toggleGroupSwitch,
 } from './groupModel';
-import { makeKnob } from './knob';
+import { makeKnob, type KnobSpec } from './knob';
+import { catalogKnobAutomation, knobSongTick } from './knobAutomation';
 import { GROUP_LEVEL_KNOB, GROUP_PAN_KNOB } from './mixerTables';
 import type { LightMeters, MixerLights } from './songMixerLights';
 import { songMixerLights } from './songMixerLights';
@@ -77,7 +81,20 @@ function nameField(ctx: AppCtx, group: GroupSpec): HTMLInputElement {
   return input;
 }
 
-/** Level and Pan, writing the group's fields live and into the document. */
+/**
+ * The lock a lane of the group's on `target` puts on its knob at the
+ * playhead (windsor#616 decision 4), as a part's strip knobs lock.
+ */
+const groupLock =
+  (ctx: AppCtx, id: number, target: StripTargetId): NonNullable<KnobSpec['automation']> =>
+  () =>
+    catalogKnobAutomation(
+      groupAt(ctx.model.doc, id),
+      target,
+      knobSongTick(ctx.model.doc, ctx.transport.position()),
+    );
+
+/** Level and Pan, writing the group's fields live and into the document, locked while a lane holds them. */
 function groupKnobs(ctx: AppCtx, group: GroupSpec, color: string): HTMLElement {
   const { id } = group;
   const now = (): GroupSpec | undefined => groupAt(ctx.model.doc, id);
@@ -87,6 +104,7 @@ function groupKnobs(ctx: AppCtx, group: GroupSpec, color: string): HTMLElement {
       ...GROUP_LEVEL_KNOB,
       color,
       dial: 'rack',
+      automation: groupLock(ctx, id, 'strip.level'),
       get: () => now()?.level ?? GROUP_LEVEL_KNOB.def,
       set: (level) => void ctx.change({ groups: { [id]: { level } } }),
     }),
@@ -94,6 +112,7 @@ function groupKnobs(ctx: AppCtx, group: GroupSpec, color: string): HTMLElement {
       ...GROUP_PAN_KNOB,
       color,
       dial: 'rack',
+      automation: groupLock(ctx, id, 'strip.pan'),
       get: () => now()?.pan ?? GROUP_PAN_KNOB.def,
       set: (pan) => void ctx.change({ groups: { [id]: { pan } } }),
     }),

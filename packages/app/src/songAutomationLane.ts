@@ -3,7 +3,10 @@
  * `2026-10-01-song-automation-lanes` decision 13; the mockup
  * `docs/design/automation-lanes-mockup.html`): the rows a part's `▸` folds
  * out beneath it, each a label in the frozen column and a stretch of
- * timeline (windsor#534).
+ * timeline (windsor#534). A group bus's folder header folds out the same
+ * rows for the group's own lanes (windsor#616): the rows take a lane owner,
+ * a part or a group (`songAutomationOwner.ts`), and a group's curves sit
+ * over the outline of where its members play.
  *
  * - **A lane** is its colour chip, name and kind, beside its value at the
  *   playhead over an on/off ● and a delete ×; and its curve over the part's
@@ -11,7 +14,8 @@
  *   (windsor#349, `songAutomationGesture.ts`), and its Shape tool stamps a
  *   shape over a range (windsor#350, `songShapeRange.ts`).
  * - **The add row** is the "+ Add lane" picker beside the voice count
- *   against `FM_LANES_MAX`, and an empty stretch of timeline.
+ *   against `FM_LANES_MAX` (a part's only: a group has no voice), and an
+ *   empty stretch of timeline.
  *
  * Every edit is one `view.commit` inside a named gesture, so it is one undo
  * step. The value readouts are handed back as `Readout`s, which the view's
@@ -24,8 +28,8 @@ import type {
   AutomationPoint,
   AutomationTargetId,
   AutomationTargetRow,
-  DocumentPart,
   Patch,
+  Region,
 } from '@windsor/engine';
 import { valueAt } from '@windsor/engine';
 import { readout } from './automationReadout';
@@ -35,7 +39,6 @@ import { curveShape } from './songAutomationCurve';
 import { withPoints } from './songAutomationEdit';
 import { wireLaneEditing } from './songAutomationGesture';
 import {
-  automationChange,
   currentValue,
   laneActivity,
   laneRow,
@@ -48,6 +51,13 @@ import {
   withLane,
   withoutLane,
 } from './songAutomationModel';
+import type { LaneOwner } from './songAutomationOwner';
+import {
+  isGroupLaneOwner,
+  liveOwner,
+  ownerAutomationChange,
+  ownerKey,
+} from './songAutomationOwner';
 import { AUTOMATION_DRAWING, LANE_KIND_COLOR } from './songAutomationTables';
 import type { SongView } from './songTab';
 import { SONG_VIEW, tickToPx } from './songViewTables';
@@ -63,24 +73,24 @@ function svg(tag: string, attrs: Readonly<Record<string, string | number>>): SVG
   return node;
 }
 
-/** The part as the document holds it now, so an edit never builds on a stale list. */
-const livePart = (view: SongView, part: DocumentPart): DocumentPart =>
-  view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
+/** The owner as the document holds it now, so an edit never builds on a stale list. */
+const liveOf = (view: SongView, owner: LaneOwner): LaneOwner =>
+  liveOwner(view.ctx.model.doc, owner);
 
-/** The patch `part` plays, from the document: what names its macros (windsor#559). */
-const patchOf = (view: SongView, part: DocumentPart): Patch | undefined =>
-  view.ctx.model.doc.patches?.[part.preset];
+/** The patch a part plays, from the document: what names its macros (windsor#559). A group plays none. */
+const patchOf = (view: SongView, owner: LaneOwner): Patch | undefined =>
+  isGroupLaneOwner(owner) ? undefined : view.ctx.model.doc.patches?.[owner.preset];
 
-/** Set `slot`'s lanes as one undo step named `label`, then put the focus back on `focusKey`. */
+/** Set the owner's lanes as one undo step named `label`, then put the focus back on `focus`. */
 function commitLanes(
   view: SongView,
-  part: DocumentPart,
+  owner: LaneOwner,
   lanes: AutomationLane[],
   edit: { readonly label: string; readonly focus?: HTMLElement },
 ): void {
   const grid = edit.focus?.closest('.lanes');
   const key = edit.focus?.dataset['focus'];
-  withGesture(edit.label, () => view.commit(automationChange(part.slot, lanes)));
+  withGesture(edit.label, () => view.commit(ownerAutomationChange(owner, lanes)));
   if (grid && key) grid.querySelector<HTMLElement>(`[data-focus="${CSS.escape(key)}"]`)?.focus();
 }
 
@@ -115,27 +125,35 @@ function paintCurve(
   );
 }
 
-/** The lane's curve over the part's regions, ghosted, at the view's zoom, under the toolbar's tools. */
-function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane): HTMLElement {
+/**
+ * The lane's curve over `ghosts` (the part's regions, or where a group's
+ * members play), ghosted, at the view's zoom, under the toolbar's tools.
+ */
+function laneTimeline(
+  view: SongView,
+  owner: LaneOwner,
+  lane: AutomationLane,
+  ghosts: readonly Region[],
+): HTMLElement {
   const px = view.state.pxPerBar;
   const bar = view.ticksPerBar();
   const timeline = el('div', 'auto-lane');
-  for (const region of part.regions) {
+  for (const region of ghosts) {
     const ghost = el('div', 'auto-ghost');
     ghost.style.left = `${tickToPx(region.start, px, bar)}px`;
     ghost.style.width = `${tickToPx(region.duration, px, bar)}px`;
     timeline.appendChild(ghost);
   }
-  const row = laneRow(part, lane.target, patchOf(view, part));
+  const row = laneRow(owner, lane.target, patchOf(view, owner));
   if (!row) return timeline;
   const box = svg('svg', { 'aria-hidden': 'true' });
   paintCurve(view, box, row, lane.points);
   timeline.appendChild(box);
   const name = row.label;
   const points = (): readonly AutomationPoint[] =>
-    lanesOf(livePart(view, part)).find((l) => l.target === lane.target)?.points ?? lane.points;
+    lanesOf(liveOf(view, owner)).find((l) => l.target === lane.target)?.points ?? lane.points;
   const commit = (label: string, next: readonly AutomationPoint[]): void => {
-    const live = livePart(view, part);
+    const live = liveOf(view, owner);
     commitLanes(view, live, withPoints(lanesOf(live), lane.target, next), { label });
   };
   wireLaneEditing({
@@ -150,7 +168,7 @@ function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane):
   // The Shape tool's range (windsor#350): a drag selects a range, and the popover stamps it.
   view.shape.attach({
     view,
-    key: `${part.slot}:${lane.target}`,
+    key: `${ownerKey(owner)}:${lane.target}`,
     timeline,
     row,
     name,
@@ -166,6 +184,37 @@ export interface LaneRowCells {
   readonly timeline: HTMLElement;
 }
 
+/** Where a lane's cells go: the readouts the playhead sets, and the stretches its curve is ghosted over. */
+interface LaneSinks {
+  readonly readouts: Readout[];
+  readonly ghosts: readonly Region[];
+}
+
+/** The lane's ● and ×: switch it on or off, delete it; each one undo step. */
+function laneButtons(view: SongView, owner: LaneOwner, lane: AutomationLane): HTMLElement {
+  const name = laneTitle(owner, lane.target, patchOf(view, owner)).name;
+  const key = `${ownerKey(owner)}:${lane.target}`;
+  const on = miniButton('●', `${name} lane on`, `on:${key}`);
+  on.classList.toggle('on', lane.on);
+  on.setAttribute('aria-pressed', String(lane.on));
+  on.title = lane.on ? 'Turn the lane off' : 'Turn the lane on';
+  on.onclick = (): void => {
+    const live = liveOf(view, owner);
+    const label = `${name} lane ${lane.on ? 'off' : 'on'}`;
+    commitLanes(view, live, toggledLane(lanesOf(live), lane.target), { label, focus: on });
+  };
+  const del = miniButton('×', `Delete the ${name} lane`, `del:${key}`);
+  del.title = 'Delete the lane';
+  del.onclick = (): void => {
+    const live = liveOf(view, owner);
+    const label = `Delete ${name} lane`;
+    commitLanes(view, live, withoutLane(lanesOf(live), lane.target), { label });
+  };
+  const buttons = el('span', 'auto-buttons');
+  buttons.append(on, del);
+  return buttons;
+}
+
 /**
  * One lane's label and curve. The label (windsor#534 decision 3) is its
  * colour chip, its name over its kind, and beside them its value at the
@@ -173,12 +222,12 @@ export interface LaneRowCells {
  */
 function laneCells(
   view: SongView,
-  part: DocumentPart,
+  owner: LaneOwner,
   lane: AutomationLane,
-  readouts: Readout[],
+  sinks: LaneSinks,
 ): LaneRowCells {
-  const title = laneTitle(part, lane.target, patchOf(view, part));
-  const activity = laneActivity(part, lane.target);
+  const title = laneTitle(owner, lane.target, patchOf(view, owner));
+  const activity = laneActivity(owner, lane.target);
   const dim = !lane.on || !activity.active;
   const color = LANE_KIND_COLOR[title.kind];
   const label = el('div', `lane-auto${dim ? ' off' : ''}`);
@@ -188,49 +237,32 @@ function laneCells(
   const side = el('span', 'auto-side');
   label.append(el('span', 'auto-chip'), text, side);
   const value = el('span', 'auto-value');
-  const key = `${part.slot}:${lane.target}`;
-  const on = miniButton('●', `${title.name} lane on`, `on:${key}`);
-  on.classList.toggle('on', lane.on);
-  on.setAttribute('aria-pressed', String(lane.on));
-  on.title = lane.on ? 'Turn the lane off' : 'Turn the lane on';
-  on.onclick = (): void => {
-    const live = livePart(view, part);
-    const label = `${title.name} lane ${lane.on ? 'off' : 'on'}`;
-    commitLanes(view, live, toggledLane(lanesOf(live), lane.target), { label, focus: on });
-  };
-  const del = miniButton('×', `Delete the ${title.name} lane`, `del:${key}`);
-  del.title = 'Delete the lane';
-  del.onclick = (): void => {
-    const live = livePart(view, part);
-    const label = `Delete ${title.name} lane`;
-    commitLanes(view, live, withoutLane(lanesOf(live), lane.target), { label });
-  };
-  const buttons = el('span', 'auto-buttons');
-  buttons.append(on, del);
-  side.append(value, buttons);
-  const row = laneRow(part, lane.target, patchOf(view, part));
+  side.append(value, laneButtons(view, owner, lane));
+  const row = laneRow(owner, lane.target, patchOf(view, owner));
   if (!activity.active) {
     value.textContent = 'inactive';
     value.title = activity.why;
   } else if (!lane.on) value.textContent = 'off';
-  else if (row)
-    readouts.push((tick) => (value.textContent = readout(row, valueAt(row, lane.points, tick))));
-
-  const timeline = laneTimeline(view, part, lane);
+  else if (row) {
+    sinks.readouts.push(
+      (tick) => (value.textContent = readout(row, valueAt(row, lane.points, tick))),
+    );
+  }
+  const timeline = laneTimeline(view, owner, lane, sinks.ghosts);
   timeline.classList.toggle('off', dim);
   for (const cell of [label, timeline]) cell.style.setProperty('--lane-c', color);
   return { label, timeline };
 }
 
 /** The picker over `pickerGroups`: a pick adds that target's lane, flat at its current value. */
-function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
+function lanePicker(view: SongView, owner: LaneOwner): HTMLSelectElement {
   const picker = document.createElement('select');
   picker.className = 'field compact auto-picker';
-  picker.name = `automation-${part.slot}`;
-  picker.setAttribute('aria-label', `Add an automation lane to ${part.name}`);
-  picker.dataset['focus'] = `add:${part.slot}`;
+  picker.name = `automation-${ownerKey(owner)}`;
+  picker.setAttribute('aria-label', `Add an automation lane to ${owner.name}`);
+  picker.dataset['focus'] = `add:${ownerKey(owner)}`;
   picker.add(new Option('+ Add lane', ''));
-  for (const group of pickerGroups(part, patchOf(view, part))) {
+  for (const group of pickerGroups(owner, patchOf(view, owner))) {
     const optgroup = document.createElement('optgroup');
     optgroup.label = group.label;
     for (const option of group.options) {
@@ -243,7 +275,7 @@ function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
   picker.onchange = (): void => {
     if (picker.value === '') return;
     const target = picker.value as AutomationTargetId;
-    const live = livePart(view, part);
+    const live = liveOf(view, owner);
     const patch = patchOf(view, live);
     const lane = newLane(target, currentValue(live, patch, target), view.songTicks());
     const label = `Add ${laneTitle(live, target, patch).name} lane`;
@@ -252,24 +284,30 @@ function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
   return picker;
 }
 
-/** The "+ Add lane" row: the picker and the voice count side by side, over an empty timeline. */
-function addRowCells(view: SongView, part: DocumentPart): LaneRowCells {
+/** The "+ Add lane" row: the picker and a part's voice count side by side, over an empty timeline. */
+function addRowCells(view: SongView, owner: LaneOwner): LaneRowCells {
   const label = el('div', 'lane-add');
-  label.append(lanePicker(view, part), el('span', 'auto-count', voiceCountLabel(lanesOf(part))));
+  label.append(lanePicker(view, owner));
+  if (!isGroupLaneOwner(owner)) {
+    label.append(el('span', 'auto-count', voiceCountLabel(lanesOf(owner))));
+  }
   return { label, timeline: el('div', 'auto-add-lane') };
 }
 
 /**
- * The rows `part` folds out: one per lane, in the document's order, then the
- * add row. Each lane that plays pushes its value cell onto `readouts`.
+ * The rows `owner` folds out: one per lane, in the document's order, then the
+ * add row. Each lane that plays pushes its value cell onto `readouts`. The
+ * curves are ghosted over `ghosts`: a part's own regions unless given (a
+ * group's outline, windsor#616).
  */
 export function automationRows(
   view: SongView,
-  part: DocumentPart,
+  owner: LaneOwner,
   readouts: Readout[],
+  ghosts: readonly Region[] = isGroupLaneOwner(owner) ? [] : owner.regions,
 ): LaneRowCells[] {
   return [
-    ...lanesOf(part).map((lane) => laneCells(view, part, lane, readouts)),
-    addRowCells(view, part),
+    ...lanesOf(owner).map((lane) => laneCells(view, owner, lane, { readouts, ghosts })),
+    addRowCells(view, owner),
   ];
 }

@@ -32,6 +32,9 @@
  * outlining where the group plays (`songGroupRow.ts`). A group's fold is view
  * state too, `closedGroups`; a member routed elsewhere moves on the next
  * repaint, since the lanes' signature holds each part's Output and the groups.
+ * The header's second fold opens the group's own automation lanes
+ * (windsor#616), `openGroups` beside `openParts`, and the lane toolbar shows
+ * while any part's or group's lanes are open.
  *
  * The selected part is the Parts tab's too (windsor#462): selecting a part or
  * one of its regions picks it there (`ctx.parts.pick`), and a render follows
@@ -48,7 +51,8 @@ import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { bodyGroups, harmonyGroup, headGroup, sizeLaneColumn } from './songLaneColumn';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
 import { refreshMixerCells } from './songMixerCell';
-import { forgetRemovedGroups, songRows, visibleRows } from './songFolderModel';
+import type { OpenLanes } from './songFolderModel';
+import { followGroupFolds, lanesOpen, songRows, visibleRows } from './songFolderModel';
 import type { Readout } from './songAutomationLane';
 import { automationSignature } from './songAutomationModel';
 import {
@@ -125,6 +129,12 @@ export interface SongViewState {
    * the document; every group starts open.
    */
   readonly closedGroups: Set<number>;
+  /**
+   * The groups whose own automation lanes are folded out under their header
+   * (windsor#616 decision 1), by id, beside `openParts`. Kept for the
+   * session, never written to the document; every group starts folded.
+   */
+  readonly openGroups: Set<number>;
   /** The lane toolbar's tool and Snap grain in ticks, 0 for Off (windsor#349 decision 1). Kept for the session. */
   automationTool: AutomationTool;
   automationSnap: number;
@@ -157,15 +167,21 @@ export interface SongView {
  * knob. A part's strip is left out (windsor#157): the mixer column's knob
  * edits it mid-drag, and a repaint would rebuild the knob under the pointer.
  * Its Output is in, with the groups' ids and names (windsor#615 decision 5):
- * a select, never dragged, that moves the part's row between folders.
+ * a select, never dragged, that moves the part's row between folders. A
+ * group's lanes are in as a part's are (windsor#616), so an insert removed
+ * on the Mixer tab takes its lane off the folder track.
  */
-function laneSignature(ctx: AppCtx, open: ReadonlySet<number>): string {
+function laneSignature(ctx: AppCtx, open: OpenLanes): string {
   const { doc } = ctx.model;
   return JSON.stringify([
     doc.transport.bars,
     doc.transport.loop ?? null,
     doc.harmony,
-    (doc.groups ?? []).map((group) => [group.id, group.name]),
+    (doc.groups ?? []).map((group) => [
+      group.id,
+      group.name,
+      automationSignature(group, open.groups.has(group.id)),
+    ]),
     doc.parts.map((part) => [
       part.slot,
       part.name,
@@ -173,7 +189,7 @@ function laneSignature(ctx: AppCtx, open: ReadonlySet<number>): string {
       part.regions,
       part.sequencer.kind,
       // Its lanes (windsor#348 decision 7), and what its inserts' settings let them move.
-      automationSignature(part, open.has(part.slot)),
+      automationSignature(part, open.parts.has(part.slot)),
       // Each region's own pattern (windsor#75): a region without one shows the part's sequencer.
       part.regions.map((_, i) => {
         const pattern = regionPattern(part, i);
@@ -238,6 +254,8 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
     state.paneScrollPx = pane.scrollTop;
   });
   let signature = '';
+  // The parts and groups folded open (windsor#616): what the signature and the toolbar read.
+  const openLanes: OpenLanes = { parts: state.openParts, groups: state.openGroups };
   // The lanes' value cells (windsor#348): set from the playhead's tick, in the song.
   let readouts: Readout[] = [];
   const readValues = (tick: number): void => {
@@ -289,13 +307,12 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
     paintLanes() {
       const { doc } = ctx.model;
       // What is drawn, so the watch repaints only on a change from elsewhere (a fold changes it too).
-      signature = laneSignature(ctx, state.openParts);
+      signature = laneSignature(ctx, openLanes);
       lanes.style.setProperty('--bars', String(doc.transport.bars));
       lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
       const brace = loopBraceRow(view);
       const fresh: Readout[] = [];
-      // The folder tracks (windsor#615): a removed group's fold is forgotten, and a folded group's members are not drawn.
-      forgetRemovedGroups(state.closedGroups, doc.groups ?? []);
+      // The folder tracks (windsor#615): a folded group's members are not drawn.
       const shown = visibleRows(songRows(doc), state.closedGroups);
       const rows: HTMLElement[] = [
         headGroup(mixer, rulerRow(doc.transport.bars, state.pxPerBar, doc.transport.meter), brace),
@@ -304,7 +321,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
       ];
       readouts = fresh;
       lanes.replaceChildren(...rows, ...brace.lines, line);
-      toolbar.hidden = !shown.some((row) => row.kind === 'part' && state.openParts.has(row.slot));
+      toolbar.hidden = !lanesOpen(shown, openLanes);
       readValues(ctx.transport.position());
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
@@ -357,7 +374,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
         stripsDrawn = strips;
         refreshMixerCells(lanes);
       }
-      const now = laneSignature(ctx, state.openParts);
+      const now = laneSignature(ctx, openLanes);
       if (now === signature) return;
       signature = now;
       state.selection = validSelection(ctx, state.selection);
@@ -384,10 +401,13 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     mixerExpanded: false,
     openParts: new Set(),
     closedGroups: new Set(),
+    openGroups: new Set(),
     automationTool: DEFAULT_AUTOMATION_TOOL,
     automationSnap: DEFAULT_SNAP_TICKS,
     shape: DEFAULT_SHAPE_SETTINGS,
   };
+  // A removed group's folds go with it on the change itself, shown or not (windsor#616).
+  followGroupFolds(ctx.model, [state.closedGroups, state.openGroups]);
   // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
   // The Shape tool of the current render (windsor#350): a render closes the last one's popover.

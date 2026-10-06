@@ -15,7 +15,9 @@
  *   the add row's empty stretch.
  *
  * - **a group** (windsor#615): its folder header (`songGroupRow.ts`) beside
- *   the outline of where it plays, then its members' blocks, each inset
+ *   the outline of where it plays, and while its lanes fold is open
+ *   (windsor#616) a label per group lane and the add row beside their
+ *   curves; then its members' blocks, each inset
  *   with the folder's rail down the inset, in the order `songRows` gives.
  *
  * The part's name and kind are the part strip's (windsor#520), so the
@@ -169,9 +171,9 @@ export function bodyGroups(
   const groups: HTMLElement[] = [];
   for (const row of rows) {
     if (row.kind === 'group') {
-      const header = groupRow(view, row);
+      const header = groupRow(view, row, readouts);
       if (!header) continue;
-      const group = laneGroup(header[0], [header[1]]);
+      const group = laneGroup(header.frozen, header.timeline);
       group.classList.add('folder-head');
       tintFolder(view, group, row.id);
       groups.push(group);

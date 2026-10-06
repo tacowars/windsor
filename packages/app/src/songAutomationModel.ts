@@ -12,13 +12,16 @@
  * engine's; the curve's geometry is `songAutomationCurve.ts`. The picker,
  * a lane's row and its title take the part's patch, so a macro is offered
  * and named only as the patch defines it (windsor#559, `macroTargets.ts`).
+ *
+ * Every rule takes a lane owner (windsor#616, `songAutomationOwner.ts`): a
+ * part, or a group bus on its folder track, whose picker offers its Level,
+ * its Pan and its own inserts' fields only (`GROUP_STRIP_TARGETS`).
  */
 import type {
   AutomationLane,
   AutomationTargetId,
   AutomationTargetKind,
   AutomationTargetRow,
-  DocumentPart,
   DocumentPartial,
   InsertKindName,
   InsertSpec,
@@ -27,6 +30,7 @@ import type {
 } from '@windsor/engine';
 import {
   FM_LANES_MAX,
+  GROUP_STRIP_TARGETS,
   OP_NAMES,
   STRIP_AUTOMATION_ROWS,
   VOICE_AUTOMATION_ROWS,
@@ -41,6 +45,8 @@ import {
 import { INSERT_LABELS } from './insertKnobTables';
 import { macroName, offersVoicePath } from './macroTargets';
 import { getPath } from './patchPath';
+import type { LaneOwner } from './songAutomationOwner';
+import { isGroupLaneOwner, ownerInserts, ownerLanes, ownerStrip } from './songAutomationOwner';
 import {
   INACTIVE_WHY,
   MIXER_GROUP_LABEL,
@@ -62,8 +68,8 @@ export interface PickerGroup {
   readonly options: readonly PickerOption[];
 }
 
-/** A part's lanes; none when it has no `automation`. */
-export const lanesOf = (part: DocumentPart): readonly AutomationLane[] => part.automation ?? [];
+/** A part's or a group's lanes; none when it has no `automation`. */
+export const lanesOf = (owner: LaneOwner): readonly AutomationLane[] => ownerLanes(owner);
 
 /** How many of `lanes` move the voice, against `FM_LANES_MAX`. */
 export const voiceLaneCount = (lanes: readonly AutomationLane[]): number =>
@@ -92,44 +98,31 @@ export function insertLabels(inserts: readonly InsertSpec[]): ReadonlyMap<string
   return out;
 }
 
-/** The insert on `part`'s strip with `insertId`. */
-const insertOf = (part: DocumentPart, insertId: string): InsertSpec | undefined =>
-  part.strip.inserts.find((spec) => spec.id === insertId);
+/** The insert in `owner`'s chain with `insertId`. */
+const insertOf = (owner: LaneOwner, insertId: string): InsertSpec | undefined =>
+  ownerInserts(owner).find((spec) => spec.id === insertId);
 
 /**
- * The row behind `target` on `part`: its bounds, scale and label, a macro's
+ * The row behind `target` on `owner`: its bounds, scale and label, a macro's
  * label the name `patch` (the part's) gives it.
  */
 export function laneRow(
-  part: DocumentPart,
+  owner: LaneOwner,
   target: string,
   patch?: Patch,
 ): AutomationTargetRow | undefined {
-  const row = targetRow(target, (insertId) => insertOf(part, insertId)?.kind);
+  const row = targetRow(target, (insertId) => insertOf(owner, insertId)?.kind);
   const parsed = parseTargetId(target);
   const name = parsed?.kind === 'voice' ? macroName(patch, parsed.path) : undefined;
   return row && name !== undefined ? { ...row, label: name } : row;
 }
 
-/**
- * The picker's groups (decision 4): Mixer, one group per insert in the chain
- * listing the fields its settings leave read (`automatableInsertFields`),
- * then the voice's groups, then Macros with each macro `patch` (the part's)
- * defines, under its name (windsor#559), then Sequencer with the fields the
- * part's sequencer kind offers (windsor#491); a group with nothing in it is
- * left out.
- */
-export function pickerGroups(part: DocumentPart, patch?: Patch): PickerGroup[] {
-  const lanes = lanesOf(part);
-  const used = new Set<string>(lanes.map((lane) => lane.target));
-  const voiceFull = voiceLaneCount(lanes) >= FM_LANES_MAX;
-  const option = (target: AutomationTargetId, label: string, full = false): PickerOption => ({
-    target,
-    label,
-    disabled: used.has(target) || full,
-  });
-  const labels = insertLabels(part.strip.inserts);
-  const inserts = part.strip.inserts.flatMap((spec) => {
+type OptionOf = (target: AutomationTargetId, label: string, full?: boolean) => PickerOption;
+
+/** One group per insert in `inserts`, each listing the fields its settings leave read. */
+function insertPickerGroups(inserts: readonly InsertSpec[], option: OptionOf): PickerGroup[] {
+  const labels = insertLabels(inserts);
+  return inserts.flatMap((spec) => {
     const insertId = spec.id;
     if (insertId === undefined) return [];
     const options = automatableInsertFields(spec).map((row) =>
@@ -137,21 +130,62 @@ export function pickerGroups(part: DocumentPart, patch?: Patch): PickerGroup[] {
     );
     return [{ label: insertGroupLabel(labels.get(insertId) ?? ''), options }];
   });
+}
+
+/** The voice's groups by section, each macro `patch` defines under its name; `full` disables them all. */
+function voicePickerGroups(
+  patch: Patch | undefined,
+  option: OptionOf,
+  full: boolean,
+): PickerGroup[] {
   const voice = new Map<string, PickerOption[]>();
   for (const row of VOICE_AUTOMATION_ROWS) {
     if (!offersVoicePath(patch, row.path)) continue;
     const label = voiceGroupLabel(row.section, OP_NAMES);
     const name = macroName(patch, row.path) ?? row.label;
-    voice.set(label, [...(voice.get(label) ?? []), option(row.target, name, voiceFull)]);
+    voice.set(label, [...(voice.get(label) ?? []), option(row.target, name, full)]);
   }
+  return [...voice].map(([label, options]) => ({ label, options }));
+}
+
+/** A group bus's strip targets: its Level and its Pan (windsor#614 decision 2). */
+const GROUP_STRIP: ReadonlySet<AutomationTargetId> = new Set(GROUP_STRIP_TARGETS);
+
+/**
+ * The picker's groups (decision 4): Mixer, one group per insert in the chain
+ * listing the fields its settings leave read (`automatableInsertFields`),
+ * then the voice's groups, then Macros with each macro `patch` (the part's)
+ * defines, under its name (windsor#559), then Sequencer with the fields the
+ * part's sequencer kind offers (windsor#491); a group with nothing in it is
+ * left out. A group bus (windsor#616 decision 3) is offered Mixer with its
+ * Level and Pan, then its inserts' groups, and nothing else: no send, voice,
+ * macro or sequencer row.
+ */
+export function pickerGroups(owner: LaneOwner, patch?: Patch): PickerGroup[] {
+  const lanes = lanesOf(owner);
+  const used = new Set<string>(lanes.map((lane) => lane.target));
+  const option: OptionOf = (target, label, full = false) => ({
+    target,
+    label,
+    disabled: used.has(target) || full,
+  });
+  const inserts = insertPickerGroups(ownerInserts(owner), option);
+  if (isGroupLaneOwner(owner)) {
+    const rows = STRIP_AUTOMATION_ROWS.filter((row) => GROUP_STRIP.has(row.target));
+    return [
+      { label: MIXER_GROUP_LABEL, options: rows.map((row) => option(row.target, row.label)) },
+      ...inserts,
+    ];
+  }
+  const voiceFull = voiceLaneCount(lanes) >= FM_LANES_MAX;
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
-  const seq = seqTargetIds(part.sequencer.kind).map((target) =>
+  const seq = seqTargetIds(owner.sequencer.kind).map((target) =>
     option(target, catalogRow(target)?.label ?? target),
   );
   return [
     { label: MIXER_GROUP_LABEL, options: mixer },
     ...inserts,
-    ...[...voice].map(([label, options]) => ({ label, options })),
+    ...voicePickerGroups(patch, option, voiceFull),
     ...(seq.length > 0 ? [{ label: SEQ_GROUP_LABEL, options: seq }] : []),
   ];
 }
@@ -168,16 +202,12 @@ export interface LaneTitle {
   readonly kind: AutomationTargetKind;
 }
 
-export function laneTitle(
-  part: DocumentPart,
-  target: AutomationTargetId,
-  patch?: Patch,
-): LaneTitle {
+export function laneTitle(owner: LaneOwner, target: AutomationTargetId, patch?: Patch): LaneTitle {
   const kind = targetKind(target);
-  const name = laneRow(part, target, patch)?.label ?? target;
+  const name = laneRow(owner, target, patch)?.label ?? target;
   const parsed = parseTargetId(target);
   if (parsed?.kind === 'insert') {
-    const kindLine = insertLabels(part.strip.inserts).get(parsed.insertId) ?? '';
+    const kindLine = insertLabels(ownerInserts(owner)).get(parsed.insertId) ?? '';
     return { name, kindLine, kind };
   }
   if (parsed?.kind === 'voice') {
@@ -198,16 +228,16 @@ type WhyOf = (spec: InsertSpec, field: string) => string | undefined;
  * `wear` while split) is inactive: the song keeps it, drawn dimmed. Strip
  * and voice lanes are always active.
  */
-export function laneActivity(part: DocumentPart, target: AutomationTargetId): LaneActivity {
+export function laneActivity(owner: LaneOwner, target: AutomationTargetId): LaneActivity {
   const parsed = parseTargetId(target);
   if (parsed?.kind !== 'insert') return { active: true };
-  const spec = insertOf(part, parsed.insertId);
+  const spec = insertOf(owner, parsed.insertId);
   if (!spec) return { active: true };
   if (automatableInsertFields(spec).some((row) => row.target === parsed.field)) {
     return { active: true };
   }
-  const label = insertLabels(part.strip.inserts).get(parsed.insertId) ?? '';
-  const name = laneRow(part, target)?.label ?? parsed.field;
+  const label = insertLabels(ownerInserts(owner)).get(parsed.insertId) ?? '';
+  const name = laneRow(owner, target)?.label ?? parsed.field;
   // The table pairs each kind with a function over that kind's spec, and `spec` is of its own kind.
   const clause = (INACTIVE_WHY[spec.kind] as WhyOf | undefined)?.(spec, parsed.field);
   const why = clause
@@ -220,27 +250,31 @@ const clampTo = (row: AutomationTargetRow, value: number): number =>
   Math.min(row.max, Math.max(row.min, value));
 
 /**
- * The parameter's value now (decision 4): from the strip, the insert's spec,
- * the part's sequencer (windsor#488) or its patch, clamped to the row. A send the strip does not name is
- * silent; anything else unread is the row's minimum.
+ * The parameter's value now (decision 4): from the strip (a group's own
+ * level and pan, windsor#616), the insert's spec, the part's sequencer
+ * (windsor#488) or its patch, clamped to the row. A send the strip does not
+ * name is silent; anything else unread is the row's minimum.
  */
 export function currentValue(
-  part: DocumentPart,
+  owner: LaneOwner,
   patch: Patch | undefined,
   target: AutomationTargetId,
 ): number {
-  const row = laneRow(part, target);
+  const row = laneRow(owner, target);
   const parsed = parseTargetId(target);
   if (!row || !parsed) return 0;
+  const part = isGroupLaneOwner(owner) ? undefined : owner;
   let raw: unknown;
   if (parsed.kind === 'strip') {
     const [section, bus] = parsed.field.split('.');
     raw =
-      section === 'send' ? (part.strip.sends[bus ?? ''] ?? 0) : getPath(part.strip, section ?? '');
+      section === 'send'
+        ? (part?.strip.sends[bus ?? ''] ?? 0)
+        : getPath(ownerStrip(owner), section ?? '');
   } else if (parsed.kind === 'insert') {
-    raw = getPath(insertOf(part, parsed.insertId), parsed.field);
+    raw = getPath(insertOf(owner, parsed.insertId), parsed.field);
   } else if (parsed.kind === 'seq') {
-    raw = getPath(part.sequencer, parsed.field);
+    raw = getPath(part?.sequencer, parsed.field);
   } else {
     raw = getPath(patch, parsed.path);
   }
@@ -288,15 +322,15 @@ export const automationChange = (slot: number, lanes: AutomationLane[]): Documen
 });
 
 /**
- * What the lanes of `part` repaint on (decision 7): its lanes, and for an
- * open part or one with lanes, which fields each insert's settings leave
- * read, so a Split switch dims a lane and refills the picker. A knob drag
- * changes neither.
+ * What the lanes of `owner`, a part or a group, repaint on (decision 7): its
+ * lanes, and for an open owner or one with lanes, which fields each insert's
+ * settings leave read, so a Split switch dims a lane and refills the picker.
+ * A knob drag changes neither.
  */
-export function automationSignature(part: DocumentPart, open: boolean): unknown {
-  const lanes = part.automation?.length ? part.automation : null;
+export function automationSignature(owner: LaneOwner, open: boolean): unknown {
+  const lanes = owner.automation?.length ? owner.automation : null;
   if (!open && lanes === null) return null;
-  const inserts = part.strip.inserts.map((spec) => [
+  const inserts = ownerInserts(owner).map((spec) => [
     spec.id,
     spec.kind,
     automatableInsertFields(spec)

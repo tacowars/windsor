@@ -23,7 +23,7 @@
  * drag on that point, or any curve edit of a held field, is refused with the
  * locked knob's notice.
  */
-import { DEFAULT_EQ, EQ_SPECTRUM, partAt } from '@windsor/engine';
+import { DEFAULT_EQ, EQ_SPECTRUM } from '@windsor/engine';
 import type { EqSpec, InsertSpec, InsertStage } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -55,7 +55,7 @@ import { insertPage } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf, liveInsert } from './insertTarget';
-import { knobSongTick, lockedKnobNotice } from './knobAutomation';
+import { insertLaneHolder, knobSongTick, lockedKnobNotice } from './knobAutomation';
 import { watchPlayhead } from './stepStrip';
 
 /** Every EQ's view for this session, by `rackKey`: never in the song. */
@@ -79,7 +79,7 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
     sampleRate: () => ctx.host.system?.engine.context.sampleRate ?? EQ_FALLBACK_SAMPLE_RATE,
     plot: () => eqPlot(model.view().range, model.sampleRate()),
     lanes: () => ({
-      part: typeof slot === 'number' ? partAt(ctx.model.doc, slot) : undefined,
+      part: insertLaneHolder(ctx.model.doc, slot),
       insert: insertsOf(ctx, slot)[index],
       tick: knobSongTick(ctx.model.doc, ctx.transport.position()),
     }),

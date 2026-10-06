@@ -4245,16 +4245,29 @@ body.chord-dragging {
 .lane-folder {
   display: grid;
   grid-template-columns: var(--tab) minmax(0, 1fr);
+  align-content: start;
   column-gap: var(--tab-gap);
+  row-gap: var(--row-gap);
   cursor: default;
 }
-.folder-tab {
-  border-radius: 2px;
-  background: var(--group-accent, var(--modulator));
+.lane-folder > :not(.folder-tab) {
+  grid-column: 2;
 }
+/* The folder tab runs down the group's open lanes (windsor#616) as a
+   part's number tab does: solid beside the header, a tint below it. */
+.folder-tab {
+  grid-column: 1;
+  border-radius: 2px;
+  background: linear-gradient(
+    var(--group-accent, var(--modulator)) 0 var(--lane-h),
+    color-mix(in srgb, var(--group-accent, var(--modulator)) 15%, var(--ground)) var(--lane-h)
+  );
+}
+/* The header's row: the member fold, the lanes fold (▸ beside "lanes" or
+   the lane count, windsor#616), then the name over the count. */
 .folder-row {
   display: grid;
-  grid-template-columns: var(--fold) minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   column-gap: var(--fold-gap);
   height: var(--lane-h);
@@ -4280,10 +4293,13 @@ body.chord-dragging {
   color: var(--group-accent, var(--ink));
 }
 .folder-row .nm small {
+  overflow: hidden;
   font-family: var(--f-num);
   font-size: 9px;
   color: var(--ink-faint);
   letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lane-group.in-folder > .lane-col {
   grid-template-columns: calc(var(--tab) - var(--indent)) minmax(0, 1fr);
@@ -5099,6 +5115,21 @@ select.field.compact {
 }
 .lane-fold button.tri[aria-expanded='true'] {
   color: var(--carrier);
+}
+/* A group's lanes fold (windsor#616): its ▸ with "lanes", or the lane
+   count while folded, beside it on one line, so it reads "▸ lanes" next to
+   the member fold's bare ▾. */
+.lane-fold.folder-lanes {
+  flex-direction: row;
+  gap: 3px;
+}
+.lane-fold .fold-caption {
+  font-family: var(--f-num);
+  font-size: 9px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  white-space: nowrap;
 }
 /* A folded part's lane count. */
 .lane-fold .auto-badge {
