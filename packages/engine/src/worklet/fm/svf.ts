@@ -15,6 +15,7 @@
  * `tuneSvfSections` tunes the serial modes' sections, the 24 dB slope's
  * second one included (windsor#595); the voice (`updateVoiceFilter`,
  * `voiceControl.ts`) calls it, and the filter insert shares it.
+ * Second consumer: the Filter insert (`worklet/filter/`, windsor#622).
  */
 
 import { DORMANT_FILTER_STATE, SVF24_SECOND_STAGE_Q } from './fmConstants';

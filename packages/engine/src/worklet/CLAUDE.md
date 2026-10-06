@@ -119,6 +119,24 @@ every double field is first written as NaN.
 `inserts/phaserAllocation.test.ts` pins it on V8 through
 `__fixtures__/phaserChangeScenario.ts`.
 
+`filter/` is the Filter insert (windsor#622), built as
+`generated/filter-processor.js` with its own `tsconfig.json` (`fm/`'s flags,
+since it compiles `fm/` modules through its imports, and Node's types for its
+tests). It runs the voice's filter and copies none of it: `filterDsp.ts`
+imports `Svf` and `tuneSvfSections` from `fm/svf.ts`, `Ladder` from
+`fm/ladder.ts` and `tuneLadder` from `fm/ladderTune.ts`, one `svfA`, `svfB`
+and `Ladder` a channel, so **an edit to any of those three rebuilds both
+`fm-processor.js` and `filter-processor.js`**, and `--check` refuses either
+left stale. `filterProcessor.ts` owns the params and lifetime, `filterGlide.ts`
+the sweep (retuned every `CTRL_INTERVAL` frames, the cutoff geometric and the
+Reso linear across a quantum). Controls and defaults are
+`inserts/filterConstants.ts` / `filterSpec.ts`.
+`worklet/filter/filterBundle.test.ts` holds the bundle to the bit against
+`fm/`'s classes imported directly (so the folder is excluded from the engine's
+test project, as `fm/` is); `inserts/filter*.test.ts` run the bundle through
+`__fixtures__/filterHarness.ts`, and `inserts/filterAllocation.test.ts` pins
+rules 2 and 7 through `__fixtures__/filterChangeScenario.ts`.
+
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
 worklet lifecycle/load reports; `retroReverbDsp.ts` owns host/internal-clock
@@ -242,7 +260,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`,
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`,
    `outputStage/`, `tape/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so

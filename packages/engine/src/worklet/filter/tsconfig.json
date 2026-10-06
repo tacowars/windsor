@@ -1,0 +1,13 @@
+{
+  // The Filter insert's own project (windsor#622), with `fm/`'s flags: it
+  // compiles `fm/svf.ts`, `fm/ladder.ts` and `fm/ladderTune.ts` through its
+  // imports, which index typed arrays without `!` and keep declared fields
+  // unemitted. Its tests load the generated bundle from disk, so Node's
+  // types are on; the DSP itself touches nothing of Node's.
+  "extends": "../compressor/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "files": ["../fm/workletGlobals.d.ts"],
+  "include": ["./**/*.ts"]
+}

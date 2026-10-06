@@ -70,6 +70,12 @@ export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
       'packages/engine/src/synth/fmProcessorFilterLadder.test.ts',
     ],
   ],
+  // The Filter insert's sources, scanned for filter arithmetic they must not
+  // hold (windsor#622).
+  [
+    'packages/engine/src/worklet/filter/**',
+    ['packages/engine/src/worklet/filter/filterBundle.test.ts'],
+  ],
   // Bundled with esbuild from tapeMagneticStage.ts and run in a child process.
   [
     'packages/engine/src/worklet/tape/**',

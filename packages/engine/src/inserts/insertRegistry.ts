@@ -31,6 +31,8 @@ import { ECHO_INSERT } from './echoInsert';
 import type { EchoSpec } from './echoInsert';
 import { EQ_INSERT } from './eqInsert';
 import type { EqSpec } from './eqSpec';
+import { FILTER_INSERT } from './filterInsert';
+import type { FilterSpec } from './filterSpec';
 import type { InsertKind, InsertStage } from './insertKind';
 import type { IdClaim } from './insertIds';
 import { chainIds } from './insertIds';
@@ -58,6 +60,7 @@ export type InsertSpec = (
   | PlateReverbSpec
   | EchoSpec
   | EqSpec
+  | FilterSpec
 ) &
   InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
@@ -78,6 +81,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   plate: PLATE_REVERB_INSERT,
   echo: ECHO_INSERT,
   eq: EQ_INSERT,
+  filter: FILTER_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];

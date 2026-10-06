@@ -7,7 +7,8 @@
  * left the cutoff in the ladder's `cutoffHz`. A second worklet, the filter
  * insert, imports this module too, so it must stay free of the voice: it
  * imports nothing from `voice.ts`, `voiceTargetTables.ts` or any `voice*`
- * module (the bundler does no tree shaking). Then:
+ * module (the bundler does no tree shaking). Second consumer: the Filter
+ * insert (`worklet/filter/filterDsp.ts`, windsor#622). Then:
  *
  * - the cutoff is held to `LADDER_CUTOFF_MIN_HZ` .. `LADDER_CUTOFF_MAX_HZ`,
  *   and below `LADDER_CUTOFF_CEILING` of the sample rate, and the half-step

@@ -235,3 +235,9 @@ export const TAPE_WORKLET_URL = new URL('../worklet/generated/tape-processor.js'
 
 /** The Parametric EQ (windsor#198). */
 export const EQ_WORKLET_URL = new URL('../worklet/generated/eq-processor.js', import.meta.url);
+
+/** The Filter insert, the voice's SVF and Acid ladder on a strip (windsor#622). */
+export const FILTER_WORKLET_URL = new URL(
+  '../worklet/generated/filter-processor.js',
+  import.meta.url,
+);

@@ -17,6 +17,7 @@ import {
   DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
   DEFAULT_EQ,
+  DEFAULT_FILTER,
   DEFAULT_PLATE_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
@@ -24,6 +25,7 @@ import {
   DRIVE_TONE_MIN_HZ,
   ECHO_BOUNDS,
   ENSEMBLE_BOUNDS,
+  FILTER_BOUNDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   RETURN_NAMES,
@@ -31,6 +33,7 @@ import {
   eqResponseDb,
 } from '@windsor/engine';
 import { withoutInsertIds } from '@windsor/engine/__fixtures__/insertIds';
+import { fmtHz } from './consoleFormat';
 import { addInsert } from './insertEdits';
 import { INSERT_CARDS } from './insertCards';
 import {
@@ -38,6 +41,7 @@ import {
   DRIVE_KNOBS,
   ECHO_KNOBS,
   ENSEMBLE_KNOBS,
+  FILTER_INSERT_KNOBS,
   INSERT_GROUPS,
   INSERT_LABELS,
   PLATE_REVERB_KNOBS,
@@ -59,9 +63,10 @@ describe('INSERT_CARDS', () => {
     expect(new Set(grouped).size).toBe(grouped.length);
   });
 
-  it('groups the Add slot as decided: EQ, Drive, Dynamics, Modulation, Time, Space', () => {
+  it('groups the Add slot as decided: EQ, Filter, Drive, Dynamics, Modulation, Time, Space', () => {
     expect(INSERT_GROUPS.map((group) => group.label)).toEqual([
       'EQ',
+      'Filter',
       'Drive',
       'Dynamics',
       'Modulation',
@@ -93,6 +98,11 @@ describe('INSERT_CARDS', () => {
       const flat = eqResponseDb(added, [20, 100, 1000, 10000, 20000], 48000, new Float64Array(5));
       expect([...flat]).toEqual([0, 0, 0, 0, 0]);
     }
+  });
+
+  it('lists the Filter alone under Filter, after EQ (windsor#622)', () => {
+    expect(INSERT_GROUPS[1]).toEqual({ label: 'Filter', kinds: ['filter'] });
+    expect(INSERT_LABELS.filter).toBe('Filter');
   });
 
   it('calls the return-derived kinds Plate reverb and Echo (windsor#171)', () => {
@@ -177,5 +187,21 @@ describe('ECHO_KNOBS (windsor#171)', () => {
       expect(o.def, f).toBeGreaterThanOrEqual(o.min);
       expect(o.def, f).toBeLessThanOrEqual(o.max);
     }
+  });
+});
+
+describe('FILTER_INSERT_KNOBS (windsor#622)', () => {
+  it('covers every Filter number from DEFAULT_FILTER, on its bounds, Cutoff on a log sweep', () => {
+    expect(FILTER_INSERT_KNOBS.map((k) => [k.f, k.label])).toEqual([
+      ['cutoff', 'Cutoff'],
+      ['resonance', 'Reso'],
+      ['mix', 'Mix'],
+    ]);
+    for (const { f, o } of FILTER_INSERT_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_FILTER[f]);
+      expect([o.min, o.max], f).toEqual(FILTER_BOUNDS[f as keyof typeof FILTER_BOUNDS]);
+    }
+    expect(FILTER_INSERT_KNOBS[0]!.o.curve).toBe('log');
+    expect(FILTER_INSERT_KNOBS[0]!.o.fmt).toBe(fmtHz);
   });
 });

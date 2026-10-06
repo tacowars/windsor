@@ -31,6 +31,7 @@ import { DELAY_BOUNDS } from '../inserts/delayConstants';
 import { ECHO_BOUNDS } from '../inserts/echoConstants';
 import { ENSEMBLE_BOUNDS } from '../inserts/ensembleConstants';
 import { EQ_BAND_COUNT, EQ_BOUNDS, EQ_FIRST_ORDER_SLOPE } from '../inserts/eqConstants';
+import { FILTER_BOUNDS } from '../inserts/filterConstants';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -311,6 +312,13 @@ const EQ_ROWS: InsertFieldRow<EqSpec>[] = [
   row('output', 'Output', EQ_BOUNDS.output, 'linear', 'dB'),
 ];
 
+/** The Filter's sweep (windsor#622); its mode, slope and switch are not targets. */
+const FILTER_ROWS = [
+  row('cutoff', 'Cutoff', FILTER_BOUNDS.cutoff, 'log', 'Hz'),
+  row('resonance', 'Resonance', FILTER_BOUNDS.resonance),
+  row('mix', 'Mix', FILTER_BOUNDS.mix),
+];
+
 /** Each insert kind's continuous fields, the targets a lane may move on it. */
 export const INSERT_AUTOMATION_FIELDS: {
   readonly [K in InsertKindName]: readonly InsertFieldRow<InsertSpecOf<K>>[];
@@ -327,4 +335,5 @@ export const INSERT_AUTOMATION_FIELDS: {
   plate: PLATE_ROWS,
   echo: ECHO_ROWS,
   eq: EQ_ROWS,
+  filter: FILTER_ROWS,
 };

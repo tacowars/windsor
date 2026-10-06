@@ -1,6 +1,6 @@
 /**
  * What the load sampler (`worklet/loadSampler.ts`, #445) costs the audio
- * thread in each of the ten processors that bundle it (windsor#214), measured
+ * thread in each of the eleven processors that bundle it (windsor#214), measured
  * on V8 rather than read off the source.
  *
  * Method: `__fixtures__/workletAllocation.ts` runs the shipped bundle in a
@@ -22,7 +22,7 @@
  * - The meter costs two heap numbers a quantum, 32 bytes, and nothing more:
  *   each `Date.now()` returns a new one, which no source form avoids (the
  *   research README has V8's graph). Where the render allocates nothing of
- *   its own (every bundle in `CLEAN`, which since windsor#265 is all ten),
+ *   its own (every bundle in `CLEAN`, which since windsor#265 is all of them),
  *   the difference between the two runs is held to that within 8 bytes a
  *   quantum.
  * - No field the sampler writes changes its representation: no
@@ -74,6 +74,7 @@ const BUNDLES = [
   'compressor-processor.js',
   'delay-processor.js',
   'eq-processor.js',
+  'filter-processor.js',
   'output-stage-processor.js',
   'phaser-processor.js',
   'retro-reverb-processor.js',
@@ -92,6 +93,7 @@ const CLEAN = new Set([
   'delay-processor.js', // windsor#249
   'fm-processor.js', // windsor#257
   'tape-processor.js', // windsor#265
+  'filter-processor.js', // windsor#622, clean from the start
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {

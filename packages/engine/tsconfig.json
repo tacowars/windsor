@@ -37,6 +37,7 @@
     "src/worklet/tape/**",
     "src/worklet/delay/**",
     "src/worklet/eq/**",
+    "src/worklet/filter/**",
     "src/**/*.test.ts",
     "src/**/__fixtures__/**",
     "src/worklet/fm/**",

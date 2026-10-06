@@ -9,6 +9,8 @@
   "include": ["src/**/*.test.ts", "src/**/__fixtures__/**/*.ts", "src/**/*.d.ts"],
   // The FM worklet's own project checks its modules and their tests
   // (`src/worklet/fm/tsconfig.json`, #654): pulled in here they would be read
-  // under `noUncheckedIndexedAccess`, which that project turns off.
-  "exclude": ["src/worklet/fm/**"]
+  // under `noUncheckedIndexedAccess`, which that project turns off. The
+  // Filter insert's tests import `fm/` modules directly, so its project
+  // checks them the same way (`src/worklet/filter/tsconfig.json`, windsor#622).
+  "exclude": ["src/worklet/fm/**", "src/worklet/filter/**"]
 }

@@ -8,6 +8,7 @@ import type {
   DriveSpec,
   EchoSpec,
   EnsembleSpec,
+  FilterSpec,
   InsertKindName,
   PlateReverbSpec,
 } from '@windsor/engine';
@@ -20,12 +21,14 @@ import {
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
+  DEFAULT_FILTER,
   DEFAULT_PLATE_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
   ENSEMBLE_BOUNDS,
+  FILTER_BOUNDS,
   REVERB_SPACE_RANGES,
 } from '@windsor/engine';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
@@ -46,6 +49,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   plate: 'Plate reverb',
   echo: 'Echo',
   eq: 'Parametric EQ',
+  filter: 'Filter',
 };
 
 /**
@@ -58,6 +62,7 @@ export const INSERT_GROUPS: readonly {
   readonly kinds: readonly InsertKindName[];
 }[] = [
   { label: 'EQ', kinds: ['eq'] },
+  { label: 'Filter', kinds: ['filter'] },
   { label: 'Drive', kinds: ['drive', 'advanced-drive', 'tape'] },
   { label: 'Dynamics', kinds: ['compressor'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
@@ -157,4 +162,30 @@ export const PLATE_REVERB_KNOBS: readonly InsertKnobEntry<PlateReverbSpec>[] = [
 export const ECHO_KNOBS: readonly InsertKnobEntry<EchoSpec>[] = [
   ...DELAY_LINE_KNOBS.map(({ f, label, o }) => ({ f, label, o: { ...o, def: DEFAULT_ECHO[f] } })),
   { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_ECHO.mix, fmt: fmt2 } },
+];
+
+/** The Filter's knobs (windsor#622): the voice filter's Cutoff and Reso, on its own ranges, then Mix. */
+export const FILTER_INSERT_KNOBS: readonly InsertKnobEntry<FilterSpec>[] = [
+  {
+    f: 'cutoff',
+    label: 'Cutoff',
+    o: {
+      min: FILTER_BOUNDS.cutoff[0],
+      max: FILTER_BOUNDS.cutoff[1],
+      def: DEFAULT_FILTER.cutoff,
+      curve: 'log',
+      fmt: fmtHz,
+    },
+  },
+  {
+    f: 'resonance',
+    label: 'Reso',
+    o: {
+      min: FILTER_BOUNDS.resonance[0],
+      max: FILTER_BOUNDS.resonance[1],
+      def: DEFAULT_FILTER.resonance,
+      fmt: fmt2,
+    },
+  },
+  { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_FILTER.mix, fmt: fmt2 } },
 ];

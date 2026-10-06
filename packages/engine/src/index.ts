@@ -642,6 +642,11 @@ export {
 export type { EqBandType, EqSlope } from './inserts/eqConstants';
 export { eqResponseDb } from './inserts/eqCoefficients';
 export { EQ_INSERT } from './inserts/eqInsert';
+// The Filter insert, the voice's SVF and Acid ladder on a strip (windsor#622).
+export { DEFAULT_FILTER } from './inserts/filterSpec';
+export type { FilterSpec } from './inserts/filterSpec';
+export { FILTER_BOUNDS, FILTER_MODES, FILTER_MODE_VOICE_IDS } from './inserts/filterConstants';
+export type { FilterMode } from './inserts/filterConstants';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeCore, TapeSpec } from './inserts/tapeSpec';
 export {

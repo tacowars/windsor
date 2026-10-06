@@ -16,6 +16,7 @@ import {
   PEAK_METER_WORKLET_URL,
   RETRO_REVERB_WORKLET_URL,
   PHASER_WORKLET_URL,
+  FILTER_WORKLET_URL,
   TAPE_WORKLET_URL,
   ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
@@ -48,6 +49,7 @@ describe('FmEngine.init', () => {
       String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
       String(EQ_WORKLET_URL),
+      String(FILTER_WORKLET_URL),
       String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
@@ -57,7 +59,7 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(11);
+    expect(context.modules).toHaveLength(12);
   });
 
   it('takes override URLs, together or one at a time', async () => {
@@ -73,6 +75,7 @@ describe('FmEngine.init', () => {
       advancedDriveUrl: 'blob:advanced-drive',
       delayUrl: 'blob:delay',
       eqUrl: 'blob:eq',
+      filterUrl: 'blob:filter',
       outputStageUrl: 'blob:output-stage-processor',
     });
     expect(both.modules).toEqual([
@@ -86,6 +89,7 @@ describe('FmEngine.init', () => {
       'blob:advanced-drive',
       'blob:delay',
       'blob:eq',
+      'blob:filter',
       'blob:output-stage-processor',
     ]);
 
@@ -102,6 +106,7 @@ describe('FmEngine.init', () => {
       String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
       String(EQ_WORKLET_URL),
+      String(FILTER_WORKLET_URL),
       String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
