@@ -24,6 +24,7 @@ import {
 } from '../__fixtures__/insertStageRig';
 import { INSERT_AUTOMATION_FIELDS } from '../automation/automationInsertTables';
 import type { AutomationTargetRow } from '../automation/automationLane';
+import { INSERT_SWITCH_FADE_S } from './insertConstants';
 import type { InsertKindName } from './insertRegistry';
 
 const undo = installParamWorklet();
@@ -191,8 +192,9 @@ describe('a shared param follows both lanes at once', () => {
 
 describe("a native kind's switch shares the wet and dry gains with Mix (windsor#628)", () => {
   const SWITCHED = ['drive', 'chorus', 'ensemble', 'echo'] as const;
+  const FADE = INSERT_SWITCH_FADE_S;
 
-  it.each(SWITCHED)('%s: the switch steps off at 1 and on at 2 while Mix ramps across', (kind) => {
+  it.each(SWITCHED)('%s: the switch crosses off at 1 and on at 2 while Mix ramps', (kind) => {
     const spec = openSpec(kind);
     const mixRow = INSERT_AUTOMATION_FIELDS[kind].find((r) => r.target === 'mix')!;
     const mix: Point[] = [0.2, 0.5, 0.8, 0.4].map((share, t) => [t, otherValue(mixRow, -1, share)]);
@@ -214,8 +216,9 @@ describe("a native kind's switch shares the wet and dry gains with Mix (windsor#
       }
     };
     expect(gains.length).toBeGreaterThan(1);
-    for (const t of [0, 0.5, 0.9]) expectAt(t, true);
-    for (const t of [1, 1.5, 1.9]) expectAt(t, false);
-    for (const t of [2, 2.5, 3]) expectAt(t, true);
+    // Each switch holds at its time and has crossed a fade later (windsor#629).
+    for (const t of [0, 0.5, 0.9, 1]) expectAt(t, true);
+    for (const t of [1 + FADE, 1.5, 1.9, 2]) expectAt(t, false);
+    for (const t of [2 + FADE, 2.5, 3]) expectAt(t, true);
   });
 });

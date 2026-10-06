@@ -22,13 +22,16 @@
  *
  * Every kind's `enabled` is a field too (windsor#628): a worklet kind's
  * `paramOf` names its `enabled` param, and a native kind folds it into the
- * gains `set` writes for it, shared with Mix where Mix writes them too.
+ * gains `set` writes for it, shared with Mix where Mix writes them too. A
+ * native kind's switch is a `SwitchTimeline` (windsor#629), so those gains
+ * cross a fade, by lane or by button, instead of stepping.
  */
 import type { AutomationHandle, KnobHandle, KnobTarget } from '../automation/automationHandles';
 import { knobHandle, sameValue } from '../automation/automationHandles';
 import { FieldTimeline } from './fieldTimeline';
-import type { SharedParam } from './sharedParamSchedule';
+import type { LaneTimeline, SharedParam } from './sharedParamSchedule';
 import { SharedSchedule, sharedFieldHandle } from './sharedParamSchedule';
+import { SwitchTimeline } from './switchTimeline';
 
 /** A stage's handles, by field, and the lock `set` reads. */
 export interface FieldHandles {
@@ -61,11 +64,13 @@ export function fieldHandles(
   shared?: SharedParams,
 ): FieldHandles {
   const handles = new Map<string, KnobHandle>();
-  const timelines = new Map<string, FieldTimeline>();
-  const timeline = (field: string): FieldTimeline => {
+  const timelines = new Map<string, LaneTimeline>();
+  const timeline = (field: string): LaneTimeline => {
     let found = timelines.get(field);
     if (!found) {
-      found = new FieldTimeline(target(field)!.resting);
+      const { resting } = target(field)!;
+      // The switch crosses a fade at each change (windsor#629).
+      found = field === SWITCH_FIELD ? new SwitchTimeline(resting) : new FieldTimeline(resting);
       timelines.set(field, found);
     }
     return found;

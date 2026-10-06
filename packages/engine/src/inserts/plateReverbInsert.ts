@@ -7,12 +7,20 @@
  *
  * Mix drives the processor's own `wet` and `dry`, so Mix 1 is the return
  * exactly (wet 1, dry 0) and Mix 0 is its dry path alone. Off closes `send`
- * and `gate` and opens `bypass`: the input passes unchanged, and the plate,
- * hearing silence, goes to sleep (#547). The plate is built by
- * `mixer/returnEffects.ts`, the return's own builder. A switch lane
- * (windsor#628) writes the same three gains.
+ * and `gate` and opens `bypass`: the input passes unchanged. The plate is
+ * built by `mixer/returnEffects.ts`, the return's own builder. A switch lane
+ * (windsor#628) writes the same gains.
+ *
+ * The switch crosses `INSERT_SWITCH_FADE_S` (windsor#629): `gate` and
+ * `bypass` read its fade, so the plate's whole output, its own dry path
+ * included, crossfades with the input. `send` and the plate's `clear` read
+ * whether it is fed: the send opens at the switch on, before the gate opens,
+ * and closes once the gate has shut, and from then `clear` holds the tank
+ * empty, so the old tail is cut and switching on again starts a new one.
+ * A switch on soon after an off waits until `clear` has been up two quanta
+ * past the fade out's end (fix round 1 for PR #635).
  */
-import { REVERB_SPACE_RANGES } from '../audioConstants';
+import { RENDER_QUANTUM_FRAMES, REVERB_SPACE_RANGES } from '../audioConstants';
 import type { PlateMix } from '../mixer/returnEffects';
 import { createPlate, writePlate } from '../mixer/returnEffects';
 import type { ReverbSpace } from '../mixer/reverbSpace';
@@ -23,7 +31,13 @@ import { sameValue } from '../automation/automationHandles';
 import type { FieldHandles } from './insertFieldHandles';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
-import { PLATE_REVERB_MIX_DEFAULT, PLATE_REVERB_SPACE_DEFAULT } from './plateReverbConstants';
+import {
+  PLATE_CLEAR_QUANTA,
+  PLATE_REVERB_MIX_DEFAULT,
+  PLATE_REVERB_SPACE_DEFAULT,
+} from './plateReverbConstants';
+import type { SharedParam } from './sharedParamSchedule';
+import type { SwitchView } from './switchTimeline';
 
 export interface PlateReverbSpec extends Readonly<ReverbSpace> {
   readonly kind: 'plate';
@@ -74,46 +88,83 @@ function normalise(
   };
 }
 
+/** The plate's param that empties its tank (`worklet/reverb/reverbProcessor.ts`). */
+const CLEAR_PARAM = 'clear';
+
 const isSpaceField = (field: string): field is keyof ReverbSpace =>
   (PLATE_SPACE_FIELDS as readonly string[]).includes(field);
 
-/** The switch's three gains: what `set` writes for `enabled`, on (1) or off (0). */
+/** The params the switch moves: what `set` writes for `enabled`. */
 interface PlateSwitch {
   readonly send: AudioParam;
   readonly gate: AudioParam;
   readonly bypass: AudioParam;
+  /** The plate's own: 1 empties the tank and keeps it empty. */
+  readonly clear: AudioParam;
 }
 
-const switchGains = (on: number): [number, number, number] => [on, on, 1 - on];
+/**
+ * The switch's params, each from the switch's fade or from whether the plate
+ * is fed. All four read it settled (fix round 1 for PR #635): `clear` is
+ * k-rate, read at a quantum's start, so a clear raised at the fade out's end
+ * and dropped by a quick switch on could fall between two quanta and leave
+ * the old tank. So `clear` stays up `PLATE_CLEAR_QUANTA` quanta past the
+ * fade out's end, and the send and the gate reopen only as it falls: a
+ * quick switch on waits at most that long.
+ */
+function switched(gains: PlateSwitch, sampleRate: number): SharedParam[] {
+  const settle = (): number => (PLATE_CLEAR_QUANTA * RENDER_QUANTUM_FRAMES) / sampleRate;
+  const by = (
+    param: AudioParam,
+    value: (on: number) => number,
+    switchView: SwitchView = 'fade',
+  ) => ({
+    params: [param],
+    fields: [SWITCH_FIELD],
+    value,
+    switchView,
+    settle,
+  });
+  return [
+    by(gains.gate, (on) => on),
+    by(gains.bypass, (on) => 1 - on),
+    by(gains.send, (open) => open, 'open'),
+    by(gains.clear, (open) => 1 - open, 'open'),
+  ];
+}
 
 /**
  * Each knob's lane (windsor#345): a space field on the plate's param of its
- * name, Mix on the plate's own `wet` and `dry`, the switch on the send, gate
- * and bypass gains (windsor#628). The plate reads `decay` and `wet` once per
- * block, unsmoothed, so a fast lane there steps every 128 samples.
+ * name, Mix on the plate's own `wet` and `dry`, the switch on the send, gate,
+ * bypass and clear (windsor#628, windsor#629). The plate reads `decay` and
+ * `wet` once per block, unsmoothed, so a fast lane there steps every 128
+ * samples.
  */
 function plateHandles(
   plate: AudioWorkletNode,
   gains: PlateSwitch,
   spec: () => PlateReverbSpec,
 ): FieldHandles {
-  return fieldHandles((field): KnobTarget | undefined => {
-    if (field === SWITCH_FIELD) {
-      const params = [gains.send, gains.gate, gains.bypass];
-      return { params, write: switchGains, resting: () => switchOf(spec()) };
-    }
-    const resting = (): number => spec()[field as keyof ReverbSpace | 'mix'];
-    if (field === 'mix') {
-      const params = [plate.parameters.get('wet')!, plate.parameters.get('dry')!];
-      const write = (v: number) => {
-        const mix = plateMix({ ...spec(), mix: v });
-        return [mix.wet, mix.dry];
-      };
-      return { params, write, resting };
-    }
-    const param = isSpaceField(field) ? plate.parameters.get(field) : undefined;
-    return param && { params: [param], write: sameValue, resting };
-  });
+  const now = (): number => plate.context.currentTime;
+  return fieldHandles(
+    (field): KnobTarget | undefined => {
+      if (field === SWITCH_FIELD) {
+        return { params: [], write: () => [], resting: () => switchOf(spec()) };
+      }
+      const resting = (): number => spec()[field as keyof ReverbSpace | 'mix'];
+      if (field === 'mix') {
+        const params = [plate.parameters.get('wet')!, plate.parameters.get('dry')!];
+        const write = (v: number) => {
+          const mix = plateMix({ ...spec(), mix: v });
+          return [mix.wet, mix.dry];
+        };
+        return { params, write, resting };
+      }
+      const param = isSpaceField(field) ? plate.parameters.get(field) : undefined;
+      return param && { params: [param], write: sameValue, resting };
+    },
+    { params: switched(gains, plate.context.sampleRate), now },
+  );
 }
 
 /** The fields of `values` no lane holds. */
@@ -141,17 +192,17 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
   bypass.connect(output);
 
   let current = spec;
+  const clear = plate.parameters.get(CLEAR_PARAM)!;
   const knobs = plateHandles(
     plate,
-    { send: send.gain, gate: gate.gain, bypass: bypass.gain },
+    { send: send.gain, gate: gate.gain, bypass: bypass.gain, clear },
     () => current,
   );
   const set = (next: PlateReverbSpec): void => {
     current = next;
     writePlate(plate, unheld(plateSpace(next), knobs));
     if (!knobs.automated('mix')) writePlate(plate, plateMix(next));
-    if (knobs.automated(SWITCH_FIELD)) return;
-    [send.gain.value, gate.gain.value, bypass.gain.value] = switchGains(switchOf(next));
+    knobs.writeShared();
   };
   set(spec);
 

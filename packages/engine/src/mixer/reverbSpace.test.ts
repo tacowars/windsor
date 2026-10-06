@@ -14,8 +14,12 @@ import { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
 const loaded = loadReverb();
 const byName = new Map(loaded.descriptors.map((d) => [d.name, d]));
 
-/** Parameters the processor owns that are not part of a saved room. */
-const NOT_IN_SPACE = new Set(['hold', 'wet', 'dry']);
+/**
+ * Parameters the processor owns that are not part of a saved room: controls,
+ * among them `clear`, which empties the tank while the Plate insert is
+ * switched off (windsor#629).
+ */
+const NOT_IN_SPACE = new Set(['hold', 'wet', 'dry', 'clear']);
 
 describe('ReverbSpace mirrors the worklet parameters', () => {
   it('names only parameters the processor declares', () => {

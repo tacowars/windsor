@@ -30,7 +30,8 @@
  * toward Width 1 (≈ 2 dB on noise at the defaults, per review).
  *
  * Off is Mix 0, the dry signal; a switch lane (windsor#628) writes the same
- * wet and dry gains, from the switch, Mix and Width together.
+ * wet and dry gains, from the switch, Mix and Width together, and either way
+ * the switch crosses `INSERT_SWITCH_FADE_S` (windsor#629).
  *
  * `set` is param writes only: the line count and the weights are the kind's.
  * `dispose` stops all four oscillators and both rate sources, and disconnects what the stage built,
@@ -153,9 +154,9 @@ function placeLines(lineCount: number, width: number): { gains: number[]; perSid
   return { gains, perSide };
 }
 
-/** The wet and dry gains at `mix`, switched `on` (1) or off (0), the wet over the lines' per-side sum. */
+/** The wet and dry gains at `mix`, the switch's fade `on` (1) to off (0), the wet over the lines' per-side sum. */
 const mixGains = (mix: number, on: number, perSide: number): [number, number] => {
-  const heard = on ? mix : 0;
+  const heard = on * mix;
   return [heard / perSide, 1 - heard];
 };
 

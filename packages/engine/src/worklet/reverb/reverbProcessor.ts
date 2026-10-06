@@ -123,6 +123,7 @@ class DattorroReverb extends AudioWorkletProcessor {
       ['hold',          0,     0,    1],
       ['wet',           1,     0,    1],
       ['dry',           0,     0,    1],
+      ['clear',         0,     0,    1],
     ].map(([name, defaultValue, minValue, maxValue]) => ({
       name, defaultValue, minValue, maxValue, automationRate: 'k-rate',
     }));
@@ -205,12 +206,18 @@ class DattorroReverb extends AudioWorkletProcessor {
    * purpose: folded into it, a plate that spent its first seconds asleep left
    * V8 with a tank loop optimised on thin feedback, measured 30 % slower on
    * loud input afterwards (dev machine, docs/research/2026-09-15-547-*).
+   *
+   * `clear` at 1 (windsor#629) empties the tank at the quantum's start and
+   * keeps it empty: the Plate insert raises it once its switch has faded the
+   * plate out, so switching on again never brings back the old tail. The
+   * empty tank is the sleep's, so the plate sleeps while it is unfed.
    */
   _render(
     inputs: Float32Array[][],
     outputs: Float32Array[][],
     parameters: Record<string, Float32Array>,
   ): boolean {
+    if (parameters.clear[0] >= 0.5 && !this._asleep) this._sleep();
     if (this._asleep && this._renderAsleep(inputs[0] ?? [], outputs[0], parameters)) return true;
     return this._renderBlock(inputs, outputs, parameters);
   }

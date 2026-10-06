@@ -7,9 +7,17 @@
  *
  * The loop is `mixer/returnEffects.ts`'s `attachDelay`, the return's own
  * builder, so Mix 1 (dry 0, wet 1) is the return's line exactly. Off closes
- * `send` and `wet` and opens `dry`: the input passes unchanged and the loop
- * empties. A switch lane (windsor#628) writes the same: `send` on its own,
- * and `wet` and `dry` from the switch and Mix together.
+ * `send` and `wet`, opens `dry` and mutes the loop's feedback: the input
+ * passes unchanged, and the loop, fed nothing and feeding nothing back,
+ * empties within one delay time, so switching on again never brings back
+ * the old repeats (windsor#629). A native delay line cannot be cleared, so
+ * the feedback mute is what cuts the tail. A switch lane (windsor#628)
+ * writes the same gains, and either way each reads the switch's fade over
+ * `INSERT_SWITCH_FADE_S`: `send` alone, `wet` and `dry` with Mix, the
+ * feedback with the Feedback knob. A switch on within a delay time of the
+ * off's end keeps `wet`, `dry` and the feedback where off left them until
+ * the loop has emptied (`echoSwitchSettle.ts`, fix round 1 for PR #635) and
+ * its damp filter has rung out (fix round 2), while `send` opens at once.
  */
 import type { DelayLine, DelayLineSettings } from '../mixer/returnEffects';
 import {
@@ -22,8 +30,10 @@ import {
 import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
+import { loopSettlesIn } from './echoSwitchSettle';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
+import type { FieldReader } from './switchTimeline';
 
 export interface EchoSpec extends DelayLineSettings {
   readonly kind: 'echo';
@@ -59,25 +69,31 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
   };
 }
 
+/** A gain the switch moves, from the knobs beside it and, last, the switch's fade. */
+type SwitchedGain = (...values: number[]) => number;
+
 const isLineField = (field: string): field is keyof DelayLineSettings =>
   (DELAY_LINE_FIELDS as readonly string[]).includes(field);
 
-/** The wet and dry gains at `mix`, with the switch `on` (1) or off (0). */
-const wetGain = (mix: number, on: number): number => (on ? mix : 0);
-const dryGain = (mix: number, on: number): number => (on ? 1 - mix : 1);
+/** The wet and dry gains at `mix`, with the switch's fade `on` (1) to off (0). */
+const wetGain = (mix: number, on: number): number => on * mix;
+const dryGain = (mix: number, on: number): number => 1 - on * mix;
 
-/** What one field's lane writes on its own: a loop field its param, the switch the send. */
-function echoTarget(
-  field: string,
-  line: DelayLine,
-  send: AudioParam,
-  spec: () => EchoSpec,
-): KnobTarget | undefined {
+/** The fields whose lanes, or knobs, say how long the loop takes to empty: the line's, then the damp filter's. */
+const SETTLE_FIELDS = ['delayTime', 'damp', 'resonance'] as const;
+
+/** The loop fields `set` writes directly: all but the feedback, which the switch shares. */
+const OWN_LINE_FIELDS = DELAY_LINE_FIELDS.filter((field) => field !== 'feedback');
+
+/** What one field's lane writes on its own: a loop field its param; the rest only what they share. */
+function echoTarget(field: string, line: DelayLine, spec: () => EchoSpec): KnobTarget | undefined {
   if (field === SWITCH_FIELD) {
-    return { params: [send], write: (v) => [v], resting: () => switchOf(spec()) };
+    return { params: [], write: () => [], resting: () => switchOf(spec()) };
   }
-  // Mix writes only the wet and dry gains, which it shares with the switch.
-  if (field === 'mix') return { params: [], write: () => [], resting: () => spec().mix };
+  // Mix and Feedback write only gains they share with the switch.
+  if (field === 'mix' || field === 'feedback') {
+    return { params: [], write: () => [], resting: () => spec()[field] };
+  }
   if (!isLineField(field)) return undefined;
   const { param, value } = delayLineParam(line, field);
   return { params: [param], write: (v) => [value(v)], resting: () => spec()[field] };
@@ -97,24 +113,44 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
   dry.connect(output);
 
   let current = spec;
-  // Each lane (windsor#345, windsor#628): a loop field on its own param, the
-  // switch on the send, and the wet and dry gains from Mix and the switch both.
-  const mixed = (params: AudioParam[], value: (mix: number, on: number) => number) => ({
+  // Each lane (windsor#345, windsor#628, windsor#629): a loop field on its own
+  // param, and every gain the switch moves from its fade and the knob beside it.
+  const feedback = delayLineParam(line, 'feedback');
+  const switched = (params: AudioParam[], fields: string[], value: SwitchedGain) => ({
     params,
-    fields: ['mix', SWITCH_FIELD],
+    fields: [...fields, SWITCH_FIELD],
     value,
   });
-  const knobs = fieldHandles((field) => echoTarget(field, line, send.gain, () => current), {
-    params: [mixed([wet.gain], wetGain), mixed([dry.gain], dryGain)],
+  // What the loop's output reaches waits, after an off, until the loop is
+  // empty and its damp filter has rung out (`echoSwitchSettle.ts`); Delay
+  // Time, Damp and Resonance, read last, only time that.
+  const settled = (params: AudioParam[], fields: string[], value: SwitchedGain) => ({
+    ...switched(params, fields, value),
+    fields: [...fields, SWITCH_FIELD, ...SETTLE_FIELDS],
+    settle: (offEnd: number, read: readonly FieldReader[]) => {
+      const [delayTime, damp, resonance] = read.slice(-SETTLE_FIELDS.length);
+      return loopSettlesIn(offEnd, {
+        delayTime: delayTime!,
+        damp: damp!,
+        resonance: resonance!,
+        sampleRate: context.sampleRate,
+      });
+    },
+  });
+  const knobs = fieldHandles((field) => echoTarget(field, line, () => current), {
+    params: [
+      settled([wet.gain], ['mix'], wetGain),
+      settled([dry.gain], ['mix'], dryGain),
+      switched([send.gain], [], (on) => on),
+      settled([feedback.param], ['feedback'], (gain, on) => on * feedback.value(gain)),
+    ],
     now: () => context.currentTime,
   });
   const set = (next: EchoSpec): void => {
     current = next;
-    const lane = (field: string): boolean => knobs.automated(field);
     const loop: Partial<Record<keyof DelayLineSettings, number>> = {};
-    for (const field of DELAY_LINE_FIELDS) if (!lane(field)) loop[field] = next[field];
+    for (const field of OWN_LINE_FIELDS) if (!knobs.automated(field)) loop[field] = next[field];
     writeDelay(line, loop);
-    if (!lane(SWITCH_FIELD)) send.gain.value = switchOf(next);
     knobs.writeShared();
   };
   set(spec);

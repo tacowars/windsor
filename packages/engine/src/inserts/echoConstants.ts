@@ -34,3 +34,19 @@ export const ECHO_LINE_DEFAULTS: DelayLineSettings = {
   damp: 3200,
   resonance: DELAY_RESONANCE_DEFAULT_DB,
 };
+
+/**
+ * How far the damp filter's ring must fall before a switch on reopens the
+ * Echo's loop (fix round 2 for PR #635, `echoSwitchSettle.ts`): dB below
+ * what it rang with.
+ */
+export const ECHO_RING_FLOOR_DB = 90;
+
+/**
+ * At most this many steps grow the ring's window over Damp and Resonance's
+ * lanes; past them the wait is the longest ring their bounds allow.
+ */
+export const ECHO_RING_MAX_STEPS = 64;
+
+/** `4` in the damp filter's pole discriminant, `a1² − 4·a2` (`echoSwitchSettle.ts`). */
+export const ECHO_POLE_DISCRIMINANT_FACTOR = 4;

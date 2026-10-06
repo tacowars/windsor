@@ -79,6 +79,14 @@ lanes record is history and is not edited.
    it on fades it back over the same. It is one constant for every insert
    (decision 6). The native-node inserts get it in windsor#629 and the
    worklet inserts in windsor#630.
+
+   The Echo's tail is cut except in one case. Its native `DelayNode` keeps
+   the last `DELAY_MAX_SECONDS` (5 s) of what it was fed and cannot be
+   cleared, so a Delay Time lane that lengthens the delay, by more than the
+   time since the off, within 5 s of a switch off reads audio from before
+   the switch. From 5 s after the off nothing from before it remains to be
+   read. tacowars accepted this as a documented limitation on 2026-10-06
+   (`inserts/echoSwitchSettle.ts`).
 9. **The lane's look (windsor#631).** The lane picker lists `On` with each
    insert's continuous fields, on a part and on a group. The lane is drawn
    at two levels, Off and On, with no ramps and no bend handle, and drawing

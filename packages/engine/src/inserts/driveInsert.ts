@@ -12,7 +12,8 @@
  * loudness. `oversample: '2x'`, because a driven saw aliases audibly without it.
  * Off is `wet` 0 and `dry` 1, so the input passes unchanged; `enabled` is
  * additive and a spec without it loads as on. A switch lane (windsor#628)
- * writes the same two gains.
+ * writes the same two gains, and either way the switch crosses
+ * `INSERT_SWITCH_FADE_S` (windsor#629): the gains read its fade, 0 to 1.
  *
  * The fader is the worklet's `gain`, before every stage, so a strip's Level
  * changes how hard it drives this insert; the Drive knob is the trim that
@@ -90,10 +91,10 @@ interface DriveParams {
 
 /** The shaper's input gain for `drive` dB: the curve spans ±RANGE, scaled into [-1, 1]. */
 const preGain = (drive: number): number => fromDb(drive) / DRIVE_CURVE_RANGE;
-/** The wet and dry gains for the drive, the mix and the switch, on (1) or off (0). */
+/** The wet and dry gains for the drive, the mix and the switch's fade, on (1) to off (0). */
 const wetGain = (drive: number, mix: number, on: number): number =>
-  on ? mix * driveCompensation(drive) : 0;
-const dryGain = (mix: number, on: number): number => (on ? 1 - mix : 1);
+  on * mix * driveCompensation(drive);
+const dryGain = (mix: number, on: number): number => 1 - on * mix;
 
 /**
  * Each knob's lane (windsor#345): Drive moves the shaper's gain, Tone the

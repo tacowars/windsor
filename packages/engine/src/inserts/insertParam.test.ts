@@ -13,7 +13,8 @@
  *
  * The switch (`enabled`, windsor#628) is one of those fields on every kind:
  * its lane `set`s, never ramps, and turning it off writes what `set` writes
- * for a spec switched off.
+ * for a spec switched off, which a native kind reaches across its fade
+ * (windsor#629).
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -31,6 +32,7 @@ import type { AutomationHow } from '../automation/automationHandles';
 import { insertKindFields } from '../automation/automationInsertFields';
 import { INSERT_AUTOMATION_FIELDS } from '../automation/automationInsertTables';
 import type { AutomationTargetRow } from '../automation/automationLane';
+import { INSERT_SWITCH_FADE_S } from './insertConstants';
 import type { InsertSpec } from './insertRegistry';
 import { INSERT_KIND_NAMES } from './insertRegistry';
 
@@ -82,7 +84,13 @@ describe('stage.param, every kind and every catalog field', () => {
     const ramped = touched(lane);
     expect(ramped.length).toBeGreaterThan(0);
     for (const [name, param] of lane.params) {
-      if (ramped.includes(name)) {
+      if (ramped.includes(name) && c.row.scale === 'switch') {
+        // A native kind's switch crosses its fade from 1; a worklet kind's sets at 1.
+        const end = 1 + INSERT_SWITCH_FADE_S;
+        expect(param.valueAt(end), name).toBe(after.get(name));
+        for (const { time } of param.automation)
+          expect(time! >= 1 && time! <= end, name).toBe(true);
+      } else if (ramped.includes(name)) {
         expect(param.automation, name).toEqual([
           { call: CALL[howOf(c.row)], value: after.get(name), time: 1 },
         ]);

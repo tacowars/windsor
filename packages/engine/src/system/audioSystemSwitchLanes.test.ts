@@ -3,9 +3,11 @@
  * record `2026-10-06-insert-switch-lanes` decisions 2–5): a lane on an
  * insert's `enabled` turns a worklet kind (Filter) and a native kind (Plate)
  * off over bar 2 and on again at bar 3, on a part strip and on a group bus,
- * with only `set`s, live and offline alike. While it holds, the spec's switch
- * changes nothing; its release writes the spec's switch back, and removing
- * the insert drops the lane.
+ * live and offline alike: the Filter's switch with only `set`s, the Plate's
+ * gains each held at the switch and ramped across `INSERT_SWITCH_FADE_S`
+ * (windsor#629). While it holds, the spec's switch changes nothing; its
+ * release writes the spec's switch back, and removing the insert drops the
+ * lane.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -24,6 +26,7 @@ import { ENGINE_WORKLETS, installParamWorklet } from '../__fixtures__/insertPara
 import { sources } from '../__fixtures__/stripRig';
 import type { AutomationLane } from '../automation/automationLane';
 import { DEFAULT_FILTER } from '../inserts/filterSpec';
+import { INSERT_SWITCH_FADE_S } from '../inserts/insertConstants';
 import type { InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
 import { renderPass } from '../render/renderPass';
@@ -71,24 +74,40 @@ function switchesOf(stages: readonly InsertStage<InsertSpec>[]): Switches {
 /** Past a tick's time by more than the transport's summed rounding, far less than a tick. */
 const EPSILON = 1e-6;
 
-/** Each switch on (1) or off (0) at `tick`, as a chain's params hold it. */
-const stateAt = (s: Switches, tick: number) => ({
-  filter: s.filter.valueAt(time(tick) + EPSILON),
-  gate: s.gate.valueAt(time(tick) + EPSILON),
-  bypass: s.bypass.valueAt(time(tick) + EPSILON),
-});
+/** Each switch on (1) or off (0) at `tick`, once the Plate's fade from a switch there is over. */
+const stateAt = (s: Switches, tick: number) => {
+  const at = time(tick) + INSERT_SWITCH_FADE_S + EPSILON;
+  return { filter: s.filter.valueAt(at), gate: s.gate.valueAt(at), bypass: s.bypass.valueAt(at) };
+};
 const ON = { filter: 1, gate: 1, bypass: 0 };
 const OFF = { filter: 0, gate: 0, bypass: 1 };
 
-/** Off over bar 2, on either side, and nothing ever ramped. */
+/** The calls of `call` on `param`, by time. */
+const timesOf = (param: FakeParam, call: string): number[] =>
+  param.automation.filter((e) => e.call === call).map((e) => e.time!);
+
+/**
+ * Off over bar 2, on either side. The Filter's switch only steps (its
+ * worklet fades itself); the Plate's gate and bypass hold at each switch and
+ * ramp across the fade (windsor#629), and nowhere else.
+ */
 function expectToggled(s: Switches): void {
   for (const tick of [0, BAR / 2, BAR - 1]) expect(stateAt(s, tick), `tick ${tick}`).toEqual(ON);
   for (const tick of [BAR, BAR + 1, 2 * BAR - 1]) {
     expect(stateAt(s, tick), `tick ${tick}`).toEqual(OFF);
   }
   for (const tick of [2 * BAR, 3 * BAR - 1]) expect(stateAt(s, tick), `tick ${tick}`).toEqual(ON);
-  for (const param of [s.filter, s.gate, s.bypass]) {
-    expect(param.automation.some((e) => e.call === 'linearRampToValueAtTime')).toBe(false);
+  expect(timesOf(s.filter, 'linearRampToValueAtTime')).toEqual([]);
+  const switches = [BAR, 2 * BAR].map(time);
+  for (const param of [s.gate, s.bypass]) {
+    // Two calls a switch: the hold at it (a set, or a ramp to the value held), then the fade.
+    const calls = param.automation;
+    expect(calls).toHaveLength(2 * switches.length);
+    switches.forEach((at, i) => {
+      expect(calls[2 * i]!.time).toBeCloseTo(at, 9);
+      expect(calls[2 * i + 1]!.call).toBe('linearRampToValueAtTime');
+      expect(calls[2 * i + 1]!.time).toBeCloseTo(at + INSERT_SWITCH_FADE_S, 9);
+    });
   }
 }
 
@@ -140,9 +159,16 @@ describe('a switch lane on a part strip', () => {
     const now = r.context.currentTime;
     const lanesOff = LANES.map((l) => ({ ...l, on: false }));
     expect(r.sys.apply({ parts: { [hat]: { automation: lanesOff } } }).ok).toBe(true);
-    for (const param of [s.filter, s.gate, s.bypass]) {
-      expect(param.automation.at(-1)).toMatchObject({ call: 'setValueAtTime', time: now });
-    }
+    expect(s.filter.automation.at(-1)).toMatchObject({ call: 'setValueAtTime', time: now });
+    // The Plate's gains hold where the lane left them and cross the fade (windsor#629).
+    expect(s.gate.automation.slice(-2)).toMatchObject([
+      { call: 'setValueAtTime', value: 1, time: now },
+      { call: 'linearRampToValueAtTime', value: 0, time: now + INSERT_SWITCH_FADE_S },
+    ]);
+    expect(s.bypass.automation.slice(-2)).toMatchObject([
+      { call: 'setValueAtTime', value: 0, time: now },
+      { call: 'linearRampToValueAtTime', value: 1, time: now + INSERT_SWITCH_FADE_S },
+    ]);
     expect([s.filter.value, s.gate.value, s.bypass.value]).toEqual([0, 0, 1]);
   });
 

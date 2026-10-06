@@ -17,7 +17,8 @@
  *
  * `enabled` false is Mix 0 (#695), so a switched-off chain is the dry signal.
  * A switch lane (windsor#628) writes the same wet and dry gains, from the
- * switch and Mix together.
+ * switch and Mix together, and either way the switch crosses
+ * `INSERT_SWITCH_FADE_S` (windsor#629).
  *
  * `set` is param writes only: the voice count is the kind's, so no setting
  * re-wires. `dispose` stops every oscillator — a running source keeps its
@@ -127,9 +128,9 @@ const voiceRate = (rate: number, i: number): number => rate * (CHORUS_VOICE_RATI
 const swingOf = (depth: number): number => depth / MS_PER_SECOND;
 /** The right side's LFO gain: `1 − 2·spread` of the left's. */
 const rightSwing = (depth: number, spread: number): number => swingOf(depth) * (1 - 2 * spread);
-/** The voices sum into the merger, so each carries its share of the wet level. */
+/** The voices sum into the merger, so each carries its share of the wet level; `on` is the switch's fade. */
 const mixGains = (mix: number, on: number, voices: number): [number, number] => {
-  const heard = on ? mix : 0;
+  const heard = on * mix;
   return [heard / voices, 1 - heard];
 };
 
