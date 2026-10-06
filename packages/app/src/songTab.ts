@@ -406,8 +406,9 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     automationSnap: DEFAULT_SNAP_TICKS,
     shape: DEFAULT_SHAPE_SETTINGS,
   };
-  // A removed group's folds go with it on the change itself, shown or not (windsor#616).
-  followGroupFolds(ctx.model, [state.closedGroups, state.openGroups]);
+  // A removed group's or part's folds go with it on the change itself, shown or not
+  // (windsor#616, windsor#620).
+  followGroupFolds(ctx.model, [state.closedGroups, state.openGroups], [state.openParts]);
   // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
   // The Shape tool of the current render (windsor#350): a render closes the last one's popover.

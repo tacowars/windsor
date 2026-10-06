@@ -9,6 +9,7 @@ import type { ChannelStrip } from '@windsor/engine';
 import {
   type FolderDoc,
   type SongRow,
+  refreshFolds,
   refreshGroupFolds,
   lanesOpen,
   memberCountLabel,
@@ -165,6 +166,20 @@ describe('the header’s count and the fold’s memory', () => {
     const closed = new Set([0, 2]);
     refreshGroupFolds(closed, [{ id: 0 }, { id: 2 }], true);
     expect([...closed]).toEqual([]);
+  });
+});
+
+describe('the part lane folds (windsor#620)', () => {
+  it('forgets a removed part’s slot, so a new part there starts folded', () => {
+    const open = new Set([0, 2]);
+    refreshFolds(open, [0, 1], false);
+    expect([...open]).toEqual([0]);
+  });
+
+  it('forgets every part when another song opens, even one at a kept slot', () => {
+    const open = new Set([0, 2]);
+    refreshFolds(open, [0, 1, 2], true);
+    expect([...open]).toEqual([]);
   });
 });
 

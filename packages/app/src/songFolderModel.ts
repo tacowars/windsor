@@ -108,47 +108,67 @@ export function memberCountLabel(count: number): string {
 
 /**
  * Bring a fold set up to the document after a change. A different song
- * (`reopened`, `DocumentModel.open`) clears it wholesale, since its group
- * ids name unrelated groups; any other change drops only the ids the song
- * no longer has, so a new group reusing one starts at the default: members
- * shown (`closedGroups`), lanes folded (`openGroups`, windsor#616).
+ * (`reopened`, `DocumentModel.open`) clears it wholesale, since its ids
+ * name unrelated groups or parts; any other change drops only the ids the
+ * song no longer has (`live`), so a new group or part reusing one starts at
+ * the default.
+ */
+export function refreshFolds(folds: Set<number>, live: Iterable<number>, reopened: boolean): void {
+  if (reopened) {
+    folds.clear();
+    return;
+  }
+  const ids = new Set(live);
+  for (const id of [...folds]) if (!ids.has(id)) folds.delete(id);
+}
+
+/**
+ * `refreshFolds` over the song's group ids: a new group reusing a removed
+ * one's id starts with its members shown (`closedGroups`) and its lanes
+ * folded (`openGroups`, windsor#616).
  */
 export function refreshGroupFolds(
   folds: Set<number>,
   groups: readonly { id: number }[],
   reopened: boolean,
 ): void {
-  if (reopened) {
-    folds.clear();
-    return;
-  }
-  const ids = new Set(groups.map((group) => group.id));
-  for (const id of [...folds]) if (!ids.has(id)) folds.delete(id);
+  refreshFolds(
+    folds,
+    groups.map((group) => group.id),
+    reopened,
+  );
 }
 
 /** What `followGroupFolds` watches: the document, its change feed and its open count (`DocumentModel`). */
 export interface GroupFoldSource {
-  readonly doc: { readonly groups?: readonly { readonly id: number }[] };
+  readonly doc: {
+    readonly parts: readonly { readonly slot: number }[];
+    readonly groups?: readonly { readonly id: number }[];
+  };
   readonly openings: number;
   onChange(listener: () => void): () => void;
 }
 
 /**
  * Follow the folds on the document change itself, not on the Song tab's
- * next repaint: only the shown tab draws, and a group added while the tab
- * is hidden may reuse the id (`nextGroupId`), so a repaint after both would
- * hand it the old group's folds. Opening another song resets them all.
- * Returns the unsubscribe.
+ * next repaint: only the shown tab draws, and a group or part added while
+ * the tab is hidden may reuse the id or slot (`nextGroupId`, the lowest
+ * free slot), so a repaint after both would hand it the old one's folds.
+ * `folds` are by group id, `partFolds` by slot (`openParts`, windsor#620).
+ * Opening another song resets them all. Returns the unsubscribe.
  */
 export function followGroupFolds(
   source: GroupFoldSource,
   folds: readonly Set<number>[],
+  partFolds: readonly Set<number>[] = [],
 ): () => void {
   let openings = source.openings;
   return source.onChange(() => {
     const reopened = source.openings !== openings;
     openings = source.openings;
     for (const set of folds) refreshGroupFolds(set, source.doc.groups ?? [], reopened);
+    const slots = source.doc.parts.map((part) => part.slot);
+    for (const set of partFolds) refreshFolds(set, slots, reopened);
   });
 }
 
