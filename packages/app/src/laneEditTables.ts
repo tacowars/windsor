@@ -37,6 +37,8 @@ export interface LaneCursorTable {
   /** Over a part region's body, and while moving it. */
   readonly grab: string;
   readonly grabbing: string;
+  /** While copying a part region's body with Cmd/Ctrl held. */
+  readonly copy: string;
   /** Over an empty stretch of a part lane: a press draws a region. */
   readonly draw: string;
 }
@@ -47,5 +49,6 @@ export const LANE_CURSORS: LaneCursorTable = {
   pick: 'pointer',
   grab: 'grab',
   grabbing: 'grabbing',
+  copy: 'copy',
   draw: 'crosshair',
 };

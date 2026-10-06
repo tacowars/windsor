@@ -80,8 +80,9 @@ export function partRow(view: SongView, part: DocumentPart, strip: HTMLElement):
 export function partLane(view: SongView, part: DocumentPart): HTMLElement {
   const lane = el('div', `lane${partSelected(view, part) ? ' selected' : ''}`);
   lane.title =
-    'drag an edge to resize, a seam to move both regions, the body to move · ' +
-    'drag an empty stretch to draw, click it for a bar · shift snaps to the step · alt-click splits';
+    'drag an edge to resize, a seam to move both regions, the body to move (cmd/ctrl-drag copies) · ' +
+    'drag an empty stretch to draw, click it for a bar · shift snaps to the step · alt-click splits · ' +
+    'cmd/ctrl+C, X, V copy, cut and paste at the playhead · cmd/ctrl+D duplicates · delete removes';
   paintRegions(view, lane, part, part.regions);
   paintLaneMarks(view, lane, part.slot, part.regions, { active: null, readout: null });
   wirePartLane(view, lane, part.slot);

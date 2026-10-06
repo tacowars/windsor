@@ -6,20 +6,28 @@
  * a body and `crosshair` on an empty stretch (`laneEditModel.ts`'s shared
  * hit test and cursors). A drag previews on the lane with its readout and
  * commits once on release, as one `ctx.change`: an edge trims its region
- * up to its neighbour, a seam rolls both regions, the body moves, and a drag
+ * up to its neighbour, a seam rolls both regions, the body moves past its
+ * neighbours over what it lands on (Cmd/Ctrl copies it), and a drag
  * across an empty stretch draws a region that copies its neighbour's pattern
  * (`drawStrokeChange`). A click on a gap adds a bar, on a block or a seam
  * selects the region under the pointer, and Alt-click splits. Shift snaps
  * to the region's own step (or the beat). A cancel puts the regions back.
  */
-import type { MusicPart, PartRegion, Region } from '@windsor/engine';
+import type { MusicPart, PartRegion } from '@windsor/engine';
 import type { LaneHit } from './laneEditModel';
 import { laneCursor, laneHitAt } from './laneEditModel';
+import { LANE_CURSORS } from './laneEditTables';
 import { drawRegionChange, drawStrokeChange, splitPartRegion } from './partEdits';
 import type { LaneMarks } from './partLaneBlocks';
 import { laneScaleOf, paintLaneMarks, paintRegions } from './partLaneBlocks';
 import type { LanePress, LaneScale } from './partLaneModel';
-import { partLaneGeometry, pressedRegion, regionDraft, spanAt } from './partLaneModel';
+import {
+  draftChanges,
+  partLaneGeometry,
+  pressedRegion,
+  regionDraft,
+  spanAt,
+} from './partLaneModel';
 import { pointerDrag } from './pointerDrag';
 import { fitEmptyRolls } from './rollRegionFit';
 import type { SongView } from './songTab';
@@ -92,16 +100,23 @@ function wireHover(
   });
 }
 
-/** One press's drag: its draft regions and the region a draw added, while it moves. */
+/**
+ * One press's drag, while it moves: its draft regions, the region it holds
+ * in them (drawn, trimmed or moved; null for a seam roll), and whether a
+ * move already fitted its empty rolls (`placeRegion`), since a move past a
+ * neighbour reorders the list `fitEmptyRolls` pairs by index.
+ */
 interface Draft {
   readonly regions: PartRegion[];
-  readonly drawn: number | null;
+  readonly index: number | null;
+  readonly moved: boolean;
 }
 
-/** Where a drag's pointer is, in ticks, and whether Shift asks for the finer grain. */
+/** Where a drag's pointer is, in ticks; whether Shift asks for the finer grain, and Cmd/Ctrl for a copy. */
 interface DragPointer {
   readonly tick: number;
   readonly fine: boolean;
+  readonly copy: boolean;
 }
 
 /** The draft the press makes at the pointer, painted on the lane with its marks; null when it makes none. */
@@ -125,17 +140,18 @@ function preview(
       active: null,
       readout: spanAt(region, 'body', meter),
     });
-    return { regions: drawn.regions, drawn: drawn.index };
+    return { regions: drawn.regions, index: drawn.index, moved: false };
   }
   const scale = { fine: pointer.fine, bar: view.ticksPerBar(), songTicks: view.songTicks(), meter };
-  const draft = regionDraft(part, press, pointer.tick, scale);
+  const draft = regionDraft(part, press, pointer.tick, scale, pointer.copy);
   if (!draft) return null;
-  paintRegions(view, lane, part, draft.regions);
+  const moved = press.hit.kind === 'body';
+  paintRegions(view, lane, part, draft.regions, moved && pointer.copy ? draft.index : null);
   paintLaneMarks(view, lane, part.slot, draft.regions, {
-    active: press.hit,
+    active: moved ? null : press.hit,
     readout: draft.readout,
   });
-  return { regions: draft.regions, drawn: null };
+  return { regions: draft.regions, index: draft.index, moved };
 }
 
 /** A press without a drag: a gap adds a bar there, a block or a seam selects the region under the pointer. */
@@ -153,11 +169,6 @@ function click(view: SongView, part: MusicPart, press: LanePress): void {
   }
 }
 
-/** Whether a draft differs from the regions it was made from: another count, or a region moved or resized. */
-const changes = (draft: readonly Region[], regions: readonly Region[]): boolean =>
-  draft.length !== regions.length ||
-  draft.some((r, i) => r.start !== regions[i]?.start || r.duration !== regions[i]?.duration);
-
 /** Select the region an edge or body press grabbed; a seam or a gap leaves the selection. */
 function selectGrabbed(view: SongView, slot: number, hit: LaneHit): void {
   if (hit.kind === 'start' || hit.kind === 'end' || hit.kind === 'body') {
@@ -167,19 +178,18 @@ function selectGrabbed(view: SongView, slot: number, hit: LaneHit): void {
 
 /**
  * A drag's release: one commit when the regions changed, else the lane
- * back as it was; then the drawn region selected, or the trimmed or moved
- * one. A seam roll keeps the selection.
+ * back as it was; then the region the drag holds selected — drawn,
+ * trimmed, moved or copied. A seam roll keeps the selection.
  */
 function release(view: SongView, part: MusicPart, press: LanePress, draft: Draft | null): void {
   const { slot } = part;
-  if (!draft || !changes(draft.regions, part.regions)) {
+  if (!draft || !draftChanges(draft.regions, part.regions)) {
     view.paintLanes();
     return selectGrabbed(view, slot, press.hit);
   }
-  const regions = fitEmptyRolls(draft.regions, part.regions);
+  const regions = draft.moved ? draft.regions : fitEmptyRolls(draft.regions, part.regions);
   if (!view.commit({ parts: { [slot]: { regions } } })) return;
-  if (draft.drawn !== null) return view.select({ kind: 'part', slot, region: draft.drawn });
-  selectGrabbed(view, slot, press.hit);
+  if (draft.index !== null) view.select({ kind: 'part', slot, region: draft.index });
 }
 
 /** Alt-click on the lane: split the region under the pointer (`splitAt`) and select its right half. */
@@ -229,10 +239,13 @@ export function wirePartLane(view: SongView, lane: HTMLElement, slot: number): v
     },
     move: (e) => {
       if (!press) return;
-      const cursor = laneCursor('part', press.at.hit, true);
+      const copy = e.ctrlKey || e.metaKey;
+      const copying = copy && press.at.hit.kind === 'body';
+      const cursor = copying ? LANE_CURSORS.copy : laneCursor('part', press.at.hit, true);
       root.style.cursor = cursor;
       lane.style.cursor = cursor;
-      draft = preview(view, lane, press.part, press.at, { tick: at.tick(e), fine: e.shiftKey });
+      const pointer = { tick: at.tick(e), fine: e.shiftKey, copy };
+      draft = preview(view, lane, press.part, press.at, pointer);
       if (!draft) {
         paintRegions(view, lane, press.part, press.part.regions);
         paintLaneMarks(view, lane, slot, press.part.regions, {

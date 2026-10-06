@@ -50,7 +50,9 @@ import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { bodyGroups, harmonyGroup, headGroup, sizeLaneColumn } from './songLaneColumn';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
+import type { RegionClip } from './regionClipboard';
 import { refreshMixerCells } from './songMixerCell';
+import { wireRegionKeys } from './songRegionKeys';
 import type { OpenLanes } from './songFolderModel';
 import { followGroupFolds, lanesOpen, songRows, visibleRows } from './songFolderModel';
 import type { Readout } from './songAutomationLane';
@@ -140,6 +142,8 @@ export interface SongViewState {
   automationSnap: number;
   /** The Shape tool's last shape, rate, phase and duty (windsor#350 decision 4). Kept for the session. */
   shape: ShapeSettings;
+  /** The region Copy or Cut last took (`regionClipboard.ts`), for Paste. Kept for the session. */
+  clipboard: RegionClip | null;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -219,7 +223,7 @@ function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
 }
 
 // eslint-disable-next-line max-lines-per-function -- the view's one composition: the lanes, the pane, the watch and the SongView the lanes call back into read as one sequence
-function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): ShapeTool {
+function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): SongView {
   body.innerHTML = '';
   // The shared part selection, picked or reset since this view last looked (windsor#462 decisions 3, 4 and 6).
   const pick = { slot: ctx.parts.selected, picks: ctx.parts.picks };
@@ -384,7 +388,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
       zoom.refit();
     },
   });
-  return shape;
+  return view;
 }
 
 /** The tab's renderer, keeping its selection across renders — what `main.ts` registers as Song. */
@@ -405,18 +409,22 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     automationTool: DEFAULT_AUTOMATION_TOOL,
     automationSnap: DEFAULT_SNAP_TICKS,
     shape: DEFAULT_SHAPE_SETTINGS,
+    clipboard: null,
   };
   // A removed group's or part's folds go with it on the change itself, shown or not
   // (windsor#616, windsor#620).
   followGroupFolds(ctx.model, [state.closedGroups, state.openGroups], [state.openParts]);
   // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
-  // The Shape tool of the current render (windsor#350): a render closes the last one's popover.
-  let shape: ShapeTool | null = null;
+  // The view of the current render: its Shape tool (windsor#350), which a render closes, and the region keys' target.
+  let view: SongView | null = null;
   return (body) => {
-    if (keyed !== body) wireToolKeys(body, state, () => shape?.toolChanged());
+    if (keyed !== body) {
+      wireToolKeys(body, state, () => view?.shape.toolChanged());
+      wireRegionKeys(body, () => view);
+    }
     keyed = body;
-    shape?.close();
-    shape = renderSongView(body, ctx, state);
+    view?.shape.close();
+    view = renderSongView(body, ctx, state);
   };
 }

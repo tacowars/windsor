@@ -222,9 +222,13 @@ detail pane at the bottom. Its layers, top down:
    over `partLaneModel.ts` and `regionModel.ts`, with the harmony lane's
    shared hit test, cursors and readout: click a gap to add a bar, drag
    across it to draw, drag an edge to trim up to the neighbour, a seam
-   where two regions touch to roll both, the body to move, alt-click to
-   split, Shift for the modifier snap (the region's `divisor`, else the
-   beat). A drag previews on the lane with its readout and commits once on
+   where two regions touch to roll both, the body to move anywhere in the
+   song over what it lands on (Cmd/Ctrl-drag copies; `regionPlacement.ts`),
+   alt-click to split, Shift for the modifier snap (the region's `divisor`,
+   else the beat). Cmd/Ctrl+C, X, V and D copy, cut, paste at the
+   playhead's bar and duplicate the selected region, and Delete removes it
+   (`regionKeys.ts` → `regionClipboard.ts`, wired by `songRegionKeys.ts`;
+   record `2026-10-06-song-region-move-copy-paste`). A drag previews on the lane with its readout and commits once on
    release. `pointerDrag.ts` is the shared press-or-drag helper (capture,
    threshold), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")

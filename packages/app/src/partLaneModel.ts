@@ -6,7 +6,8 @@
  * where, and which edge handles light. A seam is where one region's end is
  * the next one's start; dragging it rolls both (`rollRegionSeam`). An edge
  * or a body drags by the pointer's travel from the press (`dragRegion`), so
- * the grab offset holds. A press in a gap draws (`partEdits.ts`'s
+ * the grab offset holds; a body drag carries its region past its
+ * neighbours (`moveRegionOver`). A press in a gap draws (`partEdits.ts`'s
  * `drawStrokeChange`). `partLaneGestures.ts` drives it.
  */
 import type { Meter, MusicPart, PartRegion, Region } from '@windsor/engine';
@@ -16,6 +17,7 @@ import type { HandleLight } from './laneEditMarks';
 import { regionGrain } from './partEdits';
 import type { RegionDrag, SeamGrains } from './regionModel';
 import { dragRegion, regionAt, rollRegionSeam } from './regionModel';
+import { moveRegionOver } from './regionPlacement';
 import { blockBox, tickToPx } from './songViewTables';
 
 const endOf = (region: Region): number => region.start + region.duration;
@@ -60,10 +62,15 @@ export interface Readout {
   readonly text: string;
 }
 
-/** A drag's preview: the part's regions as they would commit, and the readout. */
+/**
+ * A drag's preview: the part's regions as they would commit, the readout,
+ * and the index the dragged region holds in them (a move can carry it past
+ * its neighbours); null for a seam roll, which keeps the selection.
+ */
 export interface RegionDraft {
   readonly regions: PartRegion[];
   readonly readout: Readout;
+  readonly index: number | null;
 }
 
 /** How a drag snaps and reads: Shift's finer grain, the song's bar, its length and its meter. */
@@ -101,10 +108,9 @@ export function seamGrains(
   return { grain: finer(fine), step: finer(true) };
 }
 
-const HIT_DRAG: Readonly<Record<ReadoutAnchor, RegionDrag>> = {
+const HIT_DRAG: Readonly<Record<'start' | 'end', RegionDrag>> = {
   start: 'resizeStart',
   end: 'resizeEnd',
-  body: 'move',
 };
 
 /** A seam drag's draft: the boundary moved by the pointer's travel, rolled, and the two lengths read. */
@@ -124,32 +130,79 @@ function seamDraft(
   return {
     regions,
     readout: { tick: r.start, text: seamReadout(r.start, l.duration, r.duration, scale.meter) },
+    index: null,
   };
 }
 
 /**
+ * A body drag's draft (record `2026-10-06-song-region-move-copy-paste`):
+ * the region moved by the pointer's travel, or with `copy` a copy of it,
+ * anywhere in the song and past any neighbour, over what it lands on
+ * (`moveRegionOver`).
+ */
+function moveDraft(
+  part: Pick<MusicPart, 'regions' | 'sequencer'>,
+  index: number,
+  travel: { from: number; to: number; copy: boolean },
+  scale: DraftScale,
+): RegionDraft | null {
+  const region = part.regions[index];
+  if (!region) return null;
+  const grain = regionGrain(part, index, scale.fine, scale.bar);
+  const placed = moveRegionOver(part.regions, index, region.start + travel.to - travel.from, {
+    songTicks: scale.songTicks,
+    grain,
+    copy: travel.copy,
+  });
+  const moved = placed?.regions[placed.index];
+  if (!placed || !moved) return null;
+  return { ...placed, readout: spanAt(moved, 'body', scale.meter) };
+}
+
+/**
  * What a drag from `press` to `pointerTick` makes of `part`'s regions, and
- * its readout: a seam rolls its two regions, an edge trims its region and a
- * body moves it, each by the pointer's travel and snapped. Null for a press
- * in a gap (a draw) or on a region that is gone.
+ * its readout: a seam rolls its two regions, an edge trims its region up to
+ * its neighbour and a body moves it (or with `copy`, Cmd/Ctrl held, copies
+ * it) past its neighbours, each by the pointer's travel and snapped. Null
+ * for a press in a gap (a draw) or on a region that is gone.
  */
 export function regionDraft(
   part: Pick<MusicPart, 'regions' | 'sequencer'>,
   press: LanePress,
   pointerTick: number,
   scale: DraftScale,
+  copy = false,
 ): RegionDraft | null {
   const { hit } = press;
   if (hit.kind === 'gap') return null;
-  if (hit.kind === 'seam') {
-    return seamDraft(part, hit.index, { from: press.tick, to: pointerTick }, scale);
-  }
+  const travel = { from: press.tick, to: pointerTick };
+  if (hit.kind === 'seam') return seamDraft(part, hit.index, travel, scale);
+  if (hit.kind === 'body') return moveDraft(part, hit.index, { ...travel, copy }, scale);
   const grain = regionGrain(part, hit.index, scale.fine, scale.bar);
   const drag = { kind: HIT_DRAG[hit.kind], index: hit.index, deltaTicks: pointerTick - press.tick };
   const regions = dragRegion(part.regions, drag, scale.songTicks, grain);
   const region = regions[hit.index];
-  return region ? { regions, readout: spanAt(region, hit.kind, scale.meter) } : null;
+  return region
+    ? { regions, readout: spanAt(region, hit.kind, scale.meter), index: hit.index }
+    : null;
 }
+
+/**
+ * Whether a draft differs from the regions it was made from: another
+ * count, a region moved or resized, or one holding another pattern — a
+ * copy-drag onto a region of the same span changes only what it plays.
+ * Every other edit keeps a region's pattern object, so an unchanged lane
+ * compares equal.
+ */
+export const draftChanges = (
+  draft: readonly PartRegion[],
+  regions: readonly PartRegion[],
+): boolean =>
+  draft.length !== regions.length ||
+  draft.some((r, i) => {
+    const was = regions[i];
+    return r.start !== was?.start || r.duration !== was.duration || r.pattern !== was.pattern;
+  });
 
 /** The region a press lands on: the block it hit, or on a seam the region holding its tick; -1 in a gap. */
 export function pressedRegion(regions: readonly Region[], press: LanePress): number {

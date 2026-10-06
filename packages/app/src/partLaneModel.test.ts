@@ -9,10 +9,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MusicPart, PartRegion, Region, RegionPattern } from '@windsor/engine';
-import { DEFAULT_GRID_CONFIG, PPQ, TICKS_PER_BAR } from '@windsor/engine';
+import { DEFAULT_CHORD_CONFIG, DEFAULT_GRID_CONFIG, PPQ, TICKS_PER_BAR } from '@windsor/engine';
 import { laneHitAt } from './laneEditModel';
 import type { LaneScale } from './partLaneModel';
 import {
+  draftChanges,
   handleLights,
   partLaneGeometry,
   pressedRegion,
@@ -107,6 +108,54 @@ describe('a drag from a press', () => {
     const draft = regionDraft(part(BASS), press, 13 * BAR + PPQ, DRAG);
     expect(draft?.regions[2]).toEqual(region(11 * BAR, 4 * BAR));
     expect(draft?.readout).toEqual({ tick: 13 * BAR, text: '12.1 → 16.1 · 4 bars' });
+  });
+
+  it('moves a body past its neighbour, over what it lands on, and says where the region went', () => {
+    // A/B rotation: bars 1–4 dragged past bars 5–8 to bar 7 trims B's tail; to bar 9, C's head.
+    const press = { hit: { kind: 'body', index: 0 } as const, tick: 2 * BAR };
+    const past = regionDraft(part(BASS), press, 2 * BAR + 6 * BAR, DRAG);
+    expect(past?.regions).toEqual([region(4 * BAR, 2 * BAR), region(6 * BAR, 4 * BAR), BASS[2]]);
+    const into = regionDraft(part(BASS), press, 2 * BAR + 8 * BAR, DRAG);
+    expect(into?.regions).toEqual([
+      region(4 * BAR, 4 * BAR),
+      region(8 * BAR, 4 * BAR),
+      region(12 * BAR, 2 * BAR),
+    ]);
+    expect(into?.index).toBe(1);
+    expect(into?.readout).toEqual({ tick: 10 * BAR, text: '9.1 → 13.1 · 4 bars' });
+  });
+
+  it('copies a body with the modifier, leaving the original where it was', () => {
+    const press = { hit: { kind: 'body', index: 0 } as const, tick: 2 * BAR };
+    const copied = regionDraft(part(BASS), press, 2 * BAR + 12 * BAR, DRAG, true);
+    expect(copied?.regions).toEqual([
+      ...BASS.slice(0, 2),
+      region(10 * BAR, 2 * BAR),
+      region(12 * BAR, 4 * BAR),
+    ]);
+    expect(copied?.index).toBe(3);
+  });
+
+  it('counts a copy-drag onto a region of the same span as a change, a still drop as none', () => {
+    const chord = (octave: number): RegionPattern => ({
+      ...DEFAULT_CHORD_CONFIG,
+      kind: 'chord',
+      register: { octave },
+    });
+    const lane: PartRegion[] = [
+      { ...region(0, BAR), pattern: chord(2) },
+      { ...region(BAR, BAR), pattern: chord(5) },
+    ];
+    const press = { hit: { kind: 'body', index: 0 } as const, tick: BAR / 2 };
+    const copied = regionDraft(part(lane), press, BAR / 2 + BAR, DRAG, true);
+    expect(copied?.regions.map((r) => [r.start, r.duration])).toEqual([
+      [0, BAR],
+      [BAR, BAR],
+    ]);
+    expect(copied?.regions[1]?.pattern).toEqual(chord(2));
+    expect(copied && draftChanges(copied.regions, lane)).toBe(true);
+    const still = regionDraft(part(lane), press, BAR / 2, DRAG, true);
+    expect(still && draftChanges(still.regions, lane)).toBe(false);
   });
 
   it('makes no draft from a gap, which draws instead', () => {
