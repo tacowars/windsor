@@ -164,7 +164,7 @@ export const ECHO_KNOBS: readonly InsertKnobEntry<EchoSpec>[] = [
   { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_ECHO.mix, fmt: fmt2 } },
 ];
 
-/** The Filter's knobs (windsor#622): the voice filter's Cutoff and Reso, on its own ranges, then Mix. */
+/** The Filter's knobs (windsor#622): the voice filter's Cutoff and Reso, on its own ranges and log sweeps (windsor#626), then Mix. */
 export const FILTER_INSERT_KNOBS: readonly InsertKnobEntry<FilterSpec>[] = [
   {
     f: 'cutoff',
@@ -184,6 +184,7 @@ export const FILTER_INSERT_KNOBS: readonly InsertKnobEntry<FilterSpec>[] = [
       min: FILTER_BOUNDS.resonance[0],
       max: FILTER_BOUNDS.resonance[1],
       def: DEFAULT_FILTER.resonance,
+      curve: 'log',
       fmt: fmt2,
     },
   },

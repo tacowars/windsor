@@ -54,14 +54,25 @@ const snapshotToPatchFormatFour = (doc: RawDocument): RawDocument =>
   snapshotPatchStep(doc, SNAPSHOT_PATCH_FORMAT.versionSix);
 
 /**
- * Two upgrades ship, 5 → 6 and 6 → 7. Version 2 was retired by #705,
- * version 3 by windsor#238 (record `2026-10-01-retire-song-version-3`) and
- * version 4 by windsor#224, each with no upgrade, so a song saved at any of
- * them is refused.
+ * Version 7 → 8 (windsor#626): a Filter insert's Reso row moved from a
+ * linear to a log scale, so a saved Reso lane plays along the log curve
+ * between its points. No lane is rewritten: the Filter insert shipped the
+ * same day (windsor#622), and a Reso lane saved at version 7 plays along the
+ * log curve from version 8. A version-7 snapshot already holds the current
+ * patch format, so `patches` is not touched.
+ */
+const filterResoOnLogScale = (doc: RawDocument): RawDocument => doc;
+
+/**
+ * Three upgrades ship, 5 → 6, 6 → 7 and 7 → 8. Version 2 was retired by
+ * #705, version 3 by windsor#238 (record `2026-10-01-retire-song-version-3`)
+ * and version 4 by windsor#224, each with no upgrade, so a song saved at any
+ * of them is refused.
  */
 export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   5: snapshotToPatchFormatThree,
   6: snapshotToPatchFormatFour,
+  7: filterResoOnLogScale,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

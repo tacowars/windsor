@@ -49,14 +49,14 @@ function expectTraced(param: (field: string) => FakeParam): void {
 }
 
 describe('Filter lanes', () => {
-  it('has rows for the sweep alone: Cutoff on a log scale in Hz, Reso and Mix', () => {
+  it('has rows for the sweep alone: Cutoff in Hz and Reso on a log scale, and Mix', () => {
     expect(insertTargetRow('filter', 'cutoff')).toMatchObject({
       min: 30,
       max: 18000,
       scale: 'log',
       unit: 'Hz',
     });
-    expect(insertTargetRow('filter', 'resonance')).toMatchObject({ scale: 'linear' });
+    expect(insertTargetRow('filter', 'resonance')).toMatchObject({ scale: 'log' });
     expect(insertTargetRow('filter', 'mix')).toMatchObject({ min: 0, max: 1, scale: 'linear' });
     for (const field of ['mode', 'slope24', 'enabled'])
       expect(insertTargetRow('filter', field), field).toBeUndefined();

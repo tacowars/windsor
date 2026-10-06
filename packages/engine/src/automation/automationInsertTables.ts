@@ -315,7 +315,7 @@ const EQ_ROWS: InsertFieldRow<EqSpec>[] = [
 /** The Filter's sweep (windsor#622); its mode, slope and switch are not targets. */
 const FILTER_ROWS = [
   row('cutoff', 'Cutoff', FILTER_BOUNDS.cutoff, 'log', 'Hz'),
-  row('resonance', 'Resonance', FILTER_BOUNDS.resonance),
+  row('resonance', 'Resonance', FILTER_BOUNDS.resonance, 'log'),
   row('mix', 'Mix', FILTER_BOUNDS.mix),
 ];
 

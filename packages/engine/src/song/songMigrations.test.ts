@@ -2,10 +2,12 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. Two upgrades ship, 5 → 6
+ * patch of an unreadable format is refused whole. Three upgrades ship, 5 → 6
  * (windsor#300: the snapshot's patches to patch format 3, pinned by
- * `songDriveUpgrade.test.ts`) and 6 → 7 (windsor#590: to patch format 4,
- * the operators' `noiseLp` and `noiseHp` renamed); versions 2 (#705), 3 (record
+ * `songDriveUpgrade.test.ts`), 6 → 7 (windsor#590: to patch format 4,
+ * the operators' `noiseLp` and `noiseHp` renamed) and 7 → 8 (windsor#626:
+ * the Filter's Reso lane on a log scale, an identity step pinned by
+ * `songFilterResoUpgrade.test.ts`); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused.
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
@@ -46,8 +48,8 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 describe('upgradeSong', () => {
-  it('ships two upgrades, 5 → 6 and 6 → 7: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6']);
+  it('ships three upgrades, 5 → 6, 6 → 7 and 7 → 8: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
