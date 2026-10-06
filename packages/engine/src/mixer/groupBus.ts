@@ -18,8 +18,17 @@
  * highpass an ungrouped part gets. The gate closes when the group isn't
  * open under mute and solo (`MusicRoster.resolveSolo`); the meter reads
  * after it, post-level, post-pan and post-gate, as a part strip's does.
+ *
+ * **Automation** (windsor#614, record `2026-10-05-group-automation-folder-tracks`
+ * decision 5): the level and the pan have lane handles built as a part
+ * strip's are (`automation`), so a knob never fights a lane; an insert lane
+ * finds its stage through `insertSpecs` and `inserts`, and a re-wire inside
+ * the fade tells `insertsRebuilt`, so the group's lanes re-attach. The lanes
+ * themselves are the automation player's, not the bus's: `spec` has none.
  */
 import { MS_PER_SECOND } from '../audioConstants';
+import type { KnobHandle } from '../automation/automationHandles';
+import { knobHandle, sameValue } from '../automation/automationHandles';
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import { INSERT_KINDS } from '../inserts/insertRegistry';
 import type { InsertSpec, InsertStage } from '../inserts/insertRegistry';
@@ -41,6 +50,14 @@ export interface GroupBus {
   readonly output: GainNode;
   /** The live inserts, in chain order. */
   readonly inserts: readonly InsertStage<InsertSpec>[];
+  /** The specs of the live inserts, one for one with `inserts`. */
+  readonly insertSpecs: readonly InsertSpec[];
+  /**
+   * The list the chain holds once a re-wire in flight has landed;
+   * `insertSpecs` when none is (windsor#614): the group's lanes are kept
+   * against it, as a part's against `PartStrip.nextInsertSpecs`.
+   */
+  readonly nextInsertSpecs: readonly InsertSpec[];
   /** The group's sample-peak meter, after the gate. Lazy, as a strip's is. */
   readonly meter: PeakMeter;
   /** Whether the gate is open: the group isn't muted, and isn't soloed out. */
@@ -61,7 +78,21 @@ export interface GroupBus {
   setInserts(specs: readonly InsertSpec[]): void;
   /** Ramp the gate over `seconds`, the insert fade by default; 0 sets it at once. Only a change schedules anything. */
   setOpen(open: boolean, seconds?: number): void;
+  /**
+   * A group target's lane handle (windsor#614): `level` (the fader's gain)
+   * or `pan` (the rotation's four gains). Undefined for any other field.
+   * Never touches the gate.
+   */
+  automation(field: string): KnobHandle | undefined;
   dispose(): void;
+}
+
+/**
+ * What a group bus is built with: a strip's options, and whom it tells when
+ * its insert chain is re-wired inside its fade (windsor#614).
+ */
+export interface GroupBusOptions extends Omit<RouteOptions, 'insertsRebuilt'> {
+  insertsRebuilt?: (bus: GroupBus) => void;
 }
 
 const laterByTimeout = (run: () => void, seconds: number): void => {
@@ -78,7 +109,7 @@ export function createGroupBus(
   context: BaseAudioContext,
   spec: GroupSpec,
   destination: AudioNode,
-  options: RouteOptions = {},
+  options: GroupBusOptions = {},
 ): GroupBus {
   const input = context.createGain();
   const fade = context.createGain();
@@ -107,17 +138,25 @@ export function createGroupBus(
       fade.gain.linearRampToValueAtTime(to, now + seconds);
     },
   };
-  const updates = createInsertUpdater(chain, tap, options.defer ?? laterByTimeout, options.changed);
+  const later = options.defer ?? laterByTimeout;
+  const updates = createInsertUpdater(chain, tap, later, options.changed, () =>
+    options.insertsRebuilt?.(bus),
+  );
   const meter = createPeakMeter(context, gate);
   let { name, pan, mute, solo } = spec;
+  let levelKnob = spec.level;
   let open = true;
-  return {
+  const handles = new Map<string, KnobHandle>([
+    ['level', knobHandle({ params: [level.gain], write: sameValue, resting: () => levelKnob })],
+    ['pan', rotation.automation],
+  ]);
+  const bus: GroupBus = {
     id: spec.id,
     get spec(): GroupSpec {
       return {
         id: spec.id,
         name,
-        level: level.gain.value,
+        level: levelKnob,
         pan,
         ...(mute === undefined ? {} : { mute }),
         ...(solo === undefined ? {} : { solo }),
@@ -129,6 +168,12 @@ export function createGroupBus(
     get inserts(): readonly InsertStage<InsertSpec>[] {
       return chain.stages;
     },
+    get insertSpecs(): readonly InsertSpec[] {
+      return chain.specs;
+    },
+    get nextInsertSpecs(): readonly InsertSpec[] {
+      return updates.next;
+    },
     meter,
     get open(): boolean {
       return open;
@@ -137,7 +182,8 @@ export function createGroupBus(
       name = next;
     },
     setLevel(next: number): void {
-      level.gain.value = next;
+      levelKnob = next;
+      if (!handles.get('level')!.engaged) level.gain.value = next;
     },
     setPan(next: number): void {
       pan = next;
@@ -155,6 +201,7 @@ export function createGroupBus(
       open = next;
       rampGate(gate.gain, open ? 1 : 0, context.currentTime, seconds);
     },
+    automation: (field) => handles.get(field),
     dispose(): void {
       // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
       updates.cancel();
@@ -168,6 +215,7 @@ export function createGroupBus(
       gate.disconnect();
     },
   };
+  return bus;
 }
 
 /** The gate to `to`: from where it has got to over `seconds`, or at once for 0, as a strip's gate moves. */

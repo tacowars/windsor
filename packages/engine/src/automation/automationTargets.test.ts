@@ -9,11 +9,14 @@ import {
   catalogRow,
   formatTargetId,
   insertTargetRow,
+  isGroupTarget,
   parseTargetId,
   requireCatalogRow,
+  seqTargetIds,
   targetKind,
   targetRow,
 } from './automationTargets';
+import { GROUP_STRIP_TARGETS } from './automationTargetTables';
 
 const INSERT_IDS = INSERT_KIND_NAMES.flatMap((kind) =>
   INSERT_AUTOMATION_FIELDS[kind].map((row) => `insert.k3x9a0q2.${row.target}`),
@@ -185,5 +188,25 @@ describe('the row lookups', () => {
     expect(targetRow('insert.ph000001.center')).toBeUndefined();
     expect(targetRow('voice.pitchEnvAmount')?.unit).toBe('st');
     expect(targetRow('voice.nothing')).toBeUndefined();
+  });
+});
+
+describe('group targets (windsor#614)', () => {
+  it("are a group's level and pan, and any insert field, from the catalog's own ids", () => {
+    expect(GROUP_STRIP_TARGETS).toEqual(['strip.level', 'strip.pan']);
+    for (const id of GROUP_STRIP_TARGETS) expect(STRIP_TARGET_IDS).toContain(id);
+    expect(STRIP_TARGET_IDS.filter((id) => isGroupTarget(id))).toEqual(GROUP_STRIP_TARGETS);
+    expect(isGroupTarget('insert.phase1.rate')).toBe(true);
+    expect(isGroupTarget('insert.eq1.bands.3.freq')).toBe(true);
+  });
+
+  it('never a send, a voice or a sequencer target, nor an id that does not parse', () => {
+    for (const id of ['strip.send.a', 'strip.send.b', 'strip.volume', 'insert.x', '']) {
+      expect(isGroupTarget(id)).toBe(false);
+    }
+    for (const id of VOICE_TARGET_IDS) expect(isGroupTarget(id)).toBe(false);
+    for (const id of [...seqTargetIds('figure'), ...seqTargetIds('bass')]) {
+      expect(isGroupTarget(id)).toBe(false);
+    }
   });
 });

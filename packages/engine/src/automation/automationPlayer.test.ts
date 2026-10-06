@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RIG_OWNER,
   RIG_RESTING,
   RIG_SLOT,
   RIG_SONG_TICKS,
@@ -20,6 +21,7 @@ import { FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { AUTOMATION_STEP_RAMP_SECONDS } from './automationConstants';
 import { valueAt } from './automationEvaluate';
 import { knobHandle, sameValue } from './automationHandles';
+import { partOwner } from './automationOwner';
 import { AutomationPlayer } from './automationPlayer';
 import { requireCatalogRow } from './automationTargets';
 
@@ -37,7 +39,7 @@ const SWEEP = lane('strip.pan', [point(0, -1), point(192, 1)]);
 describe('the player, tick by tick', () => {
   it('holds a lane at the rest tick when it is set, and engages its handle', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     expect(rig.calls('strip.level')).toEqual([
       { call: 'cancelScheduledValues', value: RIG_RESTING, time: 0 },
       { call: 'setValueAtTime', value: 0.25, time: 0 },
@@ -47,7 +49,7 @@ describe('the player, tick by tick', () => {
 
   it('schedules a bent segment cut every tick across the look-ahead', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const mark = rig.calls('strip.level').length;
     const times = rig.run(24);
     const calls = rig.calls('strip.level', mark);
@@ -68,7 +70,7 @@ describe('the player, tick by tick', () => {
 
   it('traces the curve: the param at every tick is the lane there', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE, SWEEP]);
+    rig.player.setLanes(RIG_OWNER, [FADE, SWEEP]);
     rig.run(2 * 96);
     for (let tick = 0; tick < 2 * 96; tick++) {
       expect(rig.param('strip.level').valueAt(at(tick))).toBeCloseTo(
@@ -85,7 +87,7 @@ describe('the player, tick by tick', () => {
   it('turns a step into set-then-ramp over the de-click', () => {
     const rig = automationRig();
     const step = lane('strip.level', [point(0, 0.5), point(24, 0.5), point(24, 1)]);
-    rig.player.setLanes(RIG_SLOT, [step]);
+    rig.player.setLanes(RIG_OWNER, [step]);
     const mark = rig.calls('strip.level').length;
     const edge = rig.run(30)[24]!;
     const calls = rig.calls('strip.level', mark).slice(2);
@@ -98,18 +100,19 @@ describe('the player, tick by tick', () => {
 
   it('schedules nothing for a song with no lanes, or with its lanes off', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, []);
-    rig.player.setLanes(RIG_SLOT + 1, [{ ...FADE, on: false }]);
+    rig.player.setLanes(RIG_OWNER, []);
+    rig.player.setLanes(partOwner(RIG_SLOT + 1), [{ ...FADE, on: false }]);
     rig.run(96);
     rig.player.stop();
     expect(rig.calls('strip.level')).toEqual([]);
+    expect(rig.calls('strip.level', 0, partOwner(RIG_SLOT + 1))).toEqual([]);
   });
 });
 
 describe('discontinuities: cancel, hold at the current tick, schedule again', () => {
   it('starts from a non-zero tick holding the value there', () => {
     const rig = automationRig(48);
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     expect(rig.calls('strip.level')[1]).toEqual({
       call: 'setValueAtTime',
       value: valueAt(LEVEL, FADE.points, 48),
@@ -126,7 +129,7 @@ describe('discontinuities: cancel, hold at the current tick, schedule again', ()
 
   it('holds the value at the new tick on a seek while stopped', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     rig.now = 5;
     const mark = rig.calls('strip.level').length;
     rig.player.seek(60);
@@ -138,7 +141,7 @@ describe('discontinuities: cancel, hold at the current tick, schedule again', ()
 
   it('holds the value where the playhead stood on a stop, and restarts with a hold', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     rig.run(24);
     rig.now = at(10.5);
     const mark = rig.calls('strip.level').length;
@@ -160,7 +163,7 @@ describe('discontinuities: cancel, hold at the current tick, schedule again', ()
   it("holds the loop start's value at the loop's jump back", () => {
     const rig = automationRig();
     rig.transport.loop = { start: 0, end: 24, songTicks: RIG_SONG_TICKS };
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const times = rig.run(26);
     const jump = times[24]!;
     const calls = rig.calls('strip.level').filter((c) => c.time === jump);
@@ -172,7 +175,7 @@ describe('discontinuities: cancel, hold at the current tick, schedule again', ()
 
   it('holds and reschedules from now on a tempo change, keeping the ticks already issued', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const times = rig.run(12);
     rig.now = at(4);
     rig.transport.bpm = 60;
@@ -192,12 +195,12 @@ describe('discontinuities: cancel, hold at the current tick, schedule again', ()
 
   it('cancels from now and schedules the new curve on a live lane edit while playing', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const times = rig.run(12);
     rig.now = at(6);
     const edited = lane('strip.level', [point(0, 1), point(96, 0.125, -0.5)]);
     const mark = rig.calls('strip.level').length;
-    rig.player.setLanes(RIG_SLOT, [edited]);
+    rig.player.setLanes(RIG_OWNER, [edited]);
     const calls = rig.calls('strip.level', mark);
     expect(calls.slice(0, 2)).toEqual([
       { call: 'cancelScheduledValues', value: expect.any(Number), time: at(6) },
@@ -217,11 +220,11 @@ describe('lanes off and gone', () => {
   it('gives the target back to its knob at now when a lane is turned off or deleted', () => {
     for (const next of [[{ ...FADE, on: false }], []]) {
       const rig = automationRig();
-      rig.player.setLanes(RIG_SLOT, [FADE]);
+      rig.player.setLanes(RIG_OWNER, [FADE]);
       rig.run(12);
       rig.now = at(3);
       const mark = rig.calls('strip.level').length;
-      rig.player.setLanes(RIG_SLOT, next);
+      rig.player.setLanes(RIG_OWNER, next);
       expect(rig.calls('strip.level', mark)).toEqual([
         { call: 'cancelScheduledValues', value: expect.any(Number), time: at(3) },
         { call: 'setValueAtTime', value: RIG_RESTING, time: at(3) },
@@ -235,7 +238,7 @@ describe('lanes off and gone', () => {
 
   it("passes a sequencer lane by: it is the region gate's, never the resolver's (windsor#488)", () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [lane('seq.gate', [point(0, 0.25), point(96, 1)]), FADE]);
+    rig.player.setLanes(RIG_OWNER, [lane('seq.gate', [point(0, 0.25), point(96, 1)]), FADE]);
     rig.run(96);
     expect(rig.calls('seq.gate')).toEqual([]);
     expect(rig.handle('seq.gate').engaged).toBe(false);
@@ -244,9 +247,9 @@ describe('lanes off and gone', () => {
 
   it('forgets a removed part without touching its params', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const mark = rig.calls('strip.level').length;
-    rig.player.removePart(RIG_SLOT);
+    rig.player.remove(RIG_OWNER);
     rig.run(24);
     rig.player.stop();
     expect(rig.calls('strip.level', mark)).toEqual([]);
@@ -254,7 +257,7 @@ describe('lanes off and gone', () => {
 
   it('stops hearing the transport once disposed', () => {
     const rig = automationRig();
-    rig.player.setLanes(RIG_SLOT, [FADE]);
+    rig.player.setLanes(RIG_OWNER, [FADE]);
     const mark = rig.calls('strip.level').length;
     rig.player.dispose();
     rig.run(24);
@@ -282,12 +285,12 @@ describe('a resync after the targets moved (windsor#345)', () => {
       songTicks: RIG_SONG_TICKS,
       restTick: 0,
     });
-    player.setLanes(RIG_SLOT, [FADE]);
+    player.setLanes(RIG_OWNER, [FADE]);
     rig.run(12);
     rig.now = at(3);
     const marks = [params.a.automation.length, params.b.automation.length] as const;
     on = 'b';
-    player.resync(RIG_SLOT);
+    player.resync(RIG_OWNER);
     expect(params.a.automation.slice(marks[0])).toEqual([
       { call: 'cancelScheduledValues', value: expect.any(Number), time: at(3) },
       { call: 'setValueAtTime', value: 0.1, time: at(3) },
@@ -305,7 +308,7 @@ describe('a resync after the targets moved (windsor#345)', () => {
     // A target the graph no longer has: its handle is given back and nothing more is scheduled.
     rig.now = at(15);
     on = null;
-    player.resync(RIG_SLOT);
+    player.resync(RIG_OWNER);
     expect(params.b.automation.slice(-1)).toEqual([
       { call: 'setValueAtTime', value: 0.2, time: at(15) },
     ]);

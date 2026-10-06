@@ -1,8 +1,9 @@
 /**
  * An insert target's automation handle (windsor#345, record
  * `2026-10-01-song-automation-lanes` decisions 2 and 9): a lane on one of a
- * strip's inserts, by the insert's stable id and the field it moves, found
- * on the live stage that insert sits on as `stage.param(field)`.
+ * strip's or a group bus's inserts (windsor#614), by the insert's stable id
+ * and the field it moves, found on the live stage that insert sits on as
+ * `stage.param(field)`.
  *
  * - **Inert while unread.** A field outside `automatableInsertFields` for
  *   the insert's current spec (Tape's `wear` while split, say) has no
@@ -20,7 +21,7 @@
 import type { AutomationHandle } from '../automation/automationHandles';
 import { automatableInsertFields } from '../automation/automationInsertFields';
 import type { AutomationTargetRow } from '../automation/automationLane';
-import type { PartStrip } from '../mixer/channelStrip';
+import type { InsertSpec, InsertStage } from './insertRegistry';
 
 /** Which insert and which of its fields a lane moves. */
 export interface InsertTarget {
@@ -28,15 +29,24 @@ export interface InsertTarget {
   readonly field: string;
 }
 
-/** The handle for `target` on `strip`'s live inserts, or undefined when there is none. */
+/**
+ * What holds a live insert chain: a part's strip (`PartStrip`) or a group bus
+ * (`GroupBus`). The specs and the stages are in chain order, one for one.
+ */
+export interface InsertHost {
+  readonly insertSpecs: readonly InsertSpec[];
+  readonly inserts: readonly InsertStage<InsertSpec>[];
+}
+
+/** The handle for `target` on `host`'s live inserts, or undefined when there is none. */
 export function insertAutomationHandle(
-  strip: PartStrip,
+  host: InsertHost,
   target: InsertTarget,
   _row: AutomationTargetRow,
 ): AutomationHandle | undefined {
-  const index = strip.insertSpecs.findIndex((insert) => insert.id === target.insertId);
-  const spec = strip.insertSpecs[index];
-  const stage = strip.inserts[index];
+  const index = host.insertSpecs.findIndex((insert) => insert.id === target.insertId);
+  const spec = host.insertSpecs[index];
+  const stage = host.inserts[index];
   if (!spec || stage?.kind !== spec.kind) return undefined;
   const read = automatableInsertFields(spec).some((row) => row.target === target.field);
   return read ? stage.param?.(target.field) : undefined;

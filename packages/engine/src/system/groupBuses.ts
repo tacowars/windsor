@@ -20,7 +20,7 @@ import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import type { GroupsPlan } from '../mixer/groupApply';
 import { applyGroupsLive, planGroupsLive } from '../mixer/groupApply';
-import type { GroupBus } from '../mixer/groupBus';
+import type { GroupBus, GroupBusOptions } from '../mixer/groupBus';
 import { createGroupBus } from '../mixer/groupBus';
 import type { GroupSpec } from '../mixer/mix';
 import { isGroupOutput } from '../mixer/mix';
@@ -32,6 +32,11 @@ export interface GroupBusesOptions {
   readonly graph: StandingGraph;
   /** A strip's: the insert registry, the change hook, the fade's wait. */
   readonly routeOptions: RouteOptions;
+  /**
+   * A group's insert chain was re-wired inside its fade (windsor#614): the
+   * group's lanes on its inserts re-attach, as a part's do.
+   */
+  readonly insertsRebuilt?: (bus: GroupBus) => void;
 }
 
 const laterByTimeout = (run: () => void, seconds: number): void => {
@@ -116,6 +121,11 @@ export class GroupBuses {
 
   private create(spec: GroupSpec): GroupBus {
     const { context, graph, routeOptions } = this.options;
-    return createGroupBus(context, spec, graph.standing().musicBus.input, routeOptions);
+    // A strip's options, with the group's own re-wire hook in place of a part's.
+    const options: GroupBusOptions = {
+      ...routeOptions,
+      insertsRebuilt: (bus) => this.options.insertsRebuilt?.(bus),
+    };
+    return createGroupBus(context, spec, graph.standing().musicBus.input, options);
   }
 }

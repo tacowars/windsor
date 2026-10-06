@@ -25,6 +25,9 @@
  * Whether an insert id names an insert of a kind that has the field is the
  * part's to say: `insertTargetRow` takes the kind. `automationTargets.test.ts`
  * round-trips every id.
+ *
+ * A group bus owns lanes too (windsor#614): the same ids, a subset of them
+ * (`isGroupTarget`), relative to the group.
  */
 import type { InsertKindName } from '../inserts/insertRegistry';
 import type { SequencerKind } from '../song/arrangement';
@@ -41,6 +44,7 @@ import type {
   VoiceTargetId,
 } from './automationLane';
 import {
+  GROUP_STRIP_TARGETS,
   STRIP_AUTOMATION_ROWS,
   voiceRowOf,
   type VoiceAutomationRow,
@@ -122,6 +126,18 @@ export function seqTargetIds(
   fields = SEQ_AUTOMATION_FIELDS,
 ): readonly SeqTargetId[] {
   return (fields[kind] ?? []).map(seqTargetId);
+}
+
+/**
+ * Whether a group bus may own a lane on `id` (windsor#614 decision 2): its
+ * level, its pan, or a field of an insert (whether the group holds that
+ * insert is the group's to say, as for a part). Never a send, a voice or a
+ * sequencer target: a group has none.
+ */
+export function isGroupTarget(id: string, stripTargets = GROUP_STRIP_TARGETS): boolean {
+  const parsed = parseTargetId(id);
+  if (parsed?.kind === 'insert') return true;
+  return parsed?.kind === 'strip' && (stripTargets as readonly string[]).includes(id);
 }
 
 /** Which family a target belongs to, by its prefix. */

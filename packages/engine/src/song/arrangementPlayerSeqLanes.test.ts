@@ -15,6 +15,7 @@ import { kinds, type RecordingPart } from '../__fixtures__/recordingPart';
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import { valueAt } from '../automation/automationEvaluate';
 import type { AutomationLane, AutomationPoint, SeqTargetId } from '../automation/automationLane';
+import { partOwner } from '../automation/automationOwner';
 import { requireCatalogRow } from '../automation/automationTargets';
 import { DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
@@ -166,7 +167,7 @@ describe('sequencer lanes in the player', () => {
     change({ kind: 'chord', ...DEFAULT_CHORD_CONFIG });
     change({ kind: 'figure', ...DEFAULT_FIGURE_CONFIG });
     expect(onTicks(r.parts.arp)).toEqual([]);
-    expect(live.lanesOf(slot)).toEqual([]);
+    expect(live.lanesOf(partOwner(slot))).toEqual([]);
     r.run(1);
     expect(onTicks(r.parts.arp).length).toBeGreaterThan(0);
   });

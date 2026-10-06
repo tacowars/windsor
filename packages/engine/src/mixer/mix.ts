@@ -12,6 +12,7 @@
  * constructor call or a private field.
  */
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
+import type { AutomationLane } from '../automation/automationLane';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import type { InsertSpec } from '../inserts/insertRegistry';
 import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
@@ -71,7 +72,8 @@ export const isReturnName = (name: unknown): name is ReturnName =>
  *
  * The song owns its groups, up to `MAX_GROUPS`, in display order. The `id`
  * is what an Output names, so a rename touches nothing else; the `name` is
- * only a label. A group has no low cut and no sends.
+ * only a label. A group has no low cut and no sends. It may carry automation
+ * lanes, as a part does (windsor#614).
  */
 export interface GroupSpec {
   /** Stable, non-negative and unique within the song: what `{ group: id }` names. */
@@ -87,6 +89,13 @@ export interface GroupSpec {
   readonly solo?: boolean;
   /** Insert effects in signal order, at most `MAX_INSERTS`; a compressor keys from the group's input. */
   readonly inserts: readonly InsertSpec[];
+  /**
+   * The group's automation lanes (windsor#614, record
+   * `2026-10-05-group-automation-folder-tracks` decisions 1–3): curves over
+   * song time on its level, its pan and its inserts' fields, the lane type a
+   * part carries. Missing means none; a partial's list replaces the whole.
+   */
+  readonly automation?: readonly AutomationLane[];
 }
 
 /** What a new group gets besides its id and name: unity, centred, no inserts, mute and solo absent. */

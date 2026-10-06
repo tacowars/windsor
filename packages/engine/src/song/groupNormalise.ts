@@ -4,23 +4,37 @@
  * pass that sends a part whose Output names a group the song lacks back to
  * Master. Never refuses: a group that can't be read is dropped, and a part
  * that names one is played on Master, each with a correction.
+ *
+ * A group's `automation` (windsor#614, record
+ * `2026-10-05-group-automation-folder-tracks` decision 3) is read by
+ * `normaliseAutomation` against the group's normalised inserts and the song's
+ * length, as a part's is, with the group's narrower targets. Absent or empty,
+ * the group has no `automation` key, so a song without group lanes writes
+ * exactly what it wrote before.
  */
 import type { FieldNormaliser } from './arrangementFields';
 import { isRecord, show } from './arrangementFields';
 import type { ArrangementDocument } from './arrangementDocument';
+import { normaliseAutomation } from './automationNormalise';
 import { normaliseBusInserts, switchedOn } from './deskNormalise';
 import { MAX_GROUPS, MIX_LEVEL_MAX } from '../audioConstants';
 import type { GroupSpec } from '../mixer/mix';
 import { DEFAULT_GROUP, isGroupOutput } from '../mixer/mix';
 
-const GROUP_KEYS = ['id', 'name', 'level', 'pan', 'mute', 'solo', 'inserts'];
+const GROUP_KEYS = ['id', 'name', 'level', 'pan', 'mute', 'solo', 'inserts', 'automation'];
 
 /**
  * The `groups` list: at most `MAX_GROUPS`, each on a unique id. A group with
  * a missing, junk or duplicate id is dropped, as is every one after the
- * eighth kept. An absent or empty list is absent.
+ * eighth kept. An absent or empty list is absent. `songTicks` is the song's
+ * length, which a group's lanes are fitted to; without it (a live group
+ * read on its own, whose lanes the live automation reads) no lane is cut.
  */
-export function normaliseGroups(raw: unknown, n: FieldNormaliser): GroupSpec[] | undefined {
+export function normaliseGroups(
+  raw: unknown,
+  n: FieldNormaliser,
+  songTicks = Number.POSITIVE_INFINITY,
+): GroupSpec[] | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) {
     n.correction(`groups: ${show(raw)} is not a list of groups — dropped`);
@@ -34,7 +48,7 @@ export function normaliseGroups(raw: unknown, n: FieldNormaliser): GroupSpec[] |
       n.correction(`${path}: a song holds at most ${MAX_GROUPS} groups — group dropped`);
       return;
     }
-    const group = normaliseGroup(entry, path, out.length + 1, n);
+    const group = normaliseGroup(entry, { path, position: out.length + 1, songTicks }, n);
     if (!group) return;
     if (used.has(group.id)) {
       n.correction(`${path}.id: ${group.id} is already used — group dropped`);
@@ -46,13 +60,16 @@ export function normaliseGroups(raw: unknown, n: FieldNormaliser): GroupSpec[] |
   return out.length > 0 ? out : undefined;
 }
 
-/** One group, or null when it has no usable id. `position` counts the kept groups from 1. */
-function normaliseGroup(
-  raw: unknown,
-  path: string,
-  position: number,
-  n: FieldNormaliser,
-): GroupSpec | null {
+/** Where a group sits: its path, its place among the kept groups from 1, and the song's length. */
+interface GroupPlace {
+  readonly path: string;
+  readonly position: number;
+  readonly songTicks: number;
+}
+
+/** One group, or null when it has no usable id. */
+function normaliseGroup(raw: unknown, place: GroupPlace, n: FieldNormaliser): GroupSpec | null {
+  const { path, position } = place;
   if (!isRecord(raw)) {
     n.correction(`${path}: ${show(raw)} is not a group — group dropped`);
     return null;
@@ -69,6 +86,15 @@ function normaliseGroup(
     n.correction(`${path}.name: ${show(raw.name)} is not a name — using "${fallbackName}"`);
   }
   const base = DEFAULT_GROUP;
+  // Read as a send bus's chain: a compressor keys from the group's own input.
+  const inserts = normaliseBusInserts(raw.inserts, `${path}.inserts`, n, base.inserts, 'a group');
+  const automation = normaliseAutomation(raw.automation, {
+    songTicks: place.songTicks,
+    inserts,
+    owner: 'group',
+    path: `${path}.automation`,
+    n,
+  });
   return {
     id,
     name: typeof raw.name === 'string' ? raw.name : fallbackName,
@@ -76,8 +102,8 @@ function normaliseGroup(
     pan: n.num(raw.pan, base.pan, -1, 1, `${path}.pan`),
     ...switchedOn('mute', raw.mute, path, n),
     ...switchedOn('solo', raw.solo, path, n),
-    // Read as a send bus's chain: a compressor keys from the group's own input.
-    inserts: normaliseBusInserts(raw.inserts, `${path}.inserts`, n, base.inserts, 'a group'),
+    inserts,
+    ...(automation ? { automation } : {}),
   };
 }
 

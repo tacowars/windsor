@@ -256,7 +256,8 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   if (Object.keys(patches).length > 0) document.patches = patches;
   const returns = normaliseReturns(o.returns, n);
   if (returns) document.returns = returns;
-  const groups = normaliseGroups(o.groups, n);
+  // A group's lanes are fitted to the song's length, as a part's are (windsor#614).
+  const groups = normaliseGroups(o.groups, n, songTicks(transport.bars, transport.meter));
   if (groups) document.groups = groups;
   if (o.master !== undefined) document.master = normaliseMaster(o.master, n);
   const meta = normaliseSongMeta(o.meta, n);

@@ -1,7 +1,9 @@
 /**
  * The automation player (windsor#344, record
- * `2026-10-01-song-automation-lanes` decision 8): every part's lanes that are
- * on, played from the one clock as AudioParam events.
+ * `2026-10-01-song-automation-lanes` decision 8): every part's and every
+ * group's lanes that are on, played from the one clock as AudioParam events.
+ * Lane lists are keyed by their owner, a part's slot or a group's id
+ * (`automationOwner.ts`, windsor#614); the timing below is the same for both.
  *
  * - **Each tick, one window.** It hears every tick on the transport, before
  *   any part's gate, and schedules `rampsBetween`'s breakpoints in that
@@ -33,6 +35,8 @@ import { AUTOMATION_STEP_RAMP_SECONDS } from './automationConstants';
 import type { AutomationRamp } from './automationEvaluate';
 import { rampsBetween, valueAt } from './automationEvaluate';
 import type { AutomationHandle } from './automationHandles';
+import type { AutomationOwner } from './automationOwner';
+import { ownerKey } from './automationOwner';
 import type {
   AutomationLane,
   AutomationPoint,
@@ -47,9 +51,9 @@ export interface ResolvedTarget {
   readonly row: AutomationTargetRow;
 }
 
-/** Finds a part's target on the live graph; undefined when it has none (yet). */
+/** Finds an owner's target on the live graph; undefined when it has none (yet). */
 export type AutomationResolver = (
-  slot: number,
+  owner: AutomationOwner,
   target: AutomationTargetId,
 ) => ResolvedTarget | undefined;
 
@@ -93,9 +97,16 @@ interface Issued {
 const fold = (tick: number, songTicks: number): number =>
   ((tick % songTicks) + songTicks) % songTicks;
 
+/** An owner's lane list, as the player holds it. */
+interface Held {
+  readonly owner: AutomationOwner;
+  readonly lanes: readonly AutomationLane[];
+}
+
 export class AutomationPlayer {
-  private readonly lanes = new Map<number, readonly AutomationLane[]>();
-  private readonly playing = new Map<number, Playing[]>();
+  /** Each owner's lanes, by `ownerKey`. */
+  private readonly lanes = new Map<string, Held>();
+  private readonly playing = new Map<string, Playing[]>();
   /** The ticks issued since the transport started, from the one sounding now on. */
   private issued: Issued[] = [];
   private lastPos: number | null = null;
@@ -118,29 +129,34 @@ export class AutomationPlayer {
   }
 
   /**
-   * A part's whole lane list (a live edit, or its lanes at build): every
+   * An owner's whole lane list (a live edit, or its lanes at build): every
    * lane that was on and no longer is gives its target back, and the lanes
    * now on are held where the playhead is and scheduled on from there.
    */
-  setLanes(slot: number, lanes: readonly AutomationLane[]): void {
-    this.lanes.set(slot, lanes);
-    this.replay(slot, this.options.now());
+  setLanes(owner: AutomationOwner, lanes: readonly AutomationLane[]): void {
+    const key = ownerKey(owner);
+    this.lanes.set(key, { owner, lanes });
+    this.replay(key, this.options.now());
   }
 
-  /** The slots that hold lanes. */
-  slots(): readonly number[] {
-    return [...this.lanes.keys()];
+  /** The owners that hold lanes, in the order they were first set. */
+  owners(): readonly AutomationOwner[] {
+    return [...this.lanes.values()].map((held) => held.owner);
   }
 
-  /** The lanes `slot` holds now; none for a slot without lanes. */
-  lanesOf(slot: number): readonly AutomationLane[] {
-    return this.lanes.get(slot) ?? [];
+  /** The lanes `owner` holds now; none for an owner without lanes. */
+  lanesOf(owner: AutomationOwner): readonly AutomationLane[] {
+    return this.lanes.get(ownerKey(owner))?.lanes ?? [];
   }
 
-  /** A part leaving the song: its lanes are forgotten, its strip goes with it. */
-  removePart(slot: number): void {
-    this.lanes.delete(slot);
-    this.playing.delete(slot);
+  /**
+   * A part or a group leaving the song: its lanes are forgotten, and its
+   * strip or bus goes with them, so nothing is given back.
+   */
+  remove(owner: AutomationOwner): void {
+    const key = ownerKey(owner);
+    this.lanes.delete(key);
+    this.playing.delete(key);
   }
 
   /** The song's length changed (`transport.bars`): positions fold by the new one. */
@@ -150,14 +166,13 @@ export class AutomationPlayer {
 
   /**
    * Find every lane's target again and restart it from now: a tempo change,
-   * a song-length change, or a part whose inserts or patch changed, or
-   * whose insert chain was rebuilt (windsor#345). One part by slot, or every
-   * part.
+   * a song-length change, or a part or group whose inserts or patch changed,
+   * or whose insert chain was rebuilt (windsor#345). One owner, or every one.
    */
-  resync(slot?: number): void {
+  resync(owner?: AutomationOwner): void {
     const now = this.options.now();
-    for (const each of slot === undefined ? [...this.lanes.keys()] : [slot]) {
-      if (this.lanes.has(each)) this.replay(each, now);
+    for (const key of owner === undefined ? [...this.lanes.keys()] : [ownerKey(owner)]) {
+      if (this.lanes.has(key)) this.replay(key, now);
     }
   }
 
@@ -223,14 +238,14 @@ export class AutomationPlayer {
   }
 
   /**
-   * Resolve `slot`'s lanes again and restart them from `now`. A handle no
+   * Resolve one owner's lanes again and restart them from `now`. A handle no
    * lane plays through any more gives its target back first: the lane is
    * off or gone, or its target moved (an insert on a rebuilt or reordered
    * stage) or went unread (windsor#345).
    */
-  private replay(slot: number, now: number): void {
-    const before = this.playing.get(slot) ?? [];
-    const next = this.resolvePart(slot);
+  private replay(key: string, now: number): void {
+    const before = this.playing.get(key) ?? [];
+    const next = this.resolveOwner(key);
     for (const lane of before) {
       if (!next.some((p) => p.handle === lane.handle)) lane.handle.release(now);
     }
@@ -255,15 +270,18 @@ export class AutomationPlayer {
     for (const lanes of this.playing.values()) this.restart(lanes, now);
   }
 
-  /** The lanes of `slot` that are on and whose target the graph has, resolved now. */
-  private resolvePart(slot: number): Playing[] {
+  /** The owner's lanes that are on and whose target the graph has, resolved now. */
+  private resolveOwner(key: string): Playing[] {
     const out: Playing[] = [];
-    for (const lane of this.lanes.get(slot) ?? []) {
-      if (!lane.on || lane.points.length === 0 || targetKind(lane.target) === 'seq') continue;
-      const resolved = this.options.resolve(slot, lane.target);
+    const { owner, lanes } = this.lanes.get(key) ?? { lanes: [] };
+    for (const lane of lanes) {
+      if (!owner || !lane.on || lane.points.length === 0 || targetKind(lane.target) === 'seq') {
+        continue;
+      }
+      const resolved = this.options.resolve(owner, lane.target);
       if (resolved) out.push({ target: lane.target, points: lane.points, ...resolved, last: 0 });
     }
-    this.playing.set(slot, out);
+    this.playing.set(key, out);
     return out;
   }
 

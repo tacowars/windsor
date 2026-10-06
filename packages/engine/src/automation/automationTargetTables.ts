@@ -72,6 +72,13 @@ export const STRIP_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
   { target: 'strip.send.b', label: 'Send B', ...SEND_RANGE, scale: 'linear', unit: '' },
 ];
 
+/**
+ * The strip targets a group bus has (windsor#614, record
+ * `2026-10-05-group-automation-folder-tracks` decision 2): its fader and its
+ * pan, on the strip rows above. A group has no sends, so no send lanes.
+ */
+export const GROUP_STRIP_TARGETS: readonly StripTargetId[] = ['strip.level', 'strip.pan'];
+
 /** How a voice target reads as a lane: its label, its knob's scale, its unit. */
 interface VoiceLook {
   readonly label: string;

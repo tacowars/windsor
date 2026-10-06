@@ -4,7 +4,9 @@
  * meter after the gate. With no inserts, unity level and centre pan it
  * passes its input through untouched; a settings-only chain edit is param
  * writes and any other list re-wires inside the fade with the level
- * untouched; the gate ramps only on a change; dispose leaves no edge.
+ * untouched; the gate ramps only on a change; dispose leaves no edge. Its
+ * level and pan have lane handles a knob never fights, and a re-wire tells
+ * its hook (windsor#614).
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -26,7 +28,7 @@ import {
 } from '../__fixtures__/stripRig';
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { InsertSpec } from '../inserts/insertRegistry';
-import type { GroupBus } from './groupBus';
+import type { GroupBus, GroupBusOptions } from './groupBus';
 import { createGroupBus } from './groupBus';
 import type { GroupSpec } from './mix';
 import { PEAK_METER_NAME } from './peakMeterConstants';
@@ -42,13 +44,14 @@ const CLOSE = 1e-6;
 
 const DRUMS: GroupSpec = { id: 3, name: 'Drums', level: 1, pan: 0, inserts: [] };
 
-async function build(spec: Partial<GroupSpec> = {}) {
+async function build(spec: Partial<GroupSpec> = {}, options: GroupBusOptions = {}) {
   const { context, part, dry } = await rig();
   await context.audioWorklet.addModule('peak-meter-processor.js');
   (part.node as unknown as { feed: unknown }).feed = tones(HZ, HZ * 1.5, AMPLITUDE);
   const bus = createGroupBus(context.asAudioContext(), { ...DRUMS, ...spec }, dry, {
     registry: TEST_KINDS,
     defer: NOW,
+    ...options,
   });
   part.output.connect(bus.input);
   return { context, part, dry, bus };
@@ -191,5 +194,63 @@ describe('a group bus', () => {
     expect(targets(bus.output)).toEqual([]);
     const meter = context.workletNodes.find((n) => n.name === PEAK_METER_NAME)!;
     expect(into(meter)).toEqual([]);
+  });
+});
+
+describe("a group bus's lane handles (windsor#614)", () => {
+  it('holds its level from a lane, records a knob turn meanwhile, and gives the knob back on release', async () => {
+    const { bus } = await build({ level: 0.8 });
+    const level = gain(sources(bus.output)[0]!);
+    const handle = bus.automation('level')!;
+    handle.hold(0.3, 1);
+    expect(level.automation.slice(-1)).toEqual([{ call: 'setValueAtTime', value: 0.3, time: 1 }]);
+    bus.setLevel(0.5);
+    expect(level.value).not.toBe(0.5);
+    expect(bus.spec.level).toBe(0.5);
+    handle.release(2);
+    expect(handle.engaged).toBe(false);
+    expect(level.automation.slice(-1)).toEqual([{ call: 'setValueAtTime', value: 0.5, time: 2 }]);
+    bus.setLevel(0.6);
+    expect(level.value).toBe(0.6);
+  });
+
+  it("drives its pan through the rotation's own handle, so a pan knob waits too", async () => {
+    const { bus } = await build();
+    const rotationIn = outOf(targets(bus.input)[0]!)[0]!;
+    const gains = outOf(rotationIn).map((node) => gain(node));
+    expect(gains).toHaveLength(4);
+    const handle = bus.automation('pan')!;
+    handle.hold(1, 1);
+    expect(gains.map((g) => g.automation.at(-1)?.time)).toEqual([1, 1, 1, 1]);
+    const held = gains.map((g) => g.value);
+    bus.setPan(-1);
+    expect(gains.map((g) => g.value)).toEqual(held);
+    expect(bus.spec.pan).toBe(-1);
+    handle.release(2);
+    expect(gains.map((g) => g.value)).not.toEqual(held);
+  });
+
+  it('has no handle on a field a group lacks', async () => {
+    const { bus } = await build();
+    for (const field of ['send.a', 'lowCut', 'mute']) expect(bus.automation(field)).toBeUndefined();
+  });
+
+  it('reports its specs, the list waiting out a fade, and tells its hook once the re-wire lands', async () => {
+    const waiting: (() => void)[] = [];
+    const rebuilt: GroupBus[] = [];
+    const { bus } = await build(
+      { inserts: [scale(1)] },
+      { defer: (run) => waiting.push(run), insertsRebuilt: (b) => rebuilt.push(b) },
+    );
+    bus.setInserts([scale(0.5)]);
+    expect(bus.insertSpecs).toEqual([scale(0.5)]);
+    expect(rebuilt).toEqual([]);
+    bus.setInserts([boost(2), scale(0.5)]);
+    expect(bus.insertSpecs).toEqual([scale(0.5)]);
+    expect(bus.nextInsertSpecs).toEqual([boost(2), scale(0.5)]);
+    for (const run of waiting.splice(0)) run();
+    expect(bus.insertSpecs).toEqual([boost(2), scale(0.5)]);
+    expect(bus.inserts.map((stage) => stage.kind)).toEqual(['boost', 'scale']);
+    expect(rebuilt).toEqual([bus]);
   });
 });

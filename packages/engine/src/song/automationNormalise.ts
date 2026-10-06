@@ -33,6 +33,12 @@
  * Deleting an insert deletes its lanes (decision 14), and changing a part's
  * kind deletes the sequencer lanes the new kind does not offer, because
  * normalising runs after every merge. `automationNormalise.test.ts` pins each case.
+ *
+ * **A group's lanes** (windsor#614, record
+ * `2026-10-05-group-automation-folder-tracks` decision 3) are read by the same
+ * rules, against the group's inserts, with `owner: 'group'`: a lane on a
+ * target a group does not have (a send, a voice or a sequencer field,
+ * `isGroupTarget`) is dropped as well.
  */
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import { SEQ_AUTOMATION_FIELDS } from '../automation/automationSeqTables';
@@ -43,6 +49,7 @@ import type {
   AutomationTargetRow,
 } from '../automation/automationLane';
 import {
+  isGroupTarget,
   requireCatalogRow,
   insertTargetRow,
   parseTargetId,
@@ -67,6 +74,8 @@ export interface AutomationContext {
    * which passes them by).
    */
   readonly kind?: SequencerKind;
+  /** Whose lanes these are: a part's (absent) or a group bus's, which has fewer targets. */
+  readonly owner?: 'part' | 'group';
   readonly path: string;
   readonly n: FieldNormaliser;
 }
@@ -132,7 +141,8 @@ function normaliseLane(
   const { n } = context;
   const o = n.section(raw, path);
   n.dropUnknown(o, LANE_KEYS, path);
-  const target = laneTarget(o.target, `${path}.target`, { kindOf, kind: context.kind }, n);
+  const owner = { kindOf, kind: context.kind, group: context.owner === 'group' };
+  const target = laneTarget(o.target, `${path}.target`, owner, n);
   if (!target) return undefined;
   const points = normalisePoints(o.points, target.row, { ...context, path: `${path}.points` });
   if (points.length === 0) {
@@ -142,22 +152,27 @@ function normaliseLane(
   return { target: target.id, on: n.bool(o.on, true, `${path}.on`), points };
 }
 
-/** What a lane's target is checked against: the part's inserts and its sequencer kind. */
-interface PartTargets {
+/** What a lane's target is checked against: the owner's inserts, a part's sequencer kind, and whether it is a group. */
+interface OwnerTargets {
   readonly kindOf: InsertKindOf;
   readonly kind: SequencerKind | undefined;
+  readonly group: boolean;
 }
 
 /** The lane's target and its row, or undefined (reported) when the part has no such target. */
 function laneTarget(
   raw: unknown,
   path: string,
-  part: PartTargets,
+  part: OwnerTargets,
   n: FieldNormaliser,
 ): { id: AutomationTargetId; row: AutomationTargetRow } | undefined {
   const parsed = typeof raw === 'string' ? parseTargetId(raw) : undefined;
   if (typeof raw !== 'string' || !parsed) {
     n.correction(`${path}: ${show(raw)} names no automation target — lane dropped`);
+    return undefined;
+  }
+  if (part.group && !isGroupTarget(raw)) {
+    n.correction(`${path}: a group has no ${raw} lane — lane dropped`);
     return undefined;
   }
   const id = raw as AutomationTargetId;
@@ -170,7 +185,8 @@ function laneTarget(
   const { kindOf } = part;
   const kind = kindOf(parsed.insertId);
   if (kind === undefined) {
-    n.correction(`${path}: the strip has no insert "${parsed.insertId}" — lane dropped`);
+    const holder = part.group ? 'group' : 'strip';
+    n.correction(`${path}: the ${holder} has no insert "${parsed.insertId}" — lane dropped`);
     return undefined;
   }
   const row = insertTargetRow(kind, parsed.field);
@@ -263,9 +279,25 @@ export function fitPoints(
 export function withFittedAutomation<P extends MusicPart>(part: P, songTicks: number): P {
   const { automation, strip } = part as Partial<DocumentPart>;
   if (!Array.isArray(automation)) return part;
-  const kindOf = insertKindOf(Array.isArray(strip?.inserts) ? strip.inserts : []);
+  const inserts = Array.isArray(strip?.inserts) ? strip.inserts : [];
+  const fitted = fitLanes(automation as readonly unknown[], inserts, songTicks);
+  return fitted === automation ? part : { ...part, automation: fitted };
+}
+
+/**
+ * An owner's lanes fitted to `songTicks` against its `inserts`, or `lanes`
+ * itself when no lane changed: `withFittedAutomation`'s fit, which the live
+ * automation also runs on a group's lanes (windsor#614). Read tolerantly: a
+ * junk lane, or one whose row it cannot find, is left as it is.
+ */
+export function fitLanes<L>(
+  lanes: readonly L[],
+  inserts: readonly InsertSpec[],
+  songTicks: number,
+): readonly L[] {
+  const kindOf = insertKindOf(inserts);
   let changed = false;
-  const fitted = automation.map((lane: unknown) => {
+  const fitted = lanes.map((lane: unknown) => {
     if (!isRecord(lane) || typeof lane.target !== 'string' || !Array.isArray(lane.points)) {
       return lane;
     }
@@ -275,5 +307,5 @@ export function withFittedAutomation<P extends MusicPart>(part: P, songTicks: nu
     changed = true;
     return { ...lane, points };
   });
-  return changed ? { ...part, automation: fitted } : part;
+  return changed ? (fitted as L[]) : lanes;
 }

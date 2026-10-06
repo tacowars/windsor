@@ -133,6 +133,7 @@ export {
   AUTOMATION_LEVEL_FLOOR_DB,
   AUTOMATION_STRIP_LEVEL_MAX,
   FM_LANES_MAX,
+  GROUP_STRIP_TARGETS,
   STRIP_AUTOMATION_ROWS,
 } from './automation/automationTargetTables';
 export type { VoiceAutomationRow, VoiceSection } from './automation/automationTargetTables';
@@ -147,6 +148,7 @@ export {
   catalogRow,
   formatTargetId,
   insertTargetRow,
+  isGroupTarget,
   parseTargetId,
   requireCatalogRow,
   seqTargetId,
@@ -163,6 +165,9 @@ export { replaceRange, stampShape } from './automation/automationShapes';
 export type { AutomationShapeSpec } from './automation/automationShapes';
 export { AUTOMATION_SHAPE_KINDS } from './automation/automationShapeTables';
 export type { AutomationShapeKind } from './automation/automationShapeTables';
+// Whose lanes a list is (windsor#614): a part's by slot, or a group bus's by id.
+export type { AutomationOwner, GroupOwner, PartOwner } from './automation/automationOwner';
+export { groupOwner, isGroupOwner, partOwner } from './automation/automationOwner';
 // The automation player's writer interface (windsor#344); the system plays the lanes itself.
 export type { AutomationHandle, AutomationHow } from './automation/automationHandles';
 export {

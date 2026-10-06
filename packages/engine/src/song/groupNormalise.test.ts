@@ -2,16 +2,31 @@
  * The `groups` section and the group Output (windsor#284; record
  * `2026-10-01-group-buses` decisions 2, 3, 7 and 11): a song's group buses
  * round-trip through normalise and export, every junk value is corrected
- * by path, and a part naming a group the song lacks plays on Master.
+ * by path, and a part naming a group the song lacks plays on Master. A
+ * group's automation lanes (windsor#614) round-trip with the rest of the
+ * song, are read against its own inserts and narrower targets, and leave a
+ * song without them as it was.
  */
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_BARS } from '../audioConstants';
 import { KICK, song } from '../__fixtures__/documentCases';
+import { AUTOMATION_LANES } from '../__fixtures__/automationSong';
+import { FULL_ARRANGEMENT, FULL_SLOT } from '../__fixtures__/fullArrangement';
+import {
+  CAPTURED_KICK,
+  GROUP_LANES,
+  GROUP_LANES_DOCUMENT,
+  GROUP_PHASER,
+  groupPhaserTarget,
+} from '../__fixtures__/groupAutomationSong';
 import { withoutInsertIds } from '../__fixtures__/insertIds';
 import { MAX_GROUPS } from '../audioConstants';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { MAX_INSERTS } from '../inserts/insertConstants';
+import { INSERT_AUTOMATION_FIELDS } from '../automation/automationInsertTables';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { makeArrangement } from './arrangementDocument';
 
 const HAT = { ...KICK, slot: 1, name: 'hat', preset: 'hat' };
@@ -191,5 +206,106 @@ describe('the group Output', () => {
     );
     expect(extra.document.parts[0]?.strip.output).toEqual({ group: 3 });
     expect(extra.corrections).toEqual(['parts[0].strip.output.bus: unknown key dropped']);
+  });
+});
+
+describe("a group's lanes (windsor#614)", () => {
+  const SONG_TICKS = DEFAULT_BARS * TICKS_PER_BAR;
+  const rise = (target: string, from = 0.2, to = 1) => ({
+    target,
+    on: true,
+    points: [
+      { tick: 0, value: from, bend: 0 },
+      { tick: TICKS_PER_BAR, value: to, bend: 0 },
+    ],
+  });
+  /** One group holding the Phaser, with `automation` as written. */
+  const withLanes = (automation: unknown, inserts: unknown[] = [GROUP_PHASER]) =>
+    makeArrangement(
+      grouped([
+        { ...DRUMS, inserts, automation },
+        { ...MUSIC, inserts: [] },
+      ]),
+    );
+  const lanesOf = (r: ReturnType<typeof makeArrangement>) => r.document.groups?.[0]?.automation;
+
+  it('round-trip with the parts, patches, returns, strips, harmony, sequencers and captured patterns', () => {
+    const { first, again } = roundTrip(GROUP_LANES_DOCUMENT);
+    expect(first.corrections).toEqual([]);
+    expect(first.dangling).toEqual([]);
+    expect(again.corrections).toEqual([]);
+    expect(again.document).toEqual(first.document);
+    expect(JSON.stringify(again.document)).toBe(JSON.stringify(first.document));
+    const doc = first.document;
+    expect(doc.groups?.[0]?.automation).toEqual(GROUP_LANES);
+    expect(doc.groups?.[0]?.inserts).toEqual([GROUP_PHASER]);
+    expect(doc.parts.find((p) => p.slot === FULL_SLOT.hat)?.automation).toEqual(AUTOMATION_LANES);
+    const kick = doc.parts.find((p) => p.slot === FULL_SLOT.kick)!;
+    expect(kick.sequencer).toMatchObject({ kind: 'euclidean', pattern: CAPTURED_KICK });
+    expect(kick.strip.output).toEqual({ group: GROUP_LANES_DOCUMENT.groups![0]!.id });
+    expect(doc.harmony).toEqual(FULL_ARRANGEMENT.harmony);
+    expect(Object.keys(doc.patches ?? {})).toEqual(Object.keys(GROUP_LANES_DOCUMENT.patches!));
+    expect(Object.keys(doc.returns ?? {})).toEqual(['a', 'b']);
+  });
+
+  it('leave a song without them byte for byte as it was: no group gains the key', () => {
+    const first = makeArrangement(grouped([DRUMS, MUSIC])).document;
+    for (const group of first.groups!) {
+      expect(Object.keys(group)).toEqual(Object.keys(group).filter((k) => k !== 'automation'));
+      expect(group).not.toHaveProperty('automation');
+    }
+    const empty = withLanes([]);
+    expect(empty.corrections).toEqual([]);
+    expect(lanesOf(empty)).toBeUndefined();
+    const text = JSON.stringify(first);
+    expect(JSON.stringify(makeArrangement(JSON.parse(text)).document)).toBe(text);
+  });
+
+  it.each([
+    ['a send', 'strip.send.a', /a group has no strip\.send\.a lane/],
+    ['a voice target', 'voice.filter.cutoff', /a group has no voice\.filter\.cutoff lane/],
+    ['a sequencer target', 'seq.gate', /a group has no seq\.gate lane/],
+    ['an insert the group does not hold', 'insert.nope.rate', /the group has no insert "nope"/],
+  ])('drop a lane on %s, with a correction', (_, target, message) => {
+    const r = withLanes([rise('strip.level'), rise(target, 0, 0.5)]);
+    expect(lanesOf(r)?.map((l) => l.target)).toEqual(['strip.level']);
+    expect(r.corrections).toHaveLength(1);
+    expect(r.corrections[0]).toMatch(/^groups\[0\]\.automation\[1\]\.target: /);
+    expect(r.corrections[0]).toMatch(message);
+  });
+
+  it('drop a list that is not one, with a correction', () => {
+    const r = withLanes({ target: 'strip.level' });
+    expect(lanesOf(r)).toBeUndefined();
+    expect(r.corrections.join('\n')).toMatch(/groups\[0\]\.automation: .* is not a list of lanes/);
+  });
+
+  it("drop the lanes of an insert the group's list no longer holds", () => {
+    const r = withLanes([rise('strip.pan', -1, 1), rise(groupPhaserTarget('rate'))], []);
+    expect(lanesOf(r)?.map((l) => l.target)).toEqual(['strip.pan']);
+    expect(r.corrections).toEqual([
+      'groups[0].automation[1].target: the group has no insert "gphase1" — lane dropped',
+    ]);
+  });
+
+  it("fit to the song's length, and have no cap", () => {
+    // A linear pan from hard left over twice the song: centre where the song ends.
+    const past = {
+      target: 'strip.pan',
+      on: true,
+      points: [
+        { tick: 0, value: -1, bend: 0 },
+        { tick: 2 * SONG_TICKS, value: 1, bend: 0 },
+      ],
+    };
+    const fields = INSERT_AUTOMATION_FIELDS.phaser.map((row) =>
+      rise(groupPhaserTarget(row.target), row.min, row.max),
+    );
+    const r = withLanes([past, rise('strip.level'), ...fields]);
+    expect(lanesOf(r)).toHaveLength(2 + fields.length);
+    expect(lanesOf(r)![0]!.points.at(-1)).toEqual({ tick: SONG_TICKS, value: 0, bend: 0 });
+    expect(r.corrections).toEqual([
+      `groups[0].automation[0].points: points past the song's end (tick ${SONG_TICKS}) — fitted to it`,
+    ]);
   });
 });

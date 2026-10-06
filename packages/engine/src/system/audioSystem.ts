@@ -16,8 +16,8 @@
  * - `MusicPlayback`: the player on the transport (start, stop, mute) and the
  *   position queries.
  * - `SystemLoadMeter`: which processors report their load, and the sum.
- * - `SongAutomation`: the parts' automation lanes on the transport
- *   (windsor#344), told of every partial after it has landed.
+ * - `SongAutomation`: the parts' and groups' automation lanes on the transport
+ *   (windsor#344, windsor#614), told of every partial after it has landed.
  *
  * What stays here is construction, the lifecycle (`init`, `update`,
  * `dispose`) and the two document transactions, which span them all.
@@ -32,6 +32,7 @@
  */
 import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { AutomationLane } from '../automation/automationLane';
+import { groupOwner, partOwner } from '../automation/automationOwner';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
@@ -57,7 +58,7 @@ import { PatchResolver } from '../song/arrangementValidate';
 import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
-import { withoutAutomation } from './automationPartial';
+import { withoutAutomation, withoutGroupAutomation } from './automationPartial';
 import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
@@ -138,7 +139,12 @@ export class AudioSystem {
       ...(options.defer ? { defer: options.defer } : {}),
     };
     const graph = new StandingGraph(this.engine, options.returns ?? RETURNS, routeOptions);
-    const groups = new GroupBuses({ context: this.engine.context, graph, routeOptions });
+    const groups = new GroupBuses({
+      context: this.engine.context,
+      graph,
+      routeOptions,
+      insertsRebuilt: (bus) => this.automation.groupInsertsRebuilt(bus),
+    });
     const parts = new PartStrips({
       engine: this.engine,
       graph,
@@ -160,8 +166,11 @@ export class AudioSystem {
       () => graph.masterStrip,
     );
     this.playback = new MusicPlayback(this.scheduler, this.engine.context);
-    this.automation = new SongAutomation(this.scheduler, this.engine.context, (slot) =>
-      roster.strip(slot),
+    this.automation = new SongAutomation(
+      this.scheduler,
+      this.engine.context,
+      (slot) => roster.strip(slot),
+      (id) => groups.get(id),
     );
   }
 
@@ -351,7 +360,8 @@ export class AudioSystem {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- held back from `rest`, read nowhere
     const { returns, patches, parts, master, groups, meta, ...rest } = partial;
     // Read before anything changes: a ninth group refuses the whole partial (windsor#285).
-    const groupPlan = this.groups.plan(groups);
+    // A group's lanes are the automation's, as a part's are (windsor#614).
+    const groupPlan = this.groups.plan(withoutGroupAutomation(groups));
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
     // A part's lanes are the automation's, after everything else has landed (windsor#344).
     const { arrangementParts, strips } = splitStrips(withoutAutomation(parts));
@@ -430,12 +440,17 @@ export class AudioSystem {
    * hear it too. A no-op before `initMusic` or for a part with no lanes.
    */
   resyncAutomation(slot: number): void {
-    this.automation.resync(slot);
+    this.automation.resync(partOwner(slot));
   }
 
   /** The lanes a part plays now: its document's, normalised and fitted. None before `initMusic`. */
   automationLanes(slot: number): readonly AutomationLane[] {
-    return this.automation.lanesOf(slot);
+    return this.automation.lanesOf(partOwner(slot));
+  }
+
+  /** The lanes a group plays now (windsor#614), as `automationLanes` reads a part's. */
+  groupAutomationLanes(id: number): readonly AutomationLane[] {
+    return this.automation.lanesOf(groupOwner(id));
   }
 
   /** A return by name, once `init()` has built them. */

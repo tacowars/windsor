@@ -19,6 +19,7 @@ import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from '../__fixtures__/fullArrangement';
 import { installWorklet, rig } from '../__fixtures__/stripRig';
 import type { AutomationHandle } from '../automation/automationHandles';
+import { partOwner } from '../automation/automationOwner';
 import { AutomationPlayer } from '../automation/automationPlayer';
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import {
@@ -47,6 +48,8 @@ afterAll(() => restore());
 const fake = (param: AudioParam): FakeParam => param as unknown as FakeParam;
 const nodeOf = (part: AudioPart): FakeWorkletNode => part.node as unknown as FakeWorkletNode;
 const stripOf = (part: AudioPart): PartStrip => ({ part }) as unknown as PartStrip;
+/** The part every resolver here is asked about. */
+const PART = partOwner(0);
 const slotMap = (...paths: string[]): (string | null)[] =>
   Array.from({ length: FM_LANES_MAX }, (_, i) => paths[i] ?? null);
 const lastPosted = (part: AudioPart): unknown => nodeOf(part).posted.at(-1);
@@ -183,14 +186,14 @@ describe('a voice lane on its part (windsor#346)', () => {
   it('hands out one handle per target, so a resync finds the one the player holds', async () => {
     const { part } = await rig();
     const resolve = automationResolver(() => stripOf(part));
-    const first = resolve(0, 'voice.ops.1.width')!.handle;
-    expect(resolve(0, 'voice.ops.1.width')!.handle).toBe(first);
-    expect(resolve(0, 'voice.filter.cutoff')!.handle).toBe(
-      resolve(0, 'voice.filter.cutoff')!.handle,
+    const first = resolve(PART, 'voice.ops.1.width')!.handle;
+    expect(resolve(PART, 'voice.ops.1.width')!.handle).toBe(first);
+    expect(resolve(PART, 'voice.filter.cutoff')!.handle).toBe(
+      resolve(PART, 'voice.filter.cutoff')!.handle,
     );
-    expect(resolve(0, 'voice.ops.2.width')!.handle).not.toBe(first);
+    expect(resolve(PART, 'voice.ops.2.width')!.handle).not.toBe(first);
     const { part: rebuilt } = await rig();
-    expect(automationResolver(() => stripOf(rebuilt))(0, 'voice.ops.1.width')!.handle).not.toBe(
+    expect(automationResolver(() => stripOf(rebuilt))(PART, 'voice.ops.1.width')!.handle).not.toBe(
       first,
     );
   });
@@ -203,7 +206,7 @@ describe('a voice lane on its part (windsor#346)', () => {
       macros: [makeMacro({ mappings: [{ target: 'filter.cutoff' }] })],
     };
     const resolve = automationResolver(() => stripOf(part));
-    const handle = resolve(0, 'voice.filter.cutoff')!.handle;
+    const handle = resolve(PART, 'voice.filter.cutoff')!.handle;
     const player = new AutomationPlayer({
       transport: new TickTransport(RIG_BPM),
       now: () => 0,
@@ -211,17 +214,17 @@ describe('a voice lane on its part (windsor#346)', () => {
       songTicks: RIG_SONG_TICKS,
       restTick: 48,
     });
-    player.setLanes(0, [lane('voice.filter.cutoff', [point(0, 400), point(96, 1600)])]);
+    player.setLanes(PART, [lane('voice.filter.cutoff', [point(0, 400), point(96, 1600)])]);
     expect(part.voiceSlotOf('filter.cutoff')).toBe(0);
     part.setPatch(mapped);
     player.resync();
-    expect(resolve(0, 'voice.filter.cutoff')).toBeUndefined();
+    expect(resolve(PART, 'voice.filter.cutoff')).toBeUndefined();
     expect(part.voiceSlotOf('filter.cutoff')).toBeUndefined();
     expect(lastPosted(part)).toEqual({ type: 'voiceSlots', slots: slotMap() });
-    expect(resolve(0, 'voice.ops.0.level')).toBeDefined();
+    expect(resolve(PART, 'voice.ops.0.level')).toBeDefined();
     part.setPatch(unmapped);
     player.resync();
-    expect(resolve(0, 'voice.filter.cutoff')!.handle).toBe(handle);
+    expect(resolve(PART, 'voice.filter.cutoff')!.handle).toBe(handle);
     expect(part.voiceSlotOf('filter.cutoff')).toBe(0);
     // Held at the playhead, tick 48, halfway up the lane: 800 Hz over the patch's cutoff.
     expect(fake(part.voiceSlotParams[0]!).automation.at(-1)!.value).toBeCloseTo(
@@ -234,7 +237,7 @@ describe('a voice lane on its part (windsor#346)', () => {
   it('has a handle for every voice row, the nine decay rows included (windsor#347)', async () => {
     const { part } = await rig();
     const resolve = automationResolver(() => stripOf(part));
-    const resolved = VOICE_TARGET_IDS.filter((target) => resolve(0, target) !== undefined);
+    const resolved = VOICE_TARGET_IDS.filter((target) => resolve(PART, target) !== undefined);
     expect(VOICE_TARGET_IDS.filter((target) => /\.decay(Time|Curve)$/.test(target))).toHaveLength(
       9,
     );

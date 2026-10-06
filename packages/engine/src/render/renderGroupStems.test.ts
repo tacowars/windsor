@@ -9,23 +9,32 @@
  * Master, and Send A fed by the snare. The fixture's hat stands in for the
  * snare and its arp for the bass, as in `groupRig.ts`. The fake `fm-part`
  * plays a tone per part while its notes sound, the same in every render.
+ *
+ * A group's lanes (windsor#614) play in the render from tick 0, into its
+ * stem and the master alike.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { lane, point } from '../__fixtures__/automationRig';
 import type { FakeContext } from '../__fixtures__/fakeAudioContext';
+import type { FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { BASS, DRUM_COMPRESSOR, KICK, SNARE, drumSong } from '../__fixtures__/groupRig';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
 import { TapeNode } from '../__fixtures__/groupRig';
 import { DetectorNode } from '../__fixtures__/sidechainRig';
+import { sources } from '../__fixtures__/stripRig';
 import { COMPRESSOR_NAME } from '../inserts/compressorConstants';
 import { TAPE_NAME } from '../inserts/tapeConstants';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import type { ChannelStrip, GroupSpec } from '../mixer/mix';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import { RENDER_QUANTUM_FRAMES } from './renderConstants';
+import { renderPass } from './renderPass';
+import { planFor } from './renderSong';
 import { renderStems } from './renderStems';
 import type { Stem } from './stemPlan';
 
@@ -224,6 +233,49 @@ describe('renderStems with group buses (windsor#286)', () => {
 
   it('renders the master alone for a song with a group and no parts', async () => {
     const stems = await collect({ ...SONG, parts: [] });
+    expect([...stems.keys()]).toEqual(['master']);
+  });
+});
+
+describe("a group's lanes in the render (windsor#614)", () => {
+  /** Unity for the first bar, then silent. */
+  const CUT = lane('strip.level', [point(0, 1), point(TICKS_PER_BAR, 1), point(TICKS_PER_BAR, 0)]);
+  const RISE = lane('strip.level', [point(0, 0.5), point(TICKS_PER_BAR, 1)]);
+  const bar = Math.round((RATE * 60 * 4) / SONG.transport.bpm);
+
+  it("holds the lane's opening value at time 0, before rendering starts", async () => {
+    const document = withGroup(SONG, { automation: [RISE] });
+    const plan = planFor(document, { sampleRate: RATE, tailSeconds: 0 });
+    let opening: unknown[] = [];
+    await renderPass(
+      document,
+      plan,
+      { sampleRate: RATE, createContext: (init) => new FakeOfflineContext(init) },
+      {
+        channels: 2,
+        attach: (system) => {
+          const level = sources(system.groupBus(DRUMS_ID)!.output)[0] as unknown as GainNode;
+          opening = (level.gain as unknown as FakeParam).automation.slice();
+          return () => {};
+        },
+      },
+    );
+    expect(opening).toEqual([
+      { call: 'cancelScheduledValues', value: DRUMS.level, time: 0 },
+      { call: 'setValueAtTime', value: 0.5, time: 0 },
+    ]);
+  });
+
+  it("carries a level lane into the group's stem, and the stems still sum to the master", async () => {
+    const stems = await collect(withGroup(SONG, { inserts: [], automation: [CUT] }));
+    const drums = stems.get('group 1 Drums')![0]!;
+    expect(peak(drums.subarray(0, Math.round(bar * 0.7)))).toBeGreaterThan(1e-3);
+    expect(peak(drums.subarray(Math.round(bar * 1.3), 2 * bar))).toBeLessThan(1e-9);
+    expect(sumError(stems)).toBeLessThan(1e-6);
+  });
+
+  it('renders the master alone for a song with a group with lanes and no parts', async () => {
+    const stems = await collect({ ...withGroup(SONG, { automation: [CUT] }), parts: [] });
     expect([...stems.keys()]).toEqual(['master']);
   });
 });
