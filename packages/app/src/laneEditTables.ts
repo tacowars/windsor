@@ -41,6 +41,8 @@ export interface LaneCursorTable {
   readonly copy: string;
   /** Over an empty stretch of a part lane: a press draws a region. */
   readonly draw: string;
+  /** While a part region's body is dragged where it cannot drop: another kind's lane, a lane of no part, off the lanes. */
+  readonly refuse: string;
 }
 
 export const LANE_CURSORS: LaneCursorTable = {
@@ -51,4 +53,5 @@ export const LANE_CURSORS: LaneCursorTable = {
   grabbing: 'grabbing',
   copy: 'copy',
   draw: 'crosshair',
+  refuse: 'not-allowed',
 };

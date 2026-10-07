@@ -59,6 +59,12 @@ export interface PasteRefusal {
   readonly refused: string;
 }
 
+/** The refusal of a `kind` region anywhere but a part playing `kind`: what Paste and a drag onto another lane say. */
+export function kindRefusal(kind: SequencerKind): PasteRefusal {
+  const name = KIND_LABELS[kind];
+  return { refused: `a ${name} region pastes only onto a ${name} part` };
+}
+
 /**
  * Paste: `clip` laid over `part`'s regions at `start`, its end cut at the
  * song's. Refused onto a part playing another kind of sequencer, or at or
@@ -70,10 +76,7 @@ export function pasteRegion(
   start: number,
   songTicks: number,
 ): Placement | PasteRefusal {
-  if (clip.kind !== part.sequencer.kind) {
-    const from = KIND_LABELS[clip.kind];
-    return { refused: `a ${from} region pastes only onto a ${from} part` };
-  }
+  if (clip.kind !== part.sequencer.kind) return kindRefusal(clip.kind);
   return (
     placeRegion(part.regions, fromClip(clip, start), songTicks) ?? {
       refused: 'the paste starts past the end of the song',

@@ -4638,6 +4638,13 @@ select.field.compact {
 .lane.selected {
   border-color: var(--carrier);
 }
+/* A region's body drag (record 2026-10-07-song-region-drag-across-parts): the lanes it can't drop on dim, the one under the pointer is bordered. */
+.lane-timeline > .lane-drop-dim {
+  opacity: 0.35;
+}
+.lane.lane-drop-target {
+  border-color: var(--carrier);
+}
 .lane.lane-harm {
   height: 40px;
 }

@@ -79,8 +79,10 @@ export function partRow(view: SongView, part: DocumentPart, strip: HTMLElement):
 /** The lane of regions for `part`, with the selected region's faint handles and seam marks. */
 export function partLane(view: SongView, part: DocumentPart): HTMLElement {
   const lane = el('div', `lane${partSelected(view, part) ? ' selected' : ''}`);
+  // Which part the lane is, for a body drag from another lane to find it by its height (`partLaneTransfer.ts`).
+  lane.dataset['partSlot'] = String(part.slot);
   lane.title =
-    'drag an edge to resize, a seam to move both regions, the body to move (cmd/ctrl-drag copies) · ' +
+    'drag an edge to resize, a seam to move both regions, the body to move it, onto another part of its kind too (cmd/ctrl-drag copies) · ' +
     'drag an empty stretch to draw, click it for a bar · shift snaps to the step · alt-click splits · ' +
     'cmd/ctrl+C, X, V copy, cut and paste at the playhead · cmd/ctrl+D duplicates · delete removes';
   paintRegions(view, lane, part, part.regions);

@@ -224,13 +224,19 @@ detail pane at the bottom. Its layers, top down:
    across it to draw, drag an edge to trim up to the neighbour, a seam
    where two regions touch to roll both, the body to move anywhere in the
    song over what it lands on (Cmd/Ctrl-drag copies; `regionPlacement.ts`),
+   or onto another part's lane of the same sequencer kind as Copy + Paste
+   would land it, one commit for both parts (`partLaneTransfer.ts` over the
+   pure `regionTransfer.ts` and `laneSpans.ts`; every lane it can't drop on
+   dims while the drag is live, and a drop there is refused with Paste's
+   toast; record `2026-10-07-song-region-drag-across-parts`),
    alt-click to split, Shift for the modifier snap (the region's `divisor`,
    else the beat). Cmd/Ctrl+C, X, V and D copy, cut, paste at the
    playhead's bar and duplicate the selected region, and Delete removes it
    (`regionKeys.ts` → `regionClipboard.ts`, wired by `songRegionKeys.ts`;
    record `2026-10-06-song-region-move-copy-paste`). A drag previews on the lane with its readout and commits once on
    release. `pointerDrag.ts` is the shared press-or-drag helper (capture,
-   threshold), the way `chordDrag.ts` does it.
+   threshold, horizontal unless a press opts into both axes, as a part
+   lane's body press does), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
    the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row
