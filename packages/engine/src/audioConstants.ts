@@ -205,6 +205,11 @@ export const ARRANGEMENT_VERSION = 8;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
+/**
+ * How many colours a part may take (windsor#641, record `2026-10-07-part-colours`
+ * decision 5): a part's `colour` is an index below this. The hex values are the app's.
+ */
+export const PART_COLOURS = 14;
 /** A mix strip's linear level: 1 is unity, 4 is +12 dB of headroom to spare. */
 export const MIX_LEVEL_MAX = 4;
 /** The most group buses a song holds (windsor#284; record `2026-10-01-group-buses` §2). */

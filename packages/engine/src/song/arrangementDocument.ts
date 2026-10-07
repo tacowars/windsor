@@ -45,11 +45,19 @@ import type { ResolveOptions } from './arrangementValidate';
 import type { FormatRefusal } from './formatUpgrade';
 import { upgradeSong } from './songMigrations';
 import { buildsNoGenerator } from './partGenerators';
+import { colourParts, type UncolouredPart } from './partColours';
 
 export { FALLBACK_ARRANGEMENT };
 
 /** A part as the document holds it: the player's part plus its own strip (#597) and lanes. */
 export interface DocumentPart extends MusicPart {
+  /**
+   * The part's colour (windsor#641, record `2026-10-07-part-colours`): an
+   * index into the app's part palette, 0 to `PART_COLOURS - 1`. Nothing that
+   * plays reads it. The normaliser fills it when absent or invalid
+   * (`partColours.ts`), so a normalised part always has one.
+   */
+  readonly colour: number;
   /** Level, pan and sends — owned by the part, not looked up by name. */
   readonly strip: ChannelStrip;
   /**
@@ -293,17 +301,19 @@ function normaliseParts(
   if (raw.length > MUSIC_PARTS_MAX) {
     n.correction(`parts: ${raw.length} parts — only the first ${MUSIC_PARTS_MAX} are kept`);
   }
-  const out: { part: DocumentPart; path: string }[] = [];
+  const out: UncolouredPart<Omit<DocumentPart, 'colour'>>[] = [];
   const used = new Set<number>();
   raw.slice(0, MUSIC_PARTS_MAX).forEach((entry, i) => {
-    const part = n.part(entry, `parts[${i}]`, transport);
-    if (!part) return;
-    if (used.has(part.slot)) {
-      n.correction(`parts[${i}]: slot ${part.slot} is already used — part dropped`);
+    const read = n.part(entry, `parts[${i}]`, transport);
+    if (!read) return;
+    if (used.has(read.part.slot)) {
+      n.correction(`parts[${i}]: slot ${read.part.slot} is already used — part dropped`);
       return;
     }
-    used.add(part.slot);
-    out.push({ part, path: `parts[${i}]` });
+    used.add(read.part.slot);
+    out.push(read);
   });
-  return n.figureSources(out);
+  // Colours are assigned over the list that survives (windsor#641), so a
+  // dropped part's colour is free for the others.
+  return n.figureSources(colourParts(out, n));
 }

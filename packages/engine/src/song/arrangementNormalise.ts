@@ -50,6 +50,20 @@ import { SCALES, type ScaleName } from '../sequencing/scaleSampler';
 import { normaliseSequencer, sequencerKindOf } from './sequencerNormalise';
 import { figureSourceFault } from './figureNormalise';
 import type { FigureSource } from '../sequencing/figureSequencer';
+import type { UncolouredPart } from './partColours';
+
+/** The keys a part may carry; anything else is dropped, reported. */
+const PART_KEYS = [
+  'slot',
+  'name',
+  'colour',
+  'preset',
+  'velocity',
+  'strip',
+  'regions',
+  'sequencer',
+  'automation',
+];
 
 export class ArrangementNormaliser extends FieldNormaliser {
   /**
@@ -178,15 +192,16 @@ export class ArrangementNormaliser extends FieldNormaliser {
   /**
    * One part of the list (#597): identity, patch, strip, regions, sequencer
    * and automation lanes (windsor#342). Null drops it, reported. The lanes
-   * come after the strip, whose insert ids they name.
+   * come after the strip, whose insert ids they name. Its colour is read
+   * raw and assigned once the whole list is known (`partColours.ts`).
    */
-  part(raw: unknown, path: string, transport: Transport): DocumentPart | null {
+  part(
+    raw: unknown,
+    path: string,
+    transport: Transport,
+  ): UncolouredPart<Omit<DocumentPart, 'colour'>> | null {
     const o = this.section(raw, path);
-    this.dropUnknown(
-      o,
-      ['slot', 'name', 'preset', 'velocity', 'strip', 'regions', 'sequencer', 'automation'],
-      path,
-    );
+    this.dropUnknown(o, PART_KEYS, path);
     const slot = this.slot(o.slot, path);
     if (slot === null) return null;
     const preset = this.preset(o.preset, path);
@@ -204,7 +219,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       path: `${path}.automation`,
       n: this,
     });
-    return {
+    const part = {
       slot,
       name: typeof o.name === 'string' ? o.name : fallbackName,
       preset,
@@ -220,6 +235,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       // Absent stays absent: a song without lanes reads and exports as before (decision 15).
       ...(automation && { automation }),
     };
+    return { part, path, colour: o.colour };
   }
 
   /**

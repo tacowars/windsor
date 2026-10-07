@@ -147,7 +147,7 @@ export const FULL_STRIPS: Readonly<Record<FullPartId, ChannelStrip>> = {
 
 /**
  * The same arrangement as a self-contained *document* (#562, #597): each part
- * with its strip, and the four patches its parts play, embedded, the way a
+ * with its colour and strip, and the four patches its parts play, embedded, the way a
  * shipped song under `arrangements/` carries them.
  *
  * The snapshot is read from the library rather than spelled out, so this
@@ -159,7 +159,12 @@ export const FULL_DOCUMENT: ArrangementDocument & {
 } = {
   version: ARRANGEMENT_VERSION,
   ...FULL_ARRANGEMENT,
-  parts: FULL_PART_IDS.map((id) => ({ ...FULL_PARTS[id], strip: FULL_STRIPS[id] })),
+  // Colours in list order, as the normaliser assigns a song without any (windsor#641).
+  parts: FULL_PART_IDS.map((id, colour) => ({
+    ...FULL_PARTS[id],
+    colour,
+    strip: FULL_STRIPS[id],
+  })),
   patches: Object.fromEntries(
     FULL_PART_IDS.map((id) => FULL_PARTS[id].preset).map((id) => [
       id,

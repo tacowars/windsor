@@ -42,6 +42,7 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
     {
       slot: 0,
       name: 'click',
+      colour: 0,
       preset: FALLBACK_PATCH_ID,
       velocity: 1,
       // Unity, centred, and with no sends — whatever a song's strips say.
