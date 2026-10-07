@@ -150,6 +150,10 @@ jobs:
           # preview push and pushes again, instead of overwriting it.
           force: false
           attempt-limit: 5
+          # Commit as the actor's ID-based noreply address. The actions' default
+          # is `<actor>@users.noreply.github.com`, which drops the ID.
+          git-config-name: ${{ github.actor }}
+          git-config-email: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
 
   # A code PR from this repo gets its build at pr-preview/pr-<N>/ and a
   # sticky comment with the URL. Forks and docs-only PRs get neither.
@@ -186,6 +190,8 @@ jobs:
           preview-branch: gh-pages
           umbrella-dir: pr-preview
           qr-code: 'false'
+          git-config-name: ${{ github.actor }}
+          git-config-email: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
 
   # Deletes the PR's preview folder when the PR is closed or merged, or when
   # a push leaves it docs-only (verify says code=false), so no stale build
@@ -239,3 +245,5 @@ jobs:
           preview-branch: gh-pages
           umbrella-dir: pr-preview
           qr-code: 'false'
+          git-config-name: ${{ github.actor }}
+          git-config-email: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
