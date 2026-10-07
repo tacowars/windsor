@@ -133,6 +133,30 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   (`docs/log/2026-10-02-ci-runs-affected-tests-on-prs.md`), and a ruleset on
   `main` requires that check and a PR.
 
+## Temporary files and disk hygiene
+
+- **Where:** a task's temporary files go in the session's scratchpad
+  directory (the environment info names it), never loose in `/tmp` or
+  `/private/tmp`. A tool that insists on `/tmp` gets one folder per task,
+  `/tmp/windsor-<issue>-<short-name>/`, with everything inside it.
+- **Python:** no venv per task. Reuse `~/.cache/windsor/venv` (created on
+  first use) or `uv run --with <pkg>`, which shares uv's cache.
+- **Cleanup:** before reporting a task finished (before the PR or the final
+  summary), delete what it created under `/tmp` and the scratchpad, except
+  what the PR or report links to or the user asked to keep. What is worth
+  keeping goes into the repo (`docs/research/<topic>/`) or onto the PR,
+  not into `/tmp`.
+- **Only your own:** delete only what this session created. Several agents
+  run in parallel: other sessions' scratchpads, another task's
+  `/tmp/windsor-*` folder and the `puppeteer_dev_chrome_profile-*` folders
+  may still be in use.
+- **Browser:** close the pages and the browser you opened through the
+  chrome-devtools MCP when done, so it removes its temporary profile.
+- **Large outputs:** audio dumps (`.f32`, `.wav`), screenshots, PDFs and
+  other large generated files are temporary unless the deliverable needs
+  them, and go in the cleanup. A task that will generate more than about
+  1 GB says so in an update first.
+
 ## Working a ticket
 
 The issue is the whole brief (`.github/ISSUE_TEMPLATE/task.md`) and the PR
