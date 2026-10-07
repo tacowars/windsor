@@ -1,5 +1,5 @@
 import { MUSIC_PARTS_MAX } from '@windsor/engine';
-import type { MusicPart, SequencerKind } from '@windsor/engine';
+import type { DocumentPart, SequencerKind } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 import {
   addPartTitle,
@@ -12,20 +12,22 @@ import {
   revealScrollLeft,
 } from './partStripModel';
 
-const part = (name: string, kind: SequencerKind): Pick<MusicPart, 'name' | 'sequencer'> =>
-  ({ name, sequencer: { kind } }) as Pick<MusicPart, 'name' | 'sequencer'>;
+type ChipPart = Pick<DocumentPart, 'name' | 'sequencer' | 'colour'>;
+
+const part = (name: string, kind: SequencerKind, colour = 0): ChipPart =>
+  ({ name, sequencer: { kind }, colour }) as ChipPart;
 
 describe('chipLabel', () => {
-  it('names the part, numbers it from 1 with its kind, and takes its regions’ colour', () => {
-    expect(chipLabel(part('Organ', 'chord'), 0)).toEqual({
+  it('names the part, numbers it from 1 with its kind, and takes the part’s own colour', () => {
+    expect(chipLabel(part('Organ', 'chord', 1), 0)).toEqual({
       name: 'Organ',
       meta: '1 · Chord',
-      tone: 'var(--modulator)',
+      tone: '#EDE36E',
     });
-    expect(chipLabel(part('Machine', 'euclidean'), 7)).toEqual({
+    expect(chipLabel(part('Machine', 'euclidean', 2), 7)).toEqual({
       name: 'Machine',
       meta: '8 · Euclid',
-      tone: 'var(--carrier)',
+      tone: '#BC3D6D',
     });
     expect(chipLabel(part('Pad', 'none'), 15).meta).toBe('16 · None');
   });

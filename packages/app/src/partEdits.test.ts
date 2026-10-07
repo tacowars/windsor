@@ -17,6 +17,7 @@ import {
   drawRegionChange,
   drawStrokeChange,
   editedRegion,
+  partColourChange,
   patternOf,
   regionGrain,
   regionPatternChange,
@@ -345,5 +346,18 @@ describe('a gesture snaps to the grain of the region it acts on (fix round 1)', 
     expect(split?.[2]?.pattern).toMatchObject({ divisor: DIVISORS.eighth });
     expect(split?.[0]?.pattern).toBeUndefined();
     expect(splitPartRegion(part, 5, BAR, false)).toBeNull();
+  });
+});
+
+describe('a part’s colour (windsor#642)', () => {
+  it('is one field on the part, kept by the document, and nothing when unchanged or gone', () => {
+    const model = new DocumentModel(newSong());
+    expect(partAt(model.doc, 0)?.colour).toBe(0);
+    const partial = partColourChange(model.doc, 0, 5);
+    expect(partial).toEqual({ parts: { 0: { colour: 5 } } });
+    if (partial) model.merge(partial);
+    expect(partAt(model.doc, 0)?.colour).toBe(5);
+    expect(partColourChange(model.doc, 0, 5)).toBeNull();
+    expect(partColourChange(model.doc, 9, 3)).toBeNull();
   });
 });

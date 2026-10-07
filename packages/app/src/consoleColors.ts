@@ -51,3 +51,43 @@ export const CSS_VARIABLE_OF: Readonly<Record<string, string>> = {
   '--line': LINE_COLOR,
   '--line-bright': LINE_BRIGHT_COLOR,
 };
+
+/** One entry of the part palette: the name the picker shows and its colour. */
+export interface PartColor {
+  readonly name: string;
+  readonly hex: string;
+}
+
+/**
+ * The part palette (windsor#642; record `2026-10-07-part-colours`, decisions
+ * 5 and 6), in assignment order: a part's `colour` is an index into it, and
+ * the engine's `PART_COLOURS` is its length. Each entry sits as far as the
+ * palette allows from the three before it, and each is at least 12
+ * CIEDE2000 from every one of the five accents above (carrier, modulator,
+ * return, sequencer lane, hot), which the console keeps for its roles and
+ * never gives a part.
+ */
+export const PART_COLORS: readonly PartColor[] = [
+  { name: 'Sky', hex: '#6EA8E2' },
+  { name: 'Lemon', hex: '#EDE36E' },
+  { name: 'Raspberry', hex: '#BC3D6D' },
+  { name: 'Umber', hex: '#8F7A55' },
+  { name: 'Aqua', hex: '#6DE6FC' },
+  { name: 'Lime', hex: '#77FB58' },
+  { name: 'Magenta', hex: '#D65FC6' },
+  { name: 'Frost', hex: '#E3DCE1' },
+  { name: 'Steel', hex: '#5A7FBF' },
+  { name: 'Grass', hex: '#669D42' },
+  { name: 'Mint', hex: '#9EE6A8' },
+  { name: 'Blush', hex: '#E2A2AA' },
+  { name: 'Periwinkle', hex: '#A6AAF2' },
+  { name: 'Olive', hex: '#ABBD3B' },
+];
+
+/**
+ * The palette entry a part's `colour` names. The normaliser keeps every
+ * part's colour in range, so the first entry stands in only for a value
+ * that never reaches here.
+ */
+export const partColor = (colour: number): PartColor =>
+  PART_COLORS[colour] ?? (PART_COLORS[0] as PartColor);

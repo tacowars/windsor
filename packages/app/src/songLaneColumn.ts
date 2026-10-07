@@ -27,7 +27,7 @@
  */
 import type { DocumentPart } from '@windsor/engine';
 import { el } from './dom';
-import { groupAccent } from './consoleColors';
+import { groupAccent, partColor } from './consoleColors';
 import type { LoopBraceRow } from './loopBrace';
 import { chipLabel } from './partStripModel';
 import { automationRows, type Readout } from './songAutomationLane';
@@ -136,6 +136,8 @@ export function partGroup(
   const rows = partBlockRows(open, part.automation?.length ?? 0);
   const folded = open ? automationRows(view, part, readouts) : [];
   const block = el('div', `lane-col${partSelected(view, part) ? ' selected' : ''}`);
+  // The selected part's outline takes the part's colour (windsor#642).
+  block.style.setProperty('--pc', partColor(part.colour).hex);
   block.append(
     numberTab(part, index, rows.length),
     partRow(view, part, strip),

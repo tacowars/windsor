@@ -1,7 +1,8 @@
 /**
  * What a part lane draws (#709 decisions 1 and 3; windsor#551): one `.reg`
- * block per region — teal for the pitched kinds, amber for Euclidean, the
- * kind and its summary in small caps, ⟲ on a region the pattern restarts in
+ * block per region — in the part's colour, the `--pc` its lane carries
+ * (windsor#642, record `2026-10-07-part-colours` decision 7), the kind and
+ * its summary in small caps, ⟲ on a region the pattern restarts in
  * and ∞ on the one whole-song region, faint ticks at the pattern's cycle —
  * and over them the editing marks: each block's two edge handles, the seam
  * marks where two regions touch and the readout while dragging
@@ -23,7 +24,6 @@ import { regionMark } from './regionModel';
 import type { SongView } from './songTab';
 import {
   CYCLE_TICKS,
-  LANE_TONE,
   REGION_SUMMARY,
   blockBox,
   forKind,
@@ -46,10 +46,9 @@ export function selectedRegion(view: SongView, slot: number): number | null {
 
 /** One `.reg` block for region `index` of `part`, labelled with that region's own pattern. */
 function regionBlock(view: SongView, part: MusicPart, index: number, region: Region): HTMLElement {
-  const tone = LANE_TONE[part.sequencer.kind];
   const pattern = regionPattern(part, index);
   const cycle = forKind(CYCLE_TICKS, pattern);
-  const node = el('div', `reg${tone === 'perc' ? ' perc' : ''}${cycle ? ' cyc' : ''}`);
+  const node = el('div', `reg${cycle ? ' cyc' : ''}`);
   const { pxPerBar, bar } = laneScaleOf(view);
   const box = blockBox(region.start, region.duration, pxPerBar, bar);
   node.style.left = `${box.leftPx}px`;

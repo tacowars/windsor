@@ -7,7 +7,9 @@
  * lane follow it. + adds a part and − removes the selected one, with the
  * confirm the Parts tab's rail used to ask. Each chip carries its part's
  * two mixer lights, from the part meter bank (`partStripLights.ts`,
- * windsor#528).
+ * windsor#528). Each chip's edge is its part's colour, which fills the
+ * selected chip, and a right-click or a long press on a chip opens the
+ * colour picker (`partColourPicker.ts`, windsor#642).
  *
  * The chips share the row, 70 to 150 px each (`console.css`). When they
  * don't fit, which is measured and never assumed from the window, the row
@@ -23,7 +25,8 @@ import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { openConfirm } from './metadataModal';
-import { addPartLive, removePartLive } from './partEdits';
+import { openPartColourPicker, wireChipColour } from './partColourPicker';
+import { addPartLive, removePartLive, setPartColourLive } from './partEdits';
 import { partListPopover } from './partStripList';
 import { watchStripLights } from './partStripLights';
 import {
@@ -60,7 +63,12 @@ function chip(ctx: AppCtx, index: number, lights: HTMLElement | undefined): HTML
   node.dataset.slot = String(slot);
   node.append(el('span', 'n', label.name), el('span', 'k', label.meta));
   if (lights) node.append(lights);
-  node.onclick = (): void => pickPart(ctx, slot);
+  const longPressed = wireChipColour(node, () =>
+    openPartColourPicker(node, part, (colour) => setPartColourLive(ctx, slot, colour)),
+  );
+  node.onclick = (): void => {
+    if (!longPressed()) pickPart(ctx, slot);
+  };
   return node;
 }
 

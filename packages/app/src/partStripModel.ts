@@ -1,15 +1,14 @@
 /**
  * The part strip's rules (windsor#520; record `2026-10-03-parts-tab-layout`,
  * decisions 2 and 3), pure so they are tested in Node: what a chip says and
- * which colour its edge takes, when + and − are offered and what their
+ * which colour its edge takes (the part's own, windsor#642), when + and − are offered and what their
  * titles say, and where the chip row scrolls for ‹ ›, and to keep the
  * selected chip in view. `partStrip.ts` draws them.
  */
-import type { MusicPart } from '@windsor/engine';
+import type { DocumentPart } from '@windsor/engine';
 import { MUSIC_PARTS_MAX } from '@windsor/engine';
+import { partColor } from './consoleColors';
 import { KIND_LABELS } from './sequencerConstants';
-import type { LaneTone } from './songViewTables';
-import { LANE_TONE } from './songViewTables';
 
 /** What one chip shows. */
 export interface ChipLabel {
@@ -17,24 +16,23 @@ export interface ChipLabel {
   readonly name: string;
   /** The second line: the 1-based position and the sequencer's label, `3 · Chord`. */
   readonly meta: string;
-  /** The left edge: the colour the Song tab draws this part's regions in. */
+  /**
+   * The part's colour (record `2026-10-07-part-colours`, decision 7): the
+   * chip's left edge and its fill when selected, the ▾ list row's, the
+   * number tab's and the regions'.
+   */
   readonly tone: string;
 }
 
-/** The region colours `.reg` and `.reg.perc` draw in (`console.css`), by lane tone. */
-const REGION_TONE: Readonly<Record<LaneTone, string>> = {
-  perc: 'var(--carrier)',
-  pitch: 'var(--modulator)',
-  none: 'var(--modulator)',
-};
-
 /** The chip of the part at `index` (0-based) in the document's order, the Song tab's lane order. */
-export function chipLabel(part: Pick<MusicPart, 'name' | 'sequencer'>, index: number): ChipLabel {
-  const kind = part.sequencer.kind;
+export function chipLabel(
+  part: Pick<DocumentPart, 'name' | 'sequencer' | 'colour'>,
+  index: number,
+): ChipLabel {
   return {
     name: part.name,
-    meta: `${index + 1} · ${KIND_LABELS[kind]}`,
-    tone: REGION_TONE[LANE_TONE[kind]],
+    meta: `${index + 1} · ${KIND_LABELS[part.sequencer.kind]}`,
+    tone: partColor(part.colour).hex,
   };
 }
 

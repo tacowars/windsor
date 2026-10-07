@@ -388,13 +388,15 @@ input {
   color: var(--ink-faint);
   white-space: nowrap;
 }
+/* The selected chip fills with its part's colour (windsor#642, record
+   2026-10-07-part-colours decision 8), the dark ink over it. */
 .pchip[aria-pressed='true'] {
-  background: var(--carrier);
-  border-color: var(--carrier);
+  background: var(--tone);
+  border-color: var(--tone);
 }
 .pchip[aria-pressed='true'] .n,
 .pchip[aria-pressed='true'] .k {
-  color: #1a1408;
+  color: #14181a;
 }
 /* The chip's two lights (windsor#528; the Song lanes mockup's Meters state):
    the part's red clip latch over its green activity light, small at the
@@ -427,7 +429,7 @@ input {
   cursor: pointer;
 }
 .pchip[aria-pressed='true'] .cl i {
-  border-color: rgba(26, 20, 8, 0.55);
+  border-color: rgba(20, 24, 26, 0.55);
 }
 /* ‹ › and ▾ show only while the row overflows. */
 .pnav,
@@ -515,8 +517,8 @@ input {
   background: var(--panel-hi);
 }
 .part-list-row[aria-current='true'] {
-  background: var(--carrier);
-  color: #1a1408;
+  background: var(--tone);
+  color: #14181a;
 }
 .part-list-row .n {
   font-family: var(--f-panel);
@@ -530,7 +532,67 @@ input {
   color: var(--ink-faint);
 }
 .part-list-row[aria-current='true'] .k {
-  color: #1a1408;
+  color: #14181a;
+}
+/* The part colour picker (windsor#642; record 2026-10-07-part-colours
+   decision 9): hung from the page body under a chip, the palette as a
+   7 × 2 grid with the part's colour ringed, and the name of the swatch
+   under the pointer below it. partColourPicker.ts places it on screen. */
+.part-colour-picker {
+  position: fixed;
+  z-index: 60;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.pcp-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 7px;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.pcp-title span {
+  color: var(--ink);
+}
+.pcp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 24px);
+  gap: 5px;
+}
+.pcp-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--pc);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.pcp-swatch:hover {
+  box-shadow: 0 0 0 1px var(--ink-dim);
+}
+.pcp-swatch[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 3px var(--ink);
+}
+.pcp-swatch:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.pcp-name {
+  margin-top: 7px;
+  font-family: var(--f-num);
+  font-size: 10px;
+  color: var(--ink-faint);
 }
 
 .tab-root {
@@ -4226,9 +4288,10 @@ body.chord-dragging {
 .lane-col > :not(.lane-tab) {
   grid-column: 2;
 }
-/* The selected part: one outline around its row, its open lanes and its add row. */
+/* The selected part: one outline around its row, its open lanes and its add
+   row, in the part's colour (--pc, windsor#642). */
 .lane-col.selected {
-  outline: 1px solid var(--carrier);
+  outline: 1px solid var(--pc);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -4635,8 +4698,9 @@ select.field.compact {
   touch-action: none;
   user-select: none;
 }
+/* A part's lane carries its colour as --pc (windsor#642): the selected lane's border and its regions'. */
 .lane.selected {
-  border-color: var(--carrier);
+  border-color: var(--pc);
 }
 /* A region's body drag (record 2026-10-07-song-region-drag-across-parts): the lanes it can't drop on dim, the one under the pointer is bordered. */
 .lane-timeline > .lane-drop-dim {
@@ -4781,8 +4845,8 @@ select.field.compact {
   gap: 5px;
   padding: 0 6px;
   border-radius: var(--r);
-  border: 1px solid var(--modulator);
-  background-color: rgba(95, 168, 160, 0.2);
+  border: 1px solid var(--pc);
+  background-color: color-mix(in srgb, var(--pc) 19%, transparent);
   color: var(--ink);
   font-family: var(--f-panel);
   font-size: 10px;
@@ -4794,10 +4858,6 @@ select.field.compact {
 .reg.narrow {
   padding: 0;
 }
-.reg.perc {
-  border-color: var(--carrier);
-  background-color: rgba(224, 164, 78, 0.17);
-}
 .reg.cyc {
   background-image: repeating-linear-gradient(
     90deg,
@@ -4805,9 +4865,10 @@ select.field.compact {
     transparent 1px var(--cyc)
   );
 }
+/* The selected region's ring is ink, clear of every part colour (windsor#642). */
 .reg.selected {
-  box-shadow: 0 0 0 1px var(--carrier);
-  border-color: var(--carrier);
+  box-shadow: 0 0 0 1px var(--ink);
+  border-color: var(--ink);
 }
 /* A region a drag across an empty stretch is drawing (windsor#551), before release. */
 .reg.drawing {
@@ -4818,7 +4879,7 @@ select.field.compact {
   font-family: var(--f-ui);
   font-size: 11px;
   line-height: 1;
-  color: var(--carrier);
+  color: var(--pc);
   font-variant: normal;
 }
 .reg .lb {

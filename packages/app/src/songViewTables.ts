@@ -321,7 +321,12 @@ export function boxTick(
 
 export type LaneTone = 'pitch' | 'perc' | 'none';
 
-/** Which accent a kind's regions draw in: teal for pitched kinds, amber for Euclidean (decision 1). */
+/**
+ * A kind's accent on its sequencer device (`DEVICE_ACCENT`, `--kc`): teal for
+ * the pitched kinds, amber for Euclidean. It drives nothing else: since
+ * windsor#642 a part's chip, number tab and regions take the part's own
+ * colour (record `2026-10-07-part-colours`, decisions 7 and 11).
+ */
 export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   none: 'none',
   euclidean: 'perc',

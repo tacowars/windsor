@@ -14,6 +14,7 @@
  * here for the harmony lane and the loop brace, which import it from here.
  */
 import type { DocumentPart } from '@windsor/engine';
+import { partColor } from './consoleColors';
 import { el } from './dom';
 import { paintLaneMarks, paintRegions } from './partLaneBlocks';
 import { wirePartLane } from './partLaneGestures';
@@ -79,6 +80,8 @@ export function partRow(view: SongView, part: DocumentPart, strip: HTMLElement):
 /** The lane of regions for `part`, with the selected region's faint handles and seam marks. */
 export function partLane(view: SongView, part: DocumentPart): HTMLElement {
   const lane = el('div', `lane${partSelected(view, part) ? ' selected' : ''}`);
+  // The part's colour (windsor#642): the selected lane's border, and every region block's (`partLaneBlocks.ts`).
+  lane.style.setProperty('--pc', partColor(part.colour).hex);
   // Which part the lane is, for a body drag from another lane to find it by its height (`partLaneTransfer.ts`).
   lane.dataset['partSlot'] = String(part.slot);
   lane.title =

@@ -7,6 +7,7 @@
  * with it (`removePartChange`). The normaliser fills the new part and the
  * kind's defaults through `DocumentModel.preview`, so nothing here restates
  * a default the engine owns. `ctx.restructure` is Import's and Restart's.
+ * A part's colour is one field (`partColourChange`, windsor#642).
  *
  * And the pattern a card edits (windsor#75, epic windsor#70; record
  * `2026-09-29-each-region-plays-its-own-pattern`): a card reads the selected
@@ -108,6 +109,28 @@ export function removePartLive(ctx: AppCtx, slot: number): boolean {
 /** Change the part's sequencer kind live — only that part rebuilds (#597); false when unchanged or refused. */
 export function setSequencerKindLive(ctx: AppCtx, slot: number, kind: SequencerKind): boolean {
   const partial = sequencerKindChange(ctx.model.doc, slot, kind, (raw) => ctx.model.preview(raw));
+  if (!partial || !ctx.change(partial).ok) return false;
+  ctx.render();
+  return true;
+}
+
+/**
+ * The partial giving the part on `slot` the palette colour `colour`
+ * (windsor#642; record `2026-10-07-part-colours`, decision 9); null when the
+ * part is gone or already has it.
+ */
+export function partColourChange(
+  doc: ArrangementDocument,
+  slot: number,
+  colour: number,
+): DocumentPartial | null {
+  const part = partAt(doc, slot);
+  return part && part.colour !== colour ? partChange(slot, { colour }) : null;
+}
+
+/** Recolour the part on `slot` live, as one undo step; the selection stays. False when unchanged or refused. */
+export function setPartColourLive(ctx: AppCtx, slot: number, colour: number): boolean {
+  const partial = partColourChange(ctx.model.doc, slot, colour);
   if (!partial || !ctx.change(partial).ok) return false;
   ctx.render();
   return true;
