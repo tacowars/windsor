@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Part Colours</title>
+<!-- The part colours mockup tacowars approved on 2026-10-07 (record
+     2026-10-07-part-colours). Static and self-contained: open it in a
+     browser. The toolbar at the very top is the mockup's own, not part of
+     the console.
+     Mockup only: each part gets its own colour, in place of today's two
+     tones by sequencer kind (amber for Euclidean, teal for the rest;
+     LANE_TONE in songViewTables.ts). "Today" redraws main
+     for comparison; "Part colours" is the proposal. The chips, number tabs,
+     lanes and regions are today's, from console.css. The song is an
+     example: 16 bars of 4/4, ten parts. Eight of the palette's colours
+     (Sky, Lemon, Umber, Magenta, Steel, Mint, Blush, Periwinkle) were read
+     by eye from a screenshot of Ableton Live's track headers; the other
+     six are pixel values from a screenshot of its colour picker.
+     The distances are CIEDE2000, computed from the hex values. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<style>
+/* Layout: mockup chrome on top, the console's part strip and Song lanes in a sideways-scrolling stage, the palette sheet and notes below. The app is dark only. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10;
+  --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c;
+  --ink-on: #14181a; --page: #0b0d0e;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --r: 3px;
+  --bar: 64px; --lane-h: 40px; --row-gap: 4px; --gap: 8px; --tab: 18px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--f-ui); font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: var(--page); border-bottom: 1px solid var(--line); }
+.tb .grp { display: flex; align-items: center; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb .grp button:first-of-type { border-radius: var(--r) 0 0 var(--r); }
+.tb .grp button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb .grp.solo button { border-radius: var(--r); margin-left: 0; }
+.tb .grp.solo button + button { margin-left: 4px; }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.tb button:disabled { opacity: .4; cursor: default; }
+.tb button:focus-visible, .pchip:focus-visible, .reg:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.hint { font: 11px var(--f-num); color: var(--ink-faint); }
+.sec { margin: 22px 16px 0; font: 700 13px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.notes { max-width: 980px; margin: 14px 16px 40px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.55; color: var(--ink-dim); }
+.notes h2 { font: 700 15px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); margin: 14px 0 4px; }
+.notes p { margin: 0 0 6px; max-width: 72ch; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ol, .notes ul { margin: 4px 0 0; padding-left: 20px; max-width: 78ch; }
+.notes li { margin-bottom: 4px; }
+.notes code { font: 11px var(--f-num); color: var(--ink); }
+.notes .ask { color: var(--carrier); }
+
+/* ---------- the console: header's part strip (as today, console.css) ---------- */
+.stage { overflow-x: auto; margin: 12px 16px 0; background: var(--ground); outline: 1px solid var(--line-bright); }
+.stage-in { width: max-content; min-width: 100%; }
+.hdr { padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.part-strip { display: flex; gap: 4px; }
+.pscroll { display: flex; gap: 3px; }
+.pchip { width: 132px; position: relative; display: block; font-family: var(--f-ui); font-size: 13px; text-align: left; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--tone, var(--line-bright)); border-radius: var(--r); padding: 4px 12px 3px 7px; line-height: 1.15; cursor: pointer; color: var(--ink); }
+.pchip:hover { background: var(--panel-hi); }
+.pchip .n { display: block; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pchip .k { font-size: 9.5px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+.pchip .cl { position: absolute; right: 3px; top: 5px; display: flex; flex-direction: column; gap: 3px; }
+.pchip .cl i { display: block; width: 7px; height: 7px; border: 1px solid var(--line); border-radius: 50%; background: color-mix(in srgb, var(--hot) 16%, var(--inset)); }
+.pchip .cl i + i { background: #1d2a22; }
+.pchip[aria-pressed='true'] { background: var(--sel); border-color: var(--sel); border-left-color: var(--sel); }
+.pchip[aria-pressed='true'] .n, .pchip[aria-pressed='true'] .k { color: var(--ink-on); }
+.pchip[aria-pressed='true'] .cl i { border-color: rgba(20, 24, 26, .55); }
+.pm { display: flex; gap: 3px; }
+.pm span { display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 10px; font-size: 15px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink); }
+
+/* ---------- the Song lanes (as today, console.css) ---------- */
+.lanes { display: flex; flex-direction: column; gap: var(--row-gap); padding: 12px 14px 16px; }
+.lane-group { display: flex; gap: var(--gap); align-items: stretch; }
+.lane-frozen { flex: none; width: 190px; }
+.ruler { display: flex; height: 22px; border-bottom: 1px solid var(--line-bright); }
+.ruler-bar { position: relative; flex: none; width: var(--bar); border-left: 1px solid var(--line-bright); font: 10px var(--f-num); color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 4px; }
+.ruler-name { display: flex; align-items: center; justify-content: flex-end; height: 22px; padding: 0 6px; font: 9px var(--f-num); color: var(--ink-faint); letter-spacing: .04em; }
+.lane-col { display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: 4px; cursor: pointer; }
+.lane-col.selected { outline: 1px solid var(--sel); outline-offset: 2px; border-radius: 2px; }
+.lane-col.selected .lane-part { background: var(--panel-hi); }
+.lane-tab { display: flex; justify-content: center; border-radius: 2px; background: var(--pc); }
+.lane-tab b { font: 600 11px var(--f-num); letter-spacing: -.02em; line-height: var(--lane-h); color: var(--ink-on); }
+.lane-part { display: grid; grid-template-columns: 12px minmax(0, 1fr); align-items: center; column-gap: 6px; height: var(--lane-h); padding: 0 6px; border-radius: var(--r); }
+.lane-part .fold, .folder-row .fold { color: var(--ink-faint); font-size: 10px; }
+.lane-group.in-folder > .lane-col { position: relative; grid-template-columns: calc(var(--tab) - 6px) minmax(0, 1fr); padding-left: 6px; }
+.lane-group.in-folder > .lane-col::before { content: ''; position: absolute; top: calc(-1 * var(--row-gap)); bottom: 0; left: 0; width: 2px; background: var(--ga); }
+.lane-folder { display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: 4px; }
+.folder-tab { border-radius: 2px; background: var(--ga); }
+.folder-row { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); align-items: center; column-gap: 6px; height: var(--lane-h); padding: 0 6px; border-radius: var(--r); background: var(--panel); }
+.folder-row .cap { font: 9px var(--f-num); color: var(--ink-faint); }
+.folder-row .nm b { color: var(--ga); }
+.fspan { position: absolute; top: 9px; bottom: 9px; border: 1px solid color-mix(in srgb, var(--ga) 45%, transparent); border-radius: var(--r); background: color-mix(in srgb, var(--ga) 16%, transparent); }
+.reg.cyc { background-image: repeating-linear-gradient(90deg, rgba(220, 227, 227, .22) 0 1px, transparent 1px var(--cyc)); }
+.ruler-name { gap: 0; justify-content: space-between; font: 600 10px var(--f-panel); letter-spacing: .14em; color: var(--ink-dim); }
+.nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; font-family: var(--f-panel); }
+.nm b { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nm small { font: 9px var(--f-num); color: var(--ink-faint); letter-spacing: .04em; }
+.mix { display: flex; align-items: center; gap: 4px; font: 10px var(--f-num); color: var(--ink); }
+.mix .v { flex: 1; }
+.mix .kn { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-bright); border-top-color: var(--modulator); border-right-color: var(--modulator); }
+.mix .ms { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px solid var(--line); border-radius: 2px; font: 600 9px var(--f-panel); color: var(--ink-faint); }
+.lane { position: relative; flex: none; width: calc(var(--bar) * 16); height: var(--lane-h); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; }
+.lane.selected { border-color: var(--sel); }
+.hblk { position: absolute; top: 3px; bottom: 3px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-top: 3px solid var(--modulator); border-radius: var(--r); padding: 2px 6px; font-family: var(--f-panel); display: flex; flex-direction: column; line-height: 1.15; overflow: hidden; }
+.hblk b { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.hblk small { font: 8.5px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+.harm-name { display: flex; flex-direction: column; justify-content: center; height: var(--lane-h); padding: 0 6px; font-family: var(--f-panel); line-height: 1.15; }
+.harm-name b { font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+.harm-name small { font: 9px var(--f-num); color: var(--ink-faint); }
+.reg { position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--pc); background-color: color-mix(in srgb, var(--pc) 19%, transparent); color: var(--ink); font-family: var(--f-panel); font-size: 10px; font-variant: small-caps; letter-spacing: .05em; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.reg .gl { flex: none; font: 11px var(--f-ui); line-height: 1; color: var(--glyph); font-variant: normal; }
+.reg .lb { overflow: hidden; text-overflow: ellipsis; }
+.reg.selected { box-shadow: 0 0 0 1px var(--sel-reg); border-color: var(--sel-reg); }
+
+/* ---------- the palette sheet ---------- */
+.sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; margin: 10px 16px 0; }
+.sw { display: grid; gap: 6px; padding: 8px; background: var(--ground); border: 1px solid var(--line); border-radius: var(--r); }
+.sw-top { display: flex; align-items: center; gap: 8px; }
+.sw-tab { width: var(--tab); height: 28px; border-radius: 2px; background: var(--pc); display: flex; align-items: center; justify-content: center; font: 600 11px var(--f-num); color: var(--ink-on); }
+.sw-name { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.sw-name b { font: 600 11px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; }
+.sw-name code { font: 10px var(--f-num); color: var(--ink-faint); }
+.sw-clash { margin-left: auto; font: 9px var(--f-num); color: var(--ink-faint); text-align: right; }
+.sw .lane { width: 100%; height: 30px; }
+.sw .reg { left: 3px; right: 40%; top: 3px; bottom: 3px; }
+.sw .pchip { width: 100%; }
+.reserved { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 10px 16px 0; font: 10px var(--f-num); color: var(--ink-dim); }
+.reserved span { display: inline-flex; align-items: center; gap: 6px; }
+.reserved i { width: 12px; height: 12px; border-radius: 2px; background: var(--c); }
+.reserved.dropped { color: var(--ink-faint); }
+.reserved.dropped i { opacity: .8; }
+
+/* ---------- the colour picker on a chip (proposed) ---------- */
+.colour-pick { position: fixed; z-index: 60; padding: 8px; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+.colour-pick[hidden] { display: none; }
+.colour-pick .ttl { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 7px; font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.colour-pick .ttl span { color: var(--ink); }
+.colour-pick .grid { display: grid; grid-template-columns: repeat(7, 24px); gap: 5px; }
+.colour-pick button { width: 24px; height: 24px; padding: 0; border: 1px solid rgba(0, 0, 0, .35); border-radius: 2px; background: var(--pc); cursor: pointer; }
+.colour-pick button:hover { box-shadow: 0 0 0 1px var(--ink-dim); }
+.colour-pick button[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--ink); }
+.colour-pick button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.colour-pick .nm { margin-top: 7px; font: 10px var(--f-num); color: var(--ink-faint); }
+@media (prefers-reduced-motion: no-preference) { .pchip, .reg, .lane-tab { transition: background-color .15s, border-color .15s; } }
+</style>
+
+<div class="tb" role="toolbar" aria-label="Mockup controls">
+  <div class="grp" role="group" aria-label="Colours">
+    <span class="lbl">Colours</span>
+    <button type="button" id="mode-today">Today</button>
+    <button type="button" id="mode-part" class="on">Part colours</button>
+  </div>
+  <div class="grp solo" role="group" aria-label="Parts">
+    <span class="lbl">Parts</span>
+    <button type="button" id="add">+ Add part</button>
+    <button type="button" id="remove">− Remove selected</button>
+    <button type="button" id="reset">Reset</button>
+  </div>
+  <span class="hint" id="hint">Click a chip, a lane or a region to select it. Right-click or long-press a chip to pick its colour.</span>
+</div>
+
+<div class="stage" id="stage"><div class="stage-in">
+  <div class="hdr"><div class="part-strip"><div class="pscroll" id="chips"></div><div class="pm"><span>+</span><span>−</span></div></div></div>
+  <div class="lanes" id="lanes"></div>
+</div></div>
+
+<h2 class="sec">The palette, in assignment order</h2>
+<div class="reserved" aria-label="The console's accents the palette shares hues with">
+  <span>Reserved, never a part colour:</span>
+  <span><i style="--c: var(--carrier)"></i>amber · carriers, arrangement controls</span>
+  <span><i style="--c: var(--modulator)"></i>teal · modulators, strips</span>
+  <span><i style="--c: var(--return)"></i>violet · returns, insert lanes</span>
+  <span><i style="--c: var(--seq)"></i>rose · sequencer lanes</span>
+  <span><i style="--c: var(--hot)"></i>orange-red · clip</span>
+</div>
+<div class="reserved dropped" id="dropped" aria-label="Dropped from the first pass"></div>
+<div class="sheet" id="sheet"></div>
+<div class="colour-pick" id="pick" role="dialog" aria-label="Part colour" hidden>
+  <div class="ttl">Colour <span id="pick-part"></span></div>
+  <div class="grid" id="pick-grid"></div>
+  <div class="nm" id="pick-name"></div>
+</div>
+
+<div class="notes">
+  <h2>Part colours</h2>
+  <p>Each part gets a colour of its own when it is made, and keeps it. The colour appears wherever the console names that part: its chip in the part strip, its number tab, and its region blocks. Everything else keeps today's accents.</p>
+  <h3>Decisions</h3>
+  <ol>
+    <li><b>The colour is stored on the part, as an index into the palette.</b> It is not worked out from the part's place in the list, so removing or reordering a part never recolours the others. Try <i>− Remove selected</i>: the number tabs renumber, the colours stay. A song saved without colours gets them in palette order on load. The field is additive, so no format bump.</li>
+    <li><b>A new part takes the colour used least in the song.</b> Ties go to the earlier colour in the palette, so a fresh song runs down the palette in order. In a song coloured by assignment alone, a removed part's colour comes back first, and with 14 colours and up to 16 parts at most two colours repeat. After the picker has doubled colours up, the next part still takes the least-used colour, ties to the earlier one. Try <i>+ Add part</i> after a removal.</li>
+    <li><b>The console's five accents are reserved</b>: amber, teal, violet, rose and orange-red never become part colours. The first pass's Lavender, Indigo, Mauve, Teal, Orchid, Ochre and Tangerine sat within 12 CIEDE2000 of one of them and are dropped. Aqua, Lime, Grass, Olive, Raspberry and Frost come from Ableton Live's swatch picker, chosen to sit as far as possible from the reserved accents and from the colours kept. The closest kept colours are Blush (12.4 from rose), Magenta (12.8 from rose) and Periwinkle (14.3 from violet).</li>
+    <li><b>The palette's order spreads neighbours apart.</b> Each entry sits as far as the palette allows from the three before it, so parts made one after another never look alike.</li>
+    <li><b>A chip's colour is picked by right-clicking it, or long-pressing it on touch.</b> A 7 × 2 swatch grid opens under the chip with the part's colour ringed, and the name of the colour under the pointer below it. One click picks and closes it; Escape or a click outside closes it.</li>
+    <li><b>The selected chip fills with its own colour</b>, where today it fills amber. The outline around the selected part's block and lane takes its colour too.</li>
+    <li><b>The selected region's ring is ink</b>, where today it is amber.</li>
+    <li><b>The region's ⟲ glyph takes the part's colour</b>, where today it is always amber.</li>
+    <li><b>Group folders keep their Mixer accent</b>: teal, violet, amber, then round again.</li>
+    <li><b>The sequencer device keeps its accent by kind</b> (teal or amber, <code>--kc</code>). Its knobs and cells use the console's role colours.</li>
+    <li><b>Drums versus melodic by colour goes.</b> The chip still names the kind (<code>3 · Euclid</code>).</li>
+  </ol>
+</div>
+
+<script>
+/* In assignment order: each entry is as far as the palette allows from the three before it.
+   [name, hex, nearest reserved accent, its CIEDE2000 distance]. */
+const PALETTE = [
+  ['Sky', '#6EA8E2', 'violet', 22.4], ['Lemon', '#EDE36E', 'amber', 20.6], ['Raspberry', '#BC3D6D', 'rose', 16.1],
+  ['Umber', '#8F7A55', 'amber', 20.2], ['Aqua', '#6DE6FC', 'teal', 19.1], ['Lime', '#77FB58', 'teal', 32.4],
+  ['Magenta', '#D65FC6', 'rose', 12.8], ['Frost', '#E3DCE1', 'rose', 28.3], ['Steel', '#5A7FBF', 'violet', 16.3],
+  ['Grass', '#669D42', 'teal', 22.8], ['Mint', '#9EE6A8', 'teal', 22.0], ['Blush', '#E2A2AA', 'rose', 12.4],
+  ['Periwinkle', '#A6AAF2', 'violet', 14.3], ['Olive', '#ABBD3B', 'amber', 23.2],
+];
+/* Dropped from the first pass for sitting on a reserved accent (CIEDE2000 under 12). */
+const DROPPED = [
+  ['Lavender', '#A584C8', 'violet', 4.4], ['Indigo', '#8A72DA', 'violet', 5.5], ['Mauve', '#C26A9B', 'rose', 5.6],
+  ['Teal', '#6FBFAE', 'teal', 7.1], ['Orchid', '#C281DA', 'violet', 7.9], ['Ochre', '#B89A3E', 'amber', 10.2],
+  ['Tangerine', '#D27E34', 'orange-red', 11.9],
+];
+const KIND = { euclidean: 'Euclid', grid: 'Grid', chord: 'Chord', arp: 'Arp', bass: 'Bass', figure: 'Figure', roll: 'Roll' };
+const PERC = new Set(['euclidean']);
+/* Groups' accents, as the Mixer tab's (GROUP_ACCENTS): teal, violet, amber in turn. */
+const GROUPS = { drums: ['Drums', 'var(--modulator)'], keys: ['Keys', 'var(--return)'] };
+/* [name, kind, group, level, regions]; a region is [start bar (0-based), length in bars, summary, cycle in bars or 0] */
+const SONG = [
+  ['Kick', 'euclidean', 'drums', '0.80', [[0, 16, 'euclid · 4/16 · 1/16', 1]]],
+  ['Hat', 'euclidean', 'drums', '0.55', [[2, 6, 'euclid · 7/16 · 1/16', 1], [8, 8, 'euclid · 9/16 · 1/16', 1]]],
+  ['Clap', 'euclidean', 'drums', '0.60', [[4, 12, 'euclid · 2/16 · 1/16', 1]]],
+  ['Rim', 'euclidean', 'drums', '0.45', [[8, 4, 'euclid · 5/16 · 1/16', 1], [12, 4, 'euclid · 5/12 · 1/16', 0.75]]],
+  ['Bass', 'bass', null, '0.75', [[0, 8, 'bass · Follow Root', 1], [8, 8, 'bass · Octaves', 1]]],
+  ['Acid', 'grid', null, '0.60', [[4, 4, 'grid · 16 steps · 1/16', 1], [12, 4, 'grid · 16 steps · 1/16', 1]]],
+  ['Pad', 'chord', 'keys', '0.55', [[0, 16, 'chord · 1 steps · 1 bar', 1]]],
+  ['Stab', 'chord', 'keys', '0.50', [[6, 2, 'chord · 8 steps · 1/8', 1], [10, 2, 'chord · 8 steps · 1/8', 1], [14, 2, 'chord · 8 steps · 1/8', 1]]],
+  ['Arp', 'arp', null, '0.45', [[8, 8, 'arp · Up-down 1/16', 0]]],
+  ['Lead', 'roll', null, '0.60', [[12, 4, 'roll · 14 notes', 0]]],
+];
+const CHORDS = [['A min', 'i · triad', 0, 4], ['F', 'VI · triad', 4, 4], ['C', 'III · triad', 8, 4], ['G', 'VII · triad', 12, 4]];
+/* A song holds up to 16 parts (MUSIC_PARTS_MAX); + Add cycles through these, numbering repeats. */
+const PARTS_MAX = 16;
+const EXTRA = [
+  ['Perc', 'euclidean', '0.50', [[0, 8, 'euclid · 3/8 · 1/16', 0.5]]],
+  ['Organ', 'chord', '0.55', [[4, 8, 'chord · 1 steps · 1 bar', 1]]],
+  ['Pluck', 'grid', '0.60', [[0, 4, 'grid · 16 steps · 1/16', 1]]],
+  ['Vox', 'roll', '0.70', [[8, 4, 'roll · 6 notes', 0]]],
+  ['Sub', 'bass', '0.80', [[0, 16, 'bass · Follow Root', 1]]],
+];
+
+let mode = 'part';
+let parts = [];
+let sel = { part: 0, region: null };
+let extra = 0;
+
+/* A new part's colour: the one used least, ties to the earlier entry. */
+function nextColour() {
+  const used = PALETTE.map((_, i) => parts.filter((p) => p.colour === i).length);
+  return used.indexOf(Math.min(...used));
+}
+function reset() {
+  parts = [];
+  for (const [name, kind, group, level, regions] of SONG) parts.push({ name, kind, group, level, regions, colour: nextColour() });
+  sel = { part: 0, region: null };
+  extra = 0;
+}
+const tone = (p) => mode === 'part' ? PALETTE[p.colour][1] : (PERC.has(p.kind) ? 'var(--carrier)' : 'var(--modulator)');
+const selColour = (p) => mode === 'part' ? tone(p) : 'var(--carrier)';
+
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function chip(p, i, pressed) {
+  const c = h('button', 'pchip');
+  c.type = 'button';
+  c.style.setProperty('--tone', tone(p));
+  c.style.setProperty('--sel', selColour(p));
+  c.setAttribute('aria-pressed', String(pressed));
+  c.title = p.name;
+  c.append(h('span', 'n', p.name), h('span', 'k', `${i + 1} · ${KIND[p.kind]}`));
+  const cl = h('span', 'cl'); cl.append(h('i'), h('i')); c.append(cl);
+  return c;
+}
+
+function region(p, pi, [start, len, label, cyc], ri) {
+  const r = h('div', cyc ? 'reg cyc' : 'reg');
+  if (cyc) r.style.setProperty('--cyc', `calc(var(--bar) * ${cyc})`);
+  r.tabIndex = 0;
+  r.style.setProperty('--pc', tone(p));
+  r.style.setProperty('--glyph', mode === 'part' ? tone(p) : 'var(--carrier)');
+  r.style.setProperty('--sel-reg', mode === 'part' ? 'var(--ink)' : 'var(--carrier)');
+  r.style.left = `calc(var(--bar) * ${start} + 1px)`;
+  r.style.width = `calc(var(--bar) * ${len} - 3px)`;
+  r.append(h('span', 'gl', '⟲'), h('span', 'lb', label));
+  if (sel.part === pi && sel.region === ri) r.classList.add('selected');
+  r.addEventListener('click', (e) => { e.stopPropagation(); sel = { part: pi, region: ri }; render(); });
+  return r;
+}
+
+/* A group's folder row and its outline lane, spanning its members' regions. */
+function folder(id, first) {
+  const [name, accent] = GROUPS[id];
+  const members = parts.filter((p) => p.group === id);
+  const g = h('div', 'lane-group'); g.style.setProperty('--ga', accent);
+  const f = h('div', 'lane-folder lane-frozen');
+  const row = h('div', 'folder-row');
+  const nm = h('span', 'nm'); nm.append(h('b', '', name), h('small', '', `group · ${members.length} parts`));
+  row.append(h('span', 'fold', '▾'), h('span', 'cap', '▸ lanes'), nm);
+  f.append(h('div', 'folder-tab'), row);
+  const lane = h('div', 'lane');
+  const bars = new Array(16).fill(false);
+  for (const p of members) for (const [s, l] of p.regions) for (let b = s; b < s + l; b++) bars[b] = true;
+  for (let b = 0; b < 16;) {
+    if (!bars[b]) { b++; continue; }
+    const s = b; while (b < 16 && bars[b]) b++;
+    const span = h('div', 'fspan'); span.style.left = `calc(var(--bar) * ${s} + 1px)`; span.style.width = `calc(var(--bar) * ${b - s} - 3px)`; lane.append(span);
+  }
+  g.append(f, lane);
+  return g;
+}
+
+function renderLanes() {
+  const lanes = document.getElementById('lanes');
+  lanes.replaceChildren();
+  const ruler = h('div', 'ruler');
+  for (let b = 0; b < 16; b++) { const bar = h('div', 'ruler-bar'); bar.append(h('span', '', String(b + 1))); ruler.append(bar); }
+  const head = h('div', 'lane-group'); const rn = h('div', 'lane-frozen ruler-name'); rn.append(h('span', '', '▸ MIXER'), h('span', '', 'BAR · BEAT')); head.append(rn, ruler); lanes.append(head);
+
+  const hg = h('div', 'lane-group'); const hn = h('div', 'lane-frozen harm-name'); hn.append(h('b', '', 'HARMONY'), h('small', '', 'chords'));
+  const hl = h('div', 'lane');
+  for (const [ch, rn2, s, l] of CHORDS) { const b = h('div', 'hblk'); b.style.left = `calc(var(--bar) * ${s} + 1px)`; b.style.width = `calc(var(--bar) * ${l} - 3px)`; b.append(h('b', '', ch), h('small', '', rn2)); hl.append(b); }
+  hg.append(hn, hl); lanes.append(hg);
+
+  const seen = new Set();
+  parts.forEach((p, i) => {
+    if (p.group && !seen.has(p.group)) { seen.add(p.group); lanes.append(folder(p.group, i)); }
+    const g = h('div', p.group ? 'lane-group in-folder' : 'lane-group');
+    if (p.group) g.style.setProperty('--ga', GROUPS[p.group][1]);
+    const col = h('div', 'lane-col lane-frozen');
+    col.style.setProperty('--sel', selColour(p));
+    col.title = `${i + 1} · ${KIND[p.kind]} · ${p.name}`;
+    const tab = h('div', 'lane-tab'); tab.style.setProperty('--pc', tone(p)); tab.append(h('b', '', String(i + 1)));
+    const row = h('div', 'lane-part');
+    const mix = h('div', 'mix'); mix.append(h('span', 'kn'), h('span', 'v', p.level), h('span', 'ms', 'M'), h('span', 'ms', 'S'));
+    row.append(h('span', 'fold', '▸'), mix);
+    col.append(tab, row);
+    const lane = h('div', 'lane');
+    lane.style.setProperty('--sel', selColour(p));
+    p.regions.forEach((rg, ri) => lane.append(region(p, i, rg, ri)));
+    if (sel.part === i) { col.classList.add('selected'); lane.classList.add('selected'); }
+    const pick = () => { sel = { part: i, region: null }; render(); };
+    col.addEventListener('click', pick); lane.addEventListener('click', pick);
+    g.append(col, lane); lanes.append(g);
+  });
+}
+
+const LONG_PRESS_MS = 450;
+function renderChips() {
+  const chips = document.getElementById('chips');
+  chips.replaceChildren(...parts.map((p, i) => {
+    const c = chip(p, i, sel.part === i);
+    let timer = 0, longPressed = false, x0 = 0, y0 = 0;
+    c.addEventListener('click', (e) => { if (longPressed) { e.preventDefault(); longPressed = false; return; } closePick(); sel = { part: i, region: null }; render(); });
+    c.addEventListener('contextmenu', (e) => { if (mode !== 'part') return; e.preventDefault(); openPick(i, c); });
+    c.addEventListener('pointerdown', (e) => {
+      if (mode !== 'part' || e.pointerType === 'mouse') return;
+      x0 = e.clientX; y0 = e.clientY;
+      timer = setTimeout(() => { longPressed = true; openPick(i, c); }, LONG_PRESS_MS);
+    });
+    c.addEventListener('pointermove', (e) => { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8) clearTimeout(timer); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) c.addEventListener(ev, () => clearTimeout(timer));
+    return c;
+  }));
+}
+
+/* The picker: the palette as a 7 × 2 grid under the chip, the part's colour pressed. */
+function openPick(i, anchor) {
+  const pick = document.getElementById('pick');
+  const p = parts[i];
+  document.getElementById('pick-part').textContent = p.name;
+  const name = document.getElementById('pick-name');
+  name.textContent = PALETTE[p.colour][0];
+  document.getElementById('pick-grid').replaceChildren(...PALETTE.map(([n, hex], k) => {
+    const b = h('button');
+    b.type = 'button'; b.title = n; b.setAttribute('aria-label', n);
+    b.style.setProperty('--pc', hex);
+    b.setAttribute('aria-pressed', String(k === p.colour));
+    b.addEventListener('mouseenter', () => { name.textContent = n; });
+    b.addEventListener('mouseleave', () => { name.textContent = PALETTE[p.colour][0]; });
+    b.addEventListener('click', () => {
+      p.colour = k; closePick();
+      document.getElementById('hint').textContent = `${p.name} is ${n} now: its chip, number tab and regions all follow.`;
+      render();
+    });
+    return b;
+  }));
+  pick.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const w = pick.offsetWidth;
+  pick.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
+  pick.style.top = `${r.bottom + 4}px`;
+  pick.querySelector('[aria-pressed="true"]')?.focus();
+}
+function closePick() { document.getElementById('pick').hidden = true; }
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#pick, .pchip')) closePick(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePick(); });
+document.getElementById('stage').addEventListener('scroll', closePick);
+window.addEventListener('scroll', closePick, { passive: true });
+
+function renderDropped() {
+  const row = document.getElementById('dropped');
+  row.replaceChildren(h('span', '', 'Dropped:'), ...DROPPED.map(([n, hex, near, de]) => {
+    const s = h('span'); const i = h('i'); i.style.setProperty('--c', hex);
+    s.append(i, `${n} · ${de.toFixed(1)} from ${near}`); return s;
+  }));
+}
+
+function renderSheet() {
+  const sheet = document.getElementById('sheet');
+  sheet.replaceChildren(...PALETTE.map(([name, hex, near, de], i) => {
+    const s = h('div', 'sw'); s.style.setProperty('--pc', hex);
+    const top = h('div', 'sw-top');
+    const tab = h('div', 'sw-tab', String(i + 1));
+    const nm = h('div', 'sw-name'); nm.append(h('b', '', name), h('code', '', hex));
+    const clash = h('span', 'sw-clash'); clash.append(`nearest ${near}`, h('br'), `ΔE ${de.toFixed(1)}`);
+    top.append(tab, nm, clash);
+    const lane = h('div', 'lane'); const r = h('div', 'reg'); r.style.setProperty('--glyph', hex); r.append(h('span', 'gl', '⟲'), h('span', 'lb', 'whole notes')); lane.append(r);
+    const p = { name, kind: 'chord', colour: i };
+    const saved = mode; mode = 'part';
+    const c1 = chip(p, i, false); const c2 = chip(p, i, true);
+    mode = saved;
+    c1.tabIndex = -1; c2.tabIndex = -1;
+    s.append(top, lane, c1, c2);
+    return s;
+  }));
+}
+
+function render() {
+  document.getElementById('mode-today').classList.toggle('on', mode === 'today');
+  document.getElementById('mode-part').classList.toggle('on', mode === 'part');
+  document.getElementById('add').disabled = parts.length >= PARTS_MAX;
+  document.getElementById('remove').disabled = parts.length <= 1;
+  renderChips(); renderLanes();
+}
+
+document.getElementById('mode-today').addEventListener('click', () => { mode = 'today'; closePick(); render(); });
+document.getElementById('mode-part').addEventListener('click', () => { mode = 'part'; render(); });
+document.getElementById('reset').addEventListener('click', () => { reset(); render(); });
+document.getElementById('add').addEventListener('click', () => {
+  const [base, kind, level, regions] = EXTRA[extra % EXTRA.length];
+  const round = Math.floor(extra++ / EXTRA.length);
+  const name = round ? `${base} ${round + 1}` : base;
+  parts.push({ name, kind, group: null, level, regions, colour: nextColour() });
+  sel = { part: parts.length - 1, region: null };
+  document.getElementById('hint').textContent = `${name} took ${PALETTE[parts[parts.length - 1].colour][0]}, the colour used least.`;
+  render();
+});
+document.getElementById('remove').addEventListener('click', () => {
+  const gone = parts.splice(sel.part, 1)[0];
+  sel = { part: Math.min(sel.part, parts.length - 1), region: null };
+  document.getElementById('hint').textContent = `Removed ${gone.name}. The others keep their colours; the next part takes ${PALETTE[nextColour()][0]}, the colour used least.`;
+  render();
+});
+
+reset(); render(); renderSheet(); renderDropped();
+</script>
