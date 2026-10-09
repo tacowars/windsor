@@ -1,5 +1,6 @@
 /**
- * The FM worklet's tunables (#644): table size, mip count, the control-rate
+ * The FM worklet's tunables (#644): table size, each octave's table's size,
+ * mip count, the control-rate
  * intervals and when a voice takes the long one (windsor#326), the dormancy floors, the modulation and feedback depths, the
  * shortest envelope segment, the amplitude envelope's breaks per block
  * (windsor#301), the width ramp's snap, the feedback ramp's step
@@ -26,6 +27,20 @@ const TABLE_MASK = TABLE_SIZE - 1;
 
 const MIP_COUNT = 12; // one per octave from MIP_BASE_HZ
 const MIP_BASE_HZ = 16.352; // C0
+
+/*
+ * Each octave's table is sized to the harmonics it holds: the smallest power
+ * of two at least MIP_TABLE_RATIO times its harmonic count, from TABLE_SIZE
+ * to TABLE_SIZE_MAX. The loops interpolate linearly between a table's
+ * samples, which leaves images of its harmonics that fold back as an
+ * inharmonic floor, louder the more harmonics a table holds for its length:
+ * 733 in 2048 samples read −35 dB A-weighted under a saw at C1. At 22 times
+ * no octave reads above −72 dB, and a table of few harmonics (a sine, every
+ * octave from about C3 up) stays at TABLE_SIZE and keeps its bits
+ * (`docs/research/2026-10-08-wavetable-floor/`).
+ */
+const TABLE_SIZE_MAX = 1 << 14; // 16384
+const MIP_TABLE_RATIO = 22;
 
 const CTRL_INTERVAL = 32; // samples between control-rate updates: the fine interval
 /*
@@ -282,6 +297,8 @@ const SYNC_BLEP_GAIN = 0.5;
 export {
   TABLE_SIZE,
   TABLE_MASK,
+  TABLE_SIZE_MAX,
+  MIP_TABLE_RATIO,
   MIP_COUNT,
   MIP_BASE_HZ,
   CTRL_INTERVAL,

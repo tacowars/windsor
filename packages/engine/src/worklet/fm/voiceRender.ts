@@ -43,7 +43,6 @@ import {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
-  TABLE_SIZE,
 } from './fmConstants';
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { renderVoiceLadder } from './voiceLadder';
@@ -201,7 +200,7 @@ function renderVoiceGeneric(
         else if (k === KIND_SQUARE_D) v = pw < 0.5 ? 1 : -1;
         else {
           const t = tables[i]!;
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * (t.length - 1);
           const i0 = fi | 0;
           const s0 = t[i0];
           v = s0 + (t[i0 + 1] - s0) * (fi - i0);
@@ -223,11 +222,11 @@ function renderVoiceGeneric(
             const t = tables[i]!;
             let pd = ph + width[i];
             pd -= Math.floor(pd);
-            const fi = ph * TABLE_SIZE;
+            const fi = ph * (t.length - 1);
             const i0 = fi | 0;
             const s0 = t[i0];
             const up = s0 + (t[i0 + 1] - s0) * (fi - i0);
-            const fd = pd * TABLE_SIZE;
+            const fd = pd * (t.length - 1);
             const d0 = fd | 0;
             const sd = t[d0];
             const down = sd + (t[d0 + 1] - sd) * (fd - d0);
@@ -236,7 +235,7 @@ function renderVoiceGeneric(
           }
           default: {
             const t = tables[i]!;
-            const fi = ph * TABLE_SIZE;
+            const fi = ph * (t.length - 1);
             const i0 = fi | 0;
             const frac = fi - i0;
             const s0 = t[i0];

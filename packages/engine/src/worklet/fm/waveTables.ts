@@ -1,7 +1,8 @@
 /* global sampleRate */
 /**
  * Waveforms (#644): the wave ids, the exact sine table, the bandlimited
- * per-octave mip tables built from harmonic partials, the cache that shares
+ * per-octave mip tables built from harmonic partials, each sized to the
+ * harmonics it holds, the cache that shares
  * them across every part in this worklet global scope, and the render kind an
  * operator's wave selects. PULSE (#55) is two reads of the saw set, so its
  * waves are the saw's and the cache holds one copy. Invariants: `SIN_TAB` and `WAVE_CACHE` are
@@ -11,15 +12,23 @@
  * and the golden test pin the tables' contents.
  */
 
-import { MIP_BASE_HZ, MIP_COUNT, TABLE_MASK, TABLE_SIZE } from './fmConstants';
+import {
+  MIP_BASE_HZ,
+  MIP_COUNT,
+  MIP_TABLE_RATIO,
+  TABLE_MASK,
+  TABLE_SIZE,
+  TABLE_SIZE_MAX,
+} from './fmConstants';
+import { sineSeriesByFft } from './waveTableFft';
 import { WAVE } from './waveIds';
 
 /* ------------------------------------------------------------------ *
  * Wavetable construction
  *
  * Every non-noise, non-digital waveform is a list of harmonic amplitudes
- * rendered into TABLE_SIZE samples, once per octave, with harmonics above
- * Nyquist dropped. `tone` (0..1) scales the surviving harmonic count, which
+ * rendered once per octave, into a table sized to the harmonics it holds,
+ * with harmonics above Nyquist dropped. `tone` (0..1) scales the surviving harmonic count, which
  * is the cheap global brightness / anti-alias control.
  * ------------------------------------------------------------------ */
 
@@ -59,7 +68,12 @@ function partialsFor(waveId: number, userPartials: number[] | null): Float32Arra
 
 /**
  * Build MIP_COUNT bandlimited tables. Each has one guard sample at the end so
- * linear interpolation never wraps-checks in the inner loop.
+ * linear interpolation never wraps-checks in the inner loop. Each octave's
+ * table is the smallest power of two at least MIP_TABLE_RATIO times its
+ * highest harmonic, from TABLE_SIZE to TABLE_SIZE_MAX, so a table of many
+ * harmonics is long enough that interpolating it leaves no audible floor; a
+ * table of TABLE_SIZE is summed as it always was, to the bit, and a longer
+ * one is built by the inverse FFT (`waveTableFft.ts`).
  */
 function buildMips(partials: Float32Array, sampleRate: number, tone: number): Float32Array[] {
   const nyquist = sampleRate * 0.5;
@@ -71,28 +85,37 @@ function buildMips(partials: Float32Array, sampleRate: number, tone: number): Fl
     let maxH = Math.floor(nyquist / topHz);
     maxH = Math.min(maxH, maxPossible, partials.length);
     maxH = Math.max(1, Math.floor(maxH * tone));
+    // Sized by the highest harmonic it holds, so a sine or a sparse User wave
+    // keeps a short table.
+    let top = maxH;
+    while (top > 1 && partials[top - 1] === 0) top--;
+    let size = TABLE_SIZE;
+    while (size < MIP_TABLE_RATIO * top && size < TABLE_SIZE_MAX) size *= 2;
 
-    const t = new Float32Array(TABLE_SIZE + 1);
-    for (let h = 1; h <= maxH; h++) {
-      const amp = partials[h - 1];
-      if (amp === 0) continue;
-      let idx = 0;
-      for (let i = 0; i < TABLE_SIZE; i++) {
-        t[i] += amp * SIN_TAB[idx];
-        idx = (idx + h) & TABLE_MASK;
+    const t = new Float32Array(size + 1);
+    if (size > TABLE_SIZE) sineSeriesByFft(partials, maxH, size, t);
+    else {
+      for (let h = 1; h <= maxH; h++) {
+        const amp = partials[h - 1];
+        if (amp === 0) continue;
+        let idx = 0;
+        for (let i = 0; i < TABLE_SIZE; i++) {
+          t[i] += amp * SIN_TAB[idx];
+          idx = (idx + h) & TABLE_MASK;
+        }
       }
     }
 
     let peak = 0;
-    for (let i = 0; i < TABLE_SIZE; i++) {
+    for (let i = 0; i < size; i++) {
       const v = t[i] < 0 ? -t[i] : t[i];
       if (v > peak) peak = v;
     }
     if (peak > 1e-9) {
       const g = 1 / peak;
-      for (let i = 0; i < TABLE_SIZE; i++) t[i] *= g;
+      for (let i = 0; i < size; i++) t[i] *= g;
     }
-    t[TABLE_SIZE] = t[0];
+    t[size] = t[0];
     mips[k] = t;
   }
   return mips;
@@ -102,7 +125,7 @@ function buildMips(partials: Float32Array, sampleRate: number, tone: number): Fl
 function quantiseMips(mips: Float32Array[], levels: number): Float32Array[] {
   for (let k = 0; k < mips.length; k++) {
     const t = mips[k];
-    for (let i = 0; i <= TABLE_SIZE; i++) {
+    for (let i = 0; i < t.length; i++) {
       t[i] = Math.round(t[i] * levels) / levels;
     }
   }
