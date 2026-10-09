@@ -11,12 +11,19 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { clonePatch, makeArrangement } from '@windsor/engine';
+import { clonePatch, makeArrangement, makeMacro, type DocumentPart } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { DocumentModel } from './documentModel';
 import { keyTarget } from './knob';
+import { patchKnobAutomation } from './knobAutomation';
 import type { PatchEditor } from './partsSession';
-import { type Hideable, ratioKnobSpecs, readRatio, showPitchControls } from './ratioKnobs';
+import {
+  type Hideable,
+  ratioKnobSpecs,
+  readRatio,
+  shownRatio,
+  showPitchControls,
+} from './ratioKnobs';
 import {
   COARSE_DEF,
   COARSE_MAX,
@@ -169,6 +176,57 @@ describe('a turn of either knob', () => {
       // And writing one is a no-op rather than a thrown bay.
       expect(() => ratioKnobSpecs(c.editor, 99).coarse.set(3)).not.toThrow();
     });
+  });
+});
+
+describe('the pair under a lane or a macro on the ratio', () => {
+  /** A part whose one lane, on, holds operator A's ratio at 3.25 (windsor#646's target). */
+  const LANE_PART = {
+    automation: [
+      { target: 'voice.ops.0.ratio', on: true, points: [{ tick: 0, value: 3.25, bend: 0 }] },
+    ],
+  } as unknown as DocumentPart;
+
+  /** An editor that answers locks the way the Parts tab's does (`partsTab.ts`). */
+  const automatedEditor = (part: DocumentPart | undefined): PatchEditor => {
+    const editor: PatchEditor = {
+      patch: clonePatch(PATCH_LIBRARY['lead-bell']!.patch),
+      push: () => undefined,
+      refresh: () => undefined,
+      automation: (path) => patchKnobAutomation(part, editor.patch.macros, path, 0),
+    };
+    editor.patch.ops[0]!.ratio = 1;
+    return editor;
+  };
+
+  it('locks Coarse and Fine at their halves of the held ratio, and the readout follows', () => {
+    const editor = automatedEditor(LANE_PART);
+    const { coarse, fine } = ratioKnobSpecs(editor, 0);
+    expect(coarse.automation?.()?.value).toBe(3);
+    expect(fine.automation?.()?.value).toBe(0.25);
+    expect(coarse.automation?.()?.color).toBe(fine.automation?.()?.color);
+    expect(shownRatio(editor, 0)).toBe(3.25);
+    // The stored ratio is untouched, and another operator stays free.
+    expect(readRatio(editor, 0)).toBe(1);
+    expect(ratioKnobSpecs(editor, 1).coarse.automation?.()).toBeNull();
+  });
+
+  it('locks under a macro mapped to the ratio, its tag the macro', () => {
+    const editor = automatedEditor(undefined);
+    editor.patch.macros = [
+      makeMacro({ name: 'Sweep', value: 1, mappings: [{ target: 'ops.0.ratio', min: 1, max: 4 }] }),
+    ];
+    const lock = ratioKnobSpecs(editor, 0).coarse.automation?.();
+    expect(lock?.macro).toBe('Sweep');
+    expect(lock?.value).toBe(4);
+    expect(shownRatio(editor, 0)).toBe(4);
+  });
+
+  it('is free while nothing holds the ratio, and lock-free without an editor that answers', () => {
+    const editor = automatedEditor(undefined);
+    expect(ratioKnobSpecs(editor, 0).fine.automation?.()).toBeNull();
+    expect(shownRatio(editor, 0)).toBe(1);
+    expect(ratioKnobSpecs(freshEditor(), 0).coarse.automation).toBeUndefined();
   });
 });
 

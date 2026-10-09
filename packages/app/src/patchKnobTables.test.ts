@@ -25,6 +25,7 @@ import {
   allPatchKnobs,
   lfoKnobs,
   lfoToOpKnobs,
+  lfoToRatioKnobs,
   lfoToWidthKnobs,
   patchKnobOpts,
   type LfoKey,
@@ -47,6 +48,8 @@ describe('allPatchKnobs', () => {
       expect(paths.has(`lfo.toWidth.${i}`), `lfo.toWidth.${i}`).toBe(true);
       expect(paths.has(`lfo2.toWidth.${i}`), `lfo2.toWidth.${i}`).toBe(true);
       expect(paths.has(`lfo2.toOp.${i}`), `lfo2.toOp.${i}`).toBe(true);
+      expect(paths.has(`lfo.toRatio.${i}`), `lfo.toRatio.${i}`).toBe(true);
+      expect(paths.has(`lfo2.toRatio.${i}`), `lfo2.toRatio.${i}`).toBe(true);
     });
     for (const f of ['rate', 'amount', 'modWheelDepth', 'delay', 'toPitch']) {
       expect(paths.has(`lfo2.${f}`), `lfo2.${f}`).toBe(true);
@@ -98,7 +101,12 @@ describe('the Width knob', () => {
 });
 
 describe('the LFO tables', () => {
-  const tables = (key: LfoKey) => [...lfoKnobs(key), ...lfoToOpKnobs(key), ...lfoToWidthKnobs(key)];
+  const tables = (key: LfoKey) => [
+    ...lfoKnobs(key),
+    ...lfoToOpKnobs(key),
+    ...lfoToWidthKnobs(key),
+    ...lfoToRatioKnobs(key),
+  ];
 
   it('edit their own LFO: lfo.* for LFO 1 and lfo2.* for LFO 2', () => {
     for (const k of tables('lfo')) expect(k.f.startsWith('lfo.'), k.f).toBe(true);
@@ -111,11 +119,12 @@ describe('the LFO tables', () => {
     expect(strip('lfo2')).toEqual(strip('lfo'));
   });
 
-  it('put Width A-D (the To Width depths) after To A-D, signed -1..1', () => {
+  it('put Width A-D (the To Width depths) after To A-D, then Ratio A-D, Width signed -1..1', () => {
     const labels = tables('lfo').map((k) => k.label);
-    expect(labels.slice(-(OP_NAMES.length * 2))).toEqual([
+    expect(labels.slice(-(OP_NAMES.length * 3))).toEqual([
       ...OP_NAMES.map((n) => `To ${n}`),
       ...OP_NAMES.map((n) => `Width ${n}`),
+      ...OP_NAMES.map((n) => `Ratio ${n}`),
     ]);
     for (const k of lfoToWidthKnobs('lfo2')) {
       expect([k.o.min, k.o.max]).toEqual([-1, 1]);
@@ -123,8 +132,23 @@ describe('the LFO tables', () => {
     }
   });
 
+  it('give Ratio A-D signed octaves, -4..4 from 0, the unit in the hint', () => {
+    for (const key of ['lfo', 'lfo2'] as const) {
+      lfoToRatioKnobs(key).forEach((k, i) => {
+        expect(k.f).toBe(`${key}.toRatio.${i}`);
+        expect([k.o.min, k.o.max, patchKnobOpts(k).def]).toEqual([-4, 4, 0]);
+        expect(k.o.fmt?.(1.25)).toBe('+1.25');
+        expect(k.hint).toBe(`Ratio ${OP_NAMES[i]}: octaves of LFO on ${OP_NAMES[i]}'s ratio`);
+      });
+    }
+  });
+
   it('start LFO 2 inert: no depth anywhere and deaf to the wheel', () => {
-    for (const k of [...lfoToOpKnobs('lfo2'), ...lfoToWidthKnobs('lfo2')]) {
+    for (const k of [
+      ...lfoToOpKnobs('lfo2'),
+      ...lfoToWidthKnobs('lfo2'),
+      ...lfoToRatioKnobs('lfo2'),
+    ]) {
       expect(patchKnobOpts(k).def, k.f).toBe(0);
     }
     const wheel = lfoKnobs('lfo2').find((k) => k.f === 'lfo2.modWheelDepth');

@@ -1,12 +1,13 @@
 /**
  * The four operator rows of the Parts tab (#70, ported; laid out as rows by
  * windsor#523, record `2026-10-03-parts-tab-layout` decisions 6, 7 and 9).
- * Each row is an identity column (letter, badge, Adv, Wave, Ratio/Fixed) and
+ * Each row is an identity column (letter, badge, Adv, Wave, Sync, Ratio/Fixed) and
  * a body that wraps: the core (the main knobs, Attack to Release, then the
  * envelope, which takes the leftover width) and, while Adv is on, the Adv
  * group, which the flex wrap alone puts beside the core or under it. The
  * knob specs are `patchKnobTables.ts`; the column sizes are `console.css`'s
- * "operator rows" block.
+ * "operator rows" block. The Sync face on the wave line is
+ * `operatorSyncPicker.ts` (windsor#649).
  */
 import type { Patch } from '@windsor/engine';
 import { ALGORITHMS, OP_NAMES, WAVE, WAVE_NAMES, WIDTH_RANGE } from '@windsor/engine';
@@ -26,6 +27,7 @@ import {
   patchKnobOpts,
 } from './patchKnobTables';
 import { OP_START_NAMES, opStartIndex, opStartLocked, writeOpStart } from './operatorStart';
+import { closeSyncMenu, syncPickers } from './operatorSyncPicker';
 import { BAY_SILENT_LEVEL, PULSE_START_WIDTH } from './patchPanelConstants';
 import type { PatchEditor } from './partsSession';
 import { pathKnob } from './patchPath';
@@ -72,12 +74,13 @@ function identityHead(i: number, isCar: boolean, onAdv: (open: boolean) => void)
   return head;
 }
 
-/** The identity column's second line: the Wave select and the Ratio/Fixed toggle. */
+/** The identity column's second line: the Wave select, the Sync face and the Ratio/Fixed toggle. */
 function waveAndPitchLine(
   editor: PatchEditor,
   i: number,
   onWave: () => void,
   onPitchMode: () => void,
+  syncFace: HTMLElement,
 ): HTMLElement {
   const line = el('div', 'op-id-line');
   const waveSel = document.createElement('select');
@@ -94,7 +97,7 @@ function waveAndPitchLine(
     editor.push();
     onWave();
   };
-  line.appendChild(waveSel);
+  line.append(waveSel, syncFace);
 
   const fixBtn = el('button', 'btn') as HTMLButtonElement;
   fixBtn.type = 'button';
@@ -237,7 +240,12 @@ function advGroup(editor: PatchEditor, i: number, color: string, redraw: () => v
 }
 
 /** One operator's row: the identity column, the body and, for a User wave, the harmonic editor. */
-function operatorRow(editor: PatchEditor, i: number, isCar: boolean): HTMLElement {
+function operatorRow(
+  editor: PatchEditor,
+  i: number,
+  isCar: boolean,
+  syncFace: HTMLElement,
+): HTMLElement {
   const color = isCar ? CARRIER_COLOR : MOD_COLOR;
   const row = el('section', 'op-row');
   row.style.setProperty('--op-color', color);
@@ -271,17 +279,26 @@ function operatorRow(editor: PatchEditor, i: number, isCar: boolean): HTMLElemen
     knobs.syncKnobs();
   };
   const id = el('div', 'op-id');
-  id.append(identityHead(i, isCar, onAdv), waveAndPitchLine(editor, i, onWave, knobs.syncPitch));
+  id.append(
+    identityHead(i, isCar, onAdv),
+    waveAndPitchLine(editor, i, onWave, knobs.syncPitch, syncFace),
+  );
   row.append(id, body, harmonics.root);
   requestAnimationFrame(redraw);
   return row;
 }
 
 export function buildBays(editor: PatchEditor): void {
+  closeSyncMenu();
   const grid = $('bayGrid');
   grid.innerHTML = '';
-  const alg = ALGORITHMS[editor.patch.algorithm];
+  const carriers = ALGORITHMS[editor.patch.algorithm]?.carriers ?? [];
+  const isCar = (i: number): boolean => carriers.includes(i);
+  const faces = syncPickers(
+    editor,
+    OP_NAMES.map((_, i) => (isCar(i) ? CARRIER_COLOR : MOD_COLOR)),
+  );
   OP_NAMES.forEach((_, i) => {
-    grid.appendChild(operatorRow(editor, i, alg?.carriers.includes(i) ?? false));
+    grid.appendChild(operatorRow(editor, i, isCar(i), faces[i]!));
   });
 }

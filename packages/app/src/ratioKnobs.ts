@@ -12,9 +12,17 @@
  * `ratioKnobSpecs` is deliberately separate from the DOM: what a knob reads
  * and writes is the part worth testing, and the console's tests run without a
  * browser (`patchPanels.test.ts` takes the same shape).
+ *
+ * The ratio is a voice target (`ops.<i>.ratio`, windsor#646), so a song lane
+ * or a macro mapping can hold it. While one does, both knobs lock and light
+ * as every other path knob does (windsor#649 decision 9): the one lock the
+ * editor answers for the path, split into each knob's half of the held
+ * ratio, and the readout shows the held ratio too.
  */
 import { el } from './dom';
 import { makeKnob, type KnobElement, type KnobSpec } from './knob';
+import type { KnobAutomation } from './knobAutomation';
+import { followAutomation } from './knobLock';
 import type { PatchEditor } from './partsSession';
 import {
   COARSE_DEF,
@@ -36,6 +44,26 @@ import {
 /** The working patch's stored ratio for operator `i`. */
 export function readRatio(editor: PatchEditor, i: number): number {
   return Number(editor.patch.ops[i]?.ratio ?? COARSE_DEF);
+}
+
+/** The lock a lane or a macro puts on operator `i`'s ratio, or null while none holds it. */
+export function ratioLock(editor: PatchEditor, i: number): KnobAutomation | null {
+  return editor.automation?.(`ops.${i}.ratio`) ?? null;
+}
+
+/** One knob's share of the ratio lock: its half of the held ratio, in the lock's colour. */
+function halfLock(
+  editor: PatchEditor,
+  i: number,
+  half: (ratio: number) => number,
+): Pick<KnobSpec, 'automation'> {
+  if (!editor.automation) return {};
+  return {
+    automation: () => {
+      const lock = ratioLock(editor, i);
+      return lock && { ...lock, value: half(lock.value) };
+    },
+  };
 }
 
 function writeRatio(editor: PatchEditor, i: number, ratio: number): void {
@@ -68,6 +96,7 @@ export function ratioKnobSpecs(
       get: () => split(readRatio(editor, i)).coarse,
       set: (v) => writeRatio(editor, i, withCoarse(readRatio(editor, i), v)),
       onChange,
+      ...halfLock(editor, i, (ratio) => split(ratio).coarse),
     },
     fine: {
       label: 'Fine',
@@ -79,6 +108,7 @@ export function ratioKnobSpecs(
       get: () => split(readRatio(editor, i)).fine,
       set: (v) => writeRatio(editor, i, withFine(readRatio(editor, i), v)),
       onChange,
+      ...halfLock(editor, i, (ratio) => split(ratio).fine),
     },
   };
 }
@@ -103,16 +133,29 @@ export function showPitchControls(
   fixedNode.style.display = fixed ? '' : 'none';
 }
 
-/** The combined ratio, beside the pair, so the stored value is always visible. */
+/** The ratio the readout shows: the held ratio while a lane or macro holds it, else the stored one. */
+export function shownRatio(editor: PatchEditor, i: number): number {
+  return ratioLock(editor, i)?.value ?? readRatio(editor, i);
+}
+
+/**
+ * The combined ratio, beside the pair, so the stored value is always visible;
+ * while the ratio is held, the held value in the lock's colour, following it.
+ */
 function ratioReadout(editor: PatchEditor, i: number): { node: HTMLElement; sync: () => void } {
   const node = el('div', 'knob-readout');
   node.innerHTML = '<span class="readout-val"></span><span class="readout-label">Ratio</span>';
   const out = node.querySelector('.readout-val') as HTMLElement;
   const sync = (): void => {
-    out.textContent = fmtRatio(readRatio(editor, i));
+    const lock = ratioLock(editor, i);
+    out.textContent = fmtRatio(shownRatio(editor, i));
+    node.classList.toggle('locked', lock !== null);
+    if (lock) node.style.setProperty('--lock-color', lock.color);
+    else node.style.removeProperty('--lock-color');
   };
   node.title = 'The stored ratio: Coarse + Fine';
   sync();
+  if (editor.automation) followAutomation(node, () => ratioLock(editor, i), sync);
   return { node, sync };
 }
 

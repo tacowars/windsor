@@ -15,6 +15,7 @@ import {
 } from '@windsor/engine';
 import { ALG_LINK_COLOR, CARRIER_COLOR, INK_ON_ACCENT, MOD_COLOR } from './consoleColors';
 import { $, el, seg } from './dom';
+import { knobTitle } from './knob';
 import { drawEnv } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
 import { envAdvKnobs, envKnobs, envLoopPicker } from './envelopeKnobs';
@@ -26,6 +27,7 @@ import {
   PITCH_ENV_AMOUNT_KNOB,
   lfoKnobs,
   lfoToOpKnobs,
+  lfoToRatioKnobs,
   lfoToWidthKnobs,
   patchKnobOpts,
   type LfoKey,
@@ -367,8 +369,16 @@ export function buildLfo(editor: PatchEditor, key: LfoKey): void {
   );
   const row = $(`${key}Knobs`);
   row.innerHTML = '';
-  for (const k of [...lfoKnobs(key), ...lfoToOpKnobs(key), ...lfoToWidthKnobs(key)]) {
-    row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
+  const knobs = [
+    ...lfoKnobs(key),
+    ...lfoToOpKnobs(key),
+    ...lfoToWidthKnobs(key),
+    ...lfoToRatioKnobs(key),
+  ];
+  for (const k of knobs) {
+    const node = pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR });
+    if (k.hint) node.title = knobTitle(k.hint);
+    row.appendChild(node);
   }
   const phaseSeg = indexSeg(
     editor,
