@@ -60,6 +60,8 @@ interface Rig {
   part(slot?: number): AudioPart;
   /** The playhead moves to `tick`, the clock's time with it (or to `time`). */
   at(tick: number, time?: number): void;
+  /** ‖ or ■: the transport's halt listeners, as `rollRecMount.ts` wires them, then the halt. */
+  stop(): void;
   press(tick: number, pitch?: number, source?: string): void;
   release(tick: number, pitch?: number, source?: string): void;
   notes(region: number): readonly RollNote[];
@@ -110,6 +112,10 @@ function rig(loop?: { start: number; end: number }): Rig {
     clock,
     part,
     at,
+    stop: () => {
+      rec.close();
+      clock.running = false;
+    },
     press: (tick, pitch = 60, source = 'KeyA') => {
       if (tick > clock.tick) at(tick);
       rec.press(part(ctx.parts.selected), source, pitch, VEL, tick);
@@ -182,9 +188,7 @@ describe('a take', () => {
     const stop = armed(rig());
     stop.press(10);
     stop.at(40);
-    stop.rec.sync();
-    stop.clock.running = false;
-    stop.rec.sync();
+    stop.stop();
     expect(stop.notes(0)).toEqual([n(10, 30)]);
 
     const off = armed(rig());
@@ -284,8 +288,7 @@ describe('the take’s undo step', () => {
     r.release(45, 64, 'KeyD');
     r.press(50, 67, 'KeyG');
     r.release(60, 67, 'KeyG');
-    r.clock.running = false;
-    r.rec.sync();
+    r.stop();
     const notes = [n(10, 10), n(30, 10, 64), n(50, 10, 67)];
     expect(r.notes(0)).toEqual(notes);
     const steps: string[] = [];

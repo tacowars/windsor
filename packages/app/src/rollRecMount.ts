@@ -2,7 +2,9 @@
  * The Roll recorder wired to the console (windsor#663): its host over the
  * context, the live system's clock and the gestures; the keyboard's tap;
  * the selection, which ends a take when it moves; the context's
- * `onBeforeEdit`, which ends it before any other edit; and a timer that
+ * `onBeforeEdit`, which ends it before any other edit; the transport's
+ * `onBeforeHalt`, which ends it at the tick heard before ‖ or ■ halts the
+ * engine; and a timer that
  * reads the playhead while no Roll device is on screen (the Parts tab's
  * keys play while the Song tab is hidden). The Roll devices reach the one
  * recorder through `rollRecorder()`.
@@ -70,13 +72,14 @@ function consoleHost(ctx: AppContext): RecorderHost {
   };
 }
 
-/** Build the console's recorder and wire it: the keyboard's tap, the selection, every edit, the timer. */
+/** Build the console's recorder and wire it: the keyboard's tap, the selection, every edit, ‖ and ■, the timer. */
 export function mountRollRecorder(ctx: AppContext, keyboard: Keyboard): RollRecorder {
   const recorder = new RollRecorder(consoleHost(ctx));
   current = recorder;
   keyboard.tap = recorder;
   ctx.parts.onSelect(() => recorder.sync());
   ctx.onBeforeEdit(() => recorder.close());
+  ctx.host.transport.onBeforeHalt(() => recorder.close());
   setInterval(() => recorder.sync(), ROLL_REC.pollMs);
   return recorder;
 }

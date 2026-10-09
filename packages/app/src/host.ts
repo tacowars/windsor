@@ -91,8 +91,19 @@ export class HostTransport implements ConsoleTransport {
    * it is requested until its system is adopted; null with none pending.
    */
   private pending: number | null = null;
+  /** Told before ‖ or ■ halts the transport (`onBeforeHalt`). */
+  private readonly beforeHalt: (() => void)[] = [];
 
   constructor(private readonly live: () => TransportSystem | null) {}
+
+  /**
+   * Call `listener` before ‖ or ■ halts the transport, while the playhead
+   * still reads the tick heard: the Roll recorder ends its take there
+   * (windsor#663), instead of at its last poll.
+   */
+  onBeforeHalt(listener: () => void): void {
+    this.beforeHalt.push(listener);
+  }
 
   get state(): TransportState {
     return this.current;
@@ -114,13 +125,19 @@ export class HostTransport implements ConsoleTransport {
   /** A pause landing mid-rebuild (no system yet) still counts: the new system is adopted idle. */
   pause(): void {
     if (this.current !== 'playing') return;
+    this.halting();
     this.live()?.setMuted(true);
     this.current = nextTransportState(this.current, 'pause');
   }
 
   stop(): void {
+    this.halting();
     this.live()?.stopMusic();
     this.current = nextTransportState(this.current, 'stop');
+  }
+
+  private halting(): void {
+    for (const listener of this.beforeHalt) listener();
   }
 
   /**

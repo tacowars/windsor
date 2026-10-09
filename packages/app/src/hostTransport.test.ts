@@ -79,6 +79,20 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
     expect(system.calls).toEqual(['unmute', 'start', 'mute', 'unmute', 'start', 'stop']);
   });
 
+  it('tells its halt listeners before ‖ and ■ halt, while the position still reads the tick heard', () => {
+    const system = fakeSystem();
+    const transport = new HostTransport(() => system);
+    const heard: string[] = [];
+    transport.onBeforeHalt(() => heard.push(`${transport.position()} ${system.calls.length}`));
+    transport.play();
+    system.tick = 200;
+    transport.pause();
+    transport.play();
+    system.tick = 300;
+    transport.stop();
+    expect(heard).toEqual(['200 2', '300 5']);
+  });
+
   it('seek (windsor#102) is the engine seek, keeping the state; refused while playing or before audio', () => {
     expect(new HostTransport(() => null).seek(96)).toBe(false);
     const system = fakeSystem();
