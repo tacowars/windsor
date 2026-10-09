@@ -29,6 +29,7 @@ const settings = (o: Partial<LfoSettings> = {}): LfoSettings => ({
   modWheelDepth: 1,
   toOp: [0, 0, 0, 0],
   toWidth: [0, 0, 0, 0],
+  toRatio: [0, 0, 0, 0],
   ...o,
 });
 

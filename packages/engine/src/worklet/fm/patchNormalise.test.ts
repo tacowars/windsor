@@ -96,6 +96,35 @@ describe('patch normalisation', () => {
     expect([0.5, 3.25, 4, 4.5, -1, 'o', NaN].map(vowel)).toEqual([0.5, 3.25, 4, 4, 0, 0, 0]);
   });
 
+  it('fills every sync with off, keeps a master, and turns an unknown one off (windsor#646)', () => {
+    expect(normalisePatch({}).ops.map((op) => op.sync)).toEqual(['off', 'off', 'off', 'off']);
+    const p = normalisePatch({ ops: [{}, { sync: 'note' }, { sync: 'B' }, { sync: 'C' }] });
+    expect(p.ops.map((op) => op.sync)).toEqual(['off', 'note', 'B', 'C']);
+    const junk = { ops: [{ sync: 'X' }, { sync: 3 }, { sync: 'a' }] } as unknown as Parameters<
+      typeof normalisePatch
+    >[0];
+    expect(normalisePatch(junk).ops.map((op) => op.sync)).toEqual(['off', 'off', 'off', 'off']);
+  });
+
+  it('turns off every operator in a sync cycle, one synced to itself included, and keeps one leading into it (windsor#646)', () => {
+    const self = normalisePatch({ ops: [{ sync: 'A' }, { sync: 'A' }] });
+    expect(self.ops.map((op) => op.sync)).toEqual(['off', 'A', 'off', 'off']);
+    const pair = normalisePatch({ ops: [{ sync: 'B' }, { sync: 'A' }, { sync: 'B' }] });
+    expect(pair.ops.map((op) => op.sync)).toEqual(['off', 'off', 'B', 'off']);
+    const ring = normalisePatch({
+      ops: [{ sync: 'D' }, { sync: 'A' }, { sync: 'B' }, { sync: 'C' }],
+    });
+    expect(ring.ops.map((op) => op.sync)).toEqual(['off', 'off', 'off', 'off']);
+  });
+
+  it('fills both LFOs’ ratio depths with 0 and clamps one into −4..4 octaves (windsor#646)', () => {
+    expect(normalisePatch({}).lfo.toRatio).toEqual([0, 0, 0, 0]);
+    expect(normalisePatch({}).lfo2.toRatio).toEqual([0, 0, 0, 0]);
+    const p = normalisePatch({ lfo: { toRatio: [1.5, -9, 9] }, lfo2: { toRatio: [0, 0, 0, -2] } });
+    expect(p.lfo.toRatio).toEqual([1.5, -4, 4, 0]);
+    expect(p.lfo2.toRatio).toEqual([0, 0, 0, -2]);
+  });
+
   it('keeps a finite number and replaces anything else', () => {
     expect(num(3, 1)).toBe(3);
     expect(num('3', 1)).toBe(1);

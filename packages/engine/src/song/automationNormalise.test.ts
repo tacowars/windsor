@@ -114,7 +114,7 @@ describe('the target', () => {
       formatTargetId({ kind: 'insert', insertId: AUTOMATION_EQ_ID, field: 'drive' }),
       /eq has no .*"drive"/,
     ],
-    ['a voice path the catalog lacks', 'voice.ops.0.ratio', /names no automation target/],
+    ['a voice path the catalog lacks', 'voice.ops.0.fixedHz', /names no automation target/],
   ])('drops a lane on %s, reported', (_, target, message) => {
     const { lanes, corrections } = withLanes([
       lane(target as string, [point(0, 0.5)]),

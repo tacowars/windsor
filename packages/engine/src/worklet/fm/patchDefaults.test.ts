@@ -67,6 +67,13 @@ describe('the patch defaults (#670)', () => {
     ],
     // windsor#560: a mapping that omits its ends, on a row whose minimum is not 0 (30 Hz).
     ['a mapping with no ends', { macros: [{ mappings: [{ target: 'filter.cutoff' }] }] }],
+    // windsor#646: sync masters, a cycle the one rule turns off, and the LFO ratio depths.
+    [
+      'operator syncs and a cycle',
+      { ops: [{ sync: 'B' }, { sync: 'A' }, { sync: 'note' }, { sync: 'C' }] },
+    ],
+    ['an unknown sync', { ops: [{ sync: 'X' } as never] }],
+    ['the LFO ratio depths', { lfo: { toRatio: [0, 0.5, 0, -1] } }],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });

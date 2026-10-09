@@ -1,7 +1,9 @@
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms cut fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
+/* eslint-disable max-lines -- one voice's whole state, every field declared and born here (rule 7); hard sync's three lines (windsor#646) took it to 354 of 350, its state a class of its own in voiceSync.ts */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
- * history, amplitude ramps and their knots (windsor#301), width ramps, six
+ * history, amplitude ramps and their knots (windsor#301), width ramps, hard
+ * sync (windsor#646), six
  * envelopes, two LFOs, each operator's own filters (windsor#362, windsor#590) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), three filter stages (the third for the Formant
@@ -38,6 +40,7 @@ import { renderVoiceKernel } from './voiceKernel';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
 import { rebindStepMod, retargetStepMod, startStepMod } from './voiceStepMod';
+import { VoiceSync } from './voiceSync';
 import { VOICE_TARGET_COUNT } from './voiceTargetTables';
 import { KIND_PULSE, waveKind } from './waveTables';
 
@@ -84,6 +87,8 @@ class Voice {
   /** Each Noise operator's draw this sample in the generic loop, drawn D..A at its top (windsor#389). */
   noiseDraw: Float64Array;
   drive: VoiceDrive;
+  /** Hard sync (windsor#646): the bound patch's masters, the note's phase and the polyBLEP's state. */
+  sync: VoiceSync;
   noiseSeed: number;
   active: boolean;
   gate: boolean;
@@ -207,6 +212,7 @@ class Voice {
     // are exact, so a Noise operator reads the value `noise()` returned.
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
+    this.sync = new VoiceSync();
 
     this.noiseSeed = randomSeed32(random);
 
@@ -343,6 +349,7 @@ class Voice {
       this.ampEnv[i].noteOn();
       this.opFilter[i].reset();
     }
+    this.sync.start();
     this.bindConstants(patch);
 
     this.filtEnv.configure(patch.filter.env, this.sr);

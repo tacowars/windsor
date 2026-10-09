@@ -31,6 +31,7 @@ import {
   VT_OP_DECAY_CURVE,
   VT_OP_FEEDBACK,
   VT_OP_LEVEL,
+  VT_OP_RATIO,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
@@ -54,6 +55,7 @@ function layoutVoiceTargets(patch: Patch, out: Float64Array): void {
     out[b + VT_OP_DECAY_CURVE] = op.env.decayCurve;
     out[b + VT_OP_FEEDBACK] = op.feedback;
     out[b + VT_OP_WIDTH] = op.width;
+    out[b + VT_OP_RATIO] = op.ratio;
   }
   out[VT_LFO_AMOUNT] = patch.lfo.amount;
   out[VT_LFO_RATE] = patch.lfo.rate;

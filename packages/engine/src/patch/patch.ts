@@ -25,13 +25,16 @@ import {
   LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_RATIO_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
   MACRO_DEFAULTS,
   MACRO_MAPPING_DEFAULTS,
+  normaliseOpSyncs,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
 } from '../worklet/fm/patchDefaults';
+import type { OpSync } from '../worklet/fm/patchDefaults';
 import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 import { voiceTargetRow } from '../worklet/fm/voiceTargetTables';
 
@@ -76,6 +79,14 @@ export const MACRO_CURVE_NAMES = ['Linear', 'Exp', 'Log', 'S'] as const;
 
 /** Operators are labelled A B C D, with A nearest the output. */
 export const OP_NAMES = ['A', 'B', 'C', 'D'] as const;
+
+/**
+ * An operator's hard-sync master (windsor#646): `'off'`, `'note'`, or an
+ * operator by its `OP_NAMES` letter. The values and their one rule live with
+ * the defaults both fills read (`worklet/fm/patchDefaults.ts`).
+ */
+export type { OpSync };
+export { OP_SYNC_VALUES } from '../worklet/fm/patchDefaults';
 
 /** The algorithm routing table lives in `audioConstants.ts`; this is its home. */
 export { ALGORITHMS };
@@ -143,6 +154,14 @@ export interface Operator {
    * holds them where they are set.
    */
   opTrack: number;
+  /**
+   * Hard sync (windsor#646, record `2026-10-09-operator-hard-sync`): the
+   * operator's own phase restarts each time its master's own phase wraps,
+   * the note's or another operator's; phase modulation it receives still
+   * applies over the restarted phase. A cycle, or a value not in
+   * `OP_SYNC_VALUES`, is `'off'`.
+   */
+  sync: OpSync;
   env: Envelope;
 }
 
@@ -163,6 +182,12 @@ export interface LfoSettings {
   toOp: number[];
   /** Per-operator width modulation depth, added to `Operator.width` before the clamp. */
   toWidth: number[];
+  /**
+   * Per-operator ratio modulation depth in octaves (windsor#646): a ratio
+   * operator's frequency times `2^(lfo × depth)`, after its ratio target; a
+   * fixed-frequency operator ignores it. −4..4, 0 off.
+   */
+  toRatio: number[];
 }
 
 export interface FilterSettings {
@@ -335,6 +360,7 @@ function makeLfo(defaults: typeof LFO_DEFAULTS, o: Partial<LfoSettings> = {}): L
     ...defaults,
     toOp: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_OP_DEFAULT),
     toWidth: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_WIDTH_DEFAULT),
+    toRatio: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_RATIO_DEFAULT),
     ...o,
   };
 }
@@ -345,6 +371,8 @@ export function makePatch(o: PartialPatch = {}): Patch {
     const level = i === 0 ? LEAD_OPERATOR_LEVEL : OPERATOR_DEFAULTS.level;
     ops.push(makeOperator({ level, ...(o.ops?.[i] ?? {}) }));
   }
+  // The sync fields' one rule (windsor#646): unknown values and cycles are off.
+  normaliseOpSyncs(ops.map((op) => op.sync)).forEach((sync, i) => (ops[i]!.sync = sync));
   return {
     ...PATCH_DEFAULTS,
     ...o,
@@ -387,7 +415,7 @@ function mergeInto(current: unknown, partial: unknown): unknown {
 
 /**
  * A partial patch over a complete one, then completed again: objects recurse,
- * arrays (`ops`, `toOp`, `toWidth`, `userPartials`, `macros`) are replaced wholesale. The live
+ * arrays (`ops`, `toOp`, `toWidth`, `toRatio`, `userPartials`, `macros`) are replaced wholesale. The live
  * `patches` path of `AudioSystem.apply` merges a document's patch edit over
  * the part's current patch with this, so a partial names only what changes.
  */

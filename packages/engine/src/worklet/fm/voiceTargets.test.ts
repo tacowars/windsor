@@ -29,6 +29,7 @@ describe('layoutVoiceTargets', () => {
       level: next(),
       feedback: next(),
       width: 0.05 + next(),
+      ratio: 1 + next(),
       env: { decayTime: next(), decayCurve: next() },
     });
     const patch = normalisePatch({

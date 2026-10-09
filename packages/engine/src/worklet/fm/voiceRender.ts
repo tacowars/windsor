@@ -27,7 +27,13 @@
  * An operator's own filters (windsor#590) sit after its wave read, squeezed
  * or not, and after its feedback tap: `fb1`/`fb2` take the raw wave, `out`
  * the filtered one, so a filter changes what the operator sends on and never
- * how its own feedback sounds.
+ * how its own feedback sounds. Hard sync (windsor#646, `voiceSync.ts`):
+ * each sample ends by advancing the note master's phase and testing every
+ * master's wrap inline; only a sample on which one wrapped calls
+ * `applySyncResets`. A synced operator whose reset is corrected keeps its
+ * phase modulation for that call and sends its wave a sample late, after
+ * its feedback tap and before its own filters, with the polyBLEP's
+ * correction taken off. A voice with no synced operator takes neither branch.
  */
 
 import type { Voice } from './voice';
@@ -41,6 +47,7 @@ import {
 } from './fmConstants';
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { renderVoiceLadder } from './voiceLadder';
+import { SYNC_NOTE_BIT, applySyncResets } from './voiceSync';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
@@ -109,6 +116,17 @@ function renderVoiceGeneric(
   const at = CTRL_INTERVAL - voice.ctrlCount;
   const filters = voice.opFilter;
   const draws = voice.noiseDraw;
+  // Hard sync (windsor#646), hoisted: the synced, corrected and master bits,
+  // the corrected operators' state and the note master's phase.
+  const sync = voice.sync;
+  const synced = sync.synced,
+    blep = sync.blep,
+    masters = sync.masters;
+  const syncMod = sync.mod,
+    syncHeld = sync.held,
+    syncAfter = sync.after;
+  const noteInc = sync.noteInc;
+  let notePhase = sync.notePhase;
 
   // Width (#55), one bit per operator, hoisted: `ramping` advances its width
   // each sample, `squeezed` reads its wave compressed. Neither is set for a
@@ -164,6 +182,9 @@ function renderVoiceGeneric(
         const y = (fb1[i] + fb2[i]) * 0.5;
         mod += fb > 0 ? y * fb * FEEDBACK_SAW_CYCLES : -y * y * fb * FEEDBACK_SQUARE_CYCLES;
       }
+
+      // A corrected synced operator's step is read at this modulation (windsor#646).
+      if ((blep & (1 << i)) !== 0) syncMod[i] = mod;
 
       let ph = phase[i] + mod;
       ph -= Math.floor(ph);
@@ -228,6 +249,14 @@ function renderVoiceGeneric(
       // filters, after it, shape only what it sends on.
       fb2[i] = fb1[i];
       fb1[i] = v * a;
+      // A corrected synced operator sends the wave it held, a sample late, and
+      // holds this one less the correction a reset left it (windsor#646).
+      if ((blep & (1 << i)) !== 0) {
+        const late = syncHeld[i];
+        syncHeld[i] = v - syncAfter[i];
+        syncAfter[i] = 0;
+        v = late;
+      }
       if ((filtered & (1 << i)) !== 0) {
         const filter = filters[i];
         filter.point = v;
@@ -247,6 +276,21 @@ function renderVoiceGeneric(
         amp[i] = knotAmp[j];
         ampInc[i] = knotInc[j];
         ampBreak[i] = knotGap[j];
+      }
+    }
+
+    // Hard sync (windsor#646): the note master's phase, then each master's
+    // wrap tested inline; the resets only on a sample where one wrapped.
+    if (synced !== 0) {
+      notePhase += noteInc;
+      if (notePhase >= 1) notePhase -= Math.floor(notePhase);
+      let wrapped = (masters & SYNC_NOTE_BIT) !== 0 && notePhase < noteInc;
+      for (let m = 0; m < 4 && !wrapped; m++) {
+        wrapped = (masters & (1 << m)) !== 0 && phase[m] < phaseInc[m];
+      }
+      if (wrapped) {
+        sync.notePhase = notePhase;
+        applySyncResets(voice);
       }
     }
 
@@ -338,6 +382,7 @@ function renderVoiceGeneric(
 
   if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
+  sync.notePhase = notePhase;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();

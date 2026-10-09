@@ -123,6 +123,16 @@
       "generic": "0874af1d544820d1696d7273537e66bd17ed5c9ef231adff16cd9b5568b827b4",
       "noDormancy": "0874af1d544820d1696d7273537e66bd17ed5c9ef231adff16cd9b5568b827b4"
     },
+    "lead-sync-detune": {
+      "default": "601ebde164367a766b7f0f6b77b23a4f623e22c1702fcc4ebada5d183388b09f",
+      "generic": "601ebde164367a766b7f0f6b77b23a4f623e22c1702fcc4ebada5d183388b09f",
+      "noDormancy": "601ebde164367a766b7f0f6b77b23a4f623e22c1702fcc4ebada5d183388b09f"
+    },
+    "lead-sync-sweep": {
+      "default": "f4d342fd63989eede17d227c934962630625cf27b38c40765c031fd6ecf30f42",
+      "generic": "f4d342fd63989eede17d227c934962630625cf27b38c40765c031fd6ecf30f42",
+      "noDormancy": "f4d342fd63989eede17d227c934962630625cf27b38c40765c031fd6ecf30f42"
+    },
     "lead-width-sweep": {
       "default": "34ce1a722f8b4c636dd1b5a32458427f1050619602c21b1c1336df03eefd7e43",
       "generic": "34ce1a722f8b4c636dd1b5a32458427f1050619602c21b1c1336df03eefd7e43",

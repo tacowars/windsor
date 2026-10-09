@@ -129,8 +129,8 @@ describe('the loader and the macros (windsor#559)', () => {
     ],
     [
       'a target the table lacks',
-      [{ mappings: [{ target: 'ops.0.ratio' }] }],
-      /patch\.macros\[0\]\.mappings\[0\]\.target: "ops\.0\.ratio" is not a voice target/,
+      [{ mappings: [{ target: 'ops.0.fixedHz' }] }],
+      /patch\.macros\[0\]\.mappings\[0\]\.target: "ops\.0\.fixedHz" is not a voice target/,
     ],
     [
       'a target an earlier macro maps',

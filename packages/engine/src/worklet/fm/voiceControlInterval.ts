@@ -17,7 +17,7 @@
  *   done: its segments recur, so their ends keep landing in small blocks;
  * - a glide in progress whose time is under that same floor;
  * - an LFO that reaches anything, a depth (its amount or its wheel depth)
- *   and a destination (pitch, an operator's level or width, or the filter
+ *   and a destination (pitch, an operator's level, width or ratio, or the filter
  *   while it is on), at `CTRL_LONG_MAX_LFO_HZ` or faster, or at any rate in
  *   a shape that jumps (square, sample and hold, either saw): a jump is a
  *   transient, and a long block would stretch its amplitude ramp from 32
@@ -122,7 +122,7 @@ function lfoFast(voice: Voice, second: boolean, table: ControlIntervalTable): bo
   if (amount === 0 && p.modWheelDepth === 0) return false;
   if (p.toPitch !== 0) return true;
   for (let i = 0; i < p.toOp.length; i++) {
-    if (p.toOp[i] !== 0 || p.toWidth[i] !== 0) return true;
+    if (p.toOp[i] !== 0 || p.toWidth[i] !== 0 || p.toRatio[i] !== 0) return true;
   }
   const f = patch.filter;
   return f.mode !== FILT_OFF && (second ? f.lfo2Amount : f.lfoAmount) !== 0;

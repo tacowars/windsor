@@ -36,10 +36,13 @@ import {
   LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_RATIO_DEFAULT,
+  LFO_TO_RATIO_RANGE,
   LFO_TO_WIDTH_DEFAULT,
   MACRO_DEFAULTS,
   MACRO_VALUE_RANGE,
   MACROS_MAX,
+  normaliseOpSyncs,
   OP_FILTER_RANGE,
   OP_FILTER_TRACK_RANGE,
   OPERATOR_COUNT,
@@ -114,6 +117,7 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
     opLp: clamp(num(o.opLp, d.opLp), OP_FILTER_RANGE), // Hz, 0 off; every wave (windsor#590)
     opHp: clamp(num(o.opHp, d.opHp), OP_FILTER_RANGE),
     opTrack: clamp(num(o.opTrack, d.opTrack), OP_FILTER_TRACK_RANGE), // octaves an octave of note
+    sync: d.sync, // the patch's, once every operator is read (`normaliseOpSyncs`, windsor#646)
     env: envDefaults(o.env),
   };
 }
@@ -143,6 +147,10 @@ function lfoDefaults(
     modWheelDepth: num(raw.modWheelDepth, ld.modWheelDepth),
     toOp: perOperator(raw.toOp, LFO_TO_OP_DEFAULT),
     toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT),
+    // Octaves at full swing (windsor#646), clamped so the ratio stays finite.
+    toRatio: perOperator(raw.toRatio, LFO_TO_RATIO_DEFAULT).map((d) =>
+      clamp(d, LFO_TO_RATIO_RANGE),
+    ),
   };
 }
 
@@ -197,7 +205,11 @@ function macrosDefaults(raw: unknown): Macro[] {
 function normalisePatch(raw: PartialPatch | null | undefined): Patch {
   raw = raw || {};
   const ops: Operator[] = [];
-  for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
+  const rawOps = raw.ops;
+  for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(rawOps && rawOps[i], i));
+  // Hard sync (windsor#646): an unknown master and every cycle are off.
+  const syncs = normaliseOpSyncs(ops.map((_, i) => rawOps?.[i]?.sync));
+  for (let i = 0; i < OPERATOR_COUNT; i++) ops[i].sync = syncs[i];
 
   const filtRaw = raw.filter || {};
   const pd = PATCH_DEFAULTS,
