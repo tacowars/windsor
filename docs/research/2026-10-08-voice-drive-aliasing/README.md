@@ -1,5 +1,15 @@
 # The voice drive's aliasing, measured, and what each fix buys
 
+**Status: deferred (2026-10-09).** tacowars has not decided whether to ship
+the proposal below. Nothing in the engine changed for it; this note and its
+scripts are kept so the work can resume from here, not from scratch. The
+side finding on the oscillator's own floor was fixed separately: record
+`2026-10-09-wavetables-sized-to-their-harmonics`, measurements in
+`docs/research/2026-10-08-wavetable-floor/`. That fix changes the Saw and
+Square input at C3 and below, so the drive's `input` floor column and any
+rerun's low notes will read cleaner than the tables here, but the drive's
+own aliasing figures do not depend on it.
+
 The voice drive (`worklet/fm/voiceDrive.ts`, windsor#300) runs its shapers
 once per host sample with no oversampling. Decision 4 of
 `docs/log/2026-10-01-voice-drive-stage.md` records "`hard` and `fold` alias,
@@ -227,6 +237,8 @@ Any change to the drive changes the render of all 38 driven patches, so
 the goldens change.
 
 ## A side finding: the Saw oscillator's own floor
+
+*Fixed since: see the status note at the top.*
 
 The capture is a plain Saw with no drive. It reads −36 dB A-weighted at C1,
 about −50 to −55 dB through C#1–C2, −62 dB at C3 and −77 dB at C4. An exactly

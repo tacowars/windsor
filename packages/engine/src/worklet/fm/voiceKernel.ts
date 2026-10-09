@@ -38,7 +38,6 @@ import {
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
   OP_FILTER_DAMPING,
-  TABLE_SIZE,
 } from './fmConstants';
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { renderVoiceLadder } from './voiceLadder';
@@ -161,6 +160,12 @@ function renderVoiceKernel(
     tB = tables[B]!,
     tC = tables[C]!,
     tD = tables[D]!;
+  // Each table's length less its guard sample: the phase's scale, which is
+  // each octave's own (fmConstants.ts). An operator with no table reads none.
+  const nA = tA === null ? 0 : tA.length - 1,
+    nB = tB === null ? 0 : tB.length - 1,
+    nC = tC === null ? 0 : tC.length - 1,
+    nD = tD === null ? 0 : tD.length - 1;
   const fbA1 = fbTo[A],
     fbB1 = fbTo[B],
     fbC1 = fbTo[C],
@@ -256,14 +261,14 @@ function renderVoiceKernel(
         const pw = ph * wD;
         if (pw >= 1) v = 0;
         else if (kD === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nD;
           const i0 = fi | 0;
           const s0 = tD[i0];
           v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
         } else if (kD === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kD === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nD;
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
@@ -272,11 +277,11 @@ function renderVoiceKernel(
       else if (kD === KIND_PULSE) {
         let pd = ph + wD;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nD;
         const i0 = fi | 0;
         const s0 = tD[i0];
         const up = s0 + (tD[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nD;
         const d0 = fd | 0;
         const sd = tD[d0];
         v = up - (sd + (tD[d0 + 1] - sd) * (fd - d0));
@@ -335,14 +340,14 @@ function renderVoiceKernel(
         const pw = ph * wC;
         if (pw >= 1) v = 0;
         else if (kC === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nC;
           const i0 = fi | 0;
           const s0 = tC[i0];
           v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
         } else if (kC === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kC === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nC;
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
@@ -351,11 +356,11 @@ function renderVoiceKernel(
       else if (kC === KIND_PULSE) {
         let pd = ph + wC;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nC;
         const i0 = fi | 0;
         const s0 = tC[i0];
         const up = s0 + (tC[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nC;
         const d0 = fd | 0;
         const sd = tC[d0];
         v = up - (sd + (tC[d0 + 1] - sd) * (fd - d0));
@@ -415,14 +420,14 @@ function renderVoiceKernel(
         const pw = ph * wB;
         if (pw >= 1) v = 0;
         else if (kB === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nB;
           const i0 = fi | 0;
           const s0 = tB[i0];
           v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
         } else if (kB === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kB === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nB;
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
@@ -431,11 +436,11 @@ function renderVoiceKernel(
       else if (kB === KIND_PULSE) {
         let pd = ph + wB;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nB;
         const i0 = fi | 0;
         const s0 = tB[i0];
         const up = s0 + (tB[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nB;
         const d0 = fd | 0;
         const sd = tB[d0];
         v = up - (sd + (tB[d0 + 1] - sd) * (fd - d0));
@@ -496,14 +501,14 @@ function renderVoiceKernel(
         const pw = ph * wA;
         if (pw >= 1) v = 0;
         else if (kA === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nA;
           const i0 = fi | 0;
           const s0 = tA[i0];
           v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
         } else if (kA === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kA === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nA;
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
@@ -512,11 +517,11 @@ function renderVoiceKernel(
       else if (kA === KIND_PULSE) {
         let pd = ph + wA;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nA;
         const i0 = fi | 0;
         const s0 = tA[i0];
         const up = s0 + (tA[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nA;
         const d0 = fd | 0;
         const sd = tA[d0];
         v = up - (sd + (tA[d0 + 1] - sd) * (fd - d0));

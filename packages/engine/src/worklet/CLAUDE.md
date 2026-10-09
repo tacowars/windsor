@@ -223,7 +223,8 @@ build output. The map of `fm/` (#644):
 | `fmConstants.ts` | the tunables every other module imports, and `ENVELOPE_CURVE_STEEPNESS`, which the main thread re-exports (#656) |
 | `waveIds.ts` | `WAVE`, the waveform ids, import-free: the main thread's `patch.ts` re-exports it (#656) |
 | `modeIds.ts` | the `LOOP_*`, `FILT_*`, `LFO_*` and `DRIVE_*` ids and the `LOOP_MODE`, `FILTER_MODE`, `LFO_SHAPE` and `DRIVE_SHAPE` objects built from them, import-free: `patch.ts` re-exports the objects (#669, windsor#300) |
-| `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
+| `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up; each octave's table is sized to its highest harmonic (`MIP_TABLE_RATIO`, 2048 to `TABLE_SIZE_MAX`), so a table of few harmonics stays at 2048 and keeps its bits, and the loops scale the phase by each table's own length (record `2026-10-09-wavetables-sized-to-their-harmonics`) |
+| `waveTableFft.ts` | `sineSeriesByFft`: the inverse FFT that builds a table longer than 2048 from its harmonics, over a preallocated scratch and Float32 twiddles read at a stride, about 3 ms for a saw's set where summing took 34 |
 | `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
 | `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `writeSegmentLevel` over a segment's fields, which `advance` runs and the console's `segmentLevel` wraps, and its two steps `curveConstant` and `curveShape` (#656, windsor#233) |
 | `lfo.ts` | `Lfo` |
