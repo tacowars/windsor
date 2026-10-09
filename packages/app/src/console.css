@@ -3082,6 +3082,29 @@ body.chord-dragging {
 .roll-step.roll-fit.on {
   color: var(--carrier);
 }
+/* Quantise (windsor#661): drawn as the Loop stepper is, a well with a line-bright edge. */
+.roll-qbtn {
+  height: var(--roll-ctl-h);
+  padding: 0;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-panel);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.roll-qbtn:hover:not(:disabled) {
+  background: var(--panel-hi);
+}
+.roll-qbtn:disabled {
+  color: var(--ink-faint);
+  border-color: var(--line);
+  cursor: default;
+}
 .seg.roll-seg {
   flex-wrap: nowrap;
   height: var(--roll-ctl-h);

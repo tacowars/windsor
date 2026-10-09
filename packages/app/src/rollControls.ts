@@ -13,9 +13,9 @@ import { auditionOn, setAudition } from './rollAudition';
 import { tableKnob } from './seqFields';
 import { ROLL_KNOBS } from './sequencerKnobTables';
 import { barsOf, loopText } from './rollSummary';
-import { ROLL_SNAPS } from './rollTables';
+import { ROLL_QUANTISE, ROLL_SNAP_OFF_TICKS, ROLL_SNAPS } from './rollTables';
 import type { RollKeys } from './rollRows';
-import { type RollViewState, type RollZoom, rowZoomText, timeZoomText } from './rollView';
+import { type RollViewState, type RollZoom, rowZoomText, snapOf, timeZoomText } from './rollView';
 
 /** What the controls read and change. */
 export interface RollControlsTarget {
@@ -35,6 +35,10 @@ export interface RollControlsTarget {
   repaint(): void;
   /** One − (−1) or + (+1) of the loop, written to the song. */
   stepLoop(dir: number): void;
+  /** How many notes are selected, which Quantise names. */
+  selectedCount(): number;
+  /** One press of Quantise, written to the song. */
+  quantise(): void;
 }
 
 /** The controls, and the readouts' refresh after a repaint. */
@@ -91,6 +95,32 @@ function loopItem(target: RollControlsTarget): { node: HTMLElement; refresh: () 
   return { node: item(label, stepper([less, text, more])), refresh };
 }
 
+/**
+ * Quantise (windsor#661): its label names the Snap step, the button what it
+ * acts on; disabled with Snap Off, which has no step to snap to.
+ */
+function quantiseItem(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
+  const Q = ROLL_QUANTISE;
+  const label = el('span', 'field-label roll-loop-label', Q.label);
+  const to = el('em');
+  label.appendChild(to);
+  const button = el('button', 'roll-qbtn') as HTMLButtonElement;
+  button.type = 'button';
+  button.onclick = () => target.quantise();
+  const wrap = item(label, button);
+  const refresh = (): void => {
+    const snap = snapOf(target.view.snap);
+    const off = snap.ticks === ROLL_SNAP_OFF_TICKS;
+    const count = target.selectedCount();
+    to.textContent = off ? Q.off : `${Q.to} ${snap.label}`;
+    button.textContent = count > 0 ? `${count} ${Q.selected}` : Q.all;
+    button.disabled = off;
+    button.title = off ? Q.offTitle : Q.title;
+  };
+  refresh();
+  return { node: wrap, refresh };
+}
+
 function firstColumn(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
   const { view } = target;
   const snap = select(
@@ -126,9 +156,16 @@ function firstColumn(target: RollControlsTarget): { node: HTMLElement; refresh: 
       target.repaint();
     },
   );
+  const quantise = quantiseItem(target);
   const col = el('div', 'roll-ctl');
-  col.append(snap, loop.node, item('Keys', keys), item('Fold', fold));
-  return { node: col, refresh: loop.refresh };
+  col.append(snap, loop.node, item('Keys', keys), item('Fold', fold), quantise.node);
+  return {
+    node: col,
+    refresh: () => {
+      loop.refresh();
+      quantise.refresh();
+    },
+  };
 }
 
 function zooms(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
