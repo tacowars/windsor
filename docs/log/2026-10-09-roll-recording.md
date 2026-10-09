@@ -84,8 +84,10 @@ the build tickets.
    (tacowars, 2026-10-09): the take so far closes as its own step, the
    edit is its own step, and recording carries on as a new take. Undo
    then steps back through the later take, the edit and the earlier
-   take in turn. An undo or redo pressed during a take closes the take
-   first, then applies. The take's writes are never folded into another
+   take in turn. An undo pressed during a take closes the take first,
+   then applies. A take is an ordinary edit for redo: its first write
+   empties the redo stack, as every edit's does, so after an undo,
+   recording leaves nothing to redo (windsor#663). The take's writes are never folded into another
    edit's step, nor another edit into the take's.
 9. **The note cap.** Past `ROLL_NOTES_MAX` (2048) a region takes no new
    notes, and the device says so. A recorded note that replaces one at

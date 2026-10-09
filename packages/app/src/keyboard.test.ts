@@ -16,6 +16,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AudioPart } from '@windsor/engine';
 import { AUDITION_TAB } from './keyboardConstants';
 import { Keyboard, isShortcutPress, qwertyPlaysOn } from './keyboard';
+import { MidiPerformer } from './midiPerformer';
 
 /** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep. */
 const keysBox = { children: [] as HTMLElement[] };
@@ -190,6 +191,30 @@ describe('the audition keyboard', () => {
     log.length = 0;
     keyboard.panic();
     expect(log).toEqual(['p2 panic']);
+  });
+
+  it('tells its tap where a note really starts and stops: the pedal’s release, Hold’s at Panic', () => {
+    const taps: string[] = [];
+    keyboard.tap = {
+      press: (part, source, pitch, _velocity, at) =>
+        void taps.push(`${part === part1 ? 'p1' : 'p2'} on ${source} ${pitch} @${at}`),
+      release: (_part, source, pitch, at) => void taps.push(`off ${source} ${pitch} @${at}`),
+      panic: () => void taps.push('panic'),
+    };
+    const midi = new MidiPerformer(keyboard.midiSink('a'));
+    midi.handle({ type: 'sustain', down: true }, 1);
+    midi.handle({ type: 'noteOn', note: 60, velocity: 0.5 }, 2);
+    midi.handle({ type: 'noteOff', note: 60 }, 3);
+    midi.handle({ type: 'bend', semitones: 1 }, 4);
+    midi.handle({ type: 'sustain', down: false }, 5);
+    expect(taps).toEqual(['p1 on midi:a:60 60 @2', 'off midi:a:60 60 @5']);
+
+    taps.length = 0;
+    keyboard.hold = true;
+    keyboard.onKeyDown({ ...press('a', 'KeyA'), timeStamp: 6 } as KeyboardEvent);
+    keyboard.onKeyUp({ ...press('a', 'KeyA'), timeStamp: 7 } as KeyboardEvent);
+    keyboard.panic();
+    expect(taps).toEqual([`p1 on KeyA ${keyboard.octave * 12} @6`, 'panic']);
   });
 
   it('calls back after a Panic so a MIDI performer forgets its notes', () => {

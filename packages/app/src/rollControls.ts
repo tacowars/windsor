@@ -1,7 +1,7 @@
 /**
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
- * columns: Snap, Loop, Keys and Fold; then Vel, the ↔ and ↕ zooms and the
- * Audition switch. Vel is the console's knob on the part's `velocity`.
+ * columns: Snap, Loop, Keys, Fold and Quantise; then Vel, the ↔ and ↕
+ * zooms, the Audition switch and Rec (windsor#663, `rollRecView.ts`). Vel is the console's knob on the part's `velocity`.
  * Snap, Keys, Fold and the zooms are the view's (`rollView.ts`), and
  * Audition the console's (`rollAudition.ts`), never the song's. Loop's − and
  * + step the song's loop through whole bars (windsor#603 decision 3).
@@ -39,6 +39,8 @@ export interface RollControlsTarget {
   selectedCount(): number;
   /** One press of Quantise, written to the song. */
   quantise(): void;
+  /** The Rec switch, placed under Audition. */
+  readonly rec: HTMLElement;
 }
 
 /** The controls, and the readouts' refresh after a repaint. */
@@ -216,7 +218,7 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
   const col = el('div', 'roll-ctl');
   if (vel) col.appendChild(tableKnob(target.ctx, target.slot, vel, PITCH_COLOR));
-  col.append(zoom.node, item('Audition', audition));
+  col.append(zoom.node, item('Audition', audition), target.rec);
   return { node: col, refresh: zoom.refresh };
 }
 

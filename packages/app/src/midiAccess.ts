@@ -1,7 +1,8 @@
 /**
  * The console's Web MIDI connection (#523): asks for access, listens to the
  * selected input(s), follows hot-plugging, and remembers the choice by device
- * name. Messages go through `decodeMidi` into that input's own `MidiPerformer`.
+ * name. Messages go through `decodeMidi` into that input's own `MidiPerformer`,
+ * stamped with their own `timeStamp` (windsor#663).
  * Whatever the connection stops hearing — a deselected or unplugged device —
  * has its notes and pedal released, so nothing sticks.
  */
@@ -110,7 +111,7 @@ export class MidiAccessor {
         const performer = this.performer(input.id);
         input.onmidimessage = (e): void => {
           const event = e.data ? decodeMidi(e.data) : null;
-          if (event) performer.handle(event);
+          if (event) performer.handle(event, e.timeStamp);
         };
       } else {
         input.onmidimessage = null;

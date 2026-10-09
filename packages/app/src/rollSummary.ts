@@ -3,6 +3,9 @@
  * summary — `4-bar loop in an 8-bar region · 41 notes · A minor · snap
  * 1/16` — the ruler's repeat count, and the Loop readout.
  */
+import { keyName } from './rollHarmony';
+import { loopNoteCount } from './rollRepeats';
+import type { RollSource } from './rollSource';
 import { ROLL_BAR_FRACTIONS } from './rollTables';
 
 /** Bars, to a tenth: 4, 1.5. */
@@ -38,6 +41,17 @@ export function rollSummary(input: SummaryInput): string {
     `snap ${input.snap}`,
   ].join(' · ');
 }
+
+/** The device's summary of `source` at Snap `snap`. */
+export const sourceSummary = (source: RollSource, snap: string): string =>
+  rollSummary({
+    loopTicks: source.loopTicks,
+    regionTicks: source.regionTicks,
+    barTicks: source.barTicks,
+    notes: loopNoteCount(source.notes, source.loopTicks, source.regionTicks),
+    key: keyName(source.harmony),
+    snap,
+  });
 
 /** The ruler's count past the loop, `repeats ×2`; null when the loop fills the region. */
 export function repeatsText(loopTicks: number, regionTicks: number): string | null {

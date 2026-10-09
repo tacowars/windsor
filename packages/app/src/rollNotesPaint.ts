@@ -4,8 +4,11 @@
  * it lights, and the key guide on the keyboard, the corner and the chord
  * strip. The colours are the models' (`rollNoteLook.ts`, `rollHarmony.ts`).
  * A selected note (windsor#603) and its stem are ringed in ink; each note
- * carries its index in the roll's list for the gestures.
+ * carries its index in the roll's list for the gestures. A note still held
+ * while Rec records (windsor#663) is drawn growing with a record-coloured
+ * edge, outside the roll's list, until it is written.
  */
+import type { RollNote } from '@windsor/engine';
 import { noteName } from './consoleFormat';
 import { el } from './dom';
 import { type RollTones, tierOf } from './rollHarmony';
@@ -13,7 +16,7 @@ import { fillPct, instanceLook, noteNamed, stemLook, stemPx, velocityOf } from '
 import type { RollPanes } from './rollPanes';
 import { type RollInstance, sounding } from './rollRepeats';
 import type { RollScene } from './rollScene';
-import { ROLL_NOTE, ROLL_PANE_PX } from './rollTables';
+import { ROLL_NOTE, ROLL_PANE_PX, ROLL_REC } from './rollTables';
 
 /** One drawn note and what it draws. */
 export interface DrawnNote {
@@ -88,6 +91,39 @@ export function paintNotes(
   const ph = el('span', 'roll-ph');
   panes.velIn.replaceChildren(stems, ph);
   return { drawn, ph };
+}
+
+/**
+ * The notes Rec holds, drawn into the notes `layer` and the velocity lane
+ * as they sound so far: no index, so no gesture takes them, and a title
+ * saying they are written when they stop. Returns what it drew, for the
+ * next frame to remove.
+ */
+export function paintHeld(
+  panes: RollPanes,
+  layer: HTMLElement,
+  scene: RollScene,
+  notes: readonly RollNote[],
+): HTMLElement[] {
+  const held = { ...scene, notes };
+  const drawn: HTMLElement[] = [];
+  notes.forEach((note, index) => {
+    const instance = { index, start: note.tick, ticks: note.ticks, pass: 0, parked: false };
+    const node = noteNode(held, instance, false);
+    const stem = stemNode(held, instance, false);
+    if (node) {
+      delete node.dataset.index;
+      node.title = `${noteName(note.pitch)} · ${ROLL_REC.held}`;
+      layer.appendChild(node);
+    }
+    if (stem) panes.velIn.appendChild(stem);
+    for (const part of [node, stem]) {
+      if (!part) continue;
+      part.classList.add('rec-held');
+      drawn.push(part);
+    }
+  });
+  return drawn;
 }
 
 /**

@@ -83,6 +83,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private readonly chrome: Array<() => void> = [];
   private readonly history = new UndoHistory<ArrangementDocument>();
   private gesture: Gesture | null = null;
+  /** A Roll recording take's step is on top of the history and its writes fold into it (`recordTake`). */
+  private takeOpen = false;
+  /** Who hears of an edit before it lands (`onBeforeEdit`): the Roll recorder, which closes its take. */
+  private readonly beforeEdit = new Set<() => void>();
   /** Who follows each tab's shown state (`onTabShown`), by tab id. */
   private readonly shownListeners = new Map<string, Set<(shown: boolean) => void>>();
 
@@ -189,6 +193,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * leaves the document as it was, records nothing.
    */
   change(edit: DocumentPartial, label?: string): ApplyResult {
+    this.editing();
     const before = this.model.doc;
     const tab = this.active;
     // A Bars or meter edit carries every whole-song region and the timeline's
@@ -211,7 +216,53 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    */
   beginGesture(label: string): void {
     if (this.gesture) this.gesture.depth++;
-    else this.gesture = { label, depth: 1, before: null, tab: null };
+    else {
+      this.editing();
+      this.gesture = { label, depth: 1, before: null, tab: null };
+    }
+  }
+
+  /**
+   * Hear of every song edit, gesture, undo, redo and switch of song before
+   * it lands, until the returned call stops it: the Roll recorder closes its
+   * take there (windsor#663), so the take so far is its own step and the
+   * edit another.
+   */
+  onBeforeEdit(listener: () => void): () => void {
+    this.beforeEdit.add(listener);
+    return () => void this.beforeEdit.delete(listener);
+  }
+
+  /**
+   * A Roll recording take's write (windsor#663; record
+   * `2026-10-09-roll-recording` decision 8): applied live and merged as any
+   * edit, and recorded as one undo step named `label` at the take's first
+   * write, which empties the redo stack as every new step does. The next
+   * writes fold into that step until `closeTake`, or until anything else
+   * edits the song, undoes, redoes or switches song (each closes it first,
+   * through `onBeforeEdit`). Refused, writing nothing, while a gesture is
+   * open, so a take's write is never folded into another edit's step.
+   */
+  recordTake(edit: DocumentPartial, label: string): ApplyResult | null {
+    if (this.gesture) return null;
+    const before = this.model.doc;
+    const tab = this.active;
+    const result = this.commit(edit, []);
+    if (result.ok && !this.takeOpen && !deepEqual(before, this.model.doc)) {
+      this.history.record({ before, label, tab });
+      this.takeOpen = true;
+    }
+    return result;
+  }
+
+  /** A gesture is open: its changes are folding into one step. */
+  get gestureOpen(): boolean {
+    return this.gesture !== null;
+  }
+
+  /** The take ended: its next write, if any, opens a new step. */
+  closeTake(): void {
+    this.takeOpen = false;
   }
 
   /** Close a gesture; the outermost end records its step, if the document changed. */
@@ -256,6 +307,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * history, a gesture still open, or the engine refusing.
    */
   undo(): boolean {
+    this.editing();
     const step = this.gesture ? null : this.history.nextUndo;
     const left = step && this.restore(step.before);
     if (!step || !left) return false;
@@ -266,6 +318,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /** Step forward again through the last undone step; false when nothing moved, as for `undo`. */
   redo(): boolean {
+    this.editing();
     const step = this.gesture ? null : this.history.nextRedo;
     const left = step && this.restore(step.before);
     if (!step || !left) return false;
@@ -281,6 +334,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * and resolves false. A song with no name takes `fileName`'s.
    */
   importDoc(raw: unknown, fileName?: string): Promise<boolean> {
+    this.editing();
     return this.songs.adopt(raw, fileName === undefined ? {} : { fileName });
   }
 
@@ -299,6 +353,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * its file is left untouched.
    */
   private replaceDocument(raw: unknown, amend?: OpenAmend): void {
+    this.editing();
     this.model.open(raw, (doc) => {
       const renames = loadRenames(doc);
       const own = amend?.(doc) ?? null;
@@ -364,6 +419,12 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     }
     if (deepEqual(before, this.model.doc)) return;
     this.history.record({ before, label, tab });
+  }
+
+  /** An edit, an undo, a redo or a switch of song is about to land: a recording take closes first. */
+  private editing(): void {
+    for (const listener of this.beforeEdit) listener();
+    this.takeOpen = false;
   }
 
   private refused(result: ApplyResult): void {

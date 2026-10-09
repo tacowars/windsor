@@ -13,8 +13,9 @@
  *
  * One playhead loop (`watchPlayhead`) per card: each frame it repaints when
  * the roll, the region or the harmony changed under it, moves the key guide
- * when its chord moved, and places the playhead. A resize refits Fit and
- * Fold. The view settings are the part's for the session (`rollView.ts`).
+ * when its chord moved, places the playhead, and reads Rec (`rollRecView.ts`,
+ * windsor#663). A resize refits Fit and Fold. The view settings are the
+ * part's for the session (`rollView.ts`).
  */
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -23,7 +24,7 @@ import { DARK, readPlayhead } from './regionPlayhead';
 import { type RollControls, rollControls } from './rollControls';
 import { type RollEditing, rollEditing } from './rollEditing';
 import { type RollExpander, rollExpander } from './rollExpand';
-import { chordLabel, keyName, tonesAt } from './rollHarmony';
+import { chordLabel, tonesAt } from './rollHarmony';
 import { guideTick, playingTick, pointerTick, rollPlayhead, standingTick } from './rollGuide';
 import {
   type DrawnNote,
@@ -34,13 +35,8 @@ import {
 } from './rollNotesPaint';
 import { markKeys, paintBody, paintHead, paintKeys } from './rollPaint';
 import { type RollPanes, rollPanes, syncPanes } from './rollPanes';
-import {
-  type TickWindow,
-  loopNoteCount,
-  rollInstances,
-  rollWindow,
-  windowHolds,
-} from './rollRepeats';
+import { type RollRecView, rollRecView } from './rollRecView';
+import { type TickWindow, rollInstances, rollWindow, windowHolds } from './rollRepeats';
 import { nearestRow, rowIndexAt } from './rollRows';
 import { type RollScene, centrePitch, rollScene } from './rollScene';
 import {
@@ -51,7 +47,7 @@ import {
   sourceKey,
   withDraft,
 } from './rollSource';
-import { rollSummary } from './rollSummary';
+import { sourceSummary } from './rollSummary';
 import {
   ROLL_COLORS,
   ROLL_DRAW_BUDGET,
@@ -103,6 +99,7 @@ class RollDevice {
   private readonly controls: RollControls;
   private readonly expander: RollExpander;
   private readonly editing: RollEditing;
+  private readonly rec: RollRecView;
   private source: RollSource;
   private sourceSeen: string;
   private scene: RollScene | null = null;
@@ -152,6 +149,7 @@ class RollDevice {
         this.paint();
       },
     });
+    this.rec = this.recView();
     this.controls = rollControls({
       ctx,
       slot,
@@ -170,10 +168,24 @@ class RollDevice {
       stepLoop: (dir) => this.editing.stepLoop(dir),
       selectedCount: () => this.editing.editor.selected().length,
       quantise: () => this.editing.quantise(),
+      rec: this.rec.control,
     });
     this.wire();
     this.paint();
     this.watch();
+  }
+
+  /** Rec on this device (windsor#663). */
+  private recView(): RollRecView {
+    return rollRecView({
+      ctx: this.ctx,
+      slot: this.slot,
+      panes: this.panes,
+      summary: this.tabs.summary,
+      source: () => this.source,
+      scene: () => this.scene,
+      layer: () => this.notesLayer,
+    });
   }
 
   /** The rail's own button. */
@@ -314,24 +326,12 @@ class RollDevice {
     this.fixedLines = [head.ph, layers.ph];
     this.guideTargets = { keys, chords: head.chords, corner: panes.corner };
     this.guideKey = '';
-    this.tabs.summary.textContent = this.summary();
+    this.rec.summary(sourceSummary(this.source, snapOf(view.snap).label));
     this.restoreSpot();
     this.paintWindow();
     this.controls.refresh();
     this.updateGuide();
     this.light();
-  }
-
-  private summary(): string {
-    const { source } = this;
-    return rollSummary({
-      loopTicks: source.loopTicks,
-      regionTicks: source.regionTicks,
-      barTicks: source.barTicks,
-      notes: loopNoteCount(source.notes, source.loopTicks, source.regionTicks),
-      key: keyName(source.harmony),
-      snap: snapOf(this.view.snap).label,
-    });
   }
 
   /** Tint the keys for the guide's chord, when it moved. */
@@ -377,6 +377,7 @@ class RollDevice {
           else this.paint();
         }
         this.updateGuide();
+        this.rec.frame();
       },
       playheadAt: () =>
         rollPlayhead(regionClock(this.ctx, this.slot, this.source), this.ctx.transport.running),

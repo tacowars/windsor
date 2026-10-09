@@ -52,6 +52,24 @@ describe('MidiPerformer', () => {
     expect(log).toEqual(['on 60 0.5', 'off 60', 'on 60 0.9']);
   });
 
+  it('stamps each press and release with the event that caused it', () => {
+    const log: string[] = [];
+    const p = new MidiPerformer({
+      press: (note, _velocity, at) => void log.push(`on ${note} @${at}`),
+      release: (note, _force, at) => void log.push(`off ${note} @${at}`),
+      bend: () => {},
+      modWheel: () => {},
+    });
+    p.handle(pedal(true), 1);
+    p.handle(on(60), 2);
+    p.handle(off(60), 3);
+    p.handle(on(60), 4);
+    p.handle(off(60), 5);
+    p.handle(pedal(false), 6);
+    // The re-strike's release is the re-strike's; the pedal's is the pedal-up's.
+    expect(log).toEqual(['on 60 @2', 'off 60 @4', 'on 60 @4', 'off 60 @6']);
+  });
+
   it('passes bend and wheel through', () => {
     const { sink, log } = recorder();
     const p = new MidiPerformer(sink);
