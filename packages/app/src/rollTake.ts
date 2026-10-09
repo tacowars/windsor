@@ -18,7 +18,12 @@
  *   A cut never writes: the note stays pending, and is finished on its
  *   release or at `end()`, so the Roll never starts it again over the voice
  *   still ringing.
- * - **The clock.** `advance` is the playhead and the one judge of a jump: a
+ * - **Seeks.** The console calls `cut(songTick)` on every seek, forward or
+ *   back, with the last tick heard before it: every held note is frozen
+ *   there, pending until its release or `end()`, and the take stays open. A
+ *   forward seek moves the playhead up, so only `cut` can tell of it.
+ * - **The clock.** `advance` is the playhead, and judges a jump `cut` was
+ *   not told of (a loop jump, or a missed seek) as a safety net: a
  *   tick lower than its last is a seek or a loop jump. A press's or a
  *   release's tick is the event's own stamp, which lags the playhead (it was
  *   heard before the frame that reads it), so a lower one there is not a
@@ -155,6 +160,19 @@ export class RollTake {
     this.playhead = songTick;
     this.see(songTick);
     for (const note of this.pending.values()) note.fresh = false;
+  }
+
+  /**
+   * A seek, forward or back, after the playhead last heard `songTick`: every
+   * held note is frozen at `songTick` (a note already frozen keeps its cut)
+   * and stays pending until its release or the take's end. The take stays
+   * open, and the next `advance` starts a fresh playhead, so it judges no
+   * jump of its own over the seek.
+   */
+  cut(songTick: number): void {
+    this.see(songTick);
+    for (const note of this.pending.values()) note.frozen ??= lengthNow(note);
+    this.playhead = Number.NEGATIVE_INFINITY;
   }
 
   /** The take's end (a stop, a part switch, Rec off): every held note is cut at `songTick` and finished. */

@@ -110,6 +110,31 @@ describe('RollTake', () => {
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 30, 60)] }]);
   });
 
+  it('on a forward seek, cut() freezes every held note at the last tick heard, pending until released', () => {
+    const take = new RollTake([{ start: 0, duration: 384, loopTicks: 384 }]);
+    take.press(K, 60, 1, 0);
+    play(take, 0, 10);
+    take.cut(10);
+    play(take, 100, 104);
+    expect(take.held()).toMatchObject([{ pitch: 60, ticks: 10 }]);
+    expect(take.drain()).toEqual([]);
+    take.release(K, 60, 105);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(0, 10, 60)] }]);
+  });
+
+  it('cut() leaves the take open: a later press still records', () => {
+    const take = new RollTake([{ start: 0, duration: 384, loopTicks: 384 }]);
+    take.press(K, 60, 1, 0);
+    play(take, 0, 10);
+    take.cut(10);
+    play(take, 100, 102);
+    take.press(K, 64, 1, 102);
+    play(take, 103, 110);
+    take.release(K, 64, 110);
+    take.release(K, 60, 110);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(102, 8, 64), n(0, 10, 60)] }]);
+  });
+
   it('end() cuts every growing note at its tick and finishes every pending one', () => {
     const take = new RollTake(REGIONS);
     take.press(K, 60, 1, 100);
