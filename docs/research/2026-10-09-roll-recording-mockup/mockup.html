@@ -221,16 +221,16 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
 .rec-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); }
 .rec-item .rec-state { font-family: var(--f-num); }
 .rec-hint { color: var(--ink-faint); font-family: var(--f-num); font-size: 9px; line-height: 10px; }
-.rec-item:not(.disabled) .rec-hint { display: none; }
+.rec-item:not(.disabled):not(.paused) .rec-hint { display: none; }
 .rec-item.disabled .rec-seg { opacity: .45; }
 .rec-item.disabled .rec-seg button { cursor: not-allowed; }
 .rec-item.disabled .rec-seg button[aria-pressed="true"] { background: var(--panel-hi); color: var(--ink-dim); }
-.rec-item.armed .rec-on { background: color-mix(in srgb, var(--hot) 22%, var(--inset)); color: var(--ink); }
-.rec-item.armed .rec-dot { background: var(--hot); }
-.rec-item.armed .rec-off, .rec-item.recording .rec-off { background: var(--inset); color: var(--ink-dim); }
+.rec-item.armed .rec-on, .rec-item.paused .rec-on { background: color-mix(in srgb, var(--hot) 22%, var(--inset)); color: var(--ink); }
+.rec-item.armed .rec-dot, .rec-item.paused .rec-dot { background: var(--hot); }
+.rec-item.armed .rec-off, .rec-item.paused .rec-off, .rec-item.recording .rec-off { background: var(--inset); color: var(--ink-dim); }
 .rec-item.recording .rec-on { background: var(--hot); color: var(--inset); }
 .rec-item.recording .rec-dot { background: var(--inset); animation: rec-blink 1.2s steps(1) infinite; }
-.rec-item.armed .rec-state, .rec-item.recording .rec-state { color: var(--hot); }
+.rec-item.armed .rec-state, .rec-item.paused .rec-state, .rec-item.recording .rec-state { color: var(--hot); }
 @keyframes rec-blink { 50% { opacity: .15; } }
 /* The note being held: drawn growing, with a record-coloured edge, until it
    stops sounding and is written. */
@@ -245,7 +245,7 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
 <body data-view="rack" data-rec="disabled" class="show-new">
 <div class="tb">
   <div class="grp"><span class="lbl">View</span><button type="button" data-view="rack" class="on">Rack device</button><button type="button" data-view="expand">Expand</button></div>
-  <div class="grp"><span class="lbl">Rec</span><button type="button" data-rec="disabled" class="on">Disabled</button><button type="button" data-rec="armed">Armed, stopped</button><button type="button" data-rec="recording">Recording</button><button type="button" data-rec="full">Region full</button></div>
+  <div class="grp"><span class="lbl">Rec</span><button type="button" data-rec="disabled" class="on">Disabled</button><button type="button" data-rec="armed">Armed, stopped</button><button type="button" data-rec="paused">Armed, in a gap</button><button type="button" data-rec="recording">Recording</button><button type="button" data-rec="full">Region full</button></div>
   <div class="grp"><span class="lbl">Snap</span><button type="button" data-snap="3" class="on">1/16</button><button type="button" data-snap="6">Off</button></div>
   <div class="grp"><span class="lbl">Selection</span><button type="button" data-sel="none" class="on">None</button><button type="button" data-sel="three">3 notes</button></div>
   <div class="grp"><span class="lbl">Additions</span><button type="button" id="newToggle" class="on">Outline new controls</button></div>
@@ -273,6 +273,11 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
           part's regions.</li>
         <li><b>Armed, stopped</b>: On is tinted with its dot lit, and the label reads <code>armed</code>.
           Playing only sounds the part until the transport runs.</li>
+        <li><b>Armed, in a gap</b>: the transport runs but the playhead is between this part's regions. Rec
+          stays armed, drawn as Armed with the label <code>paused</code> and the same hint under it
+          (<code>No region under the playhead</code>). The switch stays live, so Off disarms it here;
+          left on, recording resumes when the playhead enters the next region. <b>Disabled</b> is only Rec
+          off with no region to arm into.</li>
         <li><b>Recording</b>: On is filled, its dot blinks, and the label reads <code>recording</code>. The
           playhead runs, and a held G4 grows from just after bar 3's downbeat (raw, as played: recording
           never quantises), drawn with a record-coloured edge. When its key is let go, just before bar 4, it
@@ -407,12 +412,13 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
     requestAnimationFrame(frame);
   }
 
-  const REC_TEXT = { disabled: 'no region', armed: 'armed', recording: 'recording', full: 'region full' };
+  const REC_TEXT = { disabled: 'no region', armed: 'armed', paused: 'paused', recording: 'recording', full: 'region full' };
   function setRec(state) {
     body.dataset.rec = state;
     document.querySelectorAll('.rec-item').forEach((item) => {
       item.classList.toggle('disabled', state === 'disabled');
       item.classList.toggle('armed', state === 'armed');
+      item.classList.toggle('paused', state === 'paused');
       item.classList.toggle('recording', state === 'recording' || state === 'full');
       item.querySelector('.rec-state').textContent = REC_TEXT[state];
       const on = state !== 'disabled';
@@ -421,7 +427,9 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
       item.querySelectorAll('button').forEach((b) => { b.disabled = state === 'disabled'; });
       item.querySelector('.rec-seg').title = state === 'disabled'
         ? 'No region under the playhead: move the playhead into one of this part\'s regions to record'
-        : 'Record what you play into the region under the playhead';
+        : state === 'paused'
+          ? 'Armed, paused: recording resumes when the playhead enters this part\'s next region'
+          : 'Record what you play into the region under the playhead';
     });
     tick = state === 'full' ? 300 : RUN.from;
     summary();

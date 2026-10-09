@@ -1,7 +1,7 @@
 # Recording into the Roll
 
 - **Date:** 2026-10-09
-- **Status:** proposed, waiting on tacowars's approval of the mockup
+- **Status:** accepted (tacowars approved the mockup on 2026-10-09)
 - **Links:** this record's issue, windsor#659 · the mockup,
   `docs/research/2026-10-09-roll-recording-mockup/mockup.html` · the Roll
   record `2026-10-04-roll-sequencer` · format rules in
@@ -27,9 +27,10 @@ the build tickets.
 1. **Arm, then play.** A **Rec** switch on the Roll device, off by
    default. It is console state, not song data, and it is not remembered
    across reloads. It is live only when the selected part is a Roll part
-   and a region of that part lies under the playhead. Otherwise it is drawn
-   disabled, with a hint saying why (for example "No region under the
-   playhead"). With Rec on and the transport stopped, playing only sounds
+   and a region of that part lies under the playhead. Otherwise Rec off is
+   drawn disabled, with a hint saying why ("No region under the
+   playhead"). Once armed, Rec stays live wherever the playhead goes, so it
+   can always be turned off (decision 7). With Rec on and the transport stopped, playing only sounds
    the part, as it does today.
 2. **Sources.** Notes played through the console's audition `Keyboard`
    are recorded: a MIDI input (through `MidiPerformer`), the computer
@@ -63,7 +64,10 @@ the build tickets.
 7. **Which region.** A note goes into the region it starts in, through
    the same write the device's own editing uses. A take that crosses from
    one region into the next writes to both. If the playhead leaves every
-   region of the part, recording pauses, and Rec stays armed.
+   region of the part, recording pauses and Rec stays armed: the switch
+   stays on and live, its label reads `paused`, and the hint under it
+   says "No region under the playhead". Off disarms it there; left on,
+   recording resumes when the playhead enters the part's next region.
 8. **Undo.** One take is one undo step, across every region it wrote to.
    A take runs from Rec on (or the transport's start) to the transport's
    stop, Rec off or a part switch.
@@ -73,7 +77,13 @@ the build tickets.
     quantises. **Quantise** snaps the onsets of the selected notes, or of
     every note in the region when none is selected, to the nearest step of
     the device's Snap.
-    - Lengths are kept.
+    - Lengths are kept, except where two notes of one pitch then meet.
+      Quantise writes through the same normaliser as every edit
+      (`song/rollNormalise.ts`, and `rollEdits.ts` in the device): of two
+      same-pitch notes that land on one tick the first in order is kept
+      and the other dropped, and an earlier note that now runs into a
+      later one's onset is trimmed to end there. The press stays one undo
+      step, so undo brings both back. The build tests both cases.
     - A note that rounds onto the loop's end moves to the loop's start.
     - With Snap set to Off the button is disabled.
     - One press is one undo step.
@@ -98,8 +108,9 @@ Expand, with Rec and Quantise added. It proposes:
 - **Rec** in the second column, under Audition, drawn as Audition's
   two-way switch, in the record colour (`--hot`) where Audition uses the
   part colour. Its label reads the state: `no region` (disabled, with the
-  hint under the switch), `armed`, `recording` (the dot blinks) or
-  `region full`. While recording, the held note grows with a
+  hint under the switch), `armed`, `paused` (armed in a gap between
+  regions, with the same hint, the switch still live), `recording` (the
+  dot blinks) or `region full`. While recording, the held note grows with a
   record-coloured edge until it is written.
 - **Region full** is said on the device's summary line, in the record
   colour.
