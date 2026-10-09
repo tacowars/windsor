@@ -3,14 +3,17 @@
  * Hard sync's folded alias energy (windsor#646, record decision 13), on the
  * shipped FM bundle under Node. Research only.
  *
- *   node alias.mjs <repo> [--note 84] [--ratio 3.7]
+ *   node alias.mjs <repo> [--notes 60,72,84,96] [--ratio 3.7]
  *
  * One operator, a carrier at `ratio` synced to the note, held at full level,
  * the voice filter off (a Pulse at a 0.3 duty, every other wave unsqueezed),
- * rendered three ways:
+ * rendered at each note four ways:
  *
- * - `raw`: 48 kHz with the polyBLEP's gain at 0 (the resets uncorrected);
- * - `blep`: 48 kHz as shipped;
+ * - `raw`: 48 kHz with the polyBLEP's gain at 0 (every reset uncorrected);
+ * - `shipped`: 48 kHz as shipped (the Sine and Triangle corrected, the Saw,
+ *   Square and Pulse not, so for those it is `raw`);
+ * - `forced`: the Saw and Square at 48 kHz with their resets corrected as the
+ *   Sine's are, which the shipped bundle does not do;
  * - `ref`: 768 kHz (16×) as shipped, decimated to 48 kHz through a
  *   2 049-tap Blackman-windowed sinc lowpass at 22 kHz.
  *
@@ -21,7 +24,14 @@
  * signal, everything else from 20 Hz to 20 kHz the alias, reported in dB
  * under the signal. The reference's figure is the measurement's floor.
  */
-import { BLOCK, bundleText, processorClass, renderNote, withoutBlep } from './workletBundle.mjs';
+import {
+  BLOCK,
+  bundleText,
+  processorClass,
+  renderNote,
+  withEveryTableCorrected,
+  withoutBlep,
+} from './workletBundle.mjs';
 
 const SR = 48000;
 const OVERSAMPLE = 16;
@@ -31,23 +41,29 @@ const SKIP = 4800;
 const N = 32768;
 const HARMONIC_HALF_WIDTH = 6;
 const BAND = { from: 20, to: 20000 };
-/** The two waves decision 13 names, then the other corrected ones for comparison. */
-const WAVES = { sine: 0, saw: 1, square: 2, triangle: 3, pulse: 10 };
+/** The corrected waves, then the three the shipped bundle leaves uncorrected. */
+const WAVES = { sine: 0, triangle: 3, saw: 1, square: 2, pulse: 10 };
+/** The waves the shipped bundle leaves uncorrected that `forced` corrects. */
+const FORCED = new Set(['saw', 'square']);
 const PULSE = 10;
 const PULSE_DUTY = 0.3;
 
 function parseArgs(argv) {
-  const options = { note: 84, ratio: 3.7 };
+  const options = { notes: '60,72,84,96', ratio: '3.7' };
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i].startsWith('--')) options[argv[i].slice(2)] = Number(argv[++i]);
+    if (argv[i].startsWith('--')) options[argv[i].slice(2)] = argv[++i];
     else positional.push(argv[i]);
   }
   if (positional.length !== 1) {
-    process.stderr.write('usage: node alias.mjs <repo> [--note 84] [--ratio 3.7]\n');
+    process.stderr.write('usage: node alias.mjs <repo> [--notes 60,72,84,96] [--ratio 3.7]\n');
     process.exit(2);
   }
-  return { repo: positional[0], ...options };
+  return {
+    repo: positional[0],
+    notes: options.notes.split(',').map(Number),
+    ratio: Number(options.ratio),
+  };
 }
 
 /** One synced carrier on `wave` at `ratio`, held. */
@@ -157,19 +173,25 @@ const args = parseArgs(process.argv.slice(2));
 const text = bundleText(args.repo);
 const at48 = processorClass(text, SR);
 const raw48 = processorClass(withoutBlep(text), SR);
+const forced48 = processorClass(withEveryTableCorrected(text), SR);
 const at768 = processorClass(text, SR * OVERSAMPLE);
-const f0 = 440 * 2 ** ((args.note - 69) / 12);
 const h = lowpass(CUTOFF_HZ, SR * OVERSAMPLE, TAPS);
 const frames = SKIP + N;
-console.log(`note ${args.note} (${f0.toFixed(2)} Hz), ratio ${args.ratio}, ${SR} Hz, block ${BLOCK}`);
-for (const [name, wave] of Object.entries(WAVES)) {
-  const patch = syncedCarrier(wave, args.ratio);
-  const raw = aliasDb(renderNote(raw48, patch, args.note, frames), f0);
-  const blep = aliasDb(renderNote(at48, patch, args.note, frames), f0);
-  const long = renderNote(at768, patch, args.note, frames * OVERSAMPLE + TAPS);
-  const ref = aliasDb(decimate(long, h, OVERSAMPLE), f0);
-  console.log(
-    `${name}: alias under signal raw ${raw.toFixed(1)} dB, polyBLEP ${blep.toFixed(1)} dB, ` +
-      `16x reference ${ref.toFixed(1)} dB; the polyBLEP removes ${(raw - blep).toFixed(1)} dB`,
-  );
+console.log(`ratio ${args.ratio}, ${SR} Hz, block ${BLOCK}; alias under signal in dB`);
+console.log('| Wave | Note | Uncorrected | Shipped | Forced | 16x reference | Removed |');
+console.log('|---|---|---|---|---|---|---|');
+for (const note of args.notes) {
+  const f0 = 440 * 2 ** ((note - 69) / 12);
+  for (const [name, wave] of Object.entries(WAVES)) {
+    const patch = syncedCarrier(wave, args.ratio);
+    const raw = aliasDb(renderNote(raw48, patch, note, frames), f0);
+    const shipped = aliasDb(renderNote(at48, patch, note, frames), f0);
+    const forced = FORCED.has(name) ? aliasDb(renderNote(forced48, patch, note, frames), f0) : NaN;
+    const long = renderNote(at768, patch, note, frames * OVERSAMPLE + TAPS);
+    const ref = aliasDb(decimate(long, h, OVERSAMPLE), f0);
+    const cells = [raw, shipped, forced, ref, raw - shipped].map((v) =>
+      Number.isNaN(v) ? '—' : v.toFixed(1),
+    );
+    console.log(`| ${name} | ${note} | ${cells.join(' | ')} |`);
+  }
 }

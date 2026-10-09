@@ -87,10 +87,11 @@ over the restarted phase; FM on a master does not move its wraps. Chains
 (C → B → note) reset together; a cycle or self-sync is off. A synced
 operator renders through the generic loop, about 2.5–3.3× the kernel's
 cost per voice, and a corrected wave reaches what it feeds a sample late.
-A synced Noise operator does nothing. The two-sample polyBLEP smooths a
-sine's or triangle's reset by 13–20 dB but not a band-limited saw's or
-Pulse's (`docs/research/2026-10-09-operator-hard-sync/`): judge a bright
-synced saw high up by ear. Factory examples: `lead-sync-sweep`,
+A synced Noise operator does nothing. A two-sample polyBLEP smooths the
+reset of a Sine, Triangle or User wave by 12–20 dB; the Saw, Square and
+Pulse take it uncorrected, as Saw D does, pending tacowars's listen
+(`docs/research/2026-10-09-operator-hard-sync/`): judge a bright synced
+saw high up by ear. Factory examples: `lead-sync-sweep`,
 `lead-sync-detune`.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch

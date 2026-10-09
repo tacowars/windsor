@@ -1,10 +1,12 @@
 # Operator hard sync and a ratio target
 
 - **Date:** 2026-10-09
-- **Status:** accepted (the decisions of windsor#646); decision 13's
-  measurement raised `needs-human` on the saw, see Consequences
+- **Status:** accepted (the decisions of windsor#646). Decision 13's
+  measurement raised `needs-human` on the saw; tacowars decided it on
+  2026-10-09, and decision 6 records what ships
 - **Links:** windsor#646 · its measurements in
-  `docs/research/2026-10-09-operator-hard-sync/README.md` · the console's
+  `docs/research/2026-10-09-operator-hard-sync/README.md` and the Codex
+  consult beside them (`codex-consult.md`) · the console's
   Sync picker and LFO Ratio knobs are a later build ticket
 
 ## Context
@@ -59,19 +61,36 @@ needs one.
      note).
    - A fixed-frequency operator syncs normally, as the synced operator or
      as the master.
-6. **Anti-aliasing: a two-sample polyBLEP on the reset's step.**
-   - **The step.** The wave just after the reset minus the wave it would
-     have read without it. Both reads take the sample's phase modulation
-     and width, after the width squeeze, before the operator's own filters
-     and its level.
+6. **Anti-aliasing: a two-sample polyBLEP on the reset's step, on the
+   Sine, Triangle and User waves.**
+   - **The step.** Taken at the reset instant, in time order: the wave at
+     phase 0 less the wave at the free-running phase just before the
+     reset. That phase is where the operator stood `d` of a sample before
+     the next sample, so a wrap it made earlier in the interval counts and
+     one the reset forestalled does not. Both reads take the sample's
+     phase modulation and width, after the width squeeze, before the
+     operator's own filters and its level. (The first round read the two
+     phases a sample on, which is wrong when the free-running phase wraps
+     inside the interval.)
    - **The delay.** A corrected operator's output reaches everything it
      feeds a sample late, so the sample before the reset can be corrected.
-     Its feedback taps keep the raw, undelayed wave.
-   - **The Pulse.** Its two saw reads follow the one accumulator, so they
-     reset together.
-   - **The aliasing waves.** Saw D, Square D, Sine 4bit and Sine 8bit take
-     the reset uncorrected and undelayed.
-   - **Not built.** No BLAMP and no minBLEP.
+     Its feedback taps keep the raw, undelayed wave. An uncorrected
+     operator is not delayed.
+   - **The corrected waves.** Sine, Triangle and User.
+   - **Uncorrected, pending tacowars's listen.** Saw, Square and Pulse take
+     the reset uncorrected and undelayed, as Saw D, Square D, Sine 4bit and
+     Sine 8bit do. Their tables' own edge is centred on phase 0, where a
+     reset lands, so a step read from the table misses most of the jump.
+     The Pulse's two saw reads follow the one accumulator, so they reset
+     together.
+   - **Not built.** No BLAMP, no minBLEP, and no direct-shape correction.
+   - **A possible later ticket**, if tacowars hears the saw's aliasing: a
+     restricted direct-shape correction, the ideal wave with a polyBLEP on
+     each edge. Only for an operator that is unmodulated, unfed (no
+     feedback) and unsqueezed, at Tone 1; with Windsor's polarity (the Saw
+     a falling ramp, the Pulse `saw(p) − saw(p + width)`); and judged
+     against an absolute alias target, not only an improvement over the
+     uncorrected table.
    - **The constant.** `SYNC_BLEP_GAIN` in `fmConstants.ts`.
 7. **The fast path is untouched.** A voice with any synced operator renders
    through the generic loop: `bindVoiceConstants` adds the condition to
@@ -129,13 +148,22 @@ needs one.
   with no synced operator.
 - **The golden tables.** Both gained a row for each new preset. No existing
   row moved.
-- **The polyBLEP's measurement.** At MIDI 84, ratio 3.7, it removes 12.8 dB
-  on a synced sine and −0.1 dB on a synced saw. It makes a Pulse 4.8 dB
-  worse.
+- **The polyBLEP's measurement.** In the first round, which read the step
+  a sample on and corrected every table wave, it removed 12.8 dB on a
+  synced sine and −0.1 dB on a synced saw at MIDI 84, ratio 3.7, and made a
+  Pulse 4.8 dB worse.
   - **The cause.** A band-limited saw's edge sits at phase 0, where a reset
     lands, so the table read there misses most of the jump.
-  - **What happens now.** Per decision 13 the PR raised `needs-human`, and
-    nothing better was built. The research note lists the options.
+  - **The decision.** The PR raised `needs-human`, and a Codex consult
+    found the step's timing bug. tacowars decided on 2026-10-09: fix the
+    timing, correct only the Sine, Triangle and User, and build nothing
+    better now (decision 6).
+  - **As shipped.** At MIDI 84 a synced sine sits at −40.8 dB of alias
+    under the signal (−24.8 uncorrected) and a saw at −26.5 dB,
+    uncorrected. The research note has the table at four notes and the
+    metric's limits.
+- **The two factory leads.** Both sync a saw, which is now uncorrected, so
+  their golden rows changed in the second round.
 - **The CPU.** A synced voice costs 2.3 to 3.3 times the same voice
   unsynced, almost all of it the generic loop. A kernel path for synced
   voices would be its own ticket.

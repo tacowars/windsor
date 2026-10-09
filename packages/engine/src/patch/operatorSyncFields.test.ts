@@ -107,4 +107,14 @@ describe('the sync and ratio-depth fields (windsor#646)', () => {
     expect(again.corrections).toEqual([]);
     expect(again.document).toEqual(first.document);
   });
+
+  it("turn a cycle and an unknown master in a song's patch snapshot off, as the worklet plays it", () => {
+    const cycle = { ops: [{ sync: 'B' }, { sync: 'A' }, { sync: 'B' }, { sync: 'X' }] };
+    const first = makeArrangement(song([KICK], { patches: { lead: cycle, kick: {} } }));
+    expect(syncs(first.document.patches!['lead']!)).toEqual(['off', 'off', 'B', 'off']);
+    expect(first.corrections).toHaveLength(3);
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)) as unknown);
+    expect(again.corrections).toEqual([]);
+    expect(again.document).toEqual(first.document);
+  });
 });

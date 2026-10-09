@@ -10,17 +10,24 @@
  *
  * Where a master wrapped `d` of a sample before the next sample (its phase
  * after the wrap over its increment), the synced operator's phase becomes
- * `d` times its own increment. The step that makes, the wave just after the
- * reset less the wave it would have read without it (both at the sample's
- * phase modulation and width, before the operator's own filters and its
- * level), is smoothed by a two-sample polyBLEP (`SYNC_BLEP_GAIN`): so that
- * the sample before can be corrected, a corrected operator sends its wave
- * on a sample late, to every carrier it modulates and to the carrier sum,
- * while its feedback taps keep the raw wave. The deliberately aliasing waves
- * (Saw D, Square D, Sine 4bit, Sine 8bit) take the reset uncorrected and
- * undelayed. A synced Noise operator's draw has no phase, so its sync does
- * nothing; a Noise operator as a master syncs by its phase accumulator,
- * which the generic loop advances like any other operator's.
+ * `d` times its own increment. The step that makes is taken at the reset
+ * instant, in time order: the wave at phase 0 less the wave at the
+ * free-running phase just before the reset (the phase the operator reached
+ * `d` of a sample before the next sample, so a wrap it made earlier in the
+ * interval counts and one the reset forestalled does not), both at the
+ * sample's phase modulation and width, before the operator's own filters
+ * and its level. A two-sample polyBLEP (`SYNC_BLEP_GAIN`) smooths it: so
+ * that the sample before can be corrected, a corrected operator sends its
+ * wave on a sample late, to every carrier it modulates and to the carrier
+ * sum, while its feedback taps keep the raw wave. Only the Sine, Triangle
+ * and User waves are corrected. The Saw, Square and Pulse take the reset
+ * uncorrected and undelayed, as the deliberately aliasing waves (Saw D,
+ * Square D, Sine 4bit, Sine 8bit) do: their tables' own edge sits at phase
+ * 0, where a reset lands, so a step read from the table misses most of the
+ * jump (research `2026-10-09-operator-hard-sync`). A synced Noise
+ * operator's draw has no phase, so its sync does nothing; a Noise operator
+ * as a master syncs by its phase accumulator, which the generic loop
+ * advances like any other operator's.
  *
  * Invariant: a voice with no synced operator has `synced` 0, takes the
  * kernel (`bindVoiceConstants`) and never reaches this module in a render;
@@ -38,7 +45,7 @@ import { SYNC_BLEP_GAIN, TABLE_SIZE } from './fmConstants';
 import type { OpSync } from './patchDefaults';
 import { OPERATOR_COUNT, OP_SYNC_OPERATORS } from './patchDefaults';
 import { WAVE } from './waveIds';
-import { KIND_NOISE, KIND_PULSE, KIND_TABLE } from './waveTables';
+import { KIND_NOISE, KIND_TABLE } from './waveTables';
 
 /** A master in `VoiceSync.master`: none, an operator's index, or the note. */
 const SYNC_NONE = -1;
@@ -102,10 +109,14 @@ function syncMasterOf(sync: OpSync): number {
   return OP_SYNC_OPERATORS.indexOf(sync);
 }
 
-/** Whether a reset on this wave is smoothed: every table wave and the Pulse but the deliberately aliasing ones. */
+/**
+ * Whether a reset on this wave is smoothed: the Sine, Triangle and User
+ * waves, which have no edge at phase 0. The Saw, Square and Pulse, whose
+ * tables do, take it uncorrected, as the deliberately aliasing waves do.
+ */
 function syncCorrected(kind: number, wave: number): boolean {
-  if (kind === KIND_PULSE) return true;
-  return kind === KIND_TABLE && wave !== WAVE.SINE_4BIT && wave !== WAVE.SINE_8BIT;
+  if (kind !== KIND_TABLE) return false;
+  return wave === WAVE.SINE || wave === WAVE.TRIANGLE || wave === WAVE.USER;
 }
 
 /**
@@ -159,37 +170,23 @@ function bindVoiceSync(voice: Voice, patch: Patch): void {
 }
 
 /**
- * Operator `i`'s wave at the phase in `SYNC_POINT`, left there: the generic
- * loop's read for a corrected wave, its width squeeze included, before its
- * own filters. A Pulse reads its saw twice, a duty apart.
+ * Operator `i`'s wave at the phase in `SYNC_POINT` (in [0, 1]), left there:
+ * the generic loop's read for a corrected (table) wave, its width squeeze
+ * included, before its own filters.
  */
 function syncWaveAt(voice: Voice, i: number): void {
-  const t = voice.tables[i]!;
+  // A phase a rounding below 0 wraps to 1, which is phase 0.
   const ph = SYNC_POINT[0];
-  const width = voice.width[i];
-  let x = ph;
-  let pd = 0;
-  if (voice.kind[i] === KIND_PULSE) {
-    pd = ph + width;
-    pd -= Math.floor(pd);
-  } else {
-    x = ph * width;
-    if (x >= 1) {
-      SYNC_POINT[0] = 0;
-      return;
-    }
+  const x = (ph < 1 ? ph : 0) * voice.width[i];
+  if (x >= 1) {
+    SYNC_POINT[0] = 0;
+    return;
   }
+  const t = voice.tables[i]!;
   const fi = x * TABLE_SIZE;
   const i0 = fi | 0;
   const s0 = t[i0];
-  let v = s0 + (t[i0 + 1] - s0) * (fi - i0);
-  if (voice.kind[i] === KIND_PULSE) {
-    const fd = pd * TABLE_SIZE;
-    const d0 = fd | 0;
-    const sd = t[d0];
-    v -= sd + (t[d0 + 1] - sd) * (fd - d0);
-  }
-  SYNC_POINT[0] = v;
+  SYNC_POINT[0] = s0 + (t[i0 + 1] - s0) * (fi - i0);
 }
 
 /**
@@ -197,8 +194,10 @@ function syncWaveAt(voice: Voice, i: number): void {
  * has advanced: in chain order, each synced operator whose master's phase
  * sits below that master's increment (it wrapped, or was reset, this
  * sample) restarts at `d` times its own increment. A corrected operator's
- * step is read at this sample's phase modulation, and the polyBLEP's two
- * halves go onto the wave it holds and the one it reads next.
+ * step is taken at the reset instant, at this sample's phase modulation:
+ * from the free-running phase just before the reset (its phase now less
+ * the `d` of a sample it ran since) to phase 0. The polyBLEP's two halves
+ * go onto the wave it holds and the one it reads next.
  */
 function applySyncResets(voice: Voice): void {
   const s = voice.sync;
@@ -211,16 +210,15 @@ function applySyncResets(voice: Voice): void {
     const im = m === SYNC_NOTE ? s.noteInc : phaseInc[m];
     if (!(pm < im && im > 0)) continue;
     const d = pm / im;
-    const free = phase[i];
     const reset = d * phaseInc[i];
+    const before = phase[i] - reset;
     phase[i] = reset;
     if ((s.blep & (1 << i)) === 0) continue;
     const mod = s.mod[i];
-    let ph = reset + mod;
-    SYNC_POINT[0] = ph - Math.floor(ph);
+    SYNC_POINT[0] = mod - Math.floor(mod);
     syncWaveAt(voice, i);
     const after = SYNC_POINT[0];
-    ph = free + mod;
+    const ph = before + mod;
     SYNC_POINT[0] = ph - Math.floor(ph);
     syncWaveAt(voice, i);
     const step = after - SYNC_POINT[0];

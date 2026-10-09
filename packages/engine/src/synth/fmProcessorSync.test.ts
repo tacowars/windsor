@@ -1,8 +1,9 @@
 /**
  * Hard sync through the shipped worklet (windsor#646, record
- * `2026-10-09-operator-hard-sync`): an operator synced to the note at a
+ * `2026-10-09-operator-hard-sync`): a sine synced to the note at a
  * harmonic ratio is the unsynced operator a sample late (the polyBLEP's
- * delay), at an inharmonic ratio it repeats at the note's period, synced to
+ * delay, which only the Sine, Triangle and User waves take), at an
+ * inharmonic ratio it repeats at the note's period, synced to
  * another operator it repeats at that operator's period whatever its level,
  * detune or fixed mode, and a chain resets on its master's resets as well as
  * its wraps. A cycle, a self-sync and an unknown master play as unsynced,
@@ -244,14 +245,12 @@ describe('the path a synced voice takes (windsor#646)', () => {
     expect(voiceFor(syncing(patchOf(SERIES, [{ wave: WAVE.NOISE }]), 0, 'note')).kernel).toBe(true);
   });
 
-  it('corrects a reset on every wave but the deliberately aliasing ones', () => {
+  it('corrects a reset on the Sine, Triangle and User waves only', () => {
+    const corrected: number[] = [WAVE.SINE, WAVE.TRIANGLE, WAVE.USER];
     for (const [name, wave] of Object.entries(WAVE)) {
       const voice = voiceFor(syncing(patchOf(SERIES, [{ level: 1, wave }]), 0, 'note'));
-      const raw = (
-        [WAVE.SAW_D, WAVE.SQUARE_D, WAVE.SINE_4BIT, WAVE.SINE_8BIT] as number[]
-      ).includes(wave);
       expect(voice.sync.synced, name).toBe(wave === WAVE.NOISE ? 0 : 1);
-      expect(voice.sync.blep, name).toBe(raw || wave === WAVE.NOISE ? 0 : 1);
+      expect(voice.sync.blep, name).toBe(corrected.includes(wave) ? 1 : 0);
     }
   });
 });

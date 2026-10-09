@@ -10,13 +10,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { OpSync, Patch } from '../../patch/patch';
 import { makePatch } from '../../patch/patch';
-import { TABLE_SIZE } from './fmConstants';
+import { SYNC_BLEP_GAIN, TABLE_SIZE } from './fmConstants';
 import type { Voice } from './voice';
 import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
-const { KIND_NOISE, KIND_PULSE, KIND_TABLE, waveKind } = await import('./waveTables');
+const { KIND_NOISE, waveKind } = await import('./waveTables');
 const { SYNC_NONE, SYNC_NOTE, SYNC_NOTE_BIT, VoiceSync, applySyncResets, bindVoiceSync } =
   await import('./voiceSync');
 
@@ -61,14 +61,17 @@ describe('bindVoiceSync', () => {
     expect(voice.sync.masters).toBe(0b0001);
   });
 
-  it('corrects the table waves and the Pulse, and not the deliberately aliasing waves', () => {
-    const corrected = [WAVE.SINE, WAVE.SAW, WAVE.PULSE, WAVE.USER];
-    expect(waveKind(WAVE.PULSE)).toBe(KIND_PULSE);
-    expect(waveKind(WAVE.SINE_8BIT)).toBe(KIND_TABLE);
-    expect(voiceOf(['note', 'note', 'note', 'note'], corrected).voice.sync.blep).toBe(0b1111);
-    const raw = [WAVE.SAW_D, WAVE.SQUARE_D, WAVE.SINE_4BIT, WAVE.SINE_8BIT];
-    const { sync } = voiceOf(['note', 'note', 'note', 'note'], raw).voice;
-    expect([sync.synced, sync.blep]).toEqual([0b1111, 0]);
+  it('corrects the Sine, Triangle and User waves, and not the edged or deliberately aliasing ones', () => {
+    const all = ['note', 'note', 'note', 'note'] as OpSync[];
+    const corrected = [WAVE.SINE, WAVE.TRIANGLE, WAVE.USER, WAVE.SAW];
+    expect(voiceOf(all, corrected).voice.sync.blep).toBe(0b0111);
+    for (const raw of [
+      [WAVE.SAW, WAVE.SQUARE, WAVE.PULSE, WAVE.SAW_D],
+      [WAVE.SQUARE_D, WAVE.SINE_4BIT, WAVE.SINE_8BIT, WAVE.SQUARE],
+    ]) {
+      const { sync } = voiceOf(all, raw).voice;
+      expect([sync.synced, sync.blep]).toEqual([0b1111, 0]);
+    }
   });
 
   it('clears what an operator newly corrected holds, and keeps what one still corrected does', () => {
@@ -121,5 +124,48 @@ describe('applySyncResets', () => {
     const step = -1.5;
     expect(s.held[0]).toBeCloseTo(0.75 + step * 0.25 * 0.5, 6);
     expect(s.after[0]).toBeCloseTo(step * 0.25 * 0.5, 6);
+  });
+
+  /**
+   * The step a reset of operator A takes, on the ramp: A stood at `start`
+   * at the sample before, runs at `inc`, and the note master wraps `d` of a
+   * sample before the next sample. Read back from what the next wave owes.
+   */
+  function resetStep(start: number, inc: number, d: number): number {
+    const { voice } = voiceOf(['note', 'off', 'off', 'off']);
+    const s = voice.sync;
+    s.noteInc = 0.5;
+    s.notePhase = d * s.noteInc;
+    const free = start + inc;
+    voice.phase[0] = free - Math.floor(free);
+    voice.phaseInc[0] = inc;
+    applySyncResets(voice);
+    return s.after[0] / ((1 - d) * (1 - d) * SYNC_BLEP_GAIN);
+  }
+
+  // The ramp reads 2x − 1, so a reset from phase x to phase 0 steps by −2x.
+  it.each([
+    ['a wrap of its own before the reset', 0.875, 0.25, 0.25, 0.0625],
+    ['a wrap of its own at the reset', 0.75, 0.5, 0.5, 0],
+    ['a wrap the reset forestalls', 0.875, 0.25, 0.75, 0.9375],
+    ['phase 0.95, increment 0.1, a reset a quarter sample on', 0.95, 0.1, 0.75, 0.975],
+  ])(
+    'takes the step at the reset instant, from the phase just before it to 0: %s',
+    (_, start, inc, d, before) => {
+      expect(resetStep(start, inc, d)).toBeCloseTo(-2 * before, 9);
+    },
+  );
+
+  it('takes the step at the reset instant through a ratio sweep across a whole number', () => {
+    // Synced to a note 128 samples long, at ratio r the operator reaches
+    // phase frac(r) at each reset: just under 1 below 2, just over 0 above.
+    const noteInc = 1 / 128;
+    const d = 0.3;
+    for (let r = 1.905; r < 2.1; r += 0.01) {
+      const inc = r * noteInc;
+      const before = r - Math.floor(r);
+      const start = before - (1 - d) * inc + 1;
+      expect(resetStep(start, inc, d), `ratio ${r}`).toBeCloseTo(-2 * before, 9);
+    }
   });
 });

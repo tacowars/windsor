@@ -22,6 +22,18 @@ export function withoutBlep(text) {
   return text.replace(line, 'var SYNC_BLEP_GAIN = 0;');
 }
 
+/**
+ * The bundle with every table wave's reset corrected, the Saw and Square
+ * included: what the step taken at the reset instant would do to the waves
+ * the shipped bundle leaves uncorrected. Not shipped; the Pulse has no
+ * corrected read to force.
+ */
+export function withEveryTableCorrected(text) {
+  const line = 'return wave === WAVE.SINE || wave === WAVE.TRIANGLE || wave === WAVE.USER;';
+  if (!text.includes(line)) throw new Error(`the bundle has no "${line}"`);
+  return text.replace(line, 'return true;');
+}
+
 /** The processor class from a bundle's text, evaluated at `sampleRate`. */
 export function processorClass(text, sampleRate) {
   let Processor = null;

@@ -2140,8 +2140,8 @@ function syncMasterOf(sync) {
   return OP_SYNC_OPERATORS.indexOf(sync);
 }
 function syncCorrected(kind, wave) {
-  if (kind === KIND_PULSE) return true;
-  return kind === KIND_TABLE && wave !== WAVE.SINE_4BIT && wave !== WAVE.SINE_8BIT;
+  if (kind !== KIND_TABLE) return false;
+  return wave === WAVE.SINE || wave === WAVE.TRIANGLE || wave === WAVE.USER;
 }
 function bindVoiceSync(voice, patch) {
   const s = voice.sync;
@@ -2185,32 +2185,17 @@ function bindVoiceSync(voice, patch) {
   s.count = count;
 }
 function syncWaveAt(voice, i) {
-  const t = voice.tables[i];
   const ph = SYNC_POINT[0];
-  const width = voice.width[i];
-  let x = ph;
-  let pd = 0;
-  if (voice.kind[i] === KIND_PULSE) {
-    pd = ph + width;
-    pd -= Math.floor(pd);
-  } else {
-    x = ph * width;
-    if (x >= 1) {
-      SYNC_POINT[0] = 0;
-      return;
-    }
+  const x = (ph < 1 ? ph : 0) * voice.width[i];
+  if (x >= 1) {
+    SYNC_POINT[0] = 0;
+    return;
   }
+  const t = voice.tables[i];
   const fi = x * TABLE_SIZE;
   const i0 = fi | 0;
   const s0 = t[i0];
-  let v = s0 + (t[i0 + 1] - s0) * (fi - i0);
-  if (voice.kind[i] === KIND_PULSE) {
-    const fd = pd * TABLE_SIZE;
-    const d0 = fd | 0;
-    const sd = t[d0];
-    v -= sd + (t[d0 + 1] - sd) * (fd - d0);
-  }
-  SYNC_POINT[0] = v;
+  SYNC_POINT[0] = s0 + (t[i0 + 1] - s0) * (fi - i0);
 }
 function applySyncResets(voice) {
   const s = voice.sync;
@@ -2223,16 +2208,15 @@ function applySyncResets(voice) {
     const im = m === SYNC_NOTE ? s.noteInc : phaseInc[m];
     if (!(pm < im && im > 0)) continue;
     const d = pm / im;
-    const free = phase[i];
     const reset = d * phaseInc[i];
+    const before = phase[i] - reset;
     phase[i] = reset;
     if ((s.blep & 1 << i) === 0) continue;
     const mod = s.mod[i];
-    let ph = reset + mod;
-    SYNC_POINT[0] = ph - Math.floor(ph);
+    SYNC_POINT[0] = mod - Math.floor(mod);
     syncWaveAt(voice, i);
     const after = SYNC_POINT[0];
-    ph = free + mod;
+    const ph = before + mod;
     SYNC_POINT[0] = ph - Math.floor(ph);
     syncWaveAt(voice, i);
     const step = after - SYNC_POINT[0];
