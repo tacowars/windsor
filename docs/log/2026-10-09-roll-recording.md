@@ -79,9 +79,19 @@ the build tickets.
    recording resumes when the playhead enters the part's next region.
 8. **Undo.** One take is one undo step, across every region it wrote to.
    A take runs from Rec on (or the transport's start) to the transport's
-   stop, Rec off or a part switch.
-9. **The note cap.** Past `ROLL_NOTES_MAX` (2048) a region takes no more
-   notes, and the device says so.
+   stop, Rec off or a part switch. Any other song edit made while
+   recording (Quantise, a knob, a note dragged) splits the take
+   (tacowars, 2026-10-09): the take so far closes as its own step, the
+   edit is its own step, and recording carries on as a new take. Undo
+   then steps back through the later take, the edit and the earlier
+   take in turn. An undo or redo pressed during a take closes the take
+   first, then applies. The take's writes are never folded into another
+   edit's step, nor another edit into the take's.
+9. **The note cap.** Past `ROLL_NOTES_MAX` (2048) a region takes no new
+   notes, and the device says so. A recorded note that replaces one at
+   the same tick and pitch (decision 4) adds nothing to the count, so it
+   is still written in a full region: the replacement is applied before
+   the cap is checked.
 10. **Raw recording, and a separate Quantise button.** Recording never
     quantises. **Quantise** snaps the onsets of the selected notes, or of
     every note in the region when none is selected, to the nearest step of

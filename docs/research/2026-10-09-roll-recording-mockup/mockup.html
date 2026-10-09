@@ -283,7 +283,8 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
           never quantises), drawn with a record-coloured edge. When its key is let go, just before bar 4, it
           is written and drawn as any note; the next pass plays it back.</li>
         <li><b>Region full</b>: at 2048 notes, the summary line on the device's top edge says so in the record
-          colour, and the held note is not drawn: nothing more is recorded into this region.</li>
+          colour, and the held note is not drawn: no new note is recorded into this region. A note played on
+          the tick and pitch of one already there still replaces it, as it adds nothing to the count.</li>
       </ul></li>
   </ul>
 
@@ -444,7 +445,7 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
       const full = body.dataset.rec === 'full';
       s.classList.toggle('full', full);
       s.textContent = full
-        ? 'Region full: 2048 notes, the most a region holds · nothing more is recorded here'
+        ? 'Region full: 2048 notes, the most a region holds · no new notes are recorded here'
         : `4-bar loop in an 8-bar region · 41 notes · A minor · snap ${snap}`;
     });
   }
