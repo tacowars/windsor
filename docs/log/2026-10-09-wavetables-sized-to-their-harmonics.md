@@ -1,8 +1,9 @@
 # Each octave's wavetable is sized to the harmonics it holds
 
 - **Date:** 2026-10-09
-- **Status:** proposed (tacowars's direction of 2026-10-09: fix the table
-  oscillator's floor now; leave the voice drive's anti-aliasing for later)
+- **Status:** accepted (tacowars's direction of 2026-10-09: fix the table
+  oscillator's floor now, leave the voice drive's anti-aliasing for later;
+  approved by tacowars on PR windsor#650)
 - **Links:** the measurements in
   `docs/research/2026-10-08-wavetable-floor/README.md` · the drive study
   that found the floor, `docs/research/2026-10-08-voice-drive-aliasing/README.md`
@@ -61,6 +62,5 @@ harmonics. A summed band-limited saw reads −91 dB on the same meter.
   the cache's 64 entries, the worst case is about 12 MB, against 6 MB.
 - The voice loop's measured cost did not move on a bass held at C1–C3:
   ratio 1.00 interleaved on Node 24. On the windsor#548 bank it read
-  within its scatter, 1.021 (0.95 – 1.10), so at most about 2 % (the research note).
-- A listening check by tacowars is still owed: the change is audible by
-  design on low notes.
+  1.021 (0.95 – 1.10), within its scatter, so at most about 2 % (the
+  research note).
