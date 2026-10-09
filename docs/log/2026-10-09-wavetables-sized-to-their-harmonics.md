@@ -61,6 +61,6 @@ harmonics. A summed band-limited saw reads −91 dB on the same meter.
   the cache's 64 entries, the worst case is about 12 MB, against 6 MB.
 - The voice loop's measured cost did not move on a bass held at C1–C3:
   ratio 1.00 interleaved on Node 24. On the windsor#548 bank it read
-  within its scatter, at most about 3 % (the research note).
+  within its scatter, 1.021 (0.95 – 1.10), so at most about 2 % (the research note).
 - A listening check by tacowars is still owed: the change is audible by
   design on low notes.

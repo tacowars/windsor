@@ -140,7 +140,7 @@ after/before ratios, 10 s of audio a run:
 | Scenario | Rounds | Median ratio | Range |
 |---|---|---|---|
 | `bass`: a saw and a square held at C1, C2 and C3 (the 16384, 8192 and 4096 tables) | 12 | 0.998 | 0.76 – 1.09 |
-| `bank`: the windsor#548 bench's four factory parts at C3, G3 and C4 | 12 | (running; filled in by the next commit) | |
+| `bank`: the windsor#548 bench's four factory parts at C3, G3 and C4 | 12 | 1.021 | 0.95 – 1.10 |
 
 The kernel reads each operator's table length once per render call, and
 the generic loop reads it at each table read. An earlier version that
