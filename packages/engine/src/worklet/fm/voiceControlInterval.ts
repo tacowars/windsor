@@ -24,14 +24,16 @@
  *   samples to 128 and move it by up to 128;
  * - an operator's feedback ramping under a song lane: the render loops time
  *   that ramp in fine blocks (`FEEDBACK_RAMP_STEP`);
- * - an operator's ratio being modulated (windsor#655, record
- *   `2026-10-09-sync-direct-shape` decision 4): an LFO's `toRatio` on any
- *   operator that is not 0, whatever its rate, shape or depth, or a song
- *   lane's offset that is not 0 on any `ops.<i>.ratio` row, directly or
- *   through a macro that maps the row. A ratio stepped every 128 samples
- *   puts a floor of about −43 dB under a sync sweep's alias
- *   (`docs/research/2026-10-09-sync-antialias-study/`); a step's push is
- *   fixed for the note, so it steps nothing.
+ * - in a voice with a synced operator, an operator's ratio being modulated
+ *   (windsor#655, record `2026-10-09-sync-direct-shape` decision 4): an
+ *   LFO's `toRatio` on any operator that is not 0, whatever its rate, shape
+ *   or depth, or a song lane's offset that is not 0 on any `ops.<i>.ratio`
+ *   row, directly or through a macro that maps the row. A ratio stepped
+ *   every 128 samples puts a floor of about −43 dB under a sync sweep's
+ *   alias (`docs/research/2026-10-09-sync-antialias-study/`); a step's push
+ *   is fixed for the note, so it steps nothing. The study measured the
+ *   stepping with sync on only, so a voice with no synced operator reads
+ *   its ratio LFO by the LFO rule above, as it did before.
  * A segment end inside a long block is one of windsor#301's knots, at its
  * own sample (`voiceAmpRamp.ts`), so a long block holds a long segment's end
  * and the short one after it exactly.
@@ -147,10 +149,12 @@ function isRatioRow(code: number): boolean {
 }
 
 /**
- * An operator's ratio is modulated: an LFO's `toRatio` on it, or a song
- * lane's offset on its ratio row or on a macro mapped to that row.
+ * A synced voice's operator ratio is modulated: an LFO's `toRatio` on it, or
+ * a song lane's offset on its ratio row or on a macro mapped to that row.
+ * Never for a voice with no synced operator.
  */
 function ratioModulated(voice: Voice): boolean {
+  if (voice.sync.synced === 0) return false;
   const patch = voice.patch!;
   const offsets = voice.partOffsets;
   for (let i = 0; i < OPERATOR_COUNT; i++) {

@@ -29,23 +29,32 @@ function wave(kind: number, p: number, w: number): number {
   return p < 1 - w ? G * Math.PI * w : G * Math.PI * (w - 1);
 }
 
+/** A width, or a ramp across the interval from the sample just read's to the next's. */
+type Width = number | readonly [number, number];
+
+/** The ramp's two ends, each as the voice's Float32Array holds it. */
+const ends = (w: Width): [number, number] =>
+  typeof w === 'number' ? [Math.fround(w), Math.fround(w)] : [Math.fround(w[0]), Math.fround(w[1])];
+
 /**
  * What an interval owes, found by walking it: the operator runs from `p0`
  * at `inc` a sample, restarting at phase 0 `d` of a sample before the next
- * sample (none for NaN). Every jump the wave makes over a step of the walk
- * larger than its slope could is an edge, located to the step; the reset is
- * one wherever it falls, however small its step.
+ * sample (none for NaN), its width moving linearly across the interval.
+ * Every jump the wave makes over a step of the walk larger than its slope
+ * could is an edge, located to the step; the reset is one wherever it
+ * falls, however small its step.
  */
-function walked(kind: number, p0: number, inc: number, d: number, w: number): [number, number] {
+function walked(kind: number, p0: number, inc: number, d: number, width: Width): [number, number] {
   const steps = 200_000;
   const resetAt = d === d ? 1 - d : 2;
+  const [w0, w1] = ends(width);
   let hold = 0;
   let owe = 0;
-  let last = wave(kind, p0, w);
+  let last = wave(kind, p0, w0);
   for (let s = 1; s <= steps; s++) {
     const t = s / steps;
     const p = t < resetAt ? p0 + t * inc : (t - resetAt) * inc;
-    const now = wave(kind, p - Math.floor(p), w);
+    const now = wave(kind, p - Math.floor(p), w0 + t * (w1 - w0));
     const h = now - last;
     const reset = t >= resetAt && t - 1 / steps < resetAt;
     if (Math.abs(h) > 0.05 || reset) {
@@ -58,20 +67,32 @@ function walked(kind: number, p0: number, inc: number, d: number, w: number): [n
   return [hold, owe];
 }
 
-/** What `syncShapeEdges` adds to operator A's held wave and owes its next, for one interval. */
-function edges(kind: number, p0: number, inc: number, d: number, w = 1): [number, number] {
+/**
+ * What `syncShapeEdges` adds to operator A's held wave and owes its next,
+ * for one interval: the width at the sample just read is the shape's, and
+ * the voice's has moved on to the ramp's end.
+ */
+function edges(
+  kind: number,
+  p0: number,
+  inc: number,
+  d: number,
+  width: Width = 1,
+): [number, number] {
+  const [w0, w1] = ends(width);
   const sync = new VoiceSync();
   const voice = {
     sync,
     phase: Float64Array.of(0, 0, 0, 0),
     phaseInc: Float64Array.of(inc, 0, 0, 0),
-    width: Float32Array.of(w, 1, 1, 1),
+    width: Float32Array.of(w1, 1, 1, 1),
   } as unknown as Voice;
   const sh = sync.shape;
   sh.direct = 1;
   sh.kind[0] = kind;
   sh.gain[0] = G;
   sh.prev[0] = p0;
+  sh.width[0] = w0;
   sh.reset[0] = d;
   syncShapeEdges(voice);
   expect(sh.reset[0]).toBeNaN();
@@ -154,6 +175,51 @@ describe('syncShapeEdges', () => {
     near(edges(SHAPE_PULSE, 0.5, 0.05, 0.6, 0.99), walked(SHAPE_PULSE, 0.5, 0.05, 0.6, 0.99));
     // At width 1 a Pulse is silent: nothing to correct.
     expect(edges(SHAPE_PULSE, 0.98, 0.05, 0.6, 1)).toEqual([0, 0]);
+  });
+
+  describe('a Pulse whose width ramps, its duty edge moving across the interval', () => {
+    it.each([
+      // Codex's case on PR #657: phase 0.69 to 0.72, width 0.30 to 0.32, the
+      // falling edge 0.70 to 0.68 met a fifth into the sample. A search at
+      // the end's fixed duty, 0.68, finds no edge after 0.69.
+      { name: 'widening, the edge met a fifth in', p0: 0.69, inc: 0.03, d: NaN, w: [0.3, 0.32] },
+      // Width 0.32 to 0.30: the edge 0.68 to 0.70 runs ahead, and the phase still meets it.
+      { name: 'narrowing, the edge running ahead', p0: 0.675, inc: 0.03, d: NaN, w: [0.32, 0.3] },
+      // A low note under a fast ramp: the edge, 0.70 to 0.73, outruns the
+      // phase, 0.71 to 0.712, and crosses back over it, a rising step.
+      { name: 'the edge outrunning the phase', p0: 0.71, inc: 0.002, d: NaN, w: [0.3, 0.27] },
+      // The edge, 0.70 to 0.64, is met before a reset from the low half.
+      { name: 'met before a reset', p0: 0.66, inc: 0.05, d: 0.3, w: [0.3, 0.36] },
+      // After the reset the edge, at 0.014 then, falls before the next sample.
+      { name: 'met after a reset', p0: 0.5, inc: 0.05, d: 0.6, w: [0.99, 0.98] },
+    ] as const)('sums one $name', ({ p0, inc, d, w }) => {
+      const found = edges(SHAPE_PULSE, p0, inc, d, w);
+      near(found, walked(SHAPE_PULSE, p0, inc, d, w));
+      expect(Math.abs(found[0]) + Math.abs(found[1])).toBeGreaterThan(0.01);
+    });
+
+    it('finds the edge Codex’s case meets where the phase meets it, a fifth in, falling', () => {
+      const [hold, owe] = edges(SHAPE_PULSE, 0.69, 0.03, NaN, [0.3, 0.32]);
+      // dd = 0.8 of a sample before the next: −jump·0.8² on the held wave, −jump·0.2² off the next.
+      const jump = G * Math.PI;
+      expect(hold).toBeCloseTo(-jump * 0.64 * SYNC_BLEP_GAIN, 5);
+      expect(owe).toBeCloseTo(-jump * 0.04 * SYNC_BLEP_GAIN, 5);
+    });
+
+    it.each([
+      { name: 'widening short of the edge', p0: 0.6, inc: 0.03, w: [0.3, 0.32] },
+      { name: 'narrowing, the edge staying ahead', p0: 0.6, inc: 0.03, w: [0.32, 0.3] },
+      { name: 'past the edge, which falls further behind', p0: 0.75, inc: 0.03, w: [0.3, 0.32] },
+      {
+        name: 'past the edge, which gains but never reaches it',
+        p0: 0.75,
+        inc: 0.002,
+        w: [0.3, 0.29],
+      },
+    ] as const)('corrects nothing for a ramp $name', ({ p0, inc, w }) => {
+      expect(edges(SHAPE_PULSE, p0, inc, NaN, w)).toEqual([0, 0]);
+      expect(walked(SHAPE_PULSE, p0, inc, NaN, w)).toEqual([0, 0]);
+    });
   });
 
   it('reads the next wave at the phase now, a falling Saw positive just after phase 0', () => {

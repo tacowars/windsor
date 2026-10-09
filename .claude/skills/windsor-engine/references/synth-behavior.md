@@ -96,8 +96,8 @@ computes its wave directly with a polyBLEP at every edge (windsor#655,
 record `2026-10-09-sync-direct-shape`): about 5 dB less alias on
 `lead-sync-sweep`, its peak 15 % under the table's at the same harmonics.
 Any other synced Saw, Square or Pulse takes the reset uncorrected, as Saw D
-does. A voice whose ratio an LFO or a lane moves keeps the fine control
-interval. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
+does. A voice with a synced operator whose ratio an LFO or a lane moves
+keeps the fine control interval; an unsynced one follows the LFO rule. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,

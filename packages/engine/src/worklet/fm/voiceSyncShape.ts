@@ -31,6 +31,8 @@
  * the free-running path up to the reset (the whole interval when there is
  * none), then the reset's step, from the left limit at the free-running
  * phase just before it to the wave at phase 0, then a duty edge after it.
+ * A Pulse's duty edge moves with its width's ramp across the interval, and
+ * is met where the phase meets it, from either side.
  * An edge of step `h` falling `dd` of a sample before the next sample adds
  * `h·dd²/2` to the sample held and owes `h·(1 − dd)²/2` off the next, the
  * same two-sample kernel as the corrected waves' (`SYNC_BLEP_GAIN`); edges
@@ -77,6 +79,8 @@ class SyncShape {
   /** Each direct operator's phase at the sample just read, and its wave at the next sample's phase. */
   prev: Float64Array;
   next: Float64Array;
+  /** Each direct operator's width at the sample just read, where a Pulse's duty ramp across the interval starts. */
+  width: Float64Array;
   /** Where this sample's reset fell, `d` of a sample before the next; NaN for none. */
   reset: Float64Array;
 
@@ -89,10 +93,12 @@ class SyncShape {
     this.table = [null, null, null, null];
     this.prev = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.next = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.width = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.reset = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.gain.fill(0);
     this.prev.fill(0);
     this.next.fill(0);
+    this.width.fill(1);
   }
 
   /** A note from rest: every eligible operator enters the shape afresh at its first block. */
@@ -134,11 +140,12 @@ function refreshGain(sh: SyncShape, t: Float32Array, i: number): void {
   sh.gain[i] = (2 * acc) / TABLE_SIZE;
 }
 
-/** Operator `i`'s wave at its phase now, into `next`, and the phase into `prev`. */
+/** Operator `i`'s wave at its phase and width now, into `next`, and the phase and width into `prev` and `width`. */
 function readNext(voice: Voice, sh: SyncShape, i: number): void {
   let p = voice.phase[i];
   p -= Math.floor(p);
   sh.prev[i] = p;
+  sh.width[i] = voice.width[i];
   const g = sh.gain[i];
   const k = sh.kind[i];
   if (k === SHAPE_SAW) sh.next[i] = g * HALF_PI * (1 - 2 * p);
@@ -189,7 +196,19 @@ function beginSyncShapeBlock(voice: Voice, squeezed: number): void {
  * and owes `h·(1 − dd)²/2` off the next; they sum. The polyBLEP is written
  * out at each edge, so no double crosses a call (windsor#233). Allocates
  * nothing.
+ *
+ * A Pulse's width may ramp, so its duty edge moves across the interval: the
+ * duty runs linearly from `1 − width` at the sample just read (`sh.width`)
+ * to `1 − width` now, `slope` a sample, and the phase meets the edge that
+ * stood at `x` at the interval's start at `t = (x − p0) / (inc − slope)`.
+ * While the phase outruns the edge it falls there by the shape's jump;
+ * while the edge outruns the phase (a fast ramp on a low note) the phase
+ * crosses back over it and rises by the same jump. The reset's step reads
+ * the duty at the reset's instant, and the edge after it the ramp's rest.
+ * A Square's duty and a still width's stand: `slope` is 0, and the search
+ * is the fixed-duty one to the bit.
  */
+// eslint-disable-next-line max-lines-per-function -- one interval's edges in time order: wraps and duty edges, the reset, the edge after it
 function syncShapeEdges(voice: Voice): void {
   const sh = voice.sync.shape;
   const direct = sh.direct;
@@ -201,9 +220,16 @@ function syncShapeEdges(voice: Voice): void {
     const k = sh.kind[i];
     const d = sh.reset[i];
     const isReset = d === d;
-    // The free-running phase the interval reaches: the reset's, or the next sample's.
-    const end = isReset ? p0 + (1 - d) * inc : p0 + inc;
-    const duty = k === SHAPE_SAW ? -1 : k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - voice.width[i];
+    // The share of the interval the free-running path runs, and the phase it
+    // reaches there: the reset's, or the next sample's.
+    const span = isReset ? 1 - d : 1;
+    const end = p0 + span * inc;
+    const duty = k === SHAPE_SAW ? -1 : k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - sh.width[i];
+    const slope = k === SHAPE_PULSE ? sh.width[i] - voice.width[i] : 0;
+    // How fast the phase gains on the duty edge, and the bound, in the
+    // edge's phase at the interval's start, of the edges it meets by `end`.
+    const rate = inc - slope;
+    const edgeEnd = end - span * slope;
     const jump = k === SHAPE_SQUARE ? g * HALF_PI : g * Math.PI;
     let hold = 0;
     let owe = 0;
@@ -214,29 +240,43 @@ function syncShapeEdges(voice: Voice): void {
       hold += jump * dd * dd;
       owe += jump * e * e;
     }
-    if (duty >= 0) {
-      for (let x = Math.floor(p0 - duty) + 1 + duty; isReset ? x < end : x <= end; x++) {
-        const dd = 1 - (x - p0) / inc;
+    if (duty >= 0 && rate > 0) {
+      for (let x = Math.floor(p0 - duty) + 1 + duty; isReset ? x < edgeEnd : x <= edgeEnd; x++) {
+        const dd = 1 - (x - p0) / rate;
         const e = 1 - dd;
         hold -= jump * dd * dd;
         owe -= jump * e * e;
       }
+    } else if (duty >= 0 && rate < 0) {
+      // The edge at or behind the phase overtakes it, and any behind that by the end.
+      for (let x = Math.floor(p0 - duty) + duty; x > edgeEnd; x--) {
+        const dd = 1 - (x - p0) / rate;
+        const e = 1 - dd;
+        hold += jump * dd * dd;
+        owe += jump * e * e;
+      }
     }
     if (isReset) {
       // From the left limit at the free-running phase (1 at a wrap) to the
-      // wave at phase 0. A Pulse at duty 0 is silent, so its reset steps by 0.
+      // wave at phase 0, at the reset instant's duty. A Pulse at duty 0 is
+      // silent, so its reset steps by 0.
+      const dutyAt = duty + span * slope;
       let x = end - Math.floor(end);
       if (x === 0) x = 1;
-      const h = k === SHAPE_SAW ? g * Math.PI * x : x <= duty || duty === 0 ? 0 : jump;
+      const h = k === SHAPE_SAW ? g * Math.PI * x : x <= dutyAt || dutyAt === 0 ? 0 : jump;
       const e = 1 - d;
       hold += h * d * d;
       owe += h * e * e;
-      // A duty edge after phase 0 and by the next sample.
-      if (duty > 0 && duty <= d * inc) {
-        const dd = d - duty / inc;
+      // A duty edge after phase 0 and by the next sample: the phase meets
+      // it, or, from duty 0, the edge outruns the phase at once.
+      if (dutyAt > 0 && dutyAt <= d * rate) {
+        const dd = d - dutyAt / rate;
         const f = 1 - dd;
         hold -= jump * dd * dd;
         owe -= jump * f * f;
+      } else if (dutyAt === 0 && rate < 0) {
+        hold += jump * d * d;
+        owe += jump * e * e;
       }
       sh.reset[i] = NaN;
     }

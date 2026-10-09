@@ -193,12 +193,12 @@ describe('a switch to the table path and back (windsor#655, decision 1)', () => 
 });
 
 describe('the edges a reset meets (windsor#655, decision 3)', () => {
-  /** A finite render whose every sample stays within the table path's peak for the same operator. */
+  /** A finite render whose every sample stays within the table path's peak for the same operator and LFOs. */
   function expectBounded(a: PartialOperator, extra: Partial<Patch> = {}): void {
     const x = play(synced(a, STACK_TWO, extra));
     expect(x.every(Number.isFinite)).toBe(true);
     expect(peak(x)).toBeGreaterThan(0.1);
-    expect(peak(x)).toBeLessThanOrEqual(peak(play(onTable(a))) * 1.0001);
+    expect(peak(x)).toBeLessThanOrEqual(peak(play(synced(a, ONE_TO_THREE, extra))) * 1.0001);
   }
 
   it('through a ratio swept just below and through a whole number', () => {
@@ -215,6 +215,13 @@ describe('the edges a reset meets (windsor#655, decision 3)', () => {
     expectBounded({ wave: WAVE.SQUARE, ratio: 2.5005 });
     // A Pulse at width 0.99 falls at 0.01, inside the sample after each reset.
     expectBounded({ wave: WAVE.PULSE, ratio: 2.37, width: 0.99 });
+  });
+
+  it('with a Pulse whose width an LFO sweeps, its duty edge moving within each sample', () => {
+    const a = { wave: WAVE.PULSE, ratio: 2.37, width: 0.5 };
+    const lfo = { shape: 0, rate: 20, amount: 1, toWidth: [0.4, 0, 0, 0] } as Patch['lfo'];
+    expect(bits(synced(a, STACK_TWO, { lfo }), 8)).toEqual([1, 1, 0]);
+    expectBounded(a, { lfo });
   });
 });
 

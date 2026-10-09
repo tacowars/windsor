@@ -3,8 +3,8 @@
 windsor#655 builds candidate A + D of the anti-aliasing study
 (`docs/research/2026-10-09-sync-antialias-study/`, windsor#652): a synced
 Saw, Square or Pulse that nothing modulates computes its wave directly,
-with a two-point polyBLEP at every edge, and a voice whose ratio is
-modulated keeps the fine control interval. The decisions are in
+with a two-point polyBLEP at every edge, and a synced voice whose ratio
+is modulated keeps the fine control interval. The decisions are in
 `docs/log/2026-10-09-sync-direct-shape.md`. This note measures the build
 against the study's figures for A + D (decision 8). The 2× synced voice
 that takes it to the reference is windsor#656.
@@ -12,7 +12,8 @@ that takes it to the reference is windsor#656.
 **The build lands on the study's row.** On `lead-sync-sweep` the framed
 median goes from −32.0 to −36.8 dB at MIDI 72 and from −28.4 to −33.1 dB
 at MIDI 84. That is the study's A + D row (−36.8 and −33.1) to the tenth of
-a dB. One voice costs 1.43 times shipped's CPU.
+a dB. One voice costs 1.43 to 1.46 times shipped's CPU, and the patch
+with its sync off costs what shipped's does.
 
 ## Machine and method
 
@@ -98,7 +99,21 @@ one run. `lead-sync-sweep` with every envelope at its peak, one held note
 at MIDI 60, ns per 48 kHz sample of the one voice, the median and
 interquartile range over 30 rounds of 5 s after two warm-ups, the runs
 interleaved and rotated. `unsynced` is the patch with its sync off, which
-takes the kernel. Two runs.
+takes the kernel.
+
+The bundle as it stands, D limited to synced voices and the Pulse's moving
+duty edge (the PR's second round), two runs, load average 2.7 to 3.8:
+
+| Run | Run 1 | Run 2 | × shipped (run 1, run 2) |
+|---|---|---|---|
+| shipped, unsynced | 23.5 (22.3–24.3) | 23.4 (22.6–24.2) | 0.31, 0.32 |
+| built, unsynced | 23.5 (22.4–24.0) | 22.8 (22.1–23.5) | 0.31, 0.31 |
+| shipped | 74.9 (73.0–75.9) | 72.5 (70.8–74.6) | 1, 1 |
+| shipped + D | 80.5 (78.4–83.1) | 77.7 (76.0–79.6) | 1.07, 1.07 |
+| study A + D | 102.4 (100.3–104.9) | 102.1 (100.0–104.0) | 1.37, 1.41 |
+| **built** | **109.3 (106.6–111.5)** | **105.0 (104.1–108.7)** | **1.46, 1.45** |
+
+The first round's bundle, which applied D to every voice, two runs:
 
 | Run | Run 1 | Run 2 | × shipped (run 1, run 2) |
 |---|---|---|---|
@@ -107,20 +122,27 @@ takes the kernel. Two runs.
 | shipped | 58.8 (57.8–62.9) | 57.8 (57.2–59.9) | 1, 1 |
 | shipped + D | 62.8 (61.5–65.0) | 61.2 (60.9–62.2) | 1.07, 1.06 |
 | study A + D | 80.0 (79.5–82.9) | 79.6 (79.3–80.6) | 1.36, 1.38 |
-| **built** | **84.1 (83.3–90.6)** | **82.9 (82.4–83.3)** | **1.43, 1.43** |
+| built | 84.1 (83.3–90.6) | 82.9 (82.4–83.3) | 1.43, 1.43 |
 
-- **The synced voice** costs 1.43 times shipped's, 3 to 4 ns over the
-  study's in-memory A + D. The build calls the edge search once a sample,
-  where the study wrote it into the loop.
-- **D on an unsynced voice.** The patch with its sync off still has its
-  LFO on the Saw's ratio, so D keeps that voice at the fine interval too
-  (record, decision 4): four control updates a quantum instead of one, about
-  10 ns a sample in the kernel. On the synced voice D costs 3 to 4 ns.
-- **The study's `bench.mjs`**, run once on each bundle (it reads one
-  checkout per run), agrees: at 9ea3051 unsynced 18.1 and 18.5, shipped
-  58.5 and 59.8, shipped + D 61.7 and 62.1, A + D 80.7 and 80.5; on this
-  branch unsynced 28.4 and 28.5, and the synced voice (its `shipped` row,
-  this branch's bundle) 83.1 twice.
+Every row reads about 25 % slower in the second round's runs, shipped's
+included, under the machine's shared load; the ratios to shipped are the
+figures to compare.
+
+- **The synced voice** costs 1.43 to 1.46 times shipped's, 3 to 7 ns over
+  the study's in-memory A + D. The build calls the edge search once a
+  sample, where the study wrote it into the loop. The `lead-sync-sweep`
+  Saw takes no duty edge, so the Pulse's ramp search does not reach it.
+- **D on an unsynced voice.** D applies to a voice with a synced operator
+  only (record, decision 4). The patch with its sync off still has its LFO
+  on the Saw's ratio, at 0.25 Hz, and now costs what shipped's does (23.5
+  and 22.8 ns against 23.5 and 23.4). The first round, which kept that
+  voice at the fine interval too, cost it about 10 ns a sample (18 to 29).
+  On the synced voice D costs 3 to 6 ns.
+- **The study's `bench.mjs`**, run once on each bundle in the first round
+  (it reads one checkout per run), agrees with that round: at 9ea3051
+  unsynced 18.1 and 18.5, shipped 58.5 and 59.8, shipped + D 61.7 and
+  62.1, A + D 80.7 and 80.5; on the first round's bundle unsynced 28.4 and
+  28.5, and the synced voice 83.1 twice.
 
 ## What the figures do not show
 

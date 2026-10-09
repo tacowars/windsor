@@ -69,14 +69,25 @@ were split because together they pass the size limit for interacting work.
      before it to the wave at phase 0 (consult finding 2);
    - a duty edge after phase 0 and by the next sample.
 
+   A Pulse's width may ramp across the sample, under an LFO's `toWidth` or
+   a lane, so its duty edge moves: the duty runs linearly from `1 − w` at
+   the sample just read to `1 − w` at the next. The edge is found where the
+   phase meets that moving edge, before and after a reset, and the reset's
+   step reads the duty at the reset's instant. Where the edge outruns the
+   phase (a fast ramp on a low note), the phase crosses back over it and
+   the wave rises by the same step. Each duty edge keeps the shape's own
+   step. A width that holds still finds the same edges as a fixed duty, to
+   the bit (Codex's review of PR #657).
+
    Each takes the two-point polyBLEP that the corrected waves use
    (`SYNC_BLEP_GAIN`): an edge of step `h` falling `dd` of a sample before
    the next sample adds `h·dd²/2` to the held sample and takes
    `h·(1 − dd)²/2` off the next. Corrections in one interval sum; none
    overwrites another. The operator's wave goes on a sample late, through
    the corrected waves' delay (`VoiceSync.held`, `after`).
-4. **D, the fine control interval.** A voice keeps `CTRL_INTERVAL` while
-   its ratio is modulated (`voiceControlInterval.ts`):
+4. **D, the fine control interval.** A voice with an operator whose `sync`
+   is not `'off'` keeps `CTRL_INTERVAL` while its ratio is modulated
+   (`voiceControlInterval.ts`):
    - an LFO's `toRatio` that is not 0 on any operator, whatever its rate,
      shape or depth;
    - a song lane's offset that is not 0 on any `ops.<i>.ratio` row, or on a
@@ -85,8 +96,14 @@ were split because together they pass the size limit for interacting work.
    A step's push on a ratio is fixed for the note, so it steps nothing and
    does not count. Without D the ratio steps every 128 samples, and the
    stepping alone sits at about −43 dB, under which no anti-aliasing helps.
-   D applies to any voice, synced or not: an unsynced operator whose ratio
-   an LFO moves steps its pitch the same way.
+
+   D is the synced voice's only (tacowars, 2026-10-09, a change to the
+   issue's decision 4, which applied it to any voice). The study measured
+   the stepping with sync on only, and applied to an unsynced voice D cost
+   `lead-sync-sweep` with its sync off about 10 ns a sample (18 to 29). An
+   unsynced voice with a ratio sweep chooses its interval as it did before
+   windsor#655: its ratio LFO keeps it fine at 8 Hz or faster, or in a
+   shape that jumps, as a pitch LFO does; a ratio lane alone does not.
 5. **The switch between the shape and the table.** An operator the bind
    lets take the shape sends its wave a sample late on both paths, so a
    switch neither skips nor repeats a sample. Leaving the shape, it drops
@@ -108,12 +125,13 @@ were split because together they pass the size limit for interacting work.
 ## Consequences
 
 - `lead-sync-sweep` measures −36.8 dB at MIDI 72 and −33.1 dB at 84,
-  the study's A + D row to the tenth. Its CPU is 1.43 times shipped's on
-  one voice. The figures, the machine and the waveform checks are in the
+  the study's A + D row to the tenth. Its CPU is 1.43 to 1.46 times
+  shipped's on one voice. The figures, the machine and the waveform checks are in the
   build's research note.
-- An unsynced voice whose ratio an LFO moves now updates its controls four
-  times a quantum. On `lead-sync-sweep` with its sync off that costs about
-  10 ns a sample.
+- An unsynced voice costs what it did before: D leaves it alone, and
+  `lead-sync-sweep` with its sync off measures as shipped (the build's
+  research note). An unsynced operator whose ratio a slow LFO moves still
+  steps its pitch every 128 samples, as it did before windsor#655.
 - A phase-modulated, fed, squeezed or Tone-reduced synced Saw, Square or
   Pulse keeps aliasing as before. windsor#656's 2× voice gives most of
   those about 7 dB (the study's decision 5 table); a fed one changes its
