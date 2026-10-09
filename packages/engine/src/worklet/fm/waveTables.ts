@@ -9,7 +9,11 @@
  * single-instance module state, never duplicated; `WAVE` mirrors `patch.ts`
  * (`patch.test.ts` pins the copy until #656 shares it); the warm-up at the end
  * runs inside `addModule()`, never in a render. `fmProcessorUserWave.test.ts`
- * and the golden test pin the tables' contents.
+ * and the golden test pin the tables' contents. A synced note at twice the
+ * rate (windsor#656) reads a second set built at that rate, the same sizing
+ * rule over twice the harmonics, each table scaled by the gain that
+ * normalised the part's own table of that octave, not by its own peak, so
+ * the harmonics both hold play at one level (`waveTables.test.ts`).
  */
 
 import {
@@ -73,9 +77,17 @@ function partialsFor(waveId: number, userPartials: number[] | null): Float32Arra
  * highest harmonic, from TABLE_SIZE to TABLE_SIZE_MAX, so a table of many
  * harmonics is long enough that interpolating it leaves no audible floor; a
  * table of TABLE_SIZE is summed as it always was, to the bit, and a longer
- * one is built by the inverse FFT (`waveTableFft.ts`).
+ * one is built by the inverse FFT (`waveTableFft.ts`). Each is normalised to
+ * its own peak, the gain written to `gains`, or, with `fixed`, scaled by the
+ * gain `gains` already holds for its octave (windsor#656).
  */
-function buildMips(partials: Float32Array, sampleRate: number, tone: number): Float32Array[] {
+function buildMips(
+  partials: Float32Array,
+  sampleRate: number,
+  tone: number,
+  gains: Float64Array,
+  fixed: boolean,
+): Float32Array[] {
   const nyquist = sampleRate * 0.5;
   const maxPossible = TABLE_SIZE >> 1;
   const mips: Float32Array[] = new Array(MIP_COUNT);
@@ -106,14 +118,21 @@ function buildMips(partials: Float32Array, sampleRate: number, tone: number): Fl
       }
     }
 
-    let peak = 0;
-    for (let i = 0; i < size; i++) {
-      const v = t[i] < 0 ? -t[i] : t[i];
-      if (v > peak) peak = v;
-    }
-    if (peak > 1e-9) {
-      const g = 1 / peak;
+    if (fixed) {
+      const g = gains[k];
       for (let i = 0; i < size; i++) t[i] *= g;
+    } else {
+      let peak = 0;
+      for (let i = 0; i < size; i++) {
+        const v = t[i] < 0 ? -t[i] : t[i];
+        if (v > peak) peak = v;
+      }
+      gains[k] = 1;
+      if (peak > 1e-9) {
+        const g = 1 / peak;
+        gains[k] = g;
+        for (let i = 0; i < size; i++) t[i] *= g;
+      }
     }
     t[size] = t[0];
     mips[k] = t;
@@ -132,9 +151,17 @@ function quantiseMips(mips: Float32Array[], levels: number): Float32Array[] {
   return mips;
 }
 
+/** A cached mip set and each octave's normalising gain, which a set at twice the rate takes (windsor#656). */
+interface WaveSet {
+  mips: Float32Array[];
+  gains: Float64Array;
+}
+
 /**
  * Shared across every processor instance in this worklet global scope, so 16
- * parts using a saw pay for the tables once. Keyed by waveform + quantised tone,
+ * parts using a saw pay for the tables once. Keyed by waveform + quantised
+ * tone + the rate it is built at and, for a set at twice the rate, the rate
+ * it is normalised to (windsor#656),
  * and for a User wave by the partials themselves (#511). The key used to be the
  * patch's `userKey`, which only worked while every author picked a unique one:
  * a User wave left at the default '' shared the first such table built, and a
@@ -143,34 +170,56 @@ function quantiseMips(mips: Float32Array[], levels: number): Float32Array[] {
  * so the scoring bank's User presets render exactly as before. Only a `patch`
  * message reaches here, never the audio loop, so the string is fine.
  */
-const WAVE_CACHE = new Map<string, Float32Array[]>();
+const WAVE_CACHE = new Map<string, WaveSet>();
 const WAVE_CACHE_LIMIT = 64;
 
+/**
+ * The mip set for `wave` at `sampleRate`. A set at another rate than the
+ * part's (`baseRate`, twice it for a synced note: windsor#656) scales each
+ * octave by the gain that normalised the part's own set, so its fundamental
+ * and every harmonic the two share play at the part's table's level.
+ */
 function getMips(
   wave: number,
   sampleRate: number,
   tone: number,
   userPartials: number[] | null,
+  baseRate: number = sampleRate,
 ): Float32Array[] {
+  return waveSetFor(wave, sampleRate, tone, userPartials, baseRate).mips;
+}
+
+function waveSetFor(
+  wave: number,
+  sampleRate: number,
+  tone: number,
+  userPartials: number[] | null,
+  baseRate: number,
+): WaveSet {
   // PULSE is two reads of the saw's tables (#55): one key, one copy.
   const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
   // null plays a sine and [] plays silence: the two must never share a key.
   let content = '';
   if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
-  const key = waveId + '|' + toneQ + '|' + content;
-  let mips = WAVE_CACHE.get(key);
-  if (mips) return mips;
+  const rate = baseRate === sampleRate ? '' + sampleRate : sampleRate + '/' + baseRate;
+  const key = waveId + '|' + toneQ + '|' + rate + '|' + content;
+  let set = WAVE_CACHE.get(key);
+  if (set) return set;
 
-  mips = buildMips(partialsFor(waveId, userPartials), sampleRate, toneQ);
+  const gains = new Float64Array(MIP_COUNT);
+  const fixed = baseRate !== sampleRate;
+  if (fixed) gains.set(waveSetFor(wave, baseRate, tone, userPartials, baseRate).gains);
+  const mips = buildMips(partialsFor(waveId, userPartials), sampleRate, toneQ, gains, fixed);
   if (waveId === WAVE.SINE_4BIT) quantiseMips(mips, 8);
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
 
   if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
     WAVE_CACHE.delete(WAVE_CACHE.keys().next().value!);
   }
-  WAVE_CACHE.set(key, mips);
-  return mips;
+  set = { mips, gains };
+  WAVE_CACHE.set(key, set);
+  return set;
 }
 
 /**

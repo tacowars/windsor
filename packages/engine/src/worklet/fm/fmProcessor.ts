@@ -44,8 +44,8 @@ import {
   mapVoiceSlots,
 } from './voiceOffsets';
 import { VOICE_TARGET_COUNT } from './voiceTargetTables';
-import { WAVE } from './waveIds';
-import { getMips } from './waveTables';
+import { PartWaveSets } from './partWaveSets';
+import { anyVoiceOversampled, patchOversamples } from './voiceOversample';
 
 /** `processorOptions` as the part reads them: the contract's, plus the harness-only switches (#547, #548, windsor#326). */
 interface FmProcessorOptions extends Partial<ProcessorOptions> {
@@ -53,6 +53,8 @@ interface FmProcessorOptions extends Partial<ProcessorOptions> {
   specialise?: boolean;
   /** The control intervals' table over the shipped one (windsor#326): a test sets `long` to 32 to render as before. */
   controlIntervals?: ControlIntervalOverrides;
+  /** `false` renders every synced voice at the part's rate, as the part did before windsor#656. */
+  syncOversample?: boolean;
 }
 
 /**
@@ -74,7 +76,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
   random: () => number;
   voices: Voice[];
   patch: WorkletPatch;
-  waveSets: (Float32Array[] | null)[];
+  /** The patch's waves, at the part's rate and, for a synced note, twice it (windsor#656). */
+  waves: PartWaveSets;
+  syncOversample: boolean;
   events: EventQueue;
   partControls: Float64Array;
   partOffsets: Float64Array;
@@ -148,11 +152,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // Reserve slots above the sounding limit so a stolen voice can fade out
     // while its replacement is already sounding (`voiceSteal.ts`, windsor#410).
     this.voices = buildVoicePool(this, maxVoices, sampleRate);
+    // A synced note at twice the rate (windsor#656), always on in live
+    // playback; `syncOversample: false` keeps every voice at 1× for a test.
+    this.syncOversample = opts.syncOversample !== false;
+    for (const v of this.voices) v.oversample.allowed = this.syncOversample;
 
     // The first patch arrives here, with no message, so its macro mappings
     // are compiled here too (windsor#560).
     this.patch = compileMacros(normalisePatch(opts.patch));
-    this.waveSets = [null, null, null, null];
+    this.waves = new PartWaveSets();
     this.rebuildWaves();
 
     this.events = new EventQueue(); // frame-stamped, kept sorted
@@ -193,16 +201,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e: MessageEvent<WorkletMessage>) => this.onMessage(e.data);
   }
 
+  /**
+   * The patch's wave sets, at a patch message, never in a render. The sets
+   * at twice the rate (windsor#656) are built while a note of this patch
+   * would take it, or a sounding voice at it may rebind to this patch.
+   */
   rebuildWaves(): void {
     const p = this.patch;
-    for (let i = 0; i < 4; i++) {
-      const op = p.ops[i];
-      if (op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D) {
-        this.waveSets[i] = null;
-      } else {
-        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials);
-      }
-    }
+    const twice = this.syncOversample && (patchOversamples(p) || anyVoiceOversampled(this.voices));
+    this.waves.rebuild(p, sampleRate, twice);
   }
 
   onMessage(msg: WorkletMessage): void {
@@ -215,7 +222,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
         // The console opts into hearing the knob as it turns instead.
         if (this.liveRetune) {
           const slots = this.slotTargets;
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waves, slots);
         }
         break;
       }
@@ -334,7 +341,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       v.detune = detune;
       v.pan = pan;
       v.glideFrom = glideFrom;
-      v.start(p, this.waveSets, id, this.stepModIn);
+      v.start(p, this.waves, id, this.stepModIn);
       v.mod = mod;
       v.keyed = true;
     }

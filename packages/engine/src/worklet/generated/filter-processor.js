@@ -205,6 +205,7 @@ var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
 var SYNC_BLEP_GAIN = 0.5;
 var SYNC_SHAPE_MAX_INC = 0.5;
+var SYNC_OVERSAMPLE = 2;
 
 // packages/engine/src/worklet/fm/ladderTables.ts
 var LADDER_SATURATOR = {

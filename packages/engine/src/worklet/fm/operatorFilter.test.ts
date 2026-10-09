@@ -31,7 +31,13 @@ function voiceWith(
   note = MIDDLE_C,
 ): Voice {
   const full = { wave: WAVE.SAW, opLp: 0, opHp: 0, opTrack: 0, ...op };
-  return { opFilter: [filter], patch: { ops: [full] }, note, sr: SR } as unknown as Voice;
+  return {
+    opFilter: [filter],
+    patch: { ops: [full] },
+    note,
+    sr: SR,
+    opRate: SR,
+  } as unknown as Voice;
 }
 
 function tuned(op: Partial<Operator>, note = MIDDLE_C): Filter {

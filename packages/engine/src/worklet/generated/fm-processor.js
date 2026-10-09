@@ -59,6 +59,7 @@ var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
 var SYNC_BLEP_GAIN = 0.5;
 var SYNC_SHAPE_MAX_INC = 0.5;
+var SYNC_OVERSAMPLE = 2;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -1355,7 +1356,7 @@ function partialsFor(waveId, userPartials) {
   }
   return a;
 }
-function buildMips(partials, sampleRate2, tone) {
+function buildMips(partials, sampleRate2, tone, gains, fixed) {
   const nyquist = sampleRate2 * 0.5;
   const maxPossible = TABLE_SIZE >> 1;
   const mips = new Array(MIP_COUNT);
@@ -1381,14 +1382,21 @@ function buildMips(partials, sampleRate2, tone) {
         }
       }
     }
-    let peak = 0;
-    for (let i = 0; i < size; i++) {
-      const v = t[i] < 0 ? -t[i] : t[i];
-      if (v > peak) peak = v;
-    }
-    if (peak > 1e-9) {
-      const g = 1 / peak;
+    if (fixed) {
+      const g = gains[k];
       for (let i = 0; i < size; i++) t[i] *= g;
+    } else {
+      let peak = 0;
+      for (let i = 0; i < size; i++) {
+        const v = t[i] < 0 ? -t[i] : t[i];
+        if (v > peak) peak = v;
+      }
+      gains[k] = 1;
+      if (peak > 1e-9) {
+        const g = 1 / peak;
+        gains[k] = g;
+        for (let i = 0; i < size; i++) t[i] *= g;
+      }
     }
     t[size] = t[0];
     mips[k] = t;
@@ -1406,22 +1414,30 @@ function quantiseMips(mips, levels) {
 }
 var WAVE_CACHE = /* @__PURE__ */ new Map();
 var WAVE_CACHE_LIMIT = 64;
-function getMips(wave, sampleRate2, tone, userPartials) {
+function getMips(wave, sampleRate2, tone, userPartials, baseRate = sampleRate2) {
+  return waveSetFor(wave, sampleRate2, tone, userPartials, baseRate).mips;
+}
+function waveSetFor(wave, sampleRate2, tone, userPartials, baseRate) {
   const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
   let content = "";
   if (waveId === WAVE.USER) content = userPartials ? "[" + userPartials.join(",") + "]" : "null";
-  const key = waveId + "|" + toneQ + "|" + content;
-  let mips = WAVE_CACHE.get(key);
-  if (mips) return mips;
-  mips = buildMips(partialsFor(waveId, userPartials), sampleRate2, toneQ);
+  const rate = baseRate === sampleRate2 ? "" + sampleRate2 : sampleRate2 + "/" + baseRate;
+  const key = waveId + "|" + toneQ + "|" + rate + "|" + content;
+  let set = WAVE_CACHE.get(key);
+  if (set) return set;
+  const gains = new Float64Array(MIP_COUNT);
+  const fixed = baseRate !== sampleRate2;
+  if (fixed) gains.set(waveSetFor(wave, baseRate, tone, userPartials, baseRate).gains);
+  const mips = buildMips(partialsFor(waveId, userPartials), sampleRate2, toneQ, gains, fixed);
   if (waveId === WAVE.SINE_4BIT) quantiseMips(mips, 8);
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
   if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
     WAVE_CACHE.delete(WAVE_CACHE.keys().next().value);
   }
-  WAVE_CACHE.set(key, mips);
-  return mips;
+  set = { mips, gains };
+  WAVE_CACHE.set(key, set);
+  return set;
 }
 function mipIndexAt(freqs, i) {
   const freq = freqs[i];
@@ -1716,12 +1732,12 @@ var OperatorFilter = class {
     this.point = x;
   }
 };
-function prewarpInPlace(slot, rate) {
+function prewarpInPlace(slot, voice) {
   let fc = slot[0];
   if (fc < OP_FILTER_FLOOR_HZ) fc = OP_FILTER_FLOOR_HZ;
-  const top = OP_FILTER_CEILING * rate;
+  const top = OP_FILTER_CEILING * voice.sr;
   if (fc > top) fc = top;
-  slot[0] = Math.PI * fc / rate;
+  slot[0] = Math.PI * fc / voice.opRate;
   tanInPlace(slot, 0);
 }
 function trackInPlace(slot, track, note) {
@@ -1748,7 +1764,7 @@ function bindOperatorFilter(voice, i) {
     filter.lpOn = lp > 0;
     if (filter.lpOn) {
       slot[0] = lp;
-      prewarpInPlace(slot, voice.sr);
+      prewarpInPlace(slot, voice);
       const g = slot[0];
       filter.lpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
       filter.lpA2 = g * filter.lpA1;
@@ -1762,7 +1778,7 @@ function bindOperatorFilter(voice, i) {
     filter.hpOn = hp > 0;
     if (filter.hpOn) {
       slot[0] = hp;
-      prewarpInPlace(slot, voice.sr);
+      prewarpInPlace(slot, voice);
       const g = slot[0];
       filter.hpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
       filter.hpA2 = g * filter.hpA1;
@@ -2184,7 +2200,9 @@ var SyncShape = class {
     this.next = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.width = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.reset = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.left = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.gain.fill(0);
+    this.left.fill(0);
     this.prev.fill(0);
     this.next.fill(0);
     this.width.fill(1);
@@ -2227,6 +2245,20 @@ function readNext(voice, sh, i) {
     sh.next[i] = p < 1 - w ? g * Math.PI * w : g * Math.PI * (w - 1);
   }
 }
+function carrySyncShapeReset(voice, sh, i) {
+  const d = sh.reset[i];
+  const g = sh.gain[i];
+  const k = sh.kind[i];
+  let x = sh.left[i];
+  x -= Math.floor(x);
+  if (x === 0) x = 1;
+  const duty = k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - voice.width[i];
+  const jump = k === SHAPE_SQUARE ? g * HALF_PI : g * Math.PI;
+  const h = k === SHAPE_SAW ? g * Math.PI * x : x <= duty || duty === 0 ? 0 : jump;
+  const e = 1 - d;
+  voice.sync.held[i] += h * d * d * SYNC_BLEP_GAIN;
+  voice.sync.after[i] += h * e * e * SYNC_BLEP_GAIN;
+}
 function beginSyncShapeBlock(voice, squeezed) {
   const sh = voice.sync.shape;
   const fbTo = voice.fbTo;
@@ -2235,7 +2267,7 @@ function beginSyncShapeBlock(voice, squeezed) {
     const bit = 1 << i;
     if ((sh.eligible & bit) === 0 || fbTo[i] !== 0 || (voice.fbRamp & bit) !== 0) continue;
     const inc = voice.phaseInc[i];
-    if (!(inc < SYNC_SHAPE_MAX_INC && inc > -SYNC_SHAPE_MAX_INC)) continue;
+    if (!(inc > 0 && inc < SYNC_SHAPE_MAX_INC)) continue;
     if (sh.kind[i] !== SHAPE_PULSE && (squeezed & bit) !== 0) continue;
     direct |= bit;
   }
@@ -2244,8 +2276,11 @@ function beginSyncShapeBlock(voice, squeezed) {
     const bit = 1 << i;
     if ((sh.direct & bit) !== 0 && (direct & bit) === 0) after[i] = 0;
     if ((direct & bit) === 0) continue;
-    if ((sh.direct & bit) === 0) sh.reset[i] = NaN;
     refreshGain(sh, voice.tables[i], i);
+    if ((sh.direct & bit) === 0) {
+      if (sh.reset[i] === sh.reset[i]) carrySyncShapeReset(voice, sh, i);
+      sh.reset[i] = NaN;
+    }
     readNext(voice, sh, i);
   }
   sh.direct = direct;
@@ -2313,6 +2348,13 @@ function syncShapeEdges(voice) {
     voice.sync.held[i] += hold * SYNC_BLEP_GAIN;
     voice.sync.after[i] += owe * SYNC_BLEP_GAIN;
     readNext(voice, sh, i);
+  }
+}
+function dropSyncShapePending(voice) {
+  const sh = voice.sync.shape;
+  const table = sh.eligible & ~sh.direct;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((table & 1 << i) !== 0) sh.reset[i] = NaN;
   }
 }
 
@@ -2391,7 +2433,9 @@ function bindVoiceSync(voice, patch) {
   }
   const fresh = (blep | eligible) & ~(s.blep | s.shape.eligible);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    if ((fresh & 1 << i) !== 0) s.held[i] = s.after[i] = 0;
+    if ((fresh & 1 << i) === 0) continue;
+    s.held[i] = s.after[i] = 0;
+    s.shape.reset[i] = NaN;
   }
   s.synced = placed;
   s.blep = blep;
@@ -2417,6 +2461,11 @@ function applySyncResets(voice) {
   const s = voice.sync;
   const phase = voice.phase;
   const phaseInc = voice.phaseInc;
+  const sh = s.shape;
+  const table = sh.eligible & ~sh.direct;
+  if (table !== 0) {
+    for (let i = 0; i < OPERATOR_COUNT; i++) if ((table & 1 << i) !== 0) sh.reset[i] = NaN;
+  }
   for (let k = 0; k < s.count; k++) {
     const i = s.order[k];
     const m = s.master[i];
@@ -2427,7 +2476,10 @@ function applySyncResets(voice) {
     const reset = d * phaseInc[i];
     const before = phase[i] - reset;
     phase[i] = reset;
-    if ((s.shape.direct & 1 << i) !== 0) s.shape.reset[i] = d;
+    if ((sh.eligible & 1 << i) !== 0) {
+      sh.reset[i] = d;
+      sh.left[i] = before;
+    }
     if ((s.blep & 1 << i) === 0) continue;
     const mod = s.mod[i];
     SYNC_POINT[0] = mod - Math.floor(mod);
@@ -2809,7 +2861,7 @@ function bindVoiceConstants(voice, patch) {
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
   bindVoiceSync(voice, patch);
-  voice.kernel = voice.specialise && voice.edges >= 0 && voice.sync.synced === 0;
+  voice.kernel = voice.specialise && voice.edges >= 0 && voice.sync.synced === 0 && voice.oversample.factor === 1;
 }
 function restingWidth(kind, width) {
   return kind === KIND_PULSE ? width : 1 / width;
@@ -2901,7 +2953,9 @@ function advanceVoiceControl(voice, n) {
   const pEnv = voice.pitchEnv.value * live[VT_PITCH_ENV_AMOUNT];
   const semis = voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
-  voice.sync.noteInc = baseFreq / voice.sr;
+  const opRate = voice.opRate;
+  const opN = n * voice.oversample.factor;
+  voice.sync.noteInc = baseFreq / opRate;
   const specialise = voice.specialise;
   const toRatio = lfoP.toRatio, toRatio2 = lfo2P.toRatio;
   for (let i = 0; i < 4; i++) {
@@ -2912,10 +2966,10 @@ function advanceVoiceControl(voice, n) {
       ratio *= Math.pow(2, lfoVal * toRatio[i] + lfo2Val * toRatio2[i]);
     }
     const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * ratio * detuneMul;
-    voice.phaseInc[i] = freq / voice.sr;
+    voice.phaseInc[i] = freq / opRate;
     voice.opFreq[i] = freq;
-    updateOperatorWidth(voice, i, n);
-    updateOperatorAmp(voice, i, n);
+    updateOperatorWidth(voice, i, opN);
+    updateOperatorAmp(voice, i, opN);
   }
   updateVoiceDrive(voice);
   updateVoiceFilter(voice, n);
@@ -3467,29 +3521,24 @@ function voiceHoldsEndLevel(voice) {
 }
 
 // packages/engine/src/worklet/fm/voiceRender.ts
-function renderVoiceGeneric(voice, outL, outR, off, n) {
+function renderVoiceOperators(voice, n) {
   const patch = voice.patch;
+  const sums = voice.oversample.sums;
   const mods = voice.alg.mods;
   const carriers = voice.alg.carriers;
   const order = voice.order;
   const nCar = carriers.length;
   const carGain = 1 / Math.sqrt(nCar);
-  const f = patch.filter;
-  const mode = f.mode;
-  const drive = voice.drive;
-  const driven = drive.on, driveSoft = drive.shape === DRIVE_SOFT, driveGain = drive.gain, driveBias = drive.bias, driveOffset = drive.offset, driveToned = drive.toned, driveCoef = drive.toneCoef;
-  let driveTone = drive.toneState;
-  const slope24 = f.slope24;
   const gain = patch.volume * carGain;
-  let fade = voice.fade;
-  const fadeInc = voice.fadeInc;
   const phase = voice.phase, phaseInc = voice.phaseInc, out = voice.out;
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
   const ampBreak = voice.ampBreak, ampKnot = voice.ampKnot, knotAmp = voice.knotAmp, knotInc = voice.knotInc, knotGap = voice.knotGap;
   const kind = voice.kind, tables = voice.tables;
   const width = voice.width, widthInc = voice.widthInc;
   const fbAmt = voice.fbTo, fbFrom = voice.fbFrom, fbRamp = voice.fbRamp;
-  const at = CTRL_INTERVAL - voice.ctrlCount;
+  const factor = voice.oversample.factor;
+  const at = (CTRL_INTERVAL - voice.ctrlCount) * factor;
+  const rampStep = FEEDBACK_RAMP_STEP / factor;
   const filters = voice.opFilter;
   const draws = voice.noiseDraw;
   const sync = voice.sync;
@@ -3511,6 +3560,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const shape = sync.shape;
   if (shape.eligible !== 0) beginSyncShapeBlock(voice, squeezed);
   const direct = shape.direct, late = blep | shape.eligible, shapeNext = shape.next;
+  let lastWrap = -1;
   for (let s = 0; s < n; s++) {
     if (noisy !== 0) {
       for (let i = 3; i >= 0; i--) {
@@ -3530,7 +3580,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       let fb = fbAmt[i];
       if ((fbRamp & 1 << i) !== 0) {
         const f0 = fbFrom[i];
-        fb = f0 + (fb - f0) * ((at + s) * FEEDBACK_RAMP_STEP);
+        fb = f0 + (fb - f0) * ((at + s) * rampStep);
       }
       if (fb !== 0) {
         const y = (fb1[i] + fb2[i]) * 0.5;
@@ -3543,10 +3593,10 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       if ((direct & 1 << i) !== 0) v = shapeNext[i];
       else if ((squeezed & 1 << i) !== 0) {
         const pw = ph * width[i];
-        const k2 = kind[i];
+        const k = kind[i];
         if (pw >= 1) v = 0;
-        else if (k2 === KIND_SAW_D) v = pw * 2 - 1;
-        else if (k2 === KIND_SQUARE_D) v = pw < 0.5 ? 1 : -1;
+        else if (k === KIND_SAW_D) v = pw * 2 - 1;
+        else if (k === KIND_SQUARE_D) v = pw < 0.5 ? 1 : -1;
         else {
           const t = tables[i];
           const fi = pw * (t.length - 1);
@@ -3625,6 +3675,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         wrapped = (masters & 1 << m) !== 0 && phase[m] < phaseInc[m];
       }
       if (wrapped) {
+        lastWrap = s;
         sync.notePhase = notePhase;
         applySyncResets(voice);
       }
@@ -3635,7 +3686,23 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       const i = carriers[c];
       sig += out[i] * amp[i];
     }
-    sig *= gain;
+    sums[s] = sig * gain;
+  }
+  sync.notePhase = notePhase;
+  if (lastWrap !== n - 1 && (shape.eligible & ~direct) !== 0) dropSyncShapePending(voice);
+}
+function renderVoicePost(voice, outL, outR, off, n) {
+  const sums = voice.oversample.sums;
+  const f = voice.patch.filter;
+  const mode = f.mode;
+  const drive = voice.drive;
+  const driven = drive.on, driveSoft = drive.shape === DRIVE_SOFT, driveGain = drive.gain, driveBias = drive.bias, driveOffset = drive.offset, driveToned = drive.toned, driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
+  const slope24 = f.slope24;
+  let fade = voice.fade;
+  const fadeInc = voice.fadeInc;
+  for (let s = 0; s < n; s++) {
+    let sig = sums[s];
     if (driven) {
       let x = sig * driveGain + driveBias;
       if (driveSoft) x = x > 3 ? 1 : x < -3 ? -1 : x * (27 + x * x) / (27 + 9 * x * x);
@@ -3696,11 +3763,239 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   }
   if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
-  sync.notePhase = notePhase;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();
   }
+}
+function renderVoiceGeneric(voice, outL, outR, off, n) {
+  renderVoiceOperators(voice, n);
+  renderVoicePost(voice, outL, outR, off, n);
+}
+
+// packages/engine/src/inserts/advancedDriveConstants.ts
+var ADVANCED_DRIVE_NAME = "advanced-drive";
+var DRIVE_ROUTES = ["single", "serial", "parallel", "multiband", "mid-side"];
+var DRIVE_SHAPERS = [
+  "soft",
+  "hard",
+  "diode",
+  "tube",
+  "half-wave",
+  "full-wave",
+  "fold",
+  "crush"
+];
+var DRIVE_FILTERS = ["lowpass", "highpass", "bandpass", "notch", "peak"];
+var DRIVE_LFO_SHAPES = ["sine", "triangle", "square", "up", "down"];
+var DRIVE_DIVISIONS = {
+  "1/16": 0.25,
+  "1/8": 0.5,
+  "1/8D": 0.75,
+  "1/4": 1,
+  "1/2": 2,
+  "1/1": 4,
+  "2/1": 8
+};
+var ADVANCED_DRIVE_BOUNDS = {
+  drive: [-24, 36],
+  tone: [-12, 12],
+  pivot: [80, 6e3],
+  output: [-36, 12],
+  mix: [0, 1],
+  blend: [0, 1],
+  low: [40, 4e3],
+  high: [200, 16e3],
+  rate: [0.01, 20],
+  attack: [1, 500],
+  release: [10, 2e3],
+  sensitivity: [-24, 36]
+};
+var ADVANCED_DRIVE_DEFAULTS = {
+  drive: 0,
+  tone: 0,
+  pivot: 500,
+  output: 0,
+  mix: 1,
+  blend: 0.5,
+  low: 200,
+  high: 2e3,
+  rate: 0.25,
+  attack: 10,
+  release: 180,
+  sensitivity: 0
+};
+var DRIVE_STAGE_BOUNDS = {
+  amount: [0, 1],
+  bias: [-1, 1],
+  level: [-24, 24],
+  frequency: [20, 2e4],
+  resonance: [0.5, 12],
+  peak: [-18, 18],
+  envAmount: [-1, 1],
+  envBias: [-1, 1],
+  envCutoff: [-5, 5],
+  lfoAmount: [-1, 1],
+  lfoBias: [-1, 1],
+  lfoCutoff: [-5, 5]
+};
+var DRIVE_STAGE_DEFAULTS = {
+  amount: 0.25,
+  bias: 0,
+  level: 0,
+  frequency: 12e3,
+  resonance: Math.SQRT1_2,
+  peak: 0,
+  envAmount: 0,
+  envBias: 0,
+  envCutoff: 0,
+  lfoAmount: 0,
+  lfoBias: 0,
+  lfoCutoff: 0
+};
+var DRIVE_DSP = {
+  stages: 3,
+  oversample: 2,
+  firLength: 65,
+  firCutoff: 0.235,
+  smoothSeconds: 0.02,
+  transitionSeconds: 8e-3,
+  controlStride: 16,
+  dcHz: 8,
+  maxFrequencyRatio: 0.45,
+  dbDivisor: 20,
+  ms: 1e3,
+  secondsPerMinute: 60,
+  defaultTempo: 120,
+  crossoverRatio: 1.25,
+  driveScale: 30,
+  crushBits: 16,
+  crushRange: 14,
+  tubeEven: 0.18,
+  diodeKnee: 0.65,
+  silence: 1e-12,
+  maxInternal: 64
+};
+var DRIVE_ROUTE_IDS = {
+  single: 0,
+  serial: 1,
+  parallel: 2,
+  multiband: 3,
+  midSide: 4
+};
+var DRIVE_LFO_IDS = { sine: 0, triangle: 1, square: 2, up: 3, down: 4 };
+var DRIVE_MATH = { decimal: 10, half: 0.5, blackmanA: 0.42, blackmanB: 0.08, four: 4 };
+var DRIVE_CROSSOVER = { filters: 11, pair: 4, allpassStart: 8, dryLow: 9 };
+
+// packages/engine/src/worklet/advancedDrive/driveOversample.ts
+function coefficients() {
+  const h = new Float64Array(DRIVE_DSP.firLength);
+  const center = (h.length - 1) / 2;
+  let sum = 0;
+  for (let i = 0; i < h.length; i++) {
+    const x = i - center;
+    const sinc = x === 0 ? 2 * DRIVE_DSP.firCutoff : Math.sin(2 * Math.PI * DRIVE_DSP.firCutoff * x) / (Math.PI * x);
+    const window = DRIVE_MATH.blackmanA - DRIVE_MATH.half * Math.cos(2 * Math.PI * i / (h.length - 1)) + DRIVE_MATH.blackmanB * Math.cos(DRIVE_MATH.four * Math.PI * i / (h.length - 1));
+    h[i] = sinc * window;
+    sum += h[i];
+  }
+  for (let i = 0; i < h.length; i++) h[i] /= sum;
+  return h;
+}
+var FIR = coefficients();
+var DriveFir = class {
+  constructor() {
+    this.buffer = new Float64Array(FIR.length);
+    this.cursor = 0;
+    this.input = this.output = NaN;
+  }
+  /** Filters `input` into `output`. */
+  tick() {
+    this.buffer[this.cursor] = this.input;
+    let y = 0, j = this.cursor;
+    for (let i = 0; i < FIR.length; i++) {
+      y += FIR[i] * this.buffer[j];
+      if (--j < 0) j = FIR.length - 1;
+    }
+    if (++this.cursor === FIR.length) this.cursor = 0;
+    this.output = y;
+  }
+};
+
+// packages/engine/src/worklet/fm/voiceOversample.ts
+var OVERSAMPLE_TAPS = FIR.length;
+var OVERSAMPLE_HALF = OVERSAMPLE_TAPS - 1 >> 1;
+var VoiceOversample = class {
+  constructor() {
+    this.allowed = true;
+    this.factor = 1;
+    this.sums = new Float64Array(SYNC_OVERSAMPLE * CTRL_INTERVAL_LONG);
+    this.ring = new Float64Array(2 * OVERSAMPLE_TAPS);
+    this.at = 0;
+  }
+};
+function patchOversamples(patch) {
+  let synced = false;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const op = patch.ops[i];
+    if (op.wave === WAVE.NOISE || op.feedback !== 0) return false;
+    if (op.sync !== "off") synced = true;
+  }
+  return synced;
+}
+function startVoiceOversample(voice, patch) {
+  const os = voice.oversample;
+  os.factor = os.allowed && patchOversamples(patch) ? SYNC_OVERSAMPLE : 1;
+  const rate = voice.sr * os.factor;
+  if (rate !== voice.opRate) {
+    for (let i = 0; i < OPERATOR_COUNT; i++) {
+      const filter = voice.opFilter[i];
+      filter.lpHz = filter.hpHz = NaN;
+    }
+  }
+  voice.opRate = rate;
+  os.ring.fill(0);
+  os.at = 0;
+}
+function decimateVoiceSums(os, n) {
+  const h = FIR;
+  const ring = os.ring, sums = os.sums;
+  let at = os.at;
+  for (let s = 0; s < n; s++) {
+    const even = sums[SYNC_OVERSAMPLE * s];
+    ring[at] = even;
+    ring[at + OVERSAMPLE_TAPS] = even;
+    if (++at === OVERSAMPLE_TAPS) at = 0;
+    const last = at + OVERSAMPLE_TAPS - 1;
+    let y = h[OVERSAMPLE_HALF] * ring[at + OVERSAMPLE_HALF];
+    for (let k = 0; k < OVERSAMPLE_HALF; k++) y += h[k] * (ring[at + k] + ring[last - k]);
+    const odd = sums[SYNC_OVERSAMPLE * s + 1];
+    ring[at] = odd;
+    ring[at + OVERSAMPLE_TAPS] = odd;
+    if (++at === OVERSAMPLE_TAPS) at = 0;
+    sums[s] = y;
+  }
+  os.at = at;
+}
+function anyVoiceOversampled(voices) {
+  for (let i = 0; i < voices.length; i++) {
+    if (voices[i].active && voices[i].oversample.factor !== 1) return true;
+  }
+  return false;
+}
+function oversampleQuiet(os) {
+  if (os.factor === 1) return true;
+  const ring = os.ring;
+  for (let k = 0; k < OVERSAMPLE_TAPS; k++) {
+    const v = ring[k];
+    if (v > DORMANT_AMP || v < -DORMANT_AMP) return false;
+  }
+  return true;
+}
+function renderVoiceOversampled(voice, outL, outR, off, n) {
+  renderVoiceOperators(voice, n * SYNC_OVERSAMPLE);
+  decimateVoiceSums(voice.oversample, n);
+  renderVoicePost(voice, outL, outR, off, n);
 }
 
 // packages/engine/src/worklet/fm/voiceStepMod.ts
@@ -3772,6 +4067,7 @@ var Voice = class {
     this.glideSeconds = NaN;
     this.lfoLevel = this.lfo2Level = NaN;
     this.sr = sampleRate2;
+    this.opRate = sampleRate2;
     this.random = random;
     this.partControls = partControls;
     this.opFreq = new Float64Array(4);
@@ -3806,6 +4102,7 @@ var Voice = class {
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
     this.sync = new VoiceSync();
+    this.oversample = new VoiceOversample();
     this.noiseSeed = randomSeed32(random);
     this.active = false;
     this.gate = false;
@@ -3860,26 +4157,26 @@ var Voice = class {
     return x / 2147483647 - 1;
   }
   /**
-   * Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17).
+   * Bind a patch, its prebuilt wavetables (at the part's rate, or twice it
+   * for a note that takes it: windsor#656) and the step's offsets (windsor#17).
    * Called on note-on, once the part has written the note's `note`,
    * `velocity`, `detune`, `pan` and `glideFrom` into the voice: no double is
    * passed to a call V8 may not inline (windsor#233, windsor#270), and an
    * options object would allocate one per note-on.
    */
-  start(patch, waveSets, voiceId, stepMod) {
+  start(patch, waves, voiceId, stepMod) {
     this.patch = patch;
+    startVoiceOversample(this, patch);
+    const sets = this.oversample.factor === 1 ? waves.sets : waves.sets2x;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const note = this.note;
     this.voiceId = voiceId;
-    this.active = true;
-    this.gate = true;
+    this.active = this.gate = true;
     this.fade = 1;
     this.fadeInc = 0;
-    this.age = 0;
-    this.ctrlCount = 0;
-    this.mod = 0;
-    this.glideSeconds = 0;
+    this.age = this.ctrlCount = 0;
+    this.mod = this.glideSeconds = 0;
     this.pitchTarget = note;
     const glideFrom = this.glideFrom;
     this.pitchCur = glideFrom === glideFrom ? glideFrom : note;
@@ -3899,9 +4196,9 @@ var Voice = class {
       this.ampInc[i] = 0;
       this.ampBreak[i] = 0;
       this.kind[i] = waveKind(op.wave);
-      this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
-      this.ampEnv[i].configure(op.env, this.sr);
+      this.mips[i] = sets[i];
+      this.tables[i] = sets[i] ? sets[i][0] : null;
+      this.ampEnv[i].configure(op.env, this.opRate);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
       this.opFilter[i].reset();
@@ -3935,10 +4232,12 @@ var Voice = class {
    * audibly -- acceptable while designing a sound, which is why `liveRetune`
    * is off by default and a part keeps the click-free note-on binding.
    * `slotTargets` is the part's slot map: a target a song lane moves keeps
-   * the lane's value across the rebind (windsor#346).
+   * the lane's value across the rebind (windsor#346). The voice keeps its
+   * rate, and reads the new patch's tables at it (windsor#656).
    */
-  rebind(patch, waveSets, slotTargets) {
+  rebind(patch, waves, slotTargets) {
     this.patch = patch;
+    const sets = this.oversample.factor === 1 ? waves.sets : waves.sets2x;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const keyOffset = (this.note - 60) / 12;
@@ -3948,9 +4247,9 @@ var Voice = class {
       const wasPulse = this.kind[i] === KIND_PULSE;
       this.kind[i] = waveKind(op.wave);
       if (wasPulse !== (this.kind[i] === KIND_PULSE)) switched |= 1 << i;
-      this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
-      this.ampEnv[i].configure(op.env, this.sr);
+      this.mips[i] = sets[i];
+      this.tables[i] = sets[i] ? sets[i][0] : null;
+      this.ampEnv[i].configure(op.env, this.opRate);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
     }
     this.bindConstants(patch);
@@ -4016,7 +4315,7 @@ var Voice = class {
   }
   /** Dormant (#547): the part may skip this gated voice's work (`voiceQuiet.ts`). */
   get dormant() {
-    return voiceDormant(this);
+    return voiceDormant(this) && oversampleQuiet(this.oversample);
   }
   /**
    * After a render: a released voice ends once nothing is left to hear
@@ -4028,7 +4327,7 @@ var Voice = class {
    */
   settle(quantumEnd) {
     if (this.gate || this.fadeInc !== 0) return;
-    if (voiceFinished(this)) this.active = false;
+    if (this.finished) this.active = false;
     else if (quantumEnd && voiceHoldsEndLevel(this)) this.steal();
   }
   /** A voice that is fading out is no longer available, but still sounding. */
@@ -4037,7 +4336,7 @@ var Voice = class {
   }
   /** Nothing left to hear: carriers ended, ramps at ~0, filter quiet (`voiceQuiet.ts`, windsor#7). */
   get finished() {
-    return voiceFinished(this);
+    return voiceFinished(this) && oversampleQuiet(this.oversample);
   }
   /**
    * Control-rate update, `voiceControl.js`: envelopes, LFOs, glide, ramps,
@@ -4058,11 +4357,13 @@ var Voice = class {
    * Render `n` samples into the part's stereo accumulators starting at `off`:
    * the fixed-index kernel (`voiceKernel.js`) when the bound patch can take it
    * exactly, else the generic loop (`voiceRender.js`). Both are the same
-   * arithmetic in the same order; #548 says why the bits agree.
+   * arithmetic in the same order; #548 says why the bits agree. A note at
+   * twice the rate takes the generic passes around its decimator (windsor#656).
    */
   render(outL, outR, off, n) {
     if (this.kernel) renderVoiceKernel(this, outL, outR, off, n);
-    else renderVoiceGeneric(this, outL, outR, off, n);
+    else if (this.oversample.factor === 1) renderVoiceGeneric(this, outL, outR, off, n);
+    else renderVoiceOversampled(this, outL, outR, off, n);
   }
 };
 
@@ -4168,6 +4469,23 @@ function allocateVoice(voices, maxVoices, dormancy) {
   return last;
 }
 
+// packages/engine/src/worklet/fm/partWaveSets.ts
+var PartWaveSets = class {
+  constructor() {
+    this.sets = [null, null, null, null];
+    this.sets2x = [null, null, null, null];
+  }
+  /** The sets for `patch` at `rate`, and at twice it when `twice`. */
+  rebuild(patch, rate, twice) {
+    for (let i = 0; i < OPERATOR_COUNT; i++) {
+      const op = patch.ops[i];
+      const none = op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D;
+      this.sets[i] = none ? null : getMips(op.wave, rate, patch.tone, op.userPartials);
+      this.sets2x[i] = none || !twice ? null : getMips(op.wave, SYNC_OVERSAMPLE * rate, patch.tone, op.userPartials, rate);
+    }
+  }
+};
+
 // packages/engine/src/worklet/fm/fmProcessor.ts
 var NOTE_IN_NOTE = 0, NOTE_IN_VELOCITY = 1, NOTE_IN_MOD = 2, NOTE_IN_COUNT = 3;
 var FmPartProcessor = class extends AudioWorkletProcessor {
@@ -4203,8 +4521,10 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.slideIn = false;
     this.stepModIn = null;
     this.voices = buildVoicePool(this, maxVoices, sampleRate);
+    this.syncOversample = opts.syncOversample !== false;
+    for (const v of this.voices) v.oversample.allowed = this.syncOversample;
     this.patch = compileMacros(normalisePatch(opts.patch));
-    this.waveSets = [null, null, null, null];
+    this.waves = new PartWaveSets();
     this.rebuildWaves();
     this.events = new EventQueue();
     this.lastNote = NaN;
@@ -4221,16 +4541,15 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     }
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
+  /**
+   * The patch's wave sets, at a patch message, never in a render. The sets
+   * at twice the rate (windsor#656) are built while a note of this patch
+   * would take it, or a sounding voice at it may rebind to this patch.
+   */
   rebuildWaves() {
     const p = this.patch;
-    for (let i = 0; i < 4; i++) {
-      const op = p.ops[i];
-      if (op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D) {
-        this.waveSets[i] = null;
-      } else {
-        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials);
-      }
-    }
+    const twice = this.syncOversample && (patchOversamples(p) || anyVoiceOversampled(this.voices));
+    this.waves.rebuild(p, sampleRate, twice);
   }
   onMessage(msg) {
     switch (msg.type) {
@@ -4239,7 +4558,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.rebuildWaves();
         if (this.liveRetune) {
           const slots = this.slotTargets;
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waves, slots);
         }
         break;
       }
@@ -4335,7 +4654,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
       v.detune = detune;
       v.pan = pan;
       v.glideFrom = glideFrom;
-      v.start(p, this.waveSets, id, this.stepModIn);
+      v.start(p, this.waves, id, this.stepModIn);
       v.mod = mod;
       v.keyed = true;
     }

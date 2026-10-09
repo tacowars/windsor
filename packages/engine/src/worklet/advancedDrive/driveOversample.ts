@@ -3,6 +3,9 @@
  * A sample passes through fields (`input` in, `output` out), never as an
  * argument or a return, which V8 boxes across a call it does not inline
  * (worklet rule 2). Pinned by inserts/advancedDriveAllocation.test.ts.
+ * Its taps are shared, not restated, by the FM part's synced voice at twice
+ * the rate (windsor#656, `fm/voiceOversample.ts`), which decimates through
+ * the same design.
  */
 import { DRIVE_DSP as C, DRIVE_MATH as M } from '../../inserts/advancedDriveConstants';
 function coefficients(): Float64Array {
@@ -48,3 +51,5 @@ export class DriveFir {
     this.output = y;
   }
 }
+/** The 65-tap Blackman-windowed sinc, cutoff 0.235 of the doubled rate (`DRIVE_DSP`). */
+export { FIR as DRIVE_OVERSAMPLE_FIR };

@@ -75,6 +75,57 @@ describe('the wave tables', () => {
     expect(waveKind(WAVE.PULSE)).toBe(KIND_PULSE);
   });
 
+  describe('at twice the rate, for a synced note (windsor#656)', () => {
+    /** A table's harmonic `h`, read from `TABLE_SIZE` points at its own stride. */
+    const harmonicOf = (t: Float32Array, h: number): number => {
+      const n = t.length - 1;
+      let acc = 0;
+      for (let k = 0; k < n; k++) acc += t[k]! * Math.sin((2 * Math.PI * h * k) / n);
+      return (2 * acc) / n;
+    };
+
+    it('build a set of their own, once, keyed by the rate', () => {
+      const twice = getMips(WAVE.SAW, 96000, 1, null, 48000);
+      expect(twice).not.toBe(getMips(WAVE.SAW, 48000, 1, null));
+      expect(getMips(WAVE.SAW, 96000, 1, null, 48000)).toBe(twice);
+      expect(getMips(WAVE.PULSE, 96000, 1, null, 48000)).toBe(twice);
+    });
+
+    it('size each table by the same rule over the doubled rate’s harmonics', () => {
+      const sizes = getMips(WAVE.SAW, 96000, 1, null, 48000).map((t) => t.length - 1);
+      for (let k = 0; k < MIP_COUNT; k++) {
+        const harmonics = Math.min(
+          TABLE_SIZE / 2,
+          Math.floor(48000 / (MIP_BASE_HZ * 2 ** (k + 1))),
+        );
+        let want = TABLE_SIZE;
+        while (want < MIP_TABLE_RATIO * harmonics && want < TABLE_SIZE_MAX) want *= 2;
+        expect(sizes[k], `octave ${k}`).toBe(want);
+      }
+    });
+
+    it.each([
+      ['saw', WAVE.SAW, null],
+      ['square', WAVE.SQUARE, null],
+      ['triangle', WAVE.TRIANGLE, null],
+      ['user with no fundamental', WAVE.USER, [0, 0.5, 0.25, 0.1]],
+    ] as const)(
+      'play the %s’s harmonics at the part’s table’s level, not their own peak’s',
+      (_, wave, partials) => {
+        const user = partials ? [...partials] : null;
+        const once = getMips(wave, 48000, 1, user);
+        const twice = getMips(wave, 96000, 1, user, 48000);
+        const h = partials ? 2 : 1;
+        for (let k = 0; k < MIP_COUNT; k++) {
+          // An octave whose part's table holds none of it (past its Nyquist) has no level to keep.
+          const b = harmonicOf(once[k]!, h);
+          if (Math.abs(b) < 1e-6) continue;
+          expect(harmonicOf(twice[k]!, h) / b, `octave ${k}`).toBeCloseTo(1, 5);
+        }
+      },
+    );
+  });
+
   it('give PULSE the saw’s own tables, one copy in the cache (#55)', () => {
     expect(getMips(WAVE.PULSE, 48000, 1, null)).toBe(getMips(WAVE.SAW, 48000, 1, null));
     expect(getMips(WAVE.PULSE, 48000, 0.5, null)).toBe(getMips(WAVE.SAW, 48000, 0.5, null));

@@ -7,7 +7,9 @@ with a two-point polyBLEP at every edge, and a synced voice whose ratio
 is modulated keeps the fine control interval. The decisions are in
 `docs/log/2026-10-09-sync-direct-shape.md`. This note measures the build
 against the study's figures for A + D (decision 8). The 2× synced voice
-that takes it to the reference is windsor#656.
+that takes it to the reference is windsor#656, measured
+[below](#the-synced-voice-at-twice-the-rate-windsor656): −54.7 and −53.8
+dB, within 1.3 dB of the reference's top end, for about 200 ns a voice.
 
 **The build lands on the study's row.** On `lead-sync-sweep` the framed
 median goes from −32.0 to −36.8 dB at MIDI 72 and from −28.4 to −33.1 dB
@@ -154,6 +156,149 @@ figures to compare.
   lane on a synced Saw, switching on a reset, and every sample of the
   switched render is within 1e-5 of one of the two paths' own samples.
 
+## The synced voice at twice the rate (windsor#656)
+
+windsor#656 runs the direct shape inside a voice at twice the rate, the
+other half of candidate AB2 + D. Its decisions are in
+`docs/log/2026-10-09-sync-voice-at-2x.md`. This section measures it
+against the issue's decision 9, with `voice2x.mjs` and `interleaved2x.mjs`.
+
+| | |
+|---|---|
+| Machine | Apple M1, 8 cores, macOS 26.7.1 |
+| Runtime | Node 24.21.0 (V8), the bundle evaluated under Node through the study's `render.mjs` |
+| Backend | `packages/engine/src/worklet/generated/fm-processor.js` built on this branch (`built`), the same text with the part's `syncOversample` switch off (`built at 1×`), and the bundle at `origin/main` ca831a6, windsor#655's direct shape at the part's rate (`A + D`). The study's AB2 + D and its 16× reference are its own in-memory edits of the bundle at 9ea3051. A stand-in `AudioWorkletProcessor`, 128-frame quanta, seed 1. No Web Audio |
+| Load | other sessions shared the machine: load average 3.7 to 4.2 through the CPU runs |
+
+These are dev-machine readings, as above.
+
+### Framed alias, `lead-sync-sweep`
+
+| Variant | MIDI 72 median | MIDI 72 p90 | MIDI 84 median | MIDI 84 p90 |
+|---|---|---|---|---|
+| A + D (ca831a6) | −36.8 | −33.6 | −33.1 | −29.2 |
+| study AB2 + D | −54.7 | −41.2 | −53.9 | −44.4 |
+| **built** | **−54.7** | −40.0 | **−53.8** | −43.5 |
+
+- **Within 1 dB of the study's AB2 + D row**: to the tenth at MIDI 72, 0.1
+  dB short at 84. The issue's target holds.
+- **The p90** reads 0.9 to 1.2 dB above the study's. The p90 is the sweep's
+  movement inside a frame, not alias, as the study explains; the medians
+  separate the variants.
+
+### Brightness against the 16× reference
+
+The study's synced carrier at ratio 3.7 (`fallbackPatches.mjs`), harmonic
+energy per band in dB against the reference's, as `checks.mjs` measures it.
+
+| Variant | Wave | Note | 0–5k | 5–10k | 10–15k | 15–20k |
+|---|---|---|---|---|---|---|
+| A + D (ca831a6) | saw | 72 | +0.53 | −0.02 | −1.34 | −3.23 |
+| study AB2 + D | saw | 72 | +0.27 | +0.13 | −0.19 | −0.66 |
+| **built** | saw | 72 | +0.59 | +0.45 | **+0.13** | **−0.35** |
+| A + D (ca831a6) | square | 72 | −0.07 | −0.57 | −2.31 | −3.84 |
+| study AB2 + D | square | 72 | −0.02 | −0.14 | −0.57 | −0.92 |
+| **built** | square | 72 | −0.03 | −0.16 | **−0.59** | **−0.93** |
+| A + D (ca831a6) | pulse | 72 | +0.53 | −0.32 | −1.19 | −2.79 |
+| study AB2 + D | pulse | 72 | +0.27 | +0.06 | −0.15 | −0.54 |
+| **built** | pulse | 72 | +0.59 | +0.38 | **+0.16** | **−0.22** |
+| A + D (ca831a6) | saw | 84 | +1.11 | +0.61 | −0.42 | −2.48 |
+| study AB2 + D | saw | 84 | +0.52 | +0.40 | +0.15 | −0.39 |
+| **built** | saw | 84 | +1.24 | +1.12 | **+0.87** | **+0.32** |
+| A + D (ca831a6) | square | 84 | −0.26 | −0.55 | −1.73 | −4.86 |
+| study AB2 + D | square | 84 | −0.07 | −0.15 | −0.43 | −1.25 |
+| **built** | square | 84 | −0.12 | −0.20 | **−0.48** | **−1.30** |
+| A + D (ca831a6) | pulse | 84 | +1.12 | +0.56 | −0.46 | −3.00 |
+| study AB2 + D | pulse | 84 | +0.53 | +0.39 | +0.20 | −0.55 |
+| **built** | pulse | 84 | +1.24 | +1.10 | **+0.92** | **+0.17** |
+
+- **Within 1.5 dB of the reference** at 10–15 and 15–20 kHz in every cell:
+  at most 1.30 dB under it (the square at MIDI 84) and 0.92 dB over it.
+- **The offset in the first band is the part's tables'.** The 2× tables
+  take the 48 kHz table's level (record, decision 5), so the built Saw and
+  Pulse keep A + D's offset there, +0.6 and +1.2 dB, where the study's AB2,
+  normalised at 96 kHz, read +0.3 and +0.5. Relative to its own first band
+  the built voice loses 0.8 to 1.2 dB at 15–20 kHz, as the study's AB2
+  does, to the tenth.
+
+### Level and delay against the part's rate
+
+`voice2x.mjs` section 3: the synced carrier at MIDI 36, ratio 1, RMS over
+0.5 s from 0.1 s, the built voice's 16 samples of delay taken out.
+
+| Wave | RMS, built / built at 1× | dB |
+|---|---|---|
+| saw | 0.1392 / 0.1391 | +0.006 |
+| square | 0.2398 / 0.2397 | +0.004 |
+| pulse | 0.2208 / 0.2207 | +0.005 |
+
+Within 0.01 dB, against the issue's tolerance of 0.3 dB. The delay is tested, not
+measured here: `synth/fmProcessorOversample.test.ts` holds an unsynced
+Sine in a voice at twice the rate to the same note at 1× sixteen samples
+earlier, within 1e-5 of its level once held.
+
+### CPU
+
+`interleaved2x.mjs`: `interleaved.mjs`'s method, ns per 48 kHz sample of
+one voice, the median and interquartile range over 30 rounds of 5 s after
+two warm-ups, the nine runs interleaved and rotated. Each patch is
+`lead-sync-sweep` with every envelope at its peak: as shipped (drive and
+filter off) at MIDI 60; with the Acid ladder (cutoff 1.2 kHz, Reso 0.6) and
+the soft drive at gain 2, at MIDI 60; and as shipped, 16 notes at once
+(MIDI 48 to 63), the time over the 16 voices. Two runs.
+
+| Run | Run 1 | Run 2 | × A + D (run 1, run 2) |
+|---|---|---|---|
+| as shipped: A + D (ca831a6) | 94.7 (91.4–104.3) | 94.3 (91.2–101.3) | 1, 1 |
+| as shipped: built at 1× | 93.9 (91.2–100.5) | 94.3 (90.9–99.0) | 0.99, 1.00 |
+| **as shipped: built** | **199.1 (192.5–223.1)** | **201.9 (196.8–208.2)** | **2.10, 2.14** |
+| Acid + drive: A + D (ca831a6) | 473.9 (466.7–498.5) | 481.5 (467.0–496.5) | 1, 1 |
+| Acid + drive: built at 1× | 470.3 (463.9–506.8) | 471.2 (463.8–495.7) | 0.99, 0.98 |
+| **Acid + drive: built** | **574.5 (565.7–604.8)** | **650.3 (632.1–672.6)** | **1.21, 1.35** |
+| 16 voices: A + D (ca831a6) | 98.6 (90.2–107.1) | 94.2 (90.3–100.3) | 1, 1 |
+| 16 voices: built at 1× | 98.0 (93.6–104.6) | 99.4 (93.1–103.6) | 0.99, 1.05 |
+| **16 voices: built** | **205.8 (198.5–215.5)** | **245.9 (238.1–261.7)** | **2.09, 2.61** |
+
+- **One synced voice** costs about 200 ns a sample, as the study's AB2 + D
+  did (199 to 200 ns on its own runs), about twice the direct shape at the
+  part's rate.
+- **The drive and the ladder** cost what they cost at 1×: they run at the
+  part's rate after the decimator. The built voice adds 100 to 180 ns to
+  the Acid patch's 470, the same operators' and decimator's work as
+  without it; run 2's 650 sat under heavier load.
+- **16 voices** cost the same per voice as one, 206 and 246 ns: the second
+  run read every 16-voice row higher under the machine's load.
+- **The generic loop's split into two passes** costs nothing measurable:
+  built at 1× reads A + D's figures (0.98 to 1.05).
+
+### The wave sets at twice the rate
+
+`voice2x.mjs` section 4: a fresh build of one operator's set, as a patch
+message makes it (the cache emptied first, the 48 kHz set built before the
+96 kHz one, which reads its gains), the median of 20, and the set's size.
+
+| Wave | Set | Build, ms | KB |
+|---|---|---|---|
+| saw | 48 kHz | 1.23 | 184 |
+| saw | 96 kHz | 1.67 | 240 |
+| square | 48 kHz | 1.03 | 184 |
+| square | 96 kHz | 1.37 | 240 |
+| triangle | 48 kHz | 0.97 | 184 |
+| triangle | 96 kHz | 1.25 | 240 |
+| sine | 48 kHz | 0.08 | 96 |
+| sine | 96 kHz | 0.06 | 96 |
+
+- **A saw's set at 96 kHz** is 240 KB, 56 KB over the 48 kHz set's 184 KB
+  (windsor#650's figure): its octaves from the third up hold twice the
+  harmonics and so twice the samples, while the two lowest are already at
+  `TABLE_SIZE_MAX`. It builds in about 1.4 times the 48 kHz set's time.
+  windsor#650 read about 3 ms for the 48 kHz set; this machine read 1.0 to
+  1.2 ms in a warm process.
+- **A sine's** holds one harmonic at either rate, 2 048 samples an octave.
+- The sets at twice the rate are built only while the patch would play a
+  note at twice the rate, or a voice at it is sounding: a part with no
+  synced operator builds none.
+
 ## Commands
 
 From the repo root with Node 24, after `node scripts/build-worklets.mjs`.
@@ -161,11 +306,17 @@ From the repo root with Node 24, after `node scripts/build-worklets.mjs`.
 ```bash
 node docs/research/2026-10-09-sync-antialias-build/build.mjs          # framed and the table-path check, about 1 min
 node docs/research/2026-10-09-sync-antialias-build/interleaved.mjs    # CPU, about 2 min
+node docs/research/2026-10-09-sync-antialias-build/voice2x.mjs        # windsor#656: framed, brightness, level, tables, a few s
+node docs/research/2026-10-09-sync-antialias-build/interleaved2x.mjs  # windsor#656: CPU, under 1 min
 ```
 
-`--base <rev>` names the shipped bundle (9ea3051 by default).
+`--base <rev>` names the shipped bundle (9ea3051 by default); for the two
+windsor#656 scripts `--direct <rev>` names windsor#655's (ca831a6).
 
 | File | What it holds |
 |---|---|
 | `build.mjs` | the three bundles; the framed metric and the check against the table path |
 | `interleaved.mjs` | the CPU, the three bundles in one run |
+| `voice2x.mjs` | windsor#656: the framed metric, the brightness, the level against 1×, and the wave sets' build time and size |
+| `interleaved2x.mjs` | windsor#656: the CPU, three bundles over three patches in one run |
+| `voice2xBundles.mjs` | the edit that sets the built bundle at the part's rate |

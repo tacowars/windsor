@@ -303,6 +303,16 @@ const SYNC_BLEP_GAIN = 0.5;
  */
 const SYNC_SHAPE_MAX_INC = 0.5;
 
+/*
+ * The synced voice's rate (windsor#656, record `2026-10-09-sync-voice-at-2x`,
+ * `voiceOversample.ts`): a voice that plays a synced operator, with no fed
+ * and no Noise operator, renders its operators at this many times the part's
+ * rate and decimates their carrier sum through the drive oversampler's FIR
+ * before the drive. Its scratch holds the longest control block at this
+ * rate: a render call never spans more than `CTRL_INTERVAL_LONG` samples.
+ */
+const SYNC_OVERSAMPLE = 2;
+
 export {
   TABLE_SIZE,
   TABLE_MASK,
@@ -360,4 +370,5 @@ export {
   STEAL_STREAMED_RESERVE,
   SYNC_BLEP_GAIN,
   SYNC_SHAPE_MAX_INC,
+  SYNC_OVERSAMPLE,
 };

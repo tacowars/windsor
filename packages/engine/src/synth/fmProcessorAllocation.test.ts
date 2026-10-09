@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one probe rig over every scenario of the FM part, each a patch and its events beside the run that plays it; windsor#646's synced chain took it to 381 of 350 */
+/* eslint-disable max-lines -- one probe rig over every scenario of the FM part, each a patch and its events beside the run that plays it; windsor#646's synced chain and windsor#656's at twice the rate took it past 350 */
 /**
  * Worklet rules 2 and 7 for the FM part (windsor#233), measured on V8 rather
  * than read off the source: once its paths have run, it plays notes, holds a
@@ -325,6 +325,19 @@ function syncedPad(): Patch {
   return patch;
 }
 
+/**
+ * The synced pad at twice the rate (windsor#656): D a Sine, so no operator
+ * is Noise or fed and every note takes twice the rate, with D's own filters
+ * there too. The lanes' feedback on B turns on mid-note, which a note at
+ * twice the rate plays at it, and moves B between its shape and its table,
+ * taking a reset it kept back with it.
+ */
+function syncedPad2x(): Patch {
+  const patch = syncedPad();
+  patch.ops[3]!.wave = WAVE.SINE;
+  return patch;
+}
+
 /** The synced pad's lanes: both synced operators' ratios, and the direct shape's feedback, among the song lanes on every slot. */
 const SYNC_SLOTS = [
   'ops.2.ratio',
@@ -616,6 +629,23 @@ describe('the FM part on V8', () => {
       paths,
     };
     expectClean(probe(syncedPad(), 8, true, config, { voiceSlots: SYNC_SLOTS }));
+  }, 120_000);
+
+  it('plays the pad with a chain of synced operators at twice the rate while lanes move their ratios and a feedback, for 8 000 quanta without allocating or changing a field representation (windsor#656)', () => {
+    const patch = syncedPad2x();
+    // Twice the rate: a synced operator, and none Noise or fed.
+    expect(patch.ops.some((op) => op.sync !== 'off')).toBe(true);
+    expect(patch.ops.every((op) => op.wave !== WAVE.NOISE && op.feedback === 0)).toBe(true);
+    const paths: FmPartChangeConfig['paths'] = ['held', 'stolen', 'released', 'ended', 'silent'];
+    const config = {
+      events: PAD_EVENTS,
+      period: 6,
+      toggles: LANE_TOGGLES,
+      rest: 16,
+      idStride: 64,
+      paths,
+    };
+    expectClean(probe(patch, 8, true, config, { voiceSlots: SYNC_SLOTS }));
   }, 120_000);
 
   it('holds a note in the kernel while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {

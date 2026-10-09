@@ -174,10 +174,13 @@ function bindVoiceSync(voice: Voice, patch: Patch): void {
     if (shape !== SHAPE_NONE) eligible |= 1 << i;
     else if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
   }
-  // An operator newly sent late, corrected or on the direct shape, starts with nothing held.
+  // An operator newly sent late, corrected or on the direct shape, starts
+  // with nothing held and no reset kept from before (windsor#656).
   const fresh = (blep | eligible) & ~(s.blep | s.shape.eligible);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    if ((fresh & (1 << i)) !== 0) s.held[i] = s.after[i] = 0;
+    if ((fresh & (1 << i)) === 0) continue;
+    s.held[i] = s.after[i] = 0;
+    s.shape.reset[i] = NaN;
   }
   s.synced = placed;
   s.blep = blep;
@@ -217,12 +220,20 @@ function syncWaveAt(voice: Voice, i: number): void {
  * from the free-running phase just before the reset (its phase now less
  * the `d` of a sample it ran since) to phase 0. The polyBLEP's two halves
  * go onto the wave it holds and the one it reads next. A direct shape's
- * reset leaves its `d` for `syncShapeEdges`, which takes its step.
+ * reset leaves its `d` for `syncShapeEdges`, which takes its step. An
+ * operator the shape may take, on its table this call, keeps its `d` and
+ * the free-running phase before the reset, for a return to the shape at the
+ * next call (windsor#656); a reset an earlier sample kept is dropped first.
  */
 function applySyncResets(voice: Voice): void {
   const s = voice.sync;
   const phase = voice.phase;
   const phaseInc = voice.phaseInc;
+  const sh = s.shape;
+  const table = sh.eligible & ~sh.direct;
+  if (table !== 0) {
+    for (let i = 0; i < OPERATOR_COUNT; i++) if ((table & (1 << i)) !== 0) sh.reset[i] = NaN;
+  }
   for (let k = 0; k < s.count; k++) {
     const i = s.order[k];
     const m = s.master[i];
@@ -233,8 +244,12 @@ function applySyncResets(voice: Voice): void {
     const reset = d * phaseInc[i];
     const before = phase[i] - reset;
     phase[i] = reset;
-    // A direct shape's step is taken with its edges (`syncShapeEdges`).
-    if ((s.shape.direct & (1 << i)) !== 0) s.shape.reset[i] = d;
+    // A direct shape's step is taken with its edges (`syncShapeEdges`); one on
+    // its table keeps the reset for a return to the shape.
+    if ((sh.eligible & (1 << i)) !== 0) {
+      sh.reset[i] = d;
+      sh.left[i] = before;
+    }
     if ((s.blep & (1 << i)) === 0) continue;
     const mod = s.mod[i];
     SYNC_POINT[0] = mod - Math.floor(mod);

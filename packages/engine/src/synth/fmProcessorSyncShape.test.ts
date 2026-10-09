@@ -11,11 +11,15 @@
  * A note period of 128 samples (375 Hz at 48 kHz) puts every reset on the
  * same sample of each period, and on a control block's first sample, so a
  * switch lands on a reset: the worst place for one.
+ *
+ * Every render here is at the part's rate (`syncOversample: false`), where
+ * a sample is a control block's and the shape's own; the shape inside a
+ * voice at twice the rate (windsor#656) is `fmProcessorOversample.test.ts`'s.
  */
 import { describe, expect, it } from 'vitest';
 
 import { loadProcessor, render } from '../__fixtures__/workletHarness';
-import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
+import type { CreateOptions, ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
 import { FILTER_MODE, WAVE, makePatch } from '../patch/patch';
 import type { PartialOperator, Patch } from '../patch/patch';
 import { VOICE_TARGET_COUNT, VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
@@ -34,6 +38,9 @@ const STACK_TWO = 6;
 const SETTLED = 4 * PERIOD;
 
 const HELD = { attackTime: 0.001, decayTime: 0.01, sustainLevel: 1, peakLevel: 1 };
+
+/** Every voice at the part's rate (windsor#656). */
+const AT_1X: CreateOptions = { syncOversample: false };
 
 /** Operator A synced to the note, as `a` says, over `algorithm`; the rest silent; the filter off. */
 function synced(a: PartialOperator, algorithm = STACK_TWO, extra: Partial<Patch> = {}): Patch {
@@ -58,7 +65,7 @@ interface ShapeView {
 
 /** Operator A's bits after `blocks` blocks of one note: eligible, direct, corrected. */
 function bits(patch: Patch, blocks = 2, stepMod?: number[]): [number, number, number] {
-  const processor: ProcessorLike = loaded.create(patch, 1);
+  const processor: ProcessorLike = loaded.create(patch, 1, undefined, AT_1X);
   const on: ScheduledEvent = { type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0 };
   render(loaded, processor, blocks, [stepMod ? { ...on, stepMod } : on]);
   const { sync } = processor.voices[0] as unknown as ShapeView;
@@ -67,7 +74,7 @@ function bits(patch: Patch, blocks = 2, stepMod?: number[]): [number, number, nu
 
 /** The left channel of one held note. */
 function play(patch: Patch, blocks = 40, note = NOTE): Float32Array {
-  const processor = loaded.create(patch, 1);
+  const processor = loaded.create(patch, 1, undefined, AT_1X);
   const events: ScheduledEvent[] = [{ type: 'noteOn', id: 1, note, velocity: 1, frame: 0 }];
   return render(loaded, processor, blocks, events).samples.filter((_, k) => k % 2 === 0);
 }
@@ -111,7 +118,12 @@ describe('who takes the direct shape (windsor#655, decision 1)', () => {
   it('re-checks a Saw’s live width at each control block, under an LFO that squeezes it half the time', () => {
     // The LFO's positive half asks for a width over 1, which clamps to 1.
     const lfo = { rate: 20, amount: 0.5, toWidth: [0.3, 0, 0, 0] };
-    const processor = loaded.create(synced(SAW_A, STACK_TWO, { lfo: lfo as Patch['lfo'] }), 1);
+    const processor = loaded.create(
+      synced(SAW_A, STACK_TWO, { lfo: lfo as Patch['lfo'] }),
+      1,
+      undefined,
+      AT_1X,
+    );
     const seen = new Set<string>();
     processor.inbox({ type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0 });
     for (let b = 0; b < 40; b++) {
@@ -140,6 +152,7 @@ describe('a switch to the table path and back (windsor#655, decision 1)', () => 
    */
   function run(from: number, to: number): { x: Float32Array; direct: number[] } {
     const processor = loaded.create(SAW, 1, undefined, {
+      ...AT_1X,
       voiceSlots: ['ops.0.feedback'],
       controlIntervals: { long: loaded.ctrlInterval },
     });
@@ -263,6 +276,7 @@ describe('past Nyquist, the table path (windsor#655, SYNC_SHAPE_MAX_INC)', () =>
   /** The left channel, and A's direct bit each block, with a ratio lane an octave up over `[from, to)`. */
   function run(patch: Patch, from: number, to: number): { x: Float32Array; direct: number[] } {
     const processor = loaded.create(patch, 1, undefined, {
+      ...AT_1X,
       voiceSlots: ['ops.0.ratio'],
       controlIntervals: { long: loaded.ctrlInterval },
     });
@@ -293,14 +307,11 @@ describe('past Nyquist, the table path (windsor#655, SYNC_SHAPE_MAX_INC)', () =>
     const shape = run(synced(SAW_12), BLOCKS, BLOCKS).x;
     // The same lane on the table path; A is not eligible there, so it sounds a sample early.
     const table = run(onTable(SAW_12), 10, 20).x;
-    // The first sample the shape sends back is its wave at the phase the
-    // block's opening reset left, without the half of that reset's step the
-    // table path never took: any entry on a reset does so. It stays within
-    // the naive Saw's own level, `g·π/2`, `g` the one-harmonic table's peak.
-    const back = 20 * BLOCK + 1;
-    expect(Math.abs(switched.x[back]!)).toBeLessThanOrEqual(peak(table) * (Math.PI / 2) * 1.0001);
+    // The return lands on the block's opening reset, which the table path
+    // took uncorrected: the shape takes both halves of its step back
+    // (windsor#656), so the first sample it sends back is the shape's too.
+    // Every sample is one path's or the other's.
     for (let n = SETTLED; n < switched.x.length; n++) {
-      if (n === back) continue;
       const nearest = Math.min(
         Math.abs(switched.x[n]! - shape[n]!),
         Math.abs(switched.x[n]! - table[n - 1]!),

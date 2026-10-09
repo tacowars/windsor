@@ -276,6 +276,45 @@ describe('beginSyncShapeBlock', () => {
     }
   });
 
+  /** An eligible Saw on operator A at `inc`, on its table last block, with a reset kept (`d`, `left`) or none. */
+  function entering(inc: number, d = NaN, left = 0): InstanceType<typeof VoiceSync> {
+    const sync = new VoiceSync();
+    sync.shape.eligible = 1;
+    sync.shape.kind[0] = SHAPE_SAW;
+    sync.shape.reset[0] = d;
+    sync.shape.left[0] = left;
+    sync.held[0] = 0.1;
+    const voice = {
+      sync,
+      fbTo: Float32Array.of(0, 0, 0, 0),
+      fbRamp: 0,
+      phaseInc: Float64Array.of(inc, 0, 0, 0),
+      tables: [getMips(WAVE.SAW, 48000, 1, null)[5]!, null, null, null],
+      phase: Float64Array.of(d === d ? d * inc : 0.25, 0, 0, 0),
+      width: Float32Array.of(1, 1, 1, 1),
+    } as unknown as Voice;
+    beginSyncShapeBlock(voice, 0);
+    return sync;
+  }
+
+  it('reads the table for an increment at or below 0, which the forward edge walk cannot follow (windsor#656)', () => {
+    expect(entering(0.01).shape.direct).toBe(1);
+    for (const inc of [-0.1, -0.01, 0]) expect(entering(inc).shape.direct, `${inc}`).toBe(0);
+  });
+
+  it('takes both halves of a reset it kept on its table when it returns on the next sample (windsor#656)', () => {
+    // The free-running phase 0.6 before a reset 0.3 of a sample before the next: a rise of g·π·0.6.
+    const sync = entering(0.01, 0.3, 0.6);
+    const step = sync.shape.gain[0]! * Math.PI * 0.6;
+    expect(sync.shape.direct).toBe(1);
+    expect(sync.held[0]).toBeCloseTo(0.1 + step * 0.3 * 0.3 * SYNC_BLEP_GAIN, 12);
+    expect(sync.after[0]).toBeCloseTo(step * 0.7 * 0.7 * SYNC_BLEP_GAIN, 12);
+    expect(sync.shape.reset[0]).toBeNaN();
+    // Without one kept, it enters with nothing added.
+    const plain = entering(0.01);
+    expect([plain.held[0], plain.after[0]]).toEqual([0.1, 0]);
+  });
+
   it('leaves the shape for a feedback or a squeeze, dropping what the next wave owes', () => {
     const t = getMips(WAVE.SAW, 48000, 1, null)[5]!;
     expect([block(t).shape.direct, block(t).after[0]]).toEqual([1, 0.25]);
