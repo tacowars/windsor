@@ -22,9 +22,17 @@ import {
   LOOP_LOOP,
   LOOP_TRIGGER,
 } from './modeIds';
+import { makeMacro } from '../../patch/patch';
 import { normalisePatch } from './patchNormalise';
+import { compileMacros } from './voiceMacros';
 import { CONTROL_INTERVALS, controlInterval, controlIntervalTable } from './voiceControlInterval';
-import { VOICE_TARGET_COUNT } from './voiceTargetTables';
+import {
+  VOICE_TARGET_COUNT,
+  VT_MACRO_BASE,
+  VT_OP_BASE,
+  VT_OP_RATIO,
+  VT_OP_STRIDE,
+} from './voiceTargetTables';
 import { layoutVoiceTargets } from './voiceTargets';
 
 const SR = 48000;
@@ -55,6 +63,7 @@ function voiceOf({ op, ...input }: Record<string, unknown> = {}): Voice {
   return {
     patch,
     liveValues,
+    partOffsets: new Float64Array(VOICE_TARGET_COUNT),
     fbRamp: 0,
     ampEnv: patch.ops.map((op) => envelope(op.env)),
     pitchEnv: envelope(patch.pitchEnv),
@@ -161,8 +170,6 @@ describe('controlInterval (windsor#326)', () => {
     ['toPitch', { toPitch: 0.5 }, {}],
     ['an operator level', { toOp: [0, 0, 0.5, 0] }, {}],
     ['an operator width', { toWidth: [0, 0.5, 0, 0] }, {}],
-    // An operator ratio (windsor#646) follows the LFO-on-pitch rule.
-    ['an operator ratio', { toRatio: [0, 0, 0, 0.5] }, {}],
     ['the filter', {}, { mode: FILT_LP }],
   ])('reads fine for an LFO at 8 Hz on %s, and long at 7.99 Hz', (_name, target, filter) => {
     for (const second of [false, true]) {
@@ -207,6 +214,41 @@ describe('controlInterval (windsor#326)', () => {
     const voice = voiceOf();
     voice.fbRamp = 0b0100;
     expect(controlInterval(voice)).toBe(FINE);
+  });
+
+  it('reads fine while an LFO’s ratio depth is not 0, at any rate, shape or amount (windsor#655)', () => {
+    for (const second of [false, true]) {
+      const slow = { shape: LFO_TRI, rate: 0.25, amount: 0, toRatio: [0, 0, 0, 0.5] };
+      expect(controlInterval(voiceOf({ [second ? 'lfo2' : 'lfo']: slow }))).toBe(FINE);
+      const none = { ...slow, amount: 1, toRatio: [0, 0, 0, 0] };
+      expect(controlInterval(voiceOf({ [second ? 'lfo2' : 'lfo']: none }))).toBe(LONG);
+    }
+  });
+
+  it('reads fine while a song lane moves an operator’s ratio, directly or through a macro (windsor#655)', () => {
+    const voice = voiceOf();
+    const ratio = VT_OP_BASE + 2 * VT_OP_STRIDE + VT_OP_RATIO;
+    voice.partOffsets[ratio] = 0.25;
+    expect(controlInterval(voice)).toBe(FINE);
+    voice.partOffsets[ratio] = 0;
+    // A lane on another row of the operator is not one on its ratio.
+    voice.partOffsets[ratio - 1] = 0.25;
+    expect(controlInterval(voice)).toBe(LONG);
+    for (const [target, interval] of [
+      ['ops.1.ratio', FINE],
+      ['ops.1.level', LONG],
+    ] as const) {
+      const mapped = voiceOf();
+      mapped.patch = compileMacros(
+        normalisePatch({
+          ops: [0, 1, 2, 3].map(() => ({ env: SLOW })),
+          macros: [makeMacro({ mappings: [{ target, min: 1, max: 4 }] })],
+        } as PatchInput),
+      );
+      expect(controlInterval(mapped), target).toBe(LONG);
+      mapped.partOffsets[VT_MACRO_BASE] = 0.1;
+      expect(controlInterval(mapped), target).toBe(interval);
+    }
   });
 
   it('takes its table: a long interval equal to the fine one, or another floor', () => {

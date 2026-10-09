@@ -20,11 +20,16 @@
  * that the sample before can be corrected, a corrected operator sends its
  * wave on a sample late, to every carrier it modulates and to the carrier
  * sum, while its feedback taps keep the raw wave. Only the Sine, Triangle
- * and User waves are corrected. The Saw, Square and Pulse take the reset
- * uncorrected and undelayed, as the deliberately aliasing waves (Saw D,
- * Square D, Sine 4bit, Sine 8bit) do: their tables' own edge sits at phase
- * 0, where a reset lands, so a step read from the table misses most of the
- * jump (research `2026-10-09-operator-hard-sync`). A synced Noise
+ * and User waves are corrected: the table read is at the table's own length
+ * (windsor#650 sized each octave's). A Saw, Square or Pulse that nothing
+ * modulates, in a patch at Tone 1, takes the direct shape instead
+ * (windsor#655, `voiceSyncShape.ts`), its edges and its reset smoothed
+ * there, and is sent late through the same delay on its shape or its
+ * table; any other takes the reset uncorrected and undelayed, as the
+ * deliberately aliasing waves (Saw D, Square D, Sine 4bit, Sine 8bit) do:
+ * their tables' own edge sits at phase 0, where a reset lands, so a step
+ * read from the table misses most of the jump (research
+ * `2026-10-09-operator-hard-sync`). A synced Noise
  * operator's draw has no phase, so its sync does nothing; a Noise operator
  * as a master syncs by its phase accumulator, which the generic loop
  * advances like any other operator's.
@@ -34,17 +39,18 @@
  * the generic loop tests the masters' wraps itself and calls
  * `applySyncResets` only on a sample where one wrapped. Allocation free,
  * and no double crosses a call: the wave reads pass through `SYNC_POINT`.
- * `voiceSync.test.ts` pins the binding and the chain order;
+ * `voiceSync.test.ts` pins the binding, the chain order and the reset's step;
  * `synth/fmProcessorSync.test.ts` the render; `fmProcessorAllocation.test.ts`
  * the allocation.
  */
 
 import type { Patch } from '../../patch/patch';
 import type { Voice } from './voice';
-import { SYNC_BLEP_GAIN, TABLE_SIZE } from './fmConstants';
+import { SYNC_BLEP_GAIN } from './fmConstants';
 import type { OpSync } from './patchDefaults';
 import { OPERATOR_COUNT, OP_SYNC_OPERATORS } from './patchDefaults';
 import { WAVE } from './waveIds';
+import { SHAPE_NONE, SyncShape, syncShapeKind } from './voiceSyncShape';
 import { KIND_NOISE, KIND_TABLE } from './waveTables';
 
 /** A master in `VoiceSync.master`: none, an operator's index, or the note. */
@@ -56,11 +62,11 @@ const SYNC_NOTE_BIT = 1 << SYNC_NOTE;
 /** A wave read's phase in, its value out: no double crosses `syncWaveAt` (windsor#233). */
 const SYNC_POINT = new Float64Array(1);
 
-/** One voice's sync state: what the bound patch syncs, the note's phase, and the polyBLEP's. */
+/** One voice's sync state: what the bound patch syncs, the note's phase, the polyBLEP's and the direct shape's. */
 class VoiceSync {
   /** A bit per synced operator. */
   synced: number;
-  /** A bit per synced operator whose reset is corrected, and so sent a sample late. */
+  /** A bit per synced operator whose reset is corrected, and so sent a sample late; the direct shape's are `shape.eligible`. */
   blep: number;
   /** A bit per master: an operator's own bit, `SYNC_NOTE_BIT` for the note. */
   masters: number;
@@ -74,10 +80,12 @@ class VoiceSync {
   noteInc: number;
   /** Each corrected operator's phase modulation this sample, which its step is read at. */
   mod: Float64Array;
-  /** Each corrected operator's wave from the sample before, with the correction that sample owes. */
+  /** Each corrected or direct-shape operator's wave from the sample before, with the correction that sample owes. */
   held: Float64Array;
-  /** The correction each corrected operator's next wave owes, taken off as it is held. */
+  /** The correction each such operator's next wave owes, taken off as it is held. */
   after: Float64Array;
+  /** The synced Saw, Square and Pulse's direct shape (windsor#655, `voiceSyncShape.ts`). */
+  shape: SyncShape;
 
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value.
@@ -93,6 +101,7 @@ class VoiceSync {
     this.mod = new Float64Array(OPERATOR_COUNT);
     this.held = new Float64Array(OPERATOR_COUNT);
     this.after = new Float64Array(OPERATOR_COUNT);
+    this.shape = new SyncShape();
   }
 
   /** A note from rest: the note's phase at 0 and nothing held. A legato retarget keeps both. */
@@ -100,6 +109,7 @@ class VoiceSync {
     this.notePhase = 0;
     this.held.fill(0);
     this.after.fill(0);
+    this.shape.start();
   }
 }
 
@@ -123,8 +133,9 @@ function syncCorrected(kind: number, wave: number): boolean {
  * The bound patch's sync onto the voice, after `kind` is set: each
  * operator's master, the bits, and the chain order (an operator after the
  * one it follows; an operator in a cycle, which the normaliser already
- * turned off, would be left unsynced). An operator newly corrected starts
- * with nothing held. Called by `bindVoiceConstants` at a note-on, a rebind
+ * turned off, would be left unsynced). A synced Saw, Square or Pulse the
+ * direct shape takes (`syncShapeKind`) is not corrected. An operator newly
+ * corrected or on the shape starts with nothing held. Called by `bindVoiceConstants` at a note-on, a rebind
  * and a retarget. Allocates nothing.
  */
 function bindVoiceSync(voice: Voice, patch: Patch): void {
@@ -150,6 +161,7 @@ function bindVoiceSync(voice: Voice, patch: Patch): void {
     }
   }
   let blep = 0;
+  let eligible = 0;
   let masters = 0;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     if ((placed & (1 << i)) === 0) {
@@ -157,14 +169,20 @@ function bindVoiceSync(voice: Voice, patch: Patch): void {
       continue;
     }
     masters |= 1 << master[i];
-    if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
+    const shape = syncShapeKind(voice, patch, i);
+    s.shape.kind[i] = shape;
+    if (shape !== SHAPE_NONE) eligible |= 1 << i;
+    else if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
   }
-  const fresh = blep & ~s.blep;
+  // An operator newly sent late, corrected or on the direct shape, starts with nothing held.
+  const fresh = (blep | eligible) & ~(s.blep | s.shape.eligible);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     if ((fresh & (1 << i)) !== 0) s.held[i] = s.after[i] = 0;
   }
   s.synced = placed;
   s.blep = blep;
+  s.shape.eligible = eligible;
+  s.shape.direct &= eligible;
   s.masters = masters;
   s.count = count;
 }
@@ -183,7 +201,8 @@ function syncWaveAt(voice: Voice, i: number): void {
     return;
   }
   const t = voice.tables[i]!;
-  const fi = x * TABLE_SIZE;
+  // Each octave's table is sized to its harmonics (#650): read at its own length.
+  const fi = x * (t.length - 1);
   const i0 = fi | 0;
   const s0 = t[i0];
   SYNC_POINT[0] = s0 + (t[i0 + 1] - s0) * (fi - i0);
@@ -197,7 +216,8 @@ function syncWaveAt(voice: Voice, i: number): void {
  * step is taken at the reset instant, at this sample's phase modulation:
  * from the free-running phase just before the reset (its phase now less
  * the `d` of a sample it ran since) to phase 0. The polyBLEP's two halves
- * go onto the wave it holds and the one it reads next.
+ * go onto the wave it holds and the one it reads next. A direct shape's
+ * reset leaves its `d` for `syncShapeEdges`, which takes its step.
  */
 function applySyncResets(voice: Voice): void {
   const s = voice.sync;
@@ -213,6 +233,8 @@ function applySyncResets(voice: Voice): void {
     const reset = d * phaseInc[i];
     const before = phase[i] - reset;
     phase[i] = reset;
+    // A direct shape's step is taken with its edges (`syncShapeEdges`).
+    if ((s.shape.direct & (1 << i)) !== 0) s.shape.reset[i] = d;
     if ((s.blep & (1 << i)) === 0) continue;
     const mod = s.mod[i];
     SYNC_POINT[0] = mod - Math.floor(mod);

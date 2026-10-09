@@ -88,11 +88,16 @@ over the restarted phase; FM on a master does not move its wraps. Chains
 operator renders through the generic loop, about 2.5–3.3× the kernel's
 cost per voice, and a corrected wave reaches what it feeds a sample late.
 A synced Noise operator does nothing. A two-sample polyBLEP smooths the
-reset of a Sine, Triangle or User wave by 12–20 dB; the Saw, Square and
-Pulse take it uncorrected, as Saw D does, pending tacowars's listen
-(`docs/research/2026-10-09-operator-hard-sync/`): judge a bright synced
-saw high up by ear. Factory examples: `lead-sync-sweep`,
-`lead-sync-detune`.
+reset of a Sine, Triangle or User wave by 12–20 dB
+(`docs/research/2026-10-09-operator-hard-sync/`). A synced Saw, Square or
+Pulse that nothing modulates in its algorithm (a silent modulator counts),
+in a patch at Tone 1, with no feedback and a Saw or Square at width 1,
+computes its wave directly with a polyBLEP at every edge (windsor#655,
+record `2026-10-09-sync-direct-shape`): about 5 dB less alias on
+`lead-sync-sweep`, its peak 15 % under the table's at the same harmonics.
+Any other synced Saw, Square or Pulse takes the reset uncorrected, as Saw D
+does. A voice whose ratio an LFO or a lane moves keeps the fine control
+interval. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,

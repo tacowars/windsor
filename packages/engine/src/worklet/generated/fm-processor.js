@@ -2168,6 +2168,133 @@ function renderVoiceLadder(voice, outL, outR, off, n) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceSyncShape.ts
+var SHAPE_NONE = -1, SHAPE_SAW = 0, SHAPE_SQUARE = 1, SHAPE_PULSE = 2;
+var HALF_PI = Math.PI / 2;
+var SQUARE_DUTY = 1 / 2;
+var SyncShape = class {
+  constructor() {
+    this.eligible = 0;
+    this.direct = 0;
+    this.kind = new Int32Array(OPERATOR_COUNT).fill(SHAPE_NONE);
+    this.gain = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.table = [null, null, null, null];
+    this.prev = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.next = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.reset = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.gain.fill(0);
+    this.prev.fill(0);
+    this.next.fill(0);
+  }
+  /** A note from rest: every eligible operator enters the shape afresh at its first block. */
+  start() {
+    this.direct = 0;
+    this.reset.fill(NaN);
+  }
+};
+function syncShapeKind(voice, patch, i) {
+  const alg = ALGORITHMS[patch.algorithm] ?? ALGORITHMS[0];
+  if (alg.mods[i].length !== 0 || patch.tone !== 1) return SHAPE_NONE;
+  const kind = voice.kind[i];
+  if (kind === KIND_PULSE) return SHAPE_PULSE;
+  if (kind !== KIND_TABLE) return SHAPE_NONE;
+  const wave = patch.ops[i].wave;
+  return wave === WAVE.SAW ? SHAPE_SAW : wave === WAVE.SQUARE ? SHAPE_SQUARE : SHAPE_NONE;
+}
+function refreshGain(sh, t, i) {
+  if (sh.table[i] === t) return;
+  sh.table[i] = t;
+  const stride = (t.length - 1) / TABLE_SIZE;
+  let acc = 0;
+  for (let k = 0; k < TABLE_SIZE; k++) acc += t[k * stride] * SIN_TAB[k];
+  sh.gain[i] = 2 * acc / TABLE_SIZE;
+}
+function readNext(voice, sh, i) {
+  let p = voice.phase[i];
+  p -= Math.floor(p);
+  sh.prev[i] = p;
+  const g = sh.gain[i];
+  const k = sh.kind[i];
+  if (k === SHAPE_SAW) sh.next[i] = g * HALF_PI * (1 - 2 * p);
+  else if (k === SHAPE_SQUARE)
+    sh.next[i] = p < SQUARE_DUTY ? g * HALF_PI * SQUARE_DUTY : -g * HALF_PI * SQUARE_DUTY;
+  else {
+    const w = voice.width[i];
+    sh.next[i] = p < 1 - w ? g * Math.PI * w : g * Math.PI * (w - 1);
+  }
+}
+function beginSyncShapeBlock(voice, squeezed) {
+  const sh = voice.sync.shape;
+  const fbTo = voice.fbTo;
+  let direct = 0;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const bit = 1 << i;
+    if ((sh.eligible & bit) === 0 || fbTo[i] !== 0 || (voice.fbRamp & bit) !== 0) continue;
+    if (sh.kind[i] !== SHAPE_PULSE && (squeezed & bit) !== 0) continue;
+    direct |= bit;
+  }
+  const after = voice.sync.after;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const bit = 1 << i;
+    if ((sh.direct & bit) !== 0 && (direct & bit) === 0) after[i] = 0;
+    if ((direct & bit) === 0) continue;
+    if ((sh.direct & bit) === 0) sh.reset[i] = NaN;
+    refreshGain(sh, voice.tables[i], i);
+    readNext(voice, sh, i);
+  }
+  sh.direct = direct;
+}
+function syncShapeEdges(voice) {
+  const sh = voice.sync.shape;
+  const direct = sh.direct;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((direct & 1 << i) === 0) continue;
+    const inc = voice.phaseInc[i];
+    const p0 = sh.prev[i];
+    const g = sh.gain[i];
+    const k = sh.kind[i];
+    const d = sh.reset[i];
+    const isReset = d === d;
+    const end = isReset ? p0 + (1 - d) * inc : p0 + inc;
+    const duty = k === SHAPE_SAW ? -1 : k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - voice.width[i];
+    const jump = k === SHAPE_SQUARE ? g * HALF_PI : g * Math.PI;
+    let hold = 0;
+    let owe = 0;
+    for (let x = Math.floor(p0) + 1; isReset ? x < end : x <= end; x++) {
+      const dd = 1 - (x - p0) / inc;
+      const e = 1 - dd;
+      hold += jump * dd * dd;
+      owe += jump * e * e;
+    }
+    if (duty >= 0) {
+      for (let x = Math.floor(p0 - duty) + 1 + duty; isReset ? x < end : x <= end; x++) {
+        const dd = 1 - (x - p0) / inc;
+        const e = 1 - dd;
+        hold -= jump * dd * dd;
+        owe -= jump * e * e;
+      }
+    }
+    if (isReset) {
+      let x = end - Math.floor(end);
+      if (x === 0) x = 1;
+      const h = k === SHAPE_SAW ? g * Math.PI * x : x <= duty || duty === 0 ? 0 : jump;
+      const e = 1 - d;
+      hold += h * d * d;
+      owe += h * e * e;
+      if (duty > 0 && duty <= d * inc) {
+        const dd = d - duty / inc;
+        const f = 1 - dd;
+        hold -= jump * dd * dd;
+        owe -= jump * f * f;
+      }
+      sh.reset[i] = NaN;
+    }
+    voice.sync.held[i] += hold * SYNC_BLEP_GAIN;
+    voice.sync.after[i] += owe * SYNC_BLEP_GAIN;
+    readNext(voice, sh, i);
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceSync.ts
 var SYNC_NONE = -1;
 var SYNC_NOTE = OPERATOR_COUNT;
@@ -2187,12 +2314,14 @@ var VoiceSync = class {
     this.mod = new Float64Array(OPERATOR_COUNT);
     this.held = new Float64Array(OPERATOR_COUNT);
     this.after = new Float64Array(OPERATOR_COUNT);
+    this.shape = new SyncShape();
   }
   /** A note from rest: the note's phase at 0 and nothing held. A legato retarget keeps both. */
   start() {
     this.notePhase = 0;
     this.held.fill(0);
     this.after.fill(0);
+    this.shape.start();
   }
 };
 function syncMasterOf(sync) {
@@ -2226,6 +2355,7 @@ function bindVoiceSync(voice, patch) {
     }
   }
   let blep = 0;
+  let eligible = 0;
   let masters = 0;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     if ((placed & 1 << i) === 0) {
@@ -2233,14 +2363,19 @@ function bindVoiceSync(voice, patch) {
       continue;
     }
     masters |= 1 << master[i];
-    if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
+    const shape = syncShapeKind(voice, patch, i);
+    s.shape.kind[i] = shape;
+    if (shape !== SHAPE_NONE) eligible |= 1 << i;
+    else if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
   }
-  const fresh = blep & ~s.blep;
+  const fresh = (blep | eligible) & ~(s.blep | s.shape.eligible);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     if ((fresh & 1 << i) !== 0) s.held[i] = s.after[i] = 0;
   }
   s.synced = placed;
   s.blep = blep;
+  s.shape.eligible = eligible;
+  s.shape.direct &= eligible;
   s.masters = masters;
   s.count = count;
 }
@@ -2252,7 +2387,7 @@ function syncWaveAt(voice, i) {
     return;
   }
   const t = voice.tables[i];
-  const fi = x * TABLE_SIZE;
+  const fi = x * (t.length - 1);
   const i0 = fi | 0;
   const s0 = t[i0];
   SYNC_POINT[0] = s0 + (t[i0 + 1] - s0) * (fi - i0);
@@ -2271,6 +2406,7 @@ function applySyncResets(voice) {
     const reset = d * phaseInc[i];
     const before = phase[i] - reset;
     phase[i] = reset;
+    if ((s.shape.direct & 1 << i) !== 0) s.shape.reset[i] = d;
     if ((s.blep & 1 << i) === 0) continue;
     const mod = s.mod[i];
     SYNC_POINT[0] = mod - Math.floor(mod);
@@ -2325,8 +2461,24 @@ function lfoFast(voice, second, table) {
   const f = patch.filter;
   return f.mode !== FILT_OFF && (second ? f.lfo2Amount : f.lfoAmount) !== 0;
 }
+function isRatioRow(code) {
+  const k = code - VT_OP_BASE;
+  return k >= 0 && k < OPERATOR_COUNT * VT_OP_STRIDE && k % VT_OP_STRIDE === VT_OP_RATIO;
+}
+function ratioModulated(voice) {
+  const patch = voice.patch;
+  const offsets = voice.partOffsets;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if (patch.lfo.toRatio[i] !== 0 || patch.lfo2.toRatio[i] !== 0) return true;
+    if (offsets[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_RATIO] !== 0) return true;
+  }
+  for (let j = 0; j < patch.macroMapCount; j++) {
+    if (isRatioRow(patch.macroMapTarget[j]) && offsets[patch.macroMapMacro[j]] !== 0) return true;
+  }
+  return false;
+}
 function controlInterval(voice, table = CONTROL_INTERVALS) {
-  if (voice.fbRamp !== 0) return table.fine;
+  if (voice.fbRamp !== 0 || ratioModulated(voice)) return table.fine;
   for (let i = 0; i < voice.ampEnv.length; i++) {
     if (envelopeFast(voice.ampEnv[i], true, table)) return table.fine;
   }
@@ -3334,6 +3486,9 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       squeezed |= bit;
     }
   }
+  const shape = sync.shape;
+  if (shape.eligible !== 0) beginSyncShapeBlock(voice, squeezed);
+  const direct = shape.direct, late = blep | shape.eligible, shapeNext = shape.next;
   for (let s = 0; s < n; s++) {
     if (noisy !== 0) {
       for (let i = 3; i >= 0; i--) {
@@ -3363,7 +3518,8 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       let ph = phase[i] + mod;
       ph -= Math.floor(ph);
       let v;
-      if ((squeezed & 1 << i) !== 0) {
+      if ((direct & 1 << i) !== 0) v = shapeNext[i];
+      else if ((squeezed & 1 << i) !== 0) {
         const pw = ph * width[i];
         const k2 = kind[i];
         if (pw >= 1) v = 0;
@@ -3415,11 +3571,11 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       }
       fb2[i] = fb1[i];
       fb1[i] = v * a;
-      if ((blep & 1 << i) !== 0) {
-        const late = syncHeld[i];
+      if ((late & 1 << i) !== 0) {
+        const held = syncHeld[i];
         syncHeld[i] = v - syncAfter[i];
         syncAfter[i] = 0;
-        v = late;
+        v = held;
       }
       if ((filtered & 1 << i) !== 0) {
         const filter = filters[i];
@@ -3450,6 +3606,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         sync.notePhase = notePhase;
         applySyncResets(voice);
       }
+      if (direct !== 0) syncShapeEdges(voice);
     }
     let sig = 0;
     for (let c = 0; c < nCar; c++) {

@@ -33,7 +33,11 @@
  * `applySyncResets`. A synced operator whose reset is corrected keeps its
  * phase modulation for that call and sends its wave a sample late, after
  * its feedback tap and before its own filters, with the polyBLEP's
- * correction taken off. A voice with no synced operator takes neither branch.
+ * correction taken off. A synced Saw, Square or Pulse on the direct shape
+ * (windsor#655, `voiceSyncShape.ts`) reads `shape.next` in place of its
+ * table, goes through the same delay, and has its edges found after the
+ * resets, once a sample (`syncShapeEdges`). A voice with no synced operator
+ * takes none of these branches.
  */
 
 import type { Voice } from './voice';
@@ -47,6 +51,7 @@ import {
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { renderVoiceLadder } from './voiceLadder';
 import { SYNC_NOTE_BIT, applySyncResets } from './voiceSync';
+import { beginSyncShapeBlock, syncShapeEdges } from './voiceSyncShape';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
@@ -148,6 +153,14 @@ function renderVoiceGeneric(
       squeezed |= bit;
     }
   }
+  // The synced Saw, Square and Pulse's direct shape (windsor#655): which
+  // take it this block, read from `shapeNext`; every eligible one, on its
+  // shape or its table, is sent late with the corrected waves.
+  const shape = sync.shape;
+  if (shape.eligible !== 0) beginSyncShapeBlock(voice, squeezed);
+  const direct = shape.direct,
+    late = blep | shape.eligible,
+    shapeNext = shape.next;
 
   for (let s = 0; s < n; s++) {
     // The sample's noise draws, D..A whatever the algorithm's order
@@ -189,7 +202,8 @@ function renderVoiceGeneric(
       ph -= Math.floor(ph);
 
       let v: number;
-      if ((squeezed & (1 << i)) !== 0) {
+      if ((direct & (1 << i)) !== 0) v = shapeNext[i];
+      else if ((squeezed & (1 << i)) !== 0) {
         // The wave runs at 1 / width through the first `width` of the period,
         // then holds 0. Reading at exactly 1 would interpolate past the guard
         // sample, so the hold is its own branch.
@@ -250,11 +264,11 @@ function renderVoiceGeneric(
       fb1[i] = v * a;
       // A corrected synced operator sends the wave it held, a sample late, and
       // holds this one less the correction a reset left it (windsor#646).
-      if ((blep & (1 << i)) !== 0) {
-        const late = syncHeld[i];
+      if ((late & (1 << i)) !== 0) {
+        const held = syncHeld[i];
         syncHeld[i] = v - syncAfter[i];
         syncAfter[i] = 0;
-        v = late;
+        v = held;
       }
       if ((filtered & (1 << i)) !== 0) {
         const filter = filters[i];
@@ -291,6 +305,7 @@ function renderVoiceGeneric(
         sync.notePhase = notePhase;
         applySyncResets(voice);
       }
+      if (direct !== 0) syncShapeEdges(voice);
     }
 
     let sig = 0;
