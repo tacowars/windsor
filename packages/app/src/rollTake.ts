@@ -8,10 +8,19 @@
  * - **Sources.** A note is held by its input source (the console
  *   `Keyboard`'s source key: a computer key, or one MIDI input's note) and
  *   its pitch, so two sources can hold one pitch at once; a release ends
- *   only its own source's note. Two such notes that overlap are settled by
- *   `mergeTake`, as any overlap is.
- * - **Onset.** A press lands in the region under it, at its local tick
- *   modulo the region's loop. A press in a gap is ignored: recording pauses.
+ *   only its own source's note. One source can hold one pitch twice: under
+ *   the console's Hold, `Keyboard.lift` drops a key without a note-off, so a
+ *   second press of it starts a second voice while the first still rings.
+ *   A press never ends a held note, then; each source and pitch keeps its
+ *   pending notes in press order, and a release ends the earliest (the
+ *   console sends one whenever a voice actually stops, and `MidiPerformer`
+ *   releases before it restarts a struck key). Notes that overlap are
+ *   settled by `mergeTake`, as any overlap is.
+ * - **Onset.** A press lands in the region the engine plays at its tick
+ *   (`regionState`: the transport tick modulo the song's length, or, in the
+ *   one ∞ region, the transport tick itself), at its local tick modulo the
+ *   region's loop. A press in a gap is ignored: recording pauses. Every tick
+ *   the take is given is the transport's, which never wraps.
  * - **Length and write are separate.** A held note grows with the ticks the
  *   take sees, up to its loop's end or its region's end, whichever is first,
  *   and stops there. A seek or a loop jump freezes it at the last tick it saw.
@@ -38,14 +47,12 @@
  * The regions are read once, at construction: any other song edit splits
  * the take (decision 8), so a take never outlives the regions it was given.
  */
-import type { RollNote, RollSequencerConfig } from '@windsor/engine';
-import { ROLL_NOTES_MAX } from '@windsor/engine';
+import type { Region, RollNote, RollSequencerConfig } from '@windsor/engine';
+import { isInfiniteRegion, regionState, ROLL_NOTES_MAX } from '@windsor/engine';
 import { settle } from './rollEdits';
 
-/** One region of the part in song ticks, with the loop of the roll it plays (resolved by the caller). */
-export interface TakeRegion {
-  readonly start: number;
-  readonly duration: number;
+/** One of the part's regions, as the engine reads it, with the loop of the roll it plays (resolved by the caller). */
+export interface TakeRegion extends Region {
   readonly loopTicks: number;
 }
 
@@ -72,7 +79,7 @@ interface Pending {
   readonly pitch: number;
   readonly velocity: number;
   readonly tick: number;
-  /** The song tick of the press. */
+  /** The transport tick of the press. */
   readonly onset: number;
   /** The most it can sound: to its loop's end or its region's end, whichever is first. */
   readonly limit: number;
@@ -84,14 +91,7 @@ interface Pending {
   fresh: boolean;
 }
 
-/** A held note's key: its source and its pitch (a number, so the first colon divides them). */
-const heldKey = (source: string, pitch: number): string => `${pitch}:${source}`;
-
-/** The index of the region holding song tick `songTick`, or −1 in a gap. */
-const regionAt = (regions: readonly TakeRegion[], songTick: number): number =>
-  regions.findIndex((r) => songTick >= r.start && songTick < r.start + r.duration);
-
-/** A note's length with its end at song tick `end`: at least 1, at most its limit. */
+/** A note's length with its end at transport tick `end`: at least 1, at most its limit. */
 const lengthTo = (note: Pending, end: number): number =>
   Math.max(1, Math.min(note.limit, end - note.onset));
 
@@ -106,28 +106,36 @@ function toRollNote(note: Pending, ticks: number): RollNote {
 
 /** One take: press, release and the playhead in, finished notes out per region. */
 export class RollTake {
-  /** Held notes by source and pitch (`heldKey`), in press order. */
-  private readonly pending = new Map<string, Pending>();
+  /** Held notes in press order; a source and pitch may appear more than once. */
+  private readonly pending: Pending[] = [];
   private readonly finished = new Map<number, RollNote[]>();
   private playhead = Number.NEGATIVE_INFINITY;
 
-  constructor(private readonly regions: readonly TakeRegion[]) {}
+  /** The take of a part playing `regions` in a song `songTicks` long. */
+  constructor(
+    private readonly songTicks: number,
+    private readonly regions: readonly TakeRegion[],
+  ) {}
 
   /**
-   * A key down from `source` at `songTick`, velocity 0..1. A pitch that
-   * source already holds is ended there first, as `MidiPerformer` restarts a
-   * struck key; another source's note at the pitch is left alone. A press in
-   * a gap records nothing.
+   * A key down from `source` at transport tick `songTick`, velocity 0..1. A
+   * note the source already holds at the pitch is left ringing (a second
+   * voice under Hold), as is another source's. A press in a gap records
+   * nothing.
    */
   press(source: string, pitch: number, velocity: number, songTick: number): void {
-    this.release(source, pitch, songTick);
-    const regionIndex = regionAt(this.regions, songTick);
-    const region = this.regions[regionIndex];
-    if (!region) return;
-    const local = songTick - region.start;
+    this.see(songTick);
+    const state = regionState(this.regions, this.songTicks, songTick);
+    if (!state.live) return;
+    const regionIndex = state.index;
+    const region = this.regions[regionIndex] as TakeRegion;
+    const local = state.localTick;
     const tick = local % region.loopTicks;
-    const limit = Math.min(region.loopTicks - tick, region.duration - local);
-    this.pending.set(heldKey(source, pitch), {
+    const toRegionEnd = isInfiniteRegion(this.regions, this.songTicks)
+      ? Number.POSITIVE_INFINITY
+      : region.duration - local;
+    const limit = Math.min(region.loopTicks - tick, toRegionEnd);
+    this.pending.push({
       source,
       regionIndex,
       pitch,
@@ -141,14 +149,17 @@ export class RollTake {
     });
   }
 
-  /** A key up from `source` at `songTick`: that source's note, if held, is finished there (or at its cut). */
+  /**
+   * A key up (or a voice stopped) from `source` at `songTick`: the earliest
+   * note that source holds at the pitch, if any, is finished there (or at
+   * its cut).
+   */
   release(source: string, pitch: number, songTick: number): void {
     this.see(songTick);
-    const key = heldKey(source, pitch);
-    const note = this.pending.get(key);
-    if (!note) return;
-    this.pending.delete(key);
-    this.finish(note, songTick);
+    const i = this.pending.findIndex((note) => note.source === source && note.pitch === pitch);
+    if (i < 0) return;
+    const [note] = this.pending.splice(i, 1);
+    this.finish(note as Pending, songTick);
   }
 
   /**
@@ -159,7 +170,7 @@ export class RollTake {
     if (songTick < this.playhead) this.jump(songTick);
     this.playhead = songTick;
     this.see(songTick);
-    for (const note of this.pending.values()) note.fresh = false;
+    for (const note of this.pending) note.fresh = false;
   }
 
   /**
@@ -171,19 +182,19 @@ export class RollTake {
    */
   cut(songTick: number): void {
     this.see(songTick);
-    for (const note of this.pending.values()) note.frozen ??= lengthNow(note);
+    for (const note of this.pending) note.frozen ??= lengthNow(note);
     this.playhead = Number.NEGATIVE_INFINITY;
   }
 
   /** The take's end (a stop, a part switch, Rec off): every held note is cut at `songTick` and finished. */
   end(songTick: number): void {
-    for (const note of this.pending.values()) this.finish(note, songTick);
-    this.pending.clear();
+    for (const note of this.pending) this.finish(note, songTick);
+    this.pending.length = 0;
   }
 
   /** The notes still pending, in press order, each with its length so far. */
   held(): HeldNote[] {
-    return [...this.pending.values()].map((note) => ({
+    return this.pending.map((note) => ({
       source: note.source,
       regionIndex: note.regionIndex,
       pitch: note.pitch,
@@ -204,12 +215,12 @@ export class RollTake {
 
   /** Every held note has now seen `songTick`. */
   private see(songTick: number): void {
-    for (const note of this.pending.values()) note.reach = Math.max(note.reach, songTick);
+    for (const note of this.pending) note.reach = Math.max(note.reach, songTick);
   }
 
   /** A jump back to `songTick`: freeze each note of the earlier pass at the last tick it saw. */
   private jump(songTick: number): void {
-    for (const note of this.pending.values()) {
+    for (const note of this.pending) {
       const newPass = note.fresh && note.onset <= songTick;
       if (newPass || note.frozen !== null) continue;
       note.frozen = lengthNow(note);

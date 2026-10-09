@@ -8,7 +8,8 @@ import { ROLL_NOTES_MAX } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 import { mergeTake, RollTake, type TakeRegion } from './rollTake';
 
-/** Region 0 at 96 looping 48 ticks and ending at 284 (inside its fourth loop); a gap; region 1 at 384. */
+/** In a 480-tick song: region 0 at 96 looping 48 ticks and ending at 284 (inside its fourth loop); a gap; region 1 at 384. */
+const SONG = 480;
 const REGIONS: TakeRegion[] = [
   { start: 96, duration: 188, loopTicks: 48 },
   { start: 384, duration: 96, loopTicks: 96 },
@@ -27,7 +28,7 @@ function play(take: RollTake, from: number, to: number): void {
 
 describe('RollTake', () => {
   it('stamps the onset at the region’s local tick, modulo its loop, and keeps velocity below 1', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 100);
     take.release(K, 60, 106);
     take.press(K, 62, 0.5, 96 + 50);
@@ -37,7 +38,7 @@ describe('RollTake', () => {
   });
 
   it('freezes a note at its loop’s end and hands it out only on release, past two whole loops', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 100);
     play(take, 100, 110);
     expect(take.held()).toEqual([
@@ -51,7 +52,7 @@ describe('RollTake', () => {
   });
 
   it('cuts a note at its region’s end and waits for its release', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 280);
     play(take, 280, 300);
     expect(take.held()[0]).toMatchObject({ tick: 40, ticks: 4 });
@@ -61,7 +62,7 @@ describe('RollTake', () => {
   });
 
   it('ignores a press in a gap and records again in the next region, handing notes to both', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 270);
     take.release(K, 60, 276);
     take.press(K, 64, 1, 300);
@@ -75,16 +76,32 @@ describe('RollTake', () => {
     ]);
   });
 
-  it('ends a held pitch struck again at the new press, as a struck key restarts', () => {
-    const take = new RollTake(REGIONS);
-    take.press(K, 60, 1, 100);
-    take.press(K, 60, 1, 106);
-    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 6, 60)] }]);
-    expect(take.held()).toMatchObject([{ tick: 10, pitch: 60 }]);
+  it('finds the region by the engine’s rule on the song’s second pass', () => {
+    const take = new RollTake(192, [{ start: 0, duration: 96, loopTicks: 96 }]);
+    take.press(K, 60, 1, 196);
+    take.release(K, 60, 200);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 4, 60)] }]);
+  });
+
+  it('runs the ∞ region on the transport tick, modulo its loop', () => {
+    const take = new RollTake(384, [{ start: 0, duration: 384, loopTicks: 48 }]);
+    take.press(K, 60, 1, 1000);
+    take.release(K, 60, 1002);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(1000 % 48, 2, 60)] }]);
+  });
+
+  it('under Hold, a re-press leaves the first note ringing; each release ends the earliest', () => {
+    const take = new RollTake(96, [{ start: 0, duration: 96, loopTicks: 96 }]);
+    take.press('q', 60, 1, 0);
+    take.press('q', 60, 1, 10);
+    expect(take.drain()).toEqual([]);
+    take.release('q', 60, 20);
+    take.release('q', 60, 30);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(0, 20, 60), n(10, 20, 60)] }]);
   });
 
   it('holds one pitch from two sources apart, each released by its own source', () => {
-    const take = new RollTake([{ start: 0, duration: 96, loopTicks: 96 }]);
+    const take = new RollTake(96, [{ start: 0, duration: 96, loopTicks: 96 }]);
     take.press('midi:a:60', 60, 1, 0);
     take.press('midi:b:60', 60, 1, 5);
     take.release('midi:a:60', 60, 10);
@@ -94,7 +111,7 @@ describe('RollTake', () => {
   });
 
   it('on a jump back, freezes every held note at the last tick seen, pending until released', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 100);
     play(take, 100, 130);
     // Pressed after the jump, before the playhead saw it: the new pass's note, not cut.
@@ -111,7 +128,7 @@ describe('RollTake', () => {
   });
 
   it('on a forward seek, cut() freezes every held note at the last tick heard, pending until released', () => {
-    const take = new RollTake([{ start: 0, duration: 384, loopTicks: 384 }]);
+    const take = new RollTake(384, [{ start: 0, duration: 384, loopTicks: 384 }]);
     take.press(K, 60, 1, 0);
     play(take, 0, 10);
     take.cut(10);
@@ -123,7 +140,7 @@ describe('RollTake', () => {
   });
 
   it('cut() leaves the take open: a later press still records', () => {
-    const take = new RollTake([{ start: 0, duration: 384, loopTicks: 384 }]);
+    const take = new RollTake(384, [{ start: 0, duration: 384, loopTicks: 384 }]);
     take.press(K, 60, 1, 0);
     play(take, 0, 10);
     take.cut(10);
@@ -136,7 +153,7 @@ describe('RollTake', () => {
   });
 
   it('end() cuts every growing note at its tick and finishes every pending one', () => {
-    const take = new RollTake(REGIONS);
+    const take = new RollTake(SONG, REGIONS);
     take.press(K, 60, 1, 100);
     play(take, 100, 120);
     take.advance(96);

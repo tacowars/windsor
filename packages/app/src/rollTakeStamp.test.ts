@@ -5,22 +5,49 @@ import { heardContextTime } from './rollTakeStamp';
 describe('heardContextTime', () => {
   it('maps the event through the output reading, which already includes the latency', () => {
     const output = { contextTime: 12.5, performanceTime: 4000 };
-    const at = heardContextTime(4030, { output, outputLatency: 0.02, currentTime: 13 });
+    const at = heardContextTime(4030, {
+      output,
+      outputLatency: 0.02,
+      currentTime: 13,
+      performanceNow: 4030,
+    });
     expect(at).toBeCloseTo(12.53, 9);
   });
 
   it('inverts the reading exactly: an event at its performance time was heard at its context time', () => {
     const output = { contextTime: 12.5, performanceTime: 4000 };
-    expect(heardContextTime(4000, { output, outputLatency: 0.02, currentTime: 13 })).toBe(12.5);
+    expect(
+      heardContextTime(4000, {
+        output,
+        outputLatency: 0.02,
+        currentTime: 13,
+        performanceNow: 4030,
+      }),
+    ).toBe(12.5);
   });
 
   it('falls back to the context clock with no reading, or a zero one', () => {
     for (const output of [undefined, {}, { contextTime: 0, performanceTime: 0 }]) {
-      const at = heardContextTime(4030, { output, outputLatency: 0.02, currentTime: 13 });
+      const at = heardContextTime(4030, {
+        output,
+        outputLatency: 0.02,
+        currentTime: 13,
+        performanceNow: 4030,
+      });
       expect(at).toBeCloseTo(12.98, 9);
     }
     expect(
-      heardContextTime(4030, { output: undefined, outputLatency: undefined, currentTime: 13 }),
+      heardContextTime(4030, {
+        output: undefined,
+        outputLatency: undefined,
+        currentTime: 13,
+        performanceNow: 4030,
+      }),
     ).toBe(13);
+  });
+
+  it('subtracts the event’s age in the fallback', () => {
+    const clock = { output: undefined, outputLatency: 0.02, currentTime: 13, performanceNow: 4100 };
+    expect(heardContextTime(4000, clock)).toBeCloseTo(13 - 0.02 - 0.1, 9);
   });
 });

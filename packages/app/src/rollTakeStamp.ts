@@ -11,7 +11,9 @@
  * so the output latency is already in it). Before the output has run, a
  * browser reports the pair missing or as zeros, and the stamp falls back to
  * the context's own clock, which renders ahead of what is heard by
- * `outputLatency`.
+ * `outputLatency`, less the event's age (`performance.now()` at handling
+ * minus its `timeStamp`), so a note handled late is still stamped when it
+ * was played.
  */
 
 const MS_PER_SECOND = 1000;
@@ -30,17 +32,20 @@ export interface StampClock {
   readonly outputLatency: number | undefined;
   /** `context.currentTime`, the fallback. */
   readonly currentTime: number;
+  /** `performance.now()` as the event is handled (ms), for the fallback's event age; passed in to keep this pure. */
+  readonly performanceNow: number;
 }
 
 /**
  * The context time heard at performance time `timeStamp` (ms):
  * `contextTime + (timeStamp − performanceTime) / 1000`, or, with no usable
- * output reading, `currentTime − outputLatency`.
+ * output reading, `currentTime − outputLatency − (performanceNow − timeStamp) / 1000`.
  */
 export function heardContextTime(timeStamp: number, clock: StampClock): number {
   const { contextTime, performanceTime } = clock.output ?? {};
   if (contextTime === undefined || !performanceTime) {
-    return clock.currentTime - (clock.outputLatency ?? 0);
+    const age = (clock.performanceNow - timeStamp) / MS_PER_SECOND;
+    return clock.currentTime - (clock.outputLatency ?? 0) - age;
   }
   return contextTime + (timeStamp - performanceTime) / MS_PER_SECOND;
 }
