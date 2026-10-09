@@ -7,6 +7,8 @@ var TABLE_SIZE = 1 << TABLE_BITS;
 var TABLE_MASK = TABLE_SIZE - 1;
 var MIP_COUNT = 12;
 var MIP_BASE_HZ = 16.352;
+var TABLE_SIZE_MAX = 1 << 14;
+var MIP_TABLE_RATIO = 22;
 var CTRL_INTERVAL = 32;
 var CTRL_INTERVAL_LONG = 128;
 var CTRL_LONG_MIN_SEGMENT_SECONDS = 0.1;
@@ -1270,6 +1272,57 @@ var Ladder = class {
   }
 };
 
+// packages/engine/src/worklet/fm/waveTableFft.ts
+var FFT_SIN = new Float32Array(TABLE_SIZE_MAX);
+for (let i = 0; i < TABLE_SIZE_MAX; i++) {
+  FFT_SIN[i] = Math.sin(2 * Math.PI * i / TABLE_SIZE_MAX);
+}
+var FFT_RE = new Float64Array(TABLE_SIZE_MAX);
+var FFT_IM = new Float64Array(TABLE_SIZE_MAX);
+function sineSeriesByFft(amp, maxH, size, t) {
+  const re = FFT_RE;
+  const im = FFT_IM;
+  re.fill(0, 0, size);
+  im.fill(0, 0, size);
+  for (let h = 1; h <= maxH; h++) re[h] = amp[h - 1];
+  for (let i = 1, j = 0; i < size; i++) {
+    let bit = size >> 1;
+    for (; (j & bit) !== 0; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      const r = re[i];
+      re[i] = re[j];
+      re[j] = r;
+      const m = im[i];
+      im[i] = im[j];
+      im[j] = m;
+    }
+  }
+  const stride = TABLE_SIZE_MAX / size;
+  const mask = size - 1;
+  const quarter = size >> 2;
+  for (let len = 2; len <= size; len <<= 1) {
+    const half = len >> 1;
+    const step = size / len;
+    for (let i = 0; i < size; i += len) {
+      for (let k = 0; k < half; k++) {
+        const idx = k * step;
+        const wr = FFT_SIN[(idx + quarter & mask) * stride];
+        const wi = FFT_SIN[idx * stride];
+        const a = i + k;
+        const b = a + half;
+        const tr = re[b] * wr - im[b] * wi;
+        const ti = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - tr;
+        im[b] = im[a] - ti;
+        re[a] += tr;
+        im[a] += ti;
+      }
+    }
+  }
+  for (let i = 0; i < size; i++) t[i] = im[i];
+}
+
 // packages/engine/src/worklet/fm/waveTables.ts
 var SIN_TAB = new Float32Array(TABLE_SIZE);
 for (let i = 0; i < TABLE_SIZE; i++) {
@@ -1310,26 +1363,33 @@ function buildMips(partials, sampleRate2, tone) {
     let maxH = Math.floor(nyquist / topHz);
     maxH = Math.min(maxH, maxPossible, partials.length);
     maxH = Math.max(1, Math.floor(maxH * tone));
-    const t = new Float32Array(TABLE_SIZE + 1);
-    for (let h = 1; h <= maxH; h++) {
-      const amp = partials[h - 1];
-      if (amp === 0) continue;
-      let idx = 0;
-      for (let i = 0; i < TABLE_SIZE; i++) {
-        t[i] += amp * SIN_TAB[idx];
-        idx = idx + h & TABLE_MASK;
+    let top = maxH;
+    while (top > 1 && partials[top - 1] === 0) top--;
+    let size = TABLE_SIZE;
+    while (size < MIP_TABLE_RATIO * top && size < TABLE_SIZE_MAX) size *= 2;
+    const t = new Float32Array(size + 1);
+    if (size > TABLE_SIZE) sineSeriesByFft(partials, maxH, size, t);
+    else {
+      for (let h = 1; h <= maxH; h++) {
+        const amp = partials[h - 1];
+        if (amp === 0) continue;
+        let idx = 0;
+        for (let i = 0; i < TABLE_SIZE; i++) {
+          t[i] += amp * SIN_TAB[idx];
+          idx = idx + h & TABLE_MASK;
+        }
       }
     }
     let peak = 0;
-    for (let i = 0; i < TABLE_SIZE; i++) {
+    for (let i = 0; i < size; i++) {
       const v = t[i] < 0 ? -t[i] : t[i];
       if (v > peak) peak = v;
     }
     if (peak > 1e-9) {
       const g = 1 / peak;
-      for (let i = 0; i < TABLE_SIZE; i++) t[i] *= g;
+      for (let i = 0; i < size; i++) t[i] *= g;
     }
-    t[TABLE_SIZE] = t[0];
+    t[size] = t[0];
     mips[k] = t;
   }
   return mips;
@@ -1337,7 +1397,7 @@ function buildMips(partials, sampleRate2, tone) {
 function quantiseMips(mips, levels) {
   for (let k = 0; k < mips.length; k++) {
     const t = mips[k];
-    for (let i = 0; i <= TABLE_SIZE; i++) {
+    for (let i = 0; i < t.length; i++) {
       t[i] = Math.round(t[i] * levels) / levels;
     }
   }
@@ -2726,6 +2786,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const modDC = liveC && liveD && (edges & EDGE_DC) !== 0;
   const carA = (carriers & 1) !== 0, carB = (carriers & 2) !== 0, carC = (carriers & 4) !== 0, carD = (carriers & 8) !== 0;
   const tA = tables[A], tB = tables[B], tC = tables[C], tD = tables[D];
+  const nA = tA === null ? 0 : tA.length - 1, nB = tB === null ? 0 : tB.length - 1, nC = tC === null ? 0 : tC.length - 1, nD = tD === null ? 0 : tD.length - 1;
   const fbA1 = fbTo[A], fbB1 = fbTo[B], fbC1 = fbTo[C], fbD1 = fbTo[D];
   const fbA0 = fbFrom[A], fbB0 = fbFrom[B], fbC0 = fbFrom[C], fbD0 = fbFrom[D];
   const fbRampA = (fbRamp & 1 << A) !== 0, fbRampB = (fbRamp & 1 << B) !== 0, fbRampC = (fbRamp & 1 << C) !== 0, fbRampD = (fbRamp & 1 << D) !== 0;
@@ -2764,14 +2825,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const pw = ph * wD;
         if (pw >= 1) v = 0;
         else if (kD === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nD;
           const i0 = fi | 0;
           const s0 = tD[i0];
           v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
         } else if (kD === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kD === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nD;
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
@@ -2780,11 +2841,11 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       else if (kD === KIND_PULSE) {
         let pd = ph + wD;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nD;
         const i0 = fi | 0;
         const s0 = tD[i0];
         const up = s0 + (tD[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nD;
         const d0 = fd | 0;
         const sd = tD[d0];
         v = up - (sd + (tD[d0 + 1] - sd) * (fd - d0));
@@ -2842,14 +2903,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const pw = ph * wC;
         if (pw >= 1) v = 0;
         else if (kC === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nC;
           const i0 = fi | 0;
           const s0 = tC[i0];
           v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
         } else if (kC === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kC === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nC;
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
@@ -2858,11 +2919,11 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       else if (kC === KIND_PULSE) {
         let pd = ph + wC;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nC;
         const i0 = fi | 0;
         const s0 = tC[i0];
         const up = s0 + (tC[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nC;
         const d0 = fd | 0;
         const sd = tC[d0];
         v = up - (sd + (tC[d0 + 1] - sd) * (fd - d0));
@@ -2921,14 +2982,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const pw = ph * wB;
         if (pw >= 1) v = 0;
         else if (kB === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nB;
           const i0 = fi | 0;
           const s0 = tB[i0];
           v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
         } else if (kB === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kB === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nB;
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
@@ -2937,11 +2998,11 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       else if (kB === KIND_PULSE) {
         let pd = ph + wB;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nB;
         const i0 = fi | 0;
         const s0 = tB[i0];
         const up = s0 + (tB[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nB;
         const d0 = fd | 0;
         const sd = tB[d0];
         v = up - (sd + (tB[d0 + 1] - sd) * (fd - d0));
@@ -3001,14 +3062,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const pw = ph * wA;
         if (pw >= 1) v = 0;
         else if (kA === KIND_TABLE) {
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * nA;
           const i0 = fi | 0;
           const s0 = tA[i0];
           v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
         } else if (kA === KIND_SAW_D) v = pw * 2 - 1;
         else v = pw < 0.5 ? 1 : -1;
       } else if (kA === KIND_TABLE) {
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nA;
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
@@ -3017,11 +3078,11 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       else if (kA === KIND_PULSE) {
         let pd = ph + wA;
         pd -= Math.floor(pd);
-        const fi = ph * TABLE_SIZE;
+        const fi = ph * nA;
         const i0 = fi | 0;
         const s0 = tA[i0];
         const up = s0 + (tA[i0 + 1] - s0) * (fi - i0);
-        const fd = pd * TABLE_SIZE;
+        const fd = pd * nA;
         const d0 = fd | 0;
         const sd = tA[d0];
         v = up - (sd + (tA[d0 + 1] - sd) * (fd - d0));
@@ -3310,7 +3371,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         else if (k2 === KIND_SQUARE_D) v = pw < 0.5 ? 1 : -1;
         else {
           const t = tables[i];
-          const fi = pw * TABLE_SIZE;
+          const fi = pw * (t.length - 1);
           const i0 = fi | 0;
           const s0 = t[i0];
           v = s0 + (t[i0 + 1] - s0) * (fi - i0);
@@ -3330,11 +3391,11 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
             const t = tables[i];
             let pd = ph + width[i];
             pd -= Math.floor(pd);
-            const fi = ph * TABLE_SIZE;
+            const fi = ph * (t.length - 1);
             const i0 = fi | 0;
             const s0 = t[i0];
             const up = s0 + (t[i0 + 1] - s0) * (fi - i0);
-            const fd = pd * TABLE_SIZE;
+            const fd = pd * (t.length - 1);
             const d0 = fd | 0;
             const sd = t[d0];
             const down = sd + (t[d0 + 1] - sd) * (fd - d0);
@@ -3343,7 +3404,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
           }
           default: {
             const t = tables[i];
-            const fi = ph * TABLE_SIZE;
+            const fi = ph * (t.length - 1);
             const i0 = fi | 0;
             const frac = fi - i0;
             const s0 = t[i0];
