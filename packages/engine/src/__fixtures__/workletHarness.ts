@@ -85,6 +85,8 @@ export interface CreateOptions {
   events?: ScheduledEvent[];
   /** The automation slots' map from the first block (`ProcessorOptions.voiceSlots`, windsor#346). */
   voiceSlots?: (string | null)[];
+  /** `false` renders every synced voice at the part's rate, as the part did before windsor#656. */
+  syncOversample?: boolean;
 }
 
 /** The worklet's own `Envelope`, for pinning a model of it (#620): the console's curve. */

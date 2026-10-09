@@ -97,7 +97,18 @@ record `2026-10-09-sync-direct-shape`): about 5 dB less alias on
 `lead-sync-sweep`, its peak 15 % under the table's at the same harmonics.
 Any other synced Saw, Square or Pulse takes the reset uncorrected, as Saw D
 does. A voice with a synced operator whose ratio an LFO or a lane moves
-keeps the fine control interval; an unsynced one follows the LFO rule. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
+keeps the fine control interval; an unsynced one follows the LFO rule.
+A voice with a synced operator and no fed or Noise operator renders its
+operators at twice the part's rate and decimates their sum before the
+drive and the filter (windsor#656, record `2026-10-09-sync-voice-at-2x`):
+`lead-sync-sweep`'s alias reaches the 16× reference (−54.7 and −53.8 dB at
+MIDI 72 and 84), its top end within 1.3 dB of it, for about twice the
+direct shape's CPU per voice (about 200 ns a sample on an M1 under Node).
+It sounds 16 samples (0.33 ms) behind the same patch at 1×; an operator
+sent late for its reset's correction is half a sample late there, not one. The rate is chosen at the note-on and kept for the note: a
+live edit or a lane that turns sync off or feedback on plays at the note's
+rate, and the next note takes the new one. A fed synced voice stays at the
+part's rate, since feedback sounds different at another rate. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,

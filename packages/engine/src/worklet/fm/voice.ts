@@ -1,10 +1,11 @@
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms cut fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
-/* eslint-disable max-lines -- one voice's whole state, every field declared and born here (rule 7); hard sync's three lines (windsor#646) took it to 354 of 350, its state a class of its own in voiceSync.ts */
+/* eslint-disable max-lines -- one voice's whole state, every field declared and born here (rule 7); hard sync (windsor#646) and the synced voice's rate (windsor#656) took it past 350, their state classes of their own in voiceSync.ts and voiceOversample.ts */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude ramps and their knots (windsor#301), width ramps, hard
  * sync (windsor#646), six
- * envelopes, two LFOs, each operator's own filters (windsor#362, windsor#590) and
+ * envelopes, two LFOs, each operator's own filters (windsor#362, windsor#590),
+ * the synced voice's rate and decimator (windsor#656) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), three filter stages (the third for the Formant
  * mode's three peaks, windsor#331), the Acid mode's ladder (windsor#573),
@@ -24,6 +25,7 @@
  */
 
 import type { Algorithm } from './algorithms';
+import type { PartWaveSets } from './partWaveSets';
 import type { WorkletPatch } from './patchNormalise';
 import { ALGORITHMS, ALG_ORDER } from './algorithms';
 import { Envelope, ST_IDLE } from './envelope';
@@ -39,6 +41,12 @@ import type { ControlIntervalTable } from './voiceControlInterval';
 import { renderVoiceKernel } from './voiceKernel';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
+import {
+  VoiceOversample,
+  oversampleQuiet,
+  renderVoiceOversampled,
+  startVoiceOversample,
+} from './voiceOversample';
 import { rebindStepMod, retargetStepMod, startStepMod } from './voiceStepMod';
 import { VoiceSync } from './voiceSync';
 import { VOICE_TARGET_COUNT } from './voiceTargetTables';
@@ -89,6 +97,10 @@ class Voice {
   drive: VoiceDrive;
   /** Hard sync (windsor#646): the bound patch's masters, the note's phase and the polyBLEP's state. */
   sync: VoiceSync;
+  /** The synced voice's rate (windsor#656): the factor this note took, and the decimator. */
+  oversample: VoiceOversample;
+  /** The operators' sample rate: `sr`, or twice it for a note that took twice the rate. */
+  opRate: number;
   noiseSeed: number;
   active: boolean;
   gate: boolean;
@@ -161,6 +173,10 @@ class Voice {
     this.glideSeconds = NaN;
     this.lfoLevel = this.lfo2Level = NaN;
     this.sr = sampleRate;
+    // The operators' rate (windsor#656) is the part's rate, or twice it: a
+    // rate as `sr` is, never NaN first, since each envelope's `sr` field
+    // takes it beside `sr` itself and must keep one representation.
+    this.opRate = sampleRate;
     this.random = random; // the processor's one source; see "Randomness" above
     this.partControls = partControls;
     // Control-rate scratch (windsor#233): each operator's frequency and the
@@ -213,6 +229,7 @@ class Voice {
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
     this.sync = new VoiceSync();
+    this.oversample = new VoiceOversample();
 
     this.noiseSeed = randomSeed32(random);
 
@@ -291,7 +308,8 @@ class Voice {
   }
 
   /**
-   * Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17).
+   * Bind a patch, its prebuilt wavetables (at the part's rate, or twice it
+   * for a note that takes it: windsor#656) and the step's offsets (windsor#17).
    * Called on note-on, once the part has written the note's `note`,
    * `velocity`, `detune`, `pan` and `glideFrom` into the voice: no double is
    * passed to a call V8 may not inline (windsor#233, windsor#270), and an
@@ -299,23 +317,22 @@ class Voice {
    */
   start(
     patch: WorkletPatch,
-    waveSets: (Float32Array[] | null)[],
+    waves: PartWaveSets,
     voiceId: number,
     stepMod: ArrayLike<number> | null | undefined,
   ): void {
     this.patch = patch;
+    startVoiceOversample(this, patch);
+    const sets = this.oversample.factor === 1 ? waves.sets : waves.sets2x;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const note = this.note;
     this.voiceId = voiceId;
-    this.active = true;
-    this.gate = true;
+    this.active = this.gate = true;
     this.fade = 1;
     this.fadeInc = 0;
-    this.age = 0;
-    this.ctrlCount = 0;
-    this.mod = 0;
-    this.glideSeconds = 0;
+    this.age = this.ctrlCount = 0;
+    this.mod = this.glideSeconds = 0;
 
     this.pitchTarget = note;
     const glideFrom = this.glideFrom;
@@ -341,10 +358,10 @@ class Voice {
       this.ampBreak[i] = 0;
 
       this.kind[i] = waveKind(op.wave);
-      this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
+      this.mips[i] = sets[i];
+      this.tables[i] = sets[i] ? sets[i]![0] : null;
 
-      this.ampEnv[i].configure(op.env, this.sr);
+      this.ampEnv[i].configure(op.env, this.opRate);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
       this.opFilter[i].reset();
@@ -387,10 +404,12 @@ class Voice {
    * audibly -- acceptable while designing a sound, which is why `liveRetune`
    * is off by default and a part keeps the click-free note-on binding.
    * `slotTargets` is the part's slot map: a target a song lane moves keeps
-   * the lane's value across the rebind (windsor#346).
+   * the lane's value across the rebind (windsor#346). The voice keeps its
+   * rate, and reads the new patch's tables at it (windsor#656).
    */
-  rebind(patch: WorkletPatch, waveSets: (Float32Array[] | null)[], slotTargets: Int32Array): void {
+  rebind(patch: WorkletPatch, waves: PartWaveSets, slotTargets: Int32Array): void {
     this.patch = patch;
+    const sets = this.oversample.factor === 1 ? waves.sets : waves.sets2x;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const keyOffset = (this.note - 60) / 12;
@@ -400,10 +419,10 @@ class Voice {
       const wasPulse = this.kind[i] === KIND_PULSE;
       this.kind[i] = waveKind(op.wave);
       if (wasPulse !== (this.kind[i] === KIND_PULSE)) switched |= 1 << i;
-      this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
+      this.mips[i] = sets[i];
+      this.tables[i] = sets[i] ? sets[i]![0] : null;
       // configure() swaps the parameter block and leaves the stage and value alone.
-      this.ampEnv[i].configure(op.env, this.sr);
+      this.ampEnv[i].configure(op.env, this.opRate);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
     }
     this.bindConstants(patch);
@@ -489,7 +508,7 @@ class Voice {
 
   /** Dormant (#547): the part may skip this gated voice's work (`voiceQuiet.ts`). */
   get dormant(): boolean {
-    return voiceDormant(this);
+    return voiceDormant(this) && oversampleQuiet(this.oversample);
   }
 
   /**
@@ -502,7 +521,7 @@ class Voice {
    */
   settle(quantumEnd: boolean): void {
     if (this.gate || this.fadeInc !== 0) return;
-    if (voiceFinished(this)) this.active = false;
+    if (this.finished) this.active = false;
     else if (quantumEnd && voiceHoldsEndLevel(this)) this.steal();
   }
 
@@ -513,7 +532,7 @@ class Voice {
 
   /** Nothing left to hear: carriers ended, ramps at ~0, filter quiet (`voiceQuiet.ts`, windsor#7). */
   get finished(): boolean {
-    return voiceFinished(this);
+    return voiceFinished(this) && oversampleQuiet(this.oversample);
   }
 
   /**
@@ -537,11 +556,13 @@ class Voice {
    * Render `n` samples into the part's stereo accumulators starting at `off`:
    * the fixed-index kernel (`voiceKernel.js`) when the bound patch can take it
    * exactly, else the generic loop (`voiceRender.js`). Both are the same
-   * arithmetic in the same order; #548 says why the bits agree.
+   * arithmetic in the same order; #548 says why the bits agree. A note at
+   * twice the rate takes the generic passes around its decimator (windsor#656).
    */
   render(outL: Float32Array, outR: Float32Array, off: number, n: number): void {
     if (this.kernel) renderVoiceKernel(this, outL, outR, off, n);
-    else renderVoiceGeneric(this, outL, outR, off, n);
+    else if (this.oversample.factor === 1) renderVoiceGeneric(this, outL, outR, off, n);
+    else renderVoiceOversampled(this, outL, outR, off, n);
   }
 }
 

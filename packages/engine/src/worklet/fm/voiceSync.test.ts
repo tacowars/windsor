@@ -111,6 +111,34 @@ describe('applySyncResets', () => {
     expect(voice.phase[1]).toBeCloseTo(0.0125, 15);
   });
 
+  it('keeps the reset of an operator the shape may take while it reads its table, and drops it at a later wrap that leaves it (windsor#656)', () => {
+    // A Saw synced to the note on Additive: nothing modulates it, so the shape may take it.
+    const patch = makePatch({ algorithm: 7, ops: [{ wave: WAVE.SAW, sync: 'note' }, {}, {}, {}] });
+    const voice = {
+      sync: new VoiceSync(),
+      kind: Int32Array.from(patch.ops, (op) => waveKind(op.wave)),
+      phase: new Float64Array(4),
+      phaseInc: new Float64Array(4),
+      width: new Float32Array(4).fill(1),
+      tables: [RAMP, RAMP, RAMP, RAMP],
+    } as unknown as Voice;
+    bindVoiceSync(voice, patch);
+    const s = voice.sync;
+    expect([s.shape.eligible, s.shape.direct]).toEqual([1, 0]);
+    // The note wrapped half a sample ago; A ran on to 0.9, from 0.75 at the reset.
+    s.notePhase = 0.25;
+    s.noteInc = 0.5;
+    voice.phase[0] = 0.9;
+    voice.phaseInc[0] = 0.3;
+    applySyncResets(voice);
+    expect(s.shape.reset[0]).toBe(0.5);
+    expect(s.shape.left[0]).toBeCloseTo(0.75, 15);
+    // A wrap that resets nothing of A's: the reset it kept is no longer the last sample's.
+    s.notePhase = 0.75;
+    applySyncResets(voice);
+    expect(s.shape.reset[0]).toBeNaN();
+  });
+
   it('splits the step’s polyBLEP between the wave held and the next one', () => {
     const { voice } = voiceOf(['note', 'off', 'off', 'off']);
     const s = voice.sync;

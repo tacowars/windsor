@@ -5,7 +5,8 @@
  * filter and the steal fade, over
  * locals hoisted out of the loop. It is the reference the fixed-index kernel
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
- * with `specialise: false`. Invariant: one sample loop, read top to bottom,
+ * with `specialise: false`. Invariant: each of its two passes is one sample
+ * loop, read top to bottom,
  * allocation free, no per-sample call beyond `voice.noise()`, an
  * operator's own filters (windsor#362, windsor#590), the drive and the filter (the Acid
  * mode's ladder runs over the chunk after the loop, `renderVoiceLadder`,
@@ -38,6 +39,14 @@
  * table, goes through the same delay, and has its edges found after the
  * resets, once a sample (`syncShapeEdges`). A voice with no synced operator
  * takes none of these branches.
+ *
+ * Two passes (windsor#656): `renderVoiceOperators` runs the operators and
+ * the carrier sum into the voice's `oversample.sums`, at the operators' own
+ * rate, and `renderVoicePost` runs the drive, the filter, the steal fade and
+ * the pan from it at the part's. The generic loop is the two over the same
+ * `n`, the same operations in the same order as the one loop they were, so
+ * the same bits; a synced voice at twice the rate (`voiceOversample.ts`) runs
+ * the first over `2n` and decimates between them.
  */
 
 import type { Voice } from './voice';
@@ -51,49 +60,29 @@ import {
 import { DRIVE_SOFT, FILT_FORMANT, FILT_LADDER, FILT_OFF } from './modeIds';
 import { renderVoiceLadder } from './voiceLadder';
 import { SYNC_NOTE_BIT, applySyncResets } from './voiceSync';
-import { beginSyncShapeBlock, syncShapeEdges } from './voiceSyncShape';
+import { beginSyncShapeBlock, dropSyncShapePending, syncShapeEdges } from './voiceSyncShape';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
- * Render `n` samples into the part's stereo accumulators starting at `off`.
- * Modulators are evaluated before carriers within the same sample, so there
- * is no one-sample delay in the FM chain; only self-feedback uses history.
+ * The operators and the carrier sum over `n` samples at the operators' rate,
+ * each sample's sum times the patch's gain into `oversample.sums[0..n)`. Modulators are
+ * evaluated before carriers within the same sample, so there is no
+ * one-sample delay in the FM chain; only self-feedback uses history.
  */
-// One sample loop, read top to bottom. The operator pass, the carrier sum and
-// the filter are three stages of a single computation over locals hoisted out
-// of the loop; calling out to helpers per sample would reload them and cost
-// more than the split reads.
+// One sample loop, read top to bottom. The operator pass and the carrier sum
+// are stages of a single computation over locals hoisted out of the loop;
+// calling out to helpers per sample would reload them and cost more than the
+// split reads.
 // eslint-disable-next-line max-lines-per-function -- one hot loop, see above
-function renderVoiceGeneric(
-  voice: Voice,
-  outL: Float32Array,
-  outR: Float32Array,
-  off: number,
-  n: number,
-): void {
+function renderVoiceOperators(voice: Voice, n: number): void {
   const patch = voice.patch!;
+  const sums = voice.oversample.sums;
   const mods = voice.alg.mods;
   const carriers = voice.alg.carriers;
   const order = voice.order;
   const nCar = carriers.length;
   const carGain = 1 / Math.sqrt(nCar);
-  const f = patch.filter;
-  const mode = f.mode;
-  // The drive stage (windsor#300), hoisted: `updateVoiceDrive` set it for this block.
-  const drive = voice.drive;
-  const driven = drive.on,
-    driveSoft = drive.shape === DRIVE_SOFT,
-    driveGain = drive.gain,
-    driveBias = drive.bias,
-    driveOffset = drive.offset,
-    driveToned = drive.toned,
-    driveCoef = drive.toneCoef;
-  let driveTone = drive.toneState;
-  const slope24 = f.slope24;
   const gain = patch.volume * carGain;
-
-  let fade = voice.fade;
-  const fadeInc = voice.fadeInc;
 
   const phase = voice.phase,
     phaseInc = voice.phaseInc,
@@ -114,10 +103,14 @@ function renderVoiceGeneric(
   // Float32Array(4): the patch's, or the step's (windsor#17), with a song
   // lane's offset, ramped from `fbFrom` across the control block while the
   // two differ (windsor#346): `at` is how far into the block this call starts.
+  // At twice the rate (windsor#656) the block holds twice the samples, each
+  // half the ramp's step; at 1× both are the plain values, exactly.
   const fbAmt = voice.fbTo,
     fbFrom = voice.fbFrom,
     fbRamp = voice.fbRamp;
-  const at = CTRL_INTERVAL - voice.ctrlCount;
+  const factor = voice.oversample.factor;
+  const at = (CTRL_INTERVAL - voice.ctrlCount) * factor;
+  const rampStep = FEEDBACK_RAMP_STEP / factor;
   const filters = voice.opFilter;
   const draws = voice.noiseDraw;
   // Hard sync (windsor#646), hoisted: the synced, corrected and master bits,
@@ -161,6 +154,9 @@ function renderVoiceGeneric(
   const direct = shape.direct,
     late = blep | shape.eligible,
     shapeNext = shape.next;
+  // The last sample a master wrapped on: a reset there is carried into the
+  // next call by an eligible operator on its table (`dropSyncShapePending`).
+  let lastWrap = -1;
 
   for (let s = 0; s < n; s++) {
     // The sample's noise draws, D..A whatever the algorithm's order
@@ -188,7 +184,7 @@ function renderVoiceGeneric(
       let fb = fbAmt[i];
       if ((fbRamp & (1 << i)) !== 0) {
         const f0 = fbFrom[i];
-        fb = f0 + (fb - f0) * ((at + s) * FEEDBACK_RAMP_STEP);
+        fb = f0 + (fb - f0) * ((at + s) * rampStep);
       }
       if (fb !== 0) {
         const y = (fb1[i] + fb2[i]) * 0.5;
@@ -302,6 +298,7 @@ function renderVoiceGeneric(
         wrapped = (masters & (1 << m)) !== 0 && phase[m] < phaseInc[m];
       }
       if (wrapped) {
+        lastWrap = s;
         sync.notePhase = notePhase;
         applySyncResets(voice);
       }
@@ -313,8 +310,49 @@ function renderVoiceGeneric(
       const i = carriers[c];
       sig += out[i] * amp[i];
     }
-    sig *= gain;
+    sums[s] = sig * gain;
+  }
 
+  sync.notePhase = notePhase;
+  if (lastWrap !== n - 1 && (shape.eligible & ~direct) !== 0) dropSyncShapePending(voice);
+}
+
+/**
+ * The drive, the filter, the steal fade and the pan over `n` samples at the
+ * part's rate, from the carrier sums in `oversample.sums[0..n)`, into the part's stereo
+ * accumulators starting at `off`; then the Acid mode's ladder over the chunk,
+ * and the kill at a steal fade's end.
+ */
+// One sample loop, read top to bottom, over locals hoisted out of it, as the
+// operators' loop is.
+// eslint-disable-next-line max-lines-per-function -- one hot loop, see above
+function renderVoicePost(
+  voice: Voice,
+  outL: Float32Array,
+  outR: Float32Array,
+  off: number,
+  n: number,
+): void {
+  const sums = voice.oversample.sums;
+  const f = voice.patch!.filter;
+  const mode = f.mode;
+  // The drive stage (windsor#300), hoisted: `updateVoiceDrive` set it for this block.
+  const drive = voice.drive;
+  const driven = drive.on,
+    driveSoft = drive.shape === DRIVE_SOFT,
+    driveGain = drive.gain,
+    driveBias = drive.bias,
+    driveOffset = drive.offset,
+    driveToned = drive.toned,
+    driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
+  const slope24 = f.slope24;
+
+  let fade = voice.fade;
+  const fadeInc = voice.fadeInc;
+
+  for (let s = 0; s < n; s++) {
+    let sig = sums[s];
     // The drive stage (windsor#300), before the filter and without it:
     // shape(gain * x + bias) - shape(bias), then the tone pole. `soft` is
     // written out, the filter's old soft clip operation for operation; any
@@ -396,11 +434,26 @@ function renderVoiceGeneric(
 
   if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
-  sync.notePhase = notePhase;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();
   }
 }
 
-export { renderVoiceGeneric };
+/**
+ * Render `n` samples into the part's stereo accumulators starting at `off`:
+ * the operators' pass and the post stage over the same `n`, through the
+ * voice's `oversample.sums`.
+ */
+function renderVoiceGeneric(
+  voice: Voice,
+  outL: Float32Array,
+  outR: Float32Array,
+  off: number,
+  n: number,
+): void {
+  renderVoiceOperators(voice, n);
+  renderVoicePost(voice, outL, outR, off, n);
+}
+
+export { renderVoiceGeneric, renderVoiceOperators, renderVoicePost };

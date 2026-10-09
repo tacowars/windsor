@@ -121,15 +121,17 @@ class OperatorFilter {
 
 /**
  * The prewarp for the cutoff in `slot[0]`: held to the patch's floor and to
- * `OP_FILTER_CEILING` of the sample rate, then g = tan(π fc / fs), written
- * back. Allocates nothing.
+ * `OP_FILTER_CEILING` of the part's rate, then g = tan(π fc / fs) at the rate
+ * the operators run at, written back: a synced note at twice the rate
+ * (windsor#656) runs its filters there at the cutoff a note at 1× plays.
+ * Allocates nothing.
  */
-function prewarpInPlace(slot: Float64Array, rate: number): void {
+function prewarpInPlace(slot: Float64Array, voice: Voice): void {
   let fc = slot[0];
   if (fc < OP_FILTER_FLOOR_HZ) fc = OP_FILTER_FLOOR_HZ;
-  const top = OP_FILTER_CEILING * rate;
+  const top = OP_FILTER_CEILING * voice.sr;
   if (fc > top) fc = top;
-  slot[0] = (Math.PI * fc) / rate;
+  slot[0] = (Math.PI * fc) / voice.opRate;
   tanInPlace(slot, 0);
 }
 
@@ -170,7 +172,7 @@ function bindOperatorFilter(voice: Voice, i: number): void {
     filter.lpOn = lp > 0;
     if (filter.lpOn) {
       slot[0] = lp;
-      prewarpInPlace(slot, voice.sr);
+      prewarpInPlace(slot, voice);
       const g = slot[0];
       filter.lpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
       filter.lpA2 = g * filter.lpA1;
@@ -184,7 +186,7 @@ function bindOperatorFilter(voice: Voice, i: number): void {
     filter.hpOn = hp > 0;
     if (filter.hpOn) {
       slot[0] = hp;
-      prewarpInPlace(slot, voice.sr);
+      prewarpInPlace(slot, voice);
       const g = slot[0];
       filter.hpA1 = 1 / (1 + g * (g + OP_FILTER_DAMPING));
       filter.hpA2 = g * filter.hpA1;

@@ -11,13 +11,20 @@
  * whatever that modulator's level, in a patch whose Tone is 1. Each render
  * call, so at least each control block (`beginSyncShapeBlock`): of those,
  * the ones whose live feedback is exactly 0 across the block, whose phase
- * increment is below Nyquist (`SYNC_SHAPE_MAX_INC`) and, for the Saw and
- * Square, whose live width is exactly 1 and not ramping. One that
+ * increment is above 0 and below Nyquist (`SYNC_SHAPE_MAX_INC`; the edge
+ * walk only moves forward, so a negative `fixedHz` reads its table,
+ * windsor#656) and, for the Saw and Square, whose live width is exactly 1
+ * and not ramping. One that
  * stops qualifying reads its table from that block on, and comes back when
  * it qualifies again. An eligible operator sends its wave a sample late on
  * either path, so a switch neither skips nor repeats a sample; one leaving
  * the shape drops the second half of an edge's correction, which its
- * band-limited table already has.
+ * band-limited table already has. One coming back on a sample whose reset
+ * fell in the interval before it takes that reset's correction, both
+ * halves, which the table path never computed (windsor#656): the reset's
+ * `d` and the free-running phase before it are kept for an eligible
+ * operator on its table while the reset is the last sample's
+ * (`applySyncResets`, `dropSyncShapePending`).
  *
  * **The shape**, in Windsor's polarity at the table's level: `g` is the
  * fundamental of the operator's current table (`refreshGain`, read when the
@@ -82,8 +89,14 @@ class SyncShape {
   next: Float64Array;
   /** Each direct operator's width at the sample just read, where a Pulse's duty ramp across the interval starts. */
   width: Float64Array;
-  /** Where this sample's reset fell, `d` of a sample before the next; NaN for none. */
+  /**
+   * Where this sample's reset fell, `d` of a sample before the next; NaN for
+   * none. For an eligible operator on its table, the last sample's reset,
+   * which a return to the shape at the next call takes (windsor#656).
+   */
   reset: Float64Array;
+  /** An eligible operator on its table: the free-running phase just before its last sample's reset. */
+  left: Float64Array;
 
   constructor() {
     this.eligible = 0;
@@ -96,7 +109,9 @@ class SyncShape {
     this.next = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.width = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.reset = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.left = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.gain.fill(0);
+    this.left.fill(0);
     this.prev.fill(0);
     this.next.fill(0);
     this.width.fill(1);
@@ -159,14 +174,39 @@ function readNext(voice: Voice, sh: SyncShape, i: number): void {
 }
 
 /**
+ * The correction of a reset an operator took on its table in the interval
+ * just before it returns to the shape (windsor#656): the step from the left
+ * limit at the free-running phase before it (`left`) to the wave at phase 0,
+ * the direct path's own reset step, its two halves on the wave held and owed
+ * off the next, so the sample it sends back is the shape's. A Pulse's duty
+ * is its width now. Allocates nothing.
+ */
+function carrySyncShapeReset(voice: Voice, sh: SyncShape, i: number): void {
+  const d = sh.reset[i];
+  const g = sh.gain[i];
+  const k = sh.kind[i];
+  let x = sh.left[i];
+  x -= Math.floor(x);
+  if (x === 0) x = 1;
+  const duty = k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - voice.width[i];
+  const jump = k === SHAPE_SQUARE ? g * HALF_PI : g * Math.PI;
+  const h = k === SHAPE_SAW ? g * Math.PI * x : x <= duty || duty === 0 ? 0 : jump;
+  const e = 1 - d;
+  voice.sync.held[i] += h * d * d * SYNC_BLEP_GAIN;
+  voice.sync.after[i] += h * e * e * SYNC_BLEP_GAIN;
+}
+
+/**
  * The block's direct operators, at a render call's start, after the
  * control update: each eligible one whose feedback is exactly 0 across the
- * block (`fbTo` 0 and not ramping), whose phase increment is below
- * `SYNC_SHAPE_MAX_INC` either way, and, unless it is a Pulse, that is not
- * `squeezed` (the render's bits: width exactly 1, not ramping). One leaving
- * the shape drops what the next sample owes; one entering starts with no
- * reset. Each direct operator's level follows its table, and its next wave
- * is read at its phase and width now. Allocates nothing.
+ * block (`fbTo` 0 and not ramping), whose phase increment is above 0 and
+ * below `SYNC_SHAPE_MAX_INC` (the edge walk moves forward only), and, unless
+ * it is a Pulse, that is not `squeezed` (the render's bits: width exactly 1,
+ * not ramping). One leaving the shape drops what the next sample owes; one
+ * entering takes the correction of a reset in the interval before it
+ * (`carrySyncShapeReset`) and starts with none pending. Each direct
+ * operator's level follows its table, and its next wave is read at its phase
+ * and width now. Allocates nothing.
  */
 function beginSyncShapeBlock(voice: Voice, squeezed: number): void {
   const sh = voice.sync.shape;
@@ -175,9 +215,11 @@ function beginSyncShapeBlock(voice: Voice, squeezed: number): void {
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const bit = 1 << i;
     if ((sh.eligible & bit) === 0 || fbTo[i] !== 0 || (voice.fbRamp & bit) !== 0) continue;
-    // Past Nyquist the edge loops would run once a crossed cycle: the table instead.
+    // Past Nyquist the edge loops would run once a crossed cycle, and the
+    // walk only moves forward, so a negative increment would cross its wraps
+    // uncorrected: the table for either (windsor#656).
     const inc = voice.phaseInc[i];
-    if (!(inc < SYNC_SHAPE_MAX_INC && inc > -SYNC_SHAPE_MAX_INC)) continue;
+    if (!(inc > 0 && inc < SYNC_SHAPE_MAX_INC)) continue;
     if (sh.kind[i] !== SHAPE_PULSE && (squeezed & bit) !== 0) continue;
     direct |= bit;
   }
@@ -186,8 +228,11 @@ function beginSyncShapeBlock(voice: Voice, squeezed: number): void {
     const bit = 1 << i;
     if ((sh.direct & bit) !== 0 && (direct & bit) === 0) after[i] = 0;
     if ((direct & bit) === 0) continue;
-    if ((sh.direct & bit) === 0) sh.reset[i] = NaN;
     refreshGain(sh, voice.tables[i]!, i);
+    if ((sh.direct & bit) === 0) {
+      if (sh.reset[i] === sh.reset[i]) carrySyncShapeReset(voice, sh, i);
+      sh.reset[i] = NaN;
+    }
     readNext(voice, sh, i);
   }
   sh.direct = direct;
@@ -293,6 +338,19 @@ function syncShapeEdges(voice: Voice): void {
   }
 }
 
+/**
+ * After a render call whose last sample took no reset: an eligible operator
+ * on its table drops the reset it kept, which is no longer the interval
+ * before the next call's first sample (windsor#656). Allocates nothing.
+ */
+function dropSyncShapePending(voice: Voice): void {
+  const sh = voice.sync.shape;
+  const table = sh.eligible & ~sh.direct;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((table & (1 << i)) !== 0) sh.reset[i] = NaN;
+  }
+}
+
 export {
   SHAPE_NONE,
   SHAPE_PULSE,
@@ -300,6 +358,7 @@ export {
   SHAPE_SQUARE,
   SyncShape,
   beginSyncShapeBlock,
+  dropSyncShapePending,
   syncShapeEdges,
   syncShapeKind,
 };

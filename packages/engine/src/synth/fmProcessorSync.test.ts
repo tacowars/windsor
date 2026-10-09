@@ -15,6 +15,11 @@
  * A note period of 128 samples (375 Hz at 48 kHz) puts every master's wrap
  * on the same sample of each period, so "repeats" is a sample-for-sample
  * comparison one period apart, away from the samples a reset corrects.
+ *
+ * Every render here is at the part's rate (`syncOversample: false`): these
+ * pin the resets sample for sample, which a synced voice at twice the rate
+ * (windsor#656) runs on its own samples and smears by its decimator. That
+ * voice is `fmProcessorOversample.test.ts`'s.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -66,9 +71,12 @@ function syncing(patch: Patch, i: number, sync: OpSync | string): Patch {
   return out;
 }
 
-/** The left channel of one held note at `note`. */
-function play(patch: Patch, note: number, options: CreateOptions = {}): Float32Array {
-  const processor = loaded.create(patch, 1, undefined, options);
+/** Every voice at the part's rate (windsor#656). */
+const AT_1X: CreateOptions = { syncOversample: false };
+
+/** The left channel of one held note at `note`, at the part's rate. */
+function play(patch: Patch, note: number): Float32Array {
+  const processor = loaded.create(patch, 1, undefined, AT_1X);
   const events = [{ type: 'noteOn' as const, id: 1, note, velocity: 1, frame: 0 }];
   return render(loaded, processor, BLOCKS, events).samples.filter((_, k) => k % 2 === 0);
 }
@@ -231,7 +239,7 @@ interface SyncedVoice {
 
 /** The bound voice after one block of `patch`. */
 function voiceFor(patch: Patch): SyncedVoice {
-  const processor: ProcessorLike = loaded.create(patch, 1);
+  const processor: ProcessorLike = loaded.create(patch, 1, undefined, AT_1X);
   render(loaded, processor, 1, [{ type: 'noteOn', id: 1, note: 60, velocity: 1, frame: 0 }]);
   return processor.voices[0] as unknown as SyncedVoice;
 }

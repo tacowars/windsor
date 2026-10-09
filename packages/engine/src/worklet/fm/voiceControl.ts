@@ -22,8 +22,11 @@
  * fields, and an operator's width reads its frequency and the LFO levels
  * from the voice, since V8 does not inline every call this update makes and
  * a double crossing one it does not inline is a new heap number on the audio
- * thread (`synth/fmProcessorAllocation.test.ts`). A song's lanes and a
- * note's steps move the values a ringing voice plays (windsor#346,
+ * thread (`synth/fmProcessorAllocation.test.ts`). A synced note at twice the
+ * rate (windsor#656, `voiceOversample.ts`) sets its operators' increments
+ * and ramps at the voice's `opRate`, over twice the block's samples; the
+ * LFOs, the glide, the drive and the filter stay at the part's rate. A
+ * song's lanes and a note's steps move the values a ringing voice plays (windsor#346,
  * windsor#419): the update starts by laying them out in `liveValues` by
  * target code (`voiceOffsets.ts`), and every read below of a value a lane or
  * a step can move reads it there.
@@ -93,8 +96,13 @@ function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   // Any number of Noise operators takes the kernel (windsor#389): both
   // loops draw a sample's noise D..A, so only the algorithm's edges decide.
   // A synced operator (windsor#646) takes the generic loop, so the kernel
-  // never carries the resets.
-  voice.kernel = voice.specialise && voice.edges >= 0 && voice.sync.synced === 0;
+  // never carries the resets; a note at twice the rate (windsor#656) keeps
+  // the generic passes for its life, whatever a rebind turns off.
+  voice.kernel =
+    voice.specialise &&
+    voice.edges >= 0 &&
+    voice.sync.synced === 0 &&
+    voice.oversample.factor === 1;
 }
 
 /**
@@ -265,8 +273,14 @@ function advanceVoiceControl(voice: Voice, n: number): void {
     voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
 
+  // The operators run at `opRate` (windsor#656): the part's rate, or twice it
+  // for a synced note, their ramps over `opN` samples, as many as the block
+  // holds at that rate. At 1× both are the part's, exactly.
+  const opRate = voice.opRate;
+  const opN = n * voice.oversample.factor;
+
   // Hard sync's note master (windsor#646) runs at the note's own frequency.
-  voice.sync.noteInc = baseFreq / voice.sr;
+  voice.sync.noteInc = baseFreq / opRate;
 
   const specialise = voice.specialise;
   const toRatio = lfoP.toRatio,
@@ -283,10 +297,10 @@ function advanceVoiceControl(voice: Voice, n: number): void {
       ratio *= Math.pow(2, lfoVal * toRatio[i] + lfo2Val * toRatio2[i]);
     }
     const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * ratio * detuneMul;
-    voice.phaseInc[i] = freq / voice.sr;
+    voice.phaseInc[i] = freq / opRate;
     voice.opFreq[i] = freq;
-    updateOperatorWidth(voice, i, n);
-    updateOperatorAmp(voice, i, n);
+    updateOperatorWidth(voice, i, opN);
+    updateOperatorAmp(voice, i, opN);
   }
 
   updateVoiceDrive(voice);
