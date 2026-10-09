@@ -242,6 +242,32 @@ describe('a take', () => {
     expect(r.notes(0)).toEqual([n(98, 2 * BAR - 98)]);
   });
 
+  it('cuts a note held across the song’s own wrap at its region’s end, polled coarsely or released late', () => {
+    // Loop off, or over the whole song: the engine hands the clock no loop,
+    // and its counter runs on past the song's end (positions are the tick
+    // modulo the song). A key down 2 ticks before the end of region 1 (bars
+    // 6–8, the song's last tick), polled once before the wrap, and let go 3
+    // ticks into the next pass: the note ends at the region's end, which is
+    // also its loop's.
+    const end = 8 * BAR;
+    for (const loop of [undefined, { start: 0, end }]) {
+      const polled = armed(rig(loop), end - 2);
+      polled.press(end - 2);
+      polled.at(end - 1);
+      polled.rec.sync();
+      polled.release(end + 3);
+      expect(polled.notes(1)).toEqual([n(BAR - 2, 2)]);
+
+      // The release arrives long after the wrap, timer throttled: the
+      // playhead is well into the next pass when the stamped release lands.
+      const late = armed(rig(loop), end - 2);
+      late.press(end - 2);
+      late.at(end + 200);
+      late.release(end + 3);
+      expect(late.notes(1)).toEqual([n(BAR - 2, 2)]);
+    }
+  });
+
   it('records nothing while another control’s drag is open', () => {
     const r = armed(rig());
     r.ctx.beginGesture('Level');
