@@ -14,6 +14,9 @@ export interface RollSnap {
   readonly ticks: number;
 }
 
+/** Snap Off's grain: one tick, which Quantise has no step to snap to. */
+export const ROLL_SNAP_OFF_TICKS = 1;
+
 /** Snap (decision 2): 1/4 to 1/32, the triplets, and Off at one tick. */
 export const ROLL_SNAPS: readonly RollSnap[] = [
   { label: '1/4', ticks: 24 },
@@ -22,7 +25,7 @@ export const ROLL_SNAPS: readonly RollSnap[] = [
   { label: '1/16', ticks: 6 },
   { label: '1/16T', ticks: 4 },
   { label: '1/32', ticks: 3 },
-  { label: 'Off', ticks: 1 },
+  { label: 'Off', ticks: ROLL_SNAP_OFF_TICKS },
 ];
 
 /** The Snap a roll opens on: 1/16. */
@@ -189,3 +192,16 @@ export const ROLL_EDGE_SCROLL = { zonePx: 24, maxPx: 14 } as const;
 
 /** Audition (decision 5): how long a note sounds, and where its switch is kept. */
 export const ROLL_AUDITION = { ms: 180, storageKey: 'windsor.roll.audition' } as const;
+
+/** Quantise (record `2026-10-09-roll-recording` decision 10): its label, undo step and the button's words. */
+export const ROLL_QUANTISE = {
+  label: 'Quantise',
+  undo: 'Quantise',
+  all: 'All notes',
+  selected: 'selected',
+  to: 'to',
+  off: 'snap off',
+  title:
+    'Snap the onsets of the selected notes, or every note when none is selected, to the nearest Snap step. Lengths are kept.',
+  offTitle: 'Set a Snap to quantise to',
+} as const;

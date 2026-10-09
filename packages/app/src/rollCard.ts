@@ -168,6 +168,8 @@ class RollDevice {
       }),
       repaint: () => this.paint(),
       stepLoop: (dir) => this.editing.stepLoop(dir),
+      selectedCount: () => this.editing.editor.selected().length,
+      quantise: () => this.editing.quantise(),
     });
     this.wire();
     this.paint();
@@ -202,6 +204,7 @@ class RollDevice {
     if (!this.scene) return;
     this.scene = { ...this.scene, notes: this.editing.editor.current().notes };
     this.paintWindow();
+    this.controls.refresh();
     this.light();
   }
 
