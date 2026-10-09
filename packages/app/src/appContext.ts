@@ -54,6 +54,9 @@ interface Tab<P extends TabPanel> {
   dirty: boolean;
 }
 
+/** What is about to land (`onBeforeEdit`): an edit, an undo or a redo, or a switch of song. */
+export type EditKind = 'edit' | 'song';
+
 /** An open gesture (`beginGesture`): its name, its depth, and the document before its first change. */
 interface Gesture {
   readonly label: string;
@@ -86,7 +89,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   /** A Roll recording take's step is on top of the history and its writes fold into it (`recordTake`). */
   private takeOpen = false;
   /** Who hears of an edit before it lands (`onBeforeEdit`): the Roll recorder, which closes its take. */
-  private readonly beforeEdit = new Set<() => void>();
+  private readonly beforeEdit = new Set<(kind: EditKind) => void>();
+  /** Who hears of a gesture's end (`onGestureEnd`): the Roll recorder, which writes what it held back. */
+  private readonly gestureEnd = new Set<() => void>();
   /** Who follows each tab's shown state (`onTabShown`), by tab id. */
   private readonly shownListeners = new Map<string, Set<(shown: boolean) => void>>();
 
@@ -223,14 +228,25 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   }
 
   /**
-   * Hear of every song edit, gesture, undo, redo and switch of song before
-   * it lands, until the returned call stops it: the Roll recorder closes its
-   * take there (windsor#663), so the take so far is its own step and the
-   * edit another.
+   * Hear of every song edit, gesture, undo, redo (`edit`) and switch of song
+   * (`song`) before it lands, until the returned call stops it: the Roll
+   * recorder closes its take there (windsor#663), so the take so far is its
+   * own step and the edit another. A change inside an open gesture is part
+   * of a step already announced, and is not heard again.
    */
-  onBeforeEdit(listener: () => void): () => void {
+  onBeforeEdit(listener: (kind: EditKind) => void): () => void {
     this.beforeEdit.add(listener);
     return () => void this.beforeEdit.delete(listener);
+  }
+
+  /**
+   * Hear of the outermost gesture's end, after its step is recorded, until
+   * the returned call stops it: the Roll recorder writes the notes it held
+   * back during the gesture there, as a step of their own (windsor#663).
+   */
+  onGestureEnd(listener: () => void): () => void {
+    this.gestureEnd.add(listener);
+    return () => void this.gestureEnd.delete(listener);
   }
 
   /**
@@ -276,6 +292,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (before && !deepEqual(before, this.model.doc)) {
       this.history.record({ before, label, tab });
     }
+    for (const listener of this.gestureEnd) listener();
   }
 
   get canUndo(): boolean {
@@ -334,7 +351,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * and resolves false. A song with no name takes `fileName`'s.
    */
   importDoc(raw: unknown, fileName?: string): Promise<boolean> {
-    this.editing();
+    this.editing('song');
     return this.songs.adopt(raw, fileName === undefined ? {} : { fileName });
   }
 
@@ -353,7 +370,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * its file is left untouched.
    */
   private replaceDocument(raw: unknown, amend?: OpenAmend): void {
-    this.editing();
+    this.editing('song');
     this.model.open(raw, (doc) => {
       const renames = loadRenames(doc);
       const own = amend?.(doc) ?? null;
@@ -422,8 +439,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   }
 
   /** An edit, an undo, a redo or a switch of song is about to land: a recording take closes first. */
-  private editing(): void {
-    for (const listener of this.beforeEdit) listener();
+  private editing(kind: EditKind = 'edit'): void {
+    if (!this.gesture) for (const listener of this.beforeEdit) listener(kind);
     this.takeOpen = false;
   }
 

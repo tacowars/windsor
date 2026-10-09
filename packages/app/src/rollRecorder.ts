@@ -13,15 +13,23 @@
  *   advanced to the tick heard now (`TapClock`), so a loop's jump is seen
  *   before the event after it.
  * - **The take** opens at the first press that can record (Rec on, the
- *   transport running, the selected part a Roll part, no other edit's drag
- *   open), reading the part's regions then. It ends, every held note cut at
- *   the last tick heard and written, at a transport stop, Rec off, a part
- *   switch, and before any other song edit, an undo, a redo or a switch of
- *   song (`close`, which the context calls first): the take so far closes
- *   as its own step, and the next note written opens a new take.
+ *   transport running, the selected part a Roll part), reading the part's
+ *   regions then. It ends, every held note cut at the last tick heard and
+ *   written, at a transport stop, Rec off, a part switch and a switch of
+ *   song (`close`).
+ * - **Another edit splits it** (`split`, which the context calls before
+ *   any other song edit, gesture, undo or redo): the notes the take has
+ *   written close as its own step, and the notes still held are not cut.
+ *   They carry into the next take (`RollTake.handOver`, at the next press,
+ *   release or reading, over the regions as the edit left them), keep
+ *   growing, and are written on release into that take's step.
  * - **Writes.** A note is written when it stops sounding or when the take
  *   ends, through `takeWriteChange` and the host's `write`, which folds
- *   every write of one take into one undo step.
+ *   every write of one take into one undo step. While another control's
+ *   gesture is open (a drag), its step takes every change, so the take
+ *   writes nothing: notes played then are recorded and held back, and
+ *   written when the gesture ends (`gestureEnded`), as a step of their own
+ *   after the gesture's.
  */
 import type { ArrangementDocument, AudioPart, DocumentPartial } from '@windsor/engine';
 import { songTicksOf, tickLoopOf } from '@windsor/engine';
@@ -53,8 +61,8 @@ export interface RecorderHost {
   stamp(timeStamp: number | undefined): number | null;
   /** The seconds one tick lasts at the running tempo. */
   secondsPerTick(): number;
-  /** Close a merged edit waiting on its timer; false while another edit's drag is still open. */
-  settle(): boolean;
+  /** Another control's gesture is open (a drag, or presses merging): a write would fold into its step. */
+  editOpen(): boolean;
   /** Write a take's partial into its undo step; false when nothing landed. */
   write(partial: DocumentPartial): boolean;
   /** The take's undo step is closed: the next write opens a new one. */
@@ -73,6 +81,10 @@ export class RollRecorder implements NoteTap {
   private take: RollTake | null = null;
   /** The slot the open take records into. */
   private slot = -1;
+  /** An edit landed since the take opened: its regions are read again at its next use (`current`). */
+  private stale = false;
+  /** Takes that ended while a gesture was open, with their slots: written when it ends. */
+  private readonly backlog: Array<{ readonly take: RollTake; readonly slot: number }> = [];
   private readonly clock = new TapClock();
   /** The last tick heard while the take ran. */
   private last: number | null = null;
@@ -109,10 +121,12 @@ export class RollRecorder implements NoteTap {
 
   /** The playhead: the take ends at a stop or a part switch, and otherwise follows it. */
   sync(): void {
-    const take = this.take;
-    if (!take) return;
+    if (!this.take) return;
     if (!this.host.running() || this.host.selected() !== this.slot) this.close();
-    else this.observe(take);
+    else {
+      const take = this.current();
+      if (take) this.observe(take);
+    }
   }
 
   press(
@@ -124,15 +138,15 @@ export class RollRecorder implements NoteTap {
   ): void {
     if (!this.armed || part !== this.host.livePart()) return;
     this.sync();
-    if (!this.host.running() || !this.host.settle()) return;
-    const take = this.take ?? this.open();
+    if (!this.host.running()) return;
+    const take = this.current() ?? this.open();
     const tick = this.host.stamp(timeStamp);
     if (take && tick !== null) take.press(source, pitch, velocity, tick);
   }
 
   release(_part: AudioPart, source: string, pitch: number, timeStamp?: number): void {
     this.sync();
-    const take = this.take;
+    const take = this.current();
     if (!take) return;
     const tick = this.host.stamp(timeStamp) ?? this.last;
     if (tick === null) return;
@@ -143,27 +157,66 @@ export class RollRecorder implements NoteTap {
   /** Panic: every held note ends at the tick heard, and the take runs on. */
   panic(): void {
     this.sync();
-    const take = this.take;
+    const take = this.current();
     if (!take || this.last === null) return;
     take.end(this.last);
     this.flush(take);
   }
 
   /**
-   * The take's end (a stop, Rec off, a part switch, and before any other
-   * edit, an undo or a switch of song): every held note cut at the last
-   * tick heard and written, and the undo step closed.
+   * The take's end (a stop, Rec off, a part switch, a switch of song):
+   * every held note cut at the last tick heard and written, and the undo
+   * step closed. Written when the open gesture ends, if one is open.
    */
   close(): void {
-    const take = this.take;
-    if (!take) return;
-    if (this.host.running()) this.observe(take);
+    if (!this.take) return;
+    const take = this.current();
     this.take = null;
-    if (this.last !== null) take.end(this.last);
-    this.flush(take);
+    if (take) {
+      if (this.host.running()) this.observe(take);
+      if (this.last !== null) take.end(this.last);
+      this.flush(take);
+      if (this.host.editOpen()) this.backlog.push({ take, slot: this.slot });
+    }
     this.host.closeStep();
     this.clock.reset();
     this.last = null;
+  }
+
+  /**
+   * Before any other edit, an undo or a redo (decision 8): what the take
+   * has written closes as its own step, and the notes still held carry
+   * into the next take, read over the regions as the edit leaves them.
+   */
+  split(): void {
+    const take = this.take;
+    if (!take) return;
+    if (this.host.running()) this.observe(take);
+    this.flush(take);
+    this.host.closeStep();
+    this.stale = true;
+  }
+
+  /** Another control's gesture ended: write what was held back during it, as a step after its own. */
+  gestureEnded(): void {
+    for (const { take, slot } of this.backlog.splice(0)) this.flush(take, slot);
+    if (this.take) {
+      this.flush(this.take);
+      this.stale = true;
+    }
+  }
+
+  /** The open take, its held notes handed to a new take first if an edit landed since it opened. */
+  private current(): RollTake | null {
+    const take = this.take;
+    if (!take || !this.stale) return take;
+    this.stale = false;
+    const doc = this.host.doc();
+    const roll = recPlace(doc, this.slot, this.host.position()).roll;
+    const next = roll ? new RollTake(songTicksOf(doc), takeRegions(doc, this.slot)) : null;
+    if (next) take.handOver(next);
+    this.take = next;
+    return next;
   }
 
   /** A new take on the selected part, at the tick heard now; null when it is not a Roll part. */
@@ -191,11 +244,12 @@ export class RollRecorder implements NoteTap {
     this.last = now.tick;
   }
 
-  /** Write what the take has finished. */
-  private flush(take: RollTake): void {
+  /** Write what the take has finished into part `slot`; held back while another gesture is open. */
+  private flush(take: RollTake, slot = this.slot): void {
+    if (this.host.editOpen()) return;
     const writes = take.drain();
     if (writes.length === 0) return;
-    const partial = takeWriteChange(this.host.doc(), this.slot, writes);
+    const partial = takeWriteChange(this.host.doc(), slot, writes);
     if (partial) this.host.write(partial);
   }
 }

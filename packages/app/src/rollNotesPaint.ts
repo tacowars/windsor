@@ -8,15 +8,15 @@
  * while Rec records (windsor#663) is drawn growing with a record-coloured
  * edge, outside the roll's list, until it is written.
  */
-import type { RollNote } from '@windsor/engine';
 import { noteName } from './consoleFormat';
 import { el } from './dom';
 import { type RollTones, tierOf } from './rollHarmony';
 import { fillPct, instanceLook, noteNamed, stemLook, stemPx, velocityOf } from './rollNoteLook';
 import type { RollPanes } from './rollPanes';
-import { type RollInstance, sounding } from './rollRepeats';
+import { type RollInstance, heldStart, sounding } from './rollRepeats';
 import type { RollScene } from './rollScene';
 import { ROLL_NOTE, ROLL_PANE_PX, ROLL_REC } from './rollTables';
+import type { HeldNote } from './rollTake';
 
 /** One drawn note and what it draws. */
 export interface DrawnNote {
@@ -95,20 +95,22 @@ export function paintNotes(
 
 /**
  * The notes Rec holds, drawn into the notes `layer` and the velocity lane
- * as they sound so far: no index, so no gesture takes them, and a title
- * saying they are written when they stop. Returns what it drew, for the
- * next frame to remove.
+ * as they sound so far, each on the pass of the loop it was pressed in
+ * (`heldStart`): no index, so no gesture takes them, and a title saying
+ * they are written when they stop. Returns what it drew, for the next
+ * frame to remove.
  */
 export function paintHeld(
   panes: RollPanes,
   layer: HTMLElement,
   scene: RollScene,
-  notes: readonly RollNote[],
+  notes: readonly HeldNote[],
 ): HTMLElement[] {
   const held = { ...scene, notes };
   const drawn: HTMLElement[] = [];
   notes.forEach((note, index) => {
-    const instance = { index, start: note.tick, ticks: note.ticks, pass: 0, parked: false };
+    const start = heldStart(note, scene);
+    const instance = { index, start, ticks: note.ticks, pass: 0, parked: false };
     const node = noteNode(held, instance, false);
     const stem = stemNode(held, instance, false);
     if (node) {

@@ -159,7 +159,7 @@ class RecView implements RollRecView {
       recording && !this.full && recorder
         ? recorder.held(host.slot).filter((note) => note.regionIndex === region)
         : [];
-    const key = notes.map((n) => `${n.pitch}:${n.tick}:${n.ticks}`).join(' ');
+    const key = notes.map((n) => `${n.pitch}:${n.local}:${n.ticks}`).join(' ');
     if (key === this.heldKey && this.held.every((node) => node.isConnected)) return;
     for (const node of this.held) node.remove();
     this.heldKey = key;

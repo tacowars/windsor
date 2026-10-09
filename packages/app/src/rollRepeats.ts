@@ -182,3 +182,20 @@ export const loopNoteCount = (
   loopTicks: number,
   regionTicks: number,
 ): number => notes.filter((note) => note.tick < Math.min(loopTicks, regionTicks)).length;
+
+/**
+ * Where a note Rec still holds starts in the region (windsor#663): on the
+ * pass of the loop it was pressed in, read from its region-local onset
+ * `local` the way the playhead reads the song's tick (`rollPosition`), so
+ * it grows under the playhead on every pass, not only the first.
+ */
+export function heldStart(
+  note: { readonly tick: number; readonly local: number },
+  layout: { readonly loopTicks: number; readonly regionTicks: number },
+): number {
+  const { loopTicks, regionTicks } = layout;
+  if (!(loopTicks > 0 && regionTicks > 0)) return note.tick;
+  const pass = Math.floor((note.local % regionTicks) / loopTicks);
+  const start = pass * loopTicks + note.tick;
+  return start < regionTicks ? start : note.tick;
+}

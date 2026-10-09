@@ -42,7 +42,7 @@ describe('RollTake', () => {
     take.press(K, 60, 1, 100);
     play(take, 100, 110);
     expect(take.held()).toEqual([
-      { source: K, regionIndex: 0, pitch: 60, velocity: 1, tick: 4, ticks: 10 },
+      { source: K, regionIndex: 0, pitch: 60, velocity: 1, tick: 4, local: 4, ticks: 10 },
     ]);
     play(take, 111, 100 + 2 * 48 + 10);
     expect(take.held()[0]?.ticks).toBe(48 - 4);

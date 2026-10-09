@@ -44,8 +44,11 @@
  *   `drain()` (a drained list, not a callback, so the caller decides when
  *   to write); each region's list is written through `mergeTake`.
  *
- * The regions are read once, at construction: any other song edit splits
- * the take (decision 8), so a take never outlives the regions it was given.
+ * The regions are read once, at construction. Any other song edit splits
+ * the take (decision 8): the console builds a new take over the regions as
+ * they are after the edit and hands it the notes still held (`handOver`),
+ * so a held note carries across the edit and a take never presses into
+ * regions it was not given.
  */
 import type { Region, RollNote, RollSequencerConfig } from '@windsor/engine';
 import { isInfiniteRegion, regionState, ROLL_NOTES_MAX } from '@windsor/engine';
@@ -56,13 +59,15 @@ export interface TakeRegion extends Region {
   readonly loopTicks: number;
 }
 
-/** A note still pending: its region, onset (local tick), and its length so far. */
+/** A note still pending: its region, onset (loop tick and region-local tick), and its length so far. */
 export interface HeldNote {
   readonly source: string;
   readonly regionIndex: number;
   readonly pitch: number;
   readonly velocity: number;
   readonly tick: number;
+  /** The onset in the region's local ticks, before the loop folds it: which pass it started in. */
+  readonly local: number;
   readonly ticks: number;
 }
 
@@ -79,10 +84,12 @@ interface Pending {
   readonly pitch: number;
   readonly velocity: number;
   readonly tick: number;
+  /** The onset in the region's local ticks. */
+  readonly local: number;
   /** The transport tick of the press. */
   readonly onset: number;
   /** The most it can sound: to its loop's end or its region's end, whichever is first. */
-  readonly limit: number;
+  limit: number;
   /** The highest tick seen since the press. */
   reach: number;
   /** Its length once a jump cut it, else null. */
@@ -141,6 +148,7 @@ export class RollTake {
       pitch,
       velocity,
       tick,
+      local,
       onset: songTick,
       limit,
       reach: songTick,
@@ -200,8 +208,41 @@ export class RollTake {
       pitch: note.pitch,
       velocity: note.velocity,
       tick: note.tick,
+      local: note.local,
       ticks: lengthNow(note),
     }));
+  }
+
+  /**
+   * Hand the notes this take still holds, and its finished notes not yet
+   * drained, to `next`, the take that follows it across an edit (decision
+   * 8). A held note carries where its region keeps its index, start and
+   * loop and still holds its onset; its limit is cut to the region's end
+   * as it is now. A note whose region no longer holds its place is dropped:
+   * there is nowhere to write it. This take is then empty.
+   */
+  handOver(next: RollTake): void {
+    const infinite = isInfiniteRegion(next.regions, next.songTicks);
+    for (const note of this.pending) {
+      const region = next.regions[note.regionIndex];
+      const old = this.regions[note.regionIndex];
+      const same =
+        region && old && region.start === old.start && region.loopTicks === old.loopTicks;
+      const toRegionEnd = !region
+        ? 0
+        : infinite
+          ? Number.POSITIVE_INFINITY
+          : region.duration - note.local;
+      if (!same || toRegionEnd <= 0) continue;
+      note.limit = Math.min(note.limit, toRegionEnd);
+      next.pending.push(note);
+    }
+    for (const [regionIndex, notes] of this.finished) {
+      next.finished.set(regionIndex, [...(next.finished.get(regionIndex) ?? []), ...notes]);
+    }
+    next.playhead = this.playhead;
+    this.pending.length = 0;
+    this.finished.clear();
   }
 
   /** The finished notes since the last drain, per region in region order; the list is then empty. */

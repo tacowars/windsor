@@ -2,12 +2,13 @@
  * The Roll recorder wired to the console (windsor#663): its host over the
  * context, the live system's clock and the gestures; the keyboard's tap;
  * the selection, which ends a take when it moves; the context's
- * `onBeforeEdit`, which ends it before any other edit; the transport's
- * `onBeforeHalt`, which ends it at the tick heard before ‖ or ■ halts the
- * engine; and a timer that
- * reads the playhead while no Roll device is on screen (the Parts tab's
- * keys play while the Song tab is hidden). The Roll devices reach the one
- * recorder through `rollRecorder()`.
+ * `onBeforeEdit`, which ends it before a switch of song and splits it
+ * before any other edit, and `onGestureEnd`, which writes what was played
+ * during another control's drag; the transport's `onBeforeHalt`, which
+ * ends it at the tick heard before ‖ or ■ halts the engine; and a timer
+ * that reads the playhead while no Roll device is on screen (the Parts
+ * tab's keys play while the Song tab is hidden). The Roll devices reach
+ * the one recorder through `rollRecorder()`.
  *
  * The stamp (record `2026-10-09-roll-recording` decision 3): an input
  * event's `timeStamp` mapped to the context time heard then
@@ -16,7 +17,6 @@
  */
 import type { AudioSystem } from '@windsor/engine';
 import type { AppContext } from './appContext';
-import { settleGestures } from './gestureHooks';
 import type { Keyboard } from './keyboard';
 import { type RecorderHost, RollRecorder } from './rollRecorder';
 import { ROLL_REC } from './rollTables';
@@ -59,10 +59,7 @@ function consoleHost(ctx: AppContext): RecorderHost {
       return live.scheduler.audibleTick(heardAt(live, timeStamp ?? performance.now()));
     },
     secondsPerTick: () => system()?.scheduler.transport.secondsPerTick ?? 0,
-    settle: () => {
-      settleGestures();
-      return !ctx.gestureOpen;
-    },
+    editOpen: () => ctx.gestureOpen,
     write: (partial) => {
       const result = ctx.recordTake(partial, ROLL_REC.undo);
       if (result?.ok) ctx.invalidate();
@@ -78,7 +75,8 @@ export function mountRollRecorder(ctx: AppContext, keyboard: Keyboard): RollReco
   current = recorder;
   keyboard.tap = recorder;
   ctx.parts.onSelect(() => recorder.sync());
-  ctx.onBeforeEdit(() => recorder.close());
+  ctx.onBeforeEdit((kind) => (kind === 'song' ? recorder.close() : recorder.split()));
+  ctx.onGestureEnd(() => recorder.gestureEnded());
   ctx.host.transport.onBeforeHalt(() => recorder.close());
   setInterval(() => recorder.sync(), ROLL_REC.pollMs);
   return recorder;

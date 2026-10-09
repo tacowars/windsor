@@ -81,14 +81,32 @@ the build tickets.
    A take runs from Rec on (or the transport's start) to the transport's
    stop, Rec off or a part switch. Any other song edit made while
    recording (Quantise, a knob, a note dragged) splits the take
-   (tacowars, 2026-10-09): the take so far closes as its own step, the
-   edit is its own step, and recording carries on as a new take. Undo
-   then steps back through the later take, the edit and the earlier
-   take in turn. An undo pressed during a take closes the take first,
-   then applies. A take is an ordinary edit for redo: its first write
-   empties the redo stack, as every edit's does, so after an undo,
-   recording leaves nothing to redo (windsor#663). The take's writes are never folded into another
-   edit's step, nor another edit into the take's.
+   (tacowars, 2026-10-09): the notes the take has written close as its
+   own step, the edit is its own step, and recording carries on as a new
+   take.
+   - **A held note carries across the edit** (tacowars, 2026-10-10). It
+     is not cut there: it goes into the new take, keeps growing, and is
+     written on release into the new take's step, with its own onset and
+     its full length. Undo then steps back through the later take (the
+     carried note with it), the edit and the earlier take in turn. A
+     held note whose place the edit removes (its region deleted, moved
+     or given another loop length, or trimmed to end before the note's
+     onset) is dropped, as there is nowhere left to write it.
+   - **Undo and redo.** An undo pressed during a take closes the take's
+     written notes first, then applies, and a note still held carries on
+     as across any edit (windsor#663). A take is an ordinary edit for
+     redo: its first write empties the redo stack, as every edit's does,
+     so after an undo, recording leaves nothing to redo.
+   - **Another control's drag** (tacowars, 2026-10-10). A drag holds its
+     undo step open and folds every change into it, so a take never
+     writes while one is open. Recording carries on through it: the
+     drag's start closes the take as any edit does (held notes carry),
+     the notes played during the drag are recorded and held back, and
+     when the drag ends they are written as a new take, with its own
+     step after the drag's. They play back from then on.
+
+   The take's writes are never folded into another edit's step, nor
+   another edit into the take's.
 9. **The note cap.** Past `ROLL_NOTES_MAX` (2048) a region takes no new
    notes, and the device says so. A recorded note that replaces one at
    the same tick and pitch (decision 4) adds nothing to the count, so it

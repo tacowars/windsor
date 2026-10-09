@@ -5,7 +5,7 @@
  * tests pin is the issue's boundary cases: where a take writes, where a held
  * note is cut and when it is written, the ordering that sees a loop's jump
  * before the release after it, and one undo step per take, split by every
- * other edit.
+ * other edit, with the notes still held carried across it.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -24,6 +24,7 @@ import { withGesture } from './gestureHooks';
 import type { EngineHost } from './host';
 import { library, loadPageLibrary } from './libraryModel';
 import { RollRecorder } from './rollRecorder';
+import { heldStart } from './rollRepeats';
 import { newSong } from './songParts';
 import { bpmChange } from './transportModel';
 
@@ -97,11 +98,12 @@ function rig(loop?: { start: number; end: number }): Rig {
     now: () => ({ tick: clock.tick, time: clock.time }),
     stamp: (timeStamp) => timeStamp ?? clock.tick,
     secondsPerTick: () => SPT,
-    settle: () => !ctx.gestureOpen,
+    editOpen: () => ctx.gestureOpen,
     write: (partial) => ctx.recordTake(partial, 'Record')?.ok === true,
     closeStep: () => ctx.closeTake(),
   });
-  ctx.onBeforeEdit(() => rec.close());
+  ctx.onBeforeEdit((kind) => (kind === 'song' ? rec.close() : rec.split()));
+  ctx.onGestureEnd(() => rec.gestureEnded());
   const at = (tick: number, time = tick * SPT): void => {
     clock.tick = tick;
     clock.time = time;
@@ -268,18 +270,39 @@ describe('a take', () => {
     }
   });
 
-  it('records nothing while another control’s drag is open', () => {
+  it('draws a note held in the second pass of a repeating region on that pass', () => {
+    // Region 1 is bars 6–8 looping one bar: a key down 10 ticks into its
+    // second pass is drawn there, under the playhead, not over the first.
+    const r = armed(rig(), 6 * BAR);
+    r.press(6 * BAR + 10);
+    r.at(6 * BAR + 30);
+    r.rec.sync();
+    const [note] = r.rec.held(0);
+    expect(note).toMatchObject({ regionIndex: 1, tick: 10, local: BAR + 10, ticks: 20 });
+    expect(heldStart(note!, { loopTicks: BAR, regionTicks: 3 * BAR })).toBe(BAR + 10);
+  });
+
+  it('records through another control’s drag, and writes it as its own step when the drag ends', () => {
     const r = armed(rig());
+    const velocity = partAt(r.ctx.model.doc, 0)?.velocity;
     r.ctx.beginGesture('Level');
+    r.ctx.change(partChange(0, { velocity: 0.5 }));
     r.press(10);
     r.release(20);
-    r.ctx.endGesture();
     expect(r.notes(0)).toEqual([]);
+    r.ctx.endGesture();
+    expect(r.notes(0)).toEqual([n(10, 10)]);
+    expect(r.ctx.undoLabel).toBe('Record');
+    r.ctx.undo();
+    expect([r.notes(0), partAt(r.ctx.model.doc, 0)?.velocity]).toEqual([[], 0.5]);
+    expect(r.ctx.undoLabel).toBe('Level');
+    r.ctx.undo();
+    expect([partAt(r.ctx.model.doc, 0)?.velocity, r.ctx.canUndo]).toEqual([velocity, false]);
   });
 });
 
 describe('the take’s undo step', () => {
-  it('ends the take before an undo, which then takes it all back', () => {
+  it('closes the take before an undo, which takes back what it wrote; a key still held carries on', () => {
     const r = armed(rig());
     r.press(10);
     r.release(14);
@@ -288,9 +311,10 @@ describe('the take’s undo step', () => {
     expect(r.ctx.undo()).toBe(true);
     expect(r.notes(0)).toEqual([]);
     r.release(60, 64, 'KeyD');
-    expect(r.notes(0)).toEqual([]);
-    expect(r.ctx.redo()).toBe(true);
-    expect(r.notes(0)).toEqual([n(10, 4), n(20, 30, 64)]);
+    expect(r.notes(0)).toEqual([n(20, 40, 64)]);
+    expect(r.ctx.canRedo).toBe(false);
+    r.ctx.undo();
+    expect([r.notes(0), r.ctx.canUndo]).toEqual([[], false]);
   });
 
   it('empties the redo stack at its first write', () => {
@@ -315,7 +339,7 @@ describe('the take’s undo step', () => {
     r.press(50, 67, 'KeyG');
     r.release(60, 67, 'KeyG');
     r.stop();
-    const notes = [n(10, 10), n(30, 10, 64), n(50, 10, 67)];
+    const notes = [n(10, 10), n(30, 15, 64), n(50, 10, 67)];
     expect(r.notes(0)).toEqual(notes);
     const steps: string[] = [];
     while (r.ctx.canUndo) {
@@ -325,15 +349,37 @@ describe('the take’s undo step', () => {
     }
     expect(steps).toEqual([
       'Record',
-      '2 notes, velocity 0.5',
+      '1 notes, velocity 0.5',
       'Quantise',
-      `2 notes, velocity ${velocity}`,
+      `1 notes, velocity ${velocity}`,
       'Record',
       `0 notes, velocity ${velocity}`,
     ]);
   });
 
-  it('ends a note at an edit that deletes its region, which gets no write after', () => {
+  it('carries a key held across a knob turn into the later take, its length from press to release', () => {
+    const r = armed(rig());
+    const velocity = partAt(r.ctx.model.doc, 0)?.velocity;
+    r.press(10, 64, 'KeyD');
+    r.release(20, 64, 'KeyD');
+    r.press(30);
+    r.at(40);
+    r.ctx.change(partChange(0, { velocity: 0.5 }), 'Level');
+    r.at(200);
+    r.rec.sync();
+    expect(r.notes(0)).toEqual([n(10, 10, 64)]);
+    r.release(250);
+    expect(r.notes(0)).toEqual([n(10, 10, 64), n(30, 220)]);
+    r.ctx.undo();
+    expect([r.notes(0), partAt(r.ctx.model.doc, 0)?.velocity]).toEqual([[n(10, 10, 64)], 0.5]);
+    expect(r.ctx.undoLabel).toBe('Level');
+    r.ctx.undo();
+    expect([r.notes(0), partAt(r.ctx.model.doc, 0)?.velocity]).toEqual([[n(10, 10, 64)], velocity]);
+    r.ctx.undo();
+    expect([r.notes(0), r.ctx.canUndo]).toEqual([[], false]);
+  });
+
+  it('drops a key held across an edit that deletes its region: there is nowhere to write it', () => {
     const r = armed(rig());
     r.press(5 * BAR + 10);
     r.at(5 * BAR + 30);
@@ -341,8 +387,6 @@ describe('the take’s undo step', () => {
     r.ctx.change(partChange(0, { regions }));
     r.release(5 * BAR + 40);
     expect(partAt(r.ctx.model.doc, 0)?.regions).toHaveLength(1);
-    r.ctx.undo();
-    expect(r.notes(1)).toEqual([n(10, 20)]);
     r.ctx.undo();
     expect([r.notes(1), r.ctx.canUndo]).toEqual([[], false]);
   });
