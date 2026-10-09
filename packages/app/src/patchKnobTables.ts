@@ -34,6 +34,8 @@ export interface PatchKnobEntry {
   readonly f: string;
   readonly label: string;
   readonly o: PatchKnobRange;
+  /** What the knob's title says before how to turn it, where its label alone can't (a unit). */
+  readonly hint?: string;
 }
 export type PatchKnobTable = ReadonlyArray<PatchKnobEntry>;
 
@@ -125,6 +127,20 @@ export const lfoToWidthKnobs = (key: LfoKey): PatchKnobTable =>
     f: `${key}.toWidth.${i}`,
     label: `Width ${name}`,
     o: { min: -1, max: 1, fmt: fmtSigned },
+  }));
+
+/**
+ * An LFO's per-operator ratio depth in octaves at full swing (windsor#646,
+ * windsor#649): signed, read `+1.25` as Width A–D are, with the unit in the
+ * hint because `+1.25oct` overruns the cell (the mockup's note). The range is
+ * the engine's `LFO_TO_RATIO_RANGE`, which `index.ts` does not export.
+ */
+export const lfoToRatioKnobs = (key: LfoKey): PatchKnobTable =>
+  OP_NAMES.map((name, i) => ({
+    f: `${key}.toRatio.${i}`,
+    label: `Ratio ${name}`,
+    o: { min: -4, max: 4, fmt: fmtSigned },
+    hint: `Ratio ${name}: octaves of LFO on ${name}'s ratio`,
   }));
 
 export const PITCH_ENV_AMOUNT_KNOB: PatchKnobEntry = {
@@ -256,6 +272,7 @@ export function allPatchKnobs(): PatchKnob[] {
     own(lfoKnobs(key));
     own(lfoToOpKnobs(key));
     own(lfoToWidthKnobs(key));
+    own(lfoToRatioKnobs(key));
   }
   own([PITCH_ENV_AMOUNT_KNOB]);
   OP_NAMES.forEach((_, i) =>

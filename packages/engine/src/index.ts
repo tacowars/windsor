@@ -411,11 +411,13 @@ export * from './patch/patch';
 // operator's own filters' range, floor and key-tracking range (windsor#362,
 // windsor#590), a macro's bounds (windsor#559), and an operator ratio's range,
 // the console's and the ratio target's (windsor#646). `OpSync` and
-// `OP_SYNC_VALUES` come with the patch schema above.
+// `OP_SYNC_VALUES` come with the patch schema above; `normaliseOpSyncs` is
+// the sync-cycle rule the console's Sync menu asks (windsor#649).
 export {
   LFO2_DEFAULTS,
   MACRO_MAPPINGS_MAX,
   MACRO_VALUE_RANGE,
+  normaliseOpSyncs,
   OP_FILTER_FLOOR_HZ,
   OP_FILTER_RANGE,
   OP_FILTER_TRACK_RANGE,

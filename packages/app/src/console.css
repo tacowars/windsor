@@ -6055,6 +6055,11 @@ select.field.auto-snap {
   color: var(--ink-faint);
   white-space: nowrap;
 }
+/* The Ratio readout while a lane or macro holds the ratio (windsor#649):
+   the held ratio, in the lock's colour, as the Coarse/Fine pair beside it. */
+.knob-readout.locked .readout-val {
+  color: var(--lock-color);
+}
 
 /* ---------- the locked knob (windsor#351) ---------- */
 /* Record `2026-10-01-song-automation-lanes` decision 6, the lit ring
@@ -6333,7 +6338,8 @@ input.field {
 }
 .op-row {
   display: grid;
-  grid-template-columns: 138px minmax(0, 1fr);
+  /* 170 px, up from 138, to fit the Sync face on the wave line (windsor#649). */
+  grid-template-columns: 170px minmax(0, 1fr);
   gap: 6px 12px;
   align-items: center;
   background: var(--panel);
@@ -6392,6 +6398,113 @@ input.field {
   min-width: 0;
   padding: 3px 4px;
   font-size: 11.5px;
+}
+/* The Sync face (windsor#649, `operatorSyncPicker.ts`; the mockup's
+   "Beside the wave picker"): dim `Sync` while off; synced, its master's
+   letter (or the note's ♪) in the master's colour on a tint of it. A letter
+   sets `--m-color` to its operator's colour; the note keeps the ink. */
+.sync-face {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  padding: 3px 12px 3px 6px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  background: var(--inset);
+  color: var(--ink-faint);
+  font: 600 10px var(--f-panel);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.sync-face:hover {
+  border-color: var(--ink-faint);
+}
+.sync-face::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  border: 3px solid transparent;
+  border-top-color: var(--ink-faint);
+  border-bottom: 0;
+}
+.sync-face.synced {
+  color: var(--m-color, var(--ink));
+  border-color: color-mix(in srgb, var(--m-color, var(--ink)) 70%, var(--line));
+  background: color-mix(in srgb, var(--m-color, var(--ink)) 18%, var(--inset));
+}
+.sync-face.synced::after {
+  border-top-color: var(--m-color, var(--ink));
+}
+/* Its menu, in the page above everything, placed by `operatorSyncPicker.ts`
+   from the face and the viewport; never wider than the placement's cap. */
+.sync-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: min(220px, var(--sync-menu-cap, 100%));
+  max-width: var(--sync-menu-cap, none);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45);
+  text-align: left;
+  cursor: default;
+}
+.sync-menu .mh {
+  font: 600 9px var(--f-panel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 4px 6px 5px;
+}
+.sync-menu button {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  column-gap: 6px;
+  align-items: baseline;
+  width: 100%;
+  padding: 5px 6px;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  color: var(--ink);
+  font: 12px var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.sync-menu button:hover:not(:disabled) {
+  background: var(--inset);
+}
+.sync-menu button[aria-checked='true'] {
+  background: color-mix(in srgb, var(--carrier) 16%, transparent);
+}
+.sync-menu .g {
+  font: 700 12px var(--f-panel);
+  color: var(--m-color, var(--ink));
+  text-align: center;
+}
+.sync-menu .h {
+  grid-column: 2;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  line-height: 1.35;
+}
+.sync-menu button:disabled {
+  cursor: not-allowed;
+  color: var(--ink-faint);
+}
+.sync-menu button:disabled .g {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+.sync-menu button:disabled .h {
+  color: var(--hot);
 }
 .op-body {
   /* Declared here, not on .op-rows, so the narrow-row query below can
