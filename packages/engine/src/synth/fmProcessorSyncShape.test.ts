@@ -246,3 +246,66 @@ describe('the shape against the table path (windsor#655, decision 2)', () => {
     }
   });
 });
+
+describe('past Nyquist, the table path (windsor#655, SYNC_SHAPE_MAX_INC)', () => {
+  it('a synced Saw at 48 GHz reads its table, so a block takes constant time, and plays finite samples', () => {
+    const a = { wave: WAVE.SAW, fixed: true, fixedHz: 48e9 };
+    expect(bits(synced(a))).toEqual([1, 0, 0]);
+    expect(play(synced(a), 4).every(Number.isFinite)).toBe(true);
+  });
+
+  /** A note of 32 samples (1500 Hz), a fine block: every control block opens on a reset. */
+  const HIGH = 69 + 12 * Math.log2(SR / 32 / 440);
+  /** Ratio 12 at that note is 0.375 of a cycle a sample; the lane's octave up makes it 0.75. */
+  const SAW_12 = { wave: WAVE.SAW, ratio: 12 };
+  const BLOCKS = 40;
+
+  /** The left channel, and A's direct bit each block, with a ratio lane an octave up over `[from, to)`. */
+  function run(patch: Patch, from: number, to: number): { x: Float32Array; direct: number[] } {
+    const processor = loaded.create(patch, 1, undefined, {
+      voiceSlots: ['ops.0.ratio'],
+      controlIntervals: { long: loaded.ctrlInterval },
+    });
+    const params: Record<string, Float32Array> = {
+      pitchBend: new Float32Array([0]),
+      modWheel: new Float32Array([0]),
+      gain: new Float32Array([1]),
+      [voiceSlotParamName(0)]: new Float32Array([0]),
+    };
+    const left = new Float32Array(BLOCK);
+    const right = new Float32Array(BLOCK);
+    const x = new Float32Array(BLOCKS * BLOCK);
+    const direct: number[] = [];
+    processor.inbox({ type: 'noteOn', id: 1, note: HIGH, velocity: 1, frame: 0 });
+    for (let b = 0; b < BLOCKS; b++) {
+      loaded.setFrame(b * BLOCK);
+      params[voiceSlotParamName(0)]![0] = b >= from && b < to ? 1 : 0;
+      processor.process([], [[left, right]], params);
+      x.set(left, b * BLOCK);
+      direct.push((processor.voices[0] as unknown as ShapeView).sync.shape.direct & 1);
+    }
+    return { x, direct };
+  }
+
+  it('leaves the shape while a ratio lane lifts it past Nyquist, and takes it again below, neither skipping nor repeating a sample', () => {
+    const switched = run(synced(SAW_12), 10, 20);
+    expect(switched.direct.slice(8, 22)).toEqual([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]);
+    const shape = run(synced(SAW_12), BLOCKS, BLOCKS).x;
+    // The same lane on the table path; A is not eligible there, so it sounds a sample early.
+    const table = run(onTable(SAW_12), 10, 20).x;
+    // The first sample the shape sends back is its wave at the phase the
+    // block's opening reset left, without the half of that reset's step the
+    // table path never took: any entry on a reset does so. It stays within
+    // the naive Saw's own level, `g·π/2`, `g` the one-harmonic table's peak.
+    const back = 20 * BLOCK + 1;
+    expect(Math.abs(switched.x[back]!)).toBeLessThanOrEqual(peak(table) * (Math.PI / 2) * 1.0001);
+    for (let n = SETTLED; n < switched.x.length; n++) {
+      if (n === back) continue;
+      const nearest = Math.min(
+        Math.abs(switched.x[n]! - shape[n]!),
+        Math.abs(switched.x[n]! - table[n - 1]!),
+      );
+      expect(nearest, `sample ${n}`).toBeLessThan(1e-5);
+    }
+  });
+});

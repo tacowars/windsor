@@ -58,6 +58,7 @@ var STEAL_FADE_SECONDS = 0.03;
 var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
 var SYNC_BLEP_GAIN = 0.5;
+var SYNC_SHAPE_MAX_INC = 0.5;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -2233,6 +2234,8 @@ function beginSyncShapeBlock(voice, squeezed) {
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const bit = 1 << i;
     if ((sh.eligible & bit) === 0 || fbTo[i] !== 0 || (voice.fbRamp & bit) !== 0) continue;
+    const inc = voice.phaseInc[i];
+    if (!(inc < SYNC_SHAPE_MAX_INC && inc > -SYNC_SHAPE_MAX_INC)) continue;
     if (sh.kind[i] !== SHAPE_PULSE && (squeezed & bit) !== 0) continue;
     direct |= bit;
   }

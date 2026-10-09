@@ -294,6 +294,15 @@ const STEAL_STREAMED_RESERVE = 4;
  */
 const SYNC_BLEP_GAIN = 0.5;
 
+/*
+ * The direct shape's bound (windsor#655, `voiceSyncShape.ts`): an operator
+ * takes the shape only while its phase increment is below half a cycle a
+ * sample (Nyquist) in magnitude, so each sample's edge search crosses at
+ * most one wrap and one duty edge. One at or above it, as a patch's finite
+ * but huge `ratio` or `fixedHz` may ask, reads its table, in constant time.
+ */
+const SYNC_SHAPE_MAX_INC = 0.5;
+
 export {
   TABLE_SIZE,
   TABLE_MASK,
@@ -350,4 +359,5 @@ export {
   STEAL_RESERVE_MIN,
   STEAL_STREAMED_RESERVE,
   SYNC_BLEP_GAIN,
+  SYNC_SHAPE_MAX_INC,
 };

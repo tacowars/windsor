@@ -251,6 +251,7 @@ describe('beginSyncShapeBlock', () => {
       sync,
       fbTo: Float32Array.of(fb, 0, 0, 0),
       fbRamp: 0,
+      phaseInc: Float64Array.of(0.01, 0, 0, 0),
       tables: [table, null, null, null],
       phase: Float64Array.of(0.25, 0, 0, 0),
       width: Float32Array.of(1, 1, 1, 1),

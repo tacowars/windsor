@@ -10,8 +10,9 @@
  * (a table wave) or Pulse with no modulator edge into it in the algorithm,
  * whatever that modulator's level, in a patch whose Tone is 1. Each render
  * call, so at least each control block (`beginSyncShapeBlock`): of those,
- * the ones whose live feedback is exactly 0 across the block and, for the
- * Saw and Square, whose live width is exactly 1 and not ramping. One that
+ * the ones whose live feedback is exactly 0 across the block, whose phase
+ * increment is below Nyquist (`SYNC_SHAPE_MAX_INC`) and, for the Saw and
+ * Square, whose live width is exactly 1 and not ramping. One that
  * stops qualifying reads its table from that block on, and comes back when
  * it qualifies again. An eligible operator sends its wave a sample late on
  * either path, so a switch neither skips nor repeats a sample; one leaving
@@ -50,7 +51,7 @@
 import type { Patch } from '../../patch/patch';
 import type { Voice } from './voice';
 import { ALGORITHMS } from './algorithms';
-import { SYNC_BLEP_GAIN, TABLE_SIZE } from './fmConstants';
+import { SYNC_BLEP_GAIN, SYNC_SHAPE_MAX_INC, TABLE_SIZE } from './fmConstants';
 import { OPERATOR_COUNT } from './patchDefaults';
 import { WAVE } from './waveIds';
 import { KIND_PULSE, KIND_TABLE, SIN_TAB } from './waveTables';
@@ -160,7 +161,8 @@ function readNext(voice: Voice, sh: SyncShape, i: number): void {
 /**
  * The block's direct operators, at a render call's start, after the
  * control update: each eligible one whose feedback is exactly 0 across the
- * block (`fbTo` 0 and not ramping) and, unless it is a Pulse, that is not
+ * block (`fbTo` 0 and not ramping), whose phase increment is below
+ * `SYNC_SHAPE_MAX_INC` either way, and, unless it is a Pulse, that is not
  * `squeezed` (the render's bits: width exactly 1, not ramping). One leaving
  * the shape drops what the next sample owes; one entering starts with no
  * reset. Each direct operator's level follows its table, and its next wave
@@ -173,6 +175,9 @@ function beginSyncShapeBlock(voice: Voice, squeezed: number): void {
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const bit = 1 << i;
     if ((sh.eligible & bit) === 0 || fbTo[i] !== 0 || (voice.fbRamp & bit) !== 0) continue;
+    // Past Nyquist the edge loops would run once a crossed cycle: the table instead.
+    const inc = voice.phaseInc[i];
+    if (!(inc < SYNC_SHAPE_MAX_INC && inc > -SYNC_SHAPE_MAX_INC)) continue;
     if (sh.kind[i] !== SHAPE_PULSE && (squeezed & bit) !== 0) continue;
     direct |= bit;
   }
@@ -234,6 +239,8 @@ function syncShapeEdges(voice: Voice): void {
     let hold = 0;
     let owe = 0;
     // An edge at the reset instant is the reset's own step, so the loops stop short of it.
+    // `beginSyncShapeBlock` keeps |inc| below half a cycle a sample, so each
+    // loop below crosses at most one wrap and one duty edge a sample.
     for (let x = Math.floor(p0) + 1; isReset ? x < end : x <= end; x++) {
       const dd = 1 - (x - p0) / inc;
       const e = 1 - dd;
