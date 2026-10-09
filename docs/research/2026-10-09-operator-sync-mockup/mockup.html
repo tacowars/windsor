@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Mockup only (windsor#647): the console side of operator hard sync
+     (engine: windsor#646). A Sync picker on each operator row, in two
+     placements behind the toolbar toggle, and Ratio A-D knobs on the LFO and
+     LFO 2 cards. Everything else is today's Parts tab, captured from the dev
+     build on 2026-10-09 with the factory patch "Digital Bass" loaded
+     (algorithm 04, Saw D / Sine / Sine / Square at ratios 1, 1, 2, 4): the
+     operator rows, the Filter, LFO and LFO 2 cards, their knobs, envelope
+     plots and styles are that build's own markup and rules. The strip at the
+     very top is the mockup's own switcher, not part of the console. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Operator Sync Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ---------- today's console rules, copied from the dev build ---------- */
+:root { --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10; --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70; --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c; --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif; --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif; --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; --r: 3px; }
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 13px; margin: 0px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+.section-title { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
+.section-title::after { content: ""; flex: 1 1 0%; height: 1px; background: var(--line); margin-left: 2px; }
+.section-title > span { flex: 0 0 auto; }
+.knob-row { display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: flex-end; }
+.parts-grid { display: grid; grid-template-columns: 230px minmax(0px, 1fr); gap: 1px; background: var(--line); }
+.parts-grid .bays { background: var(--ground); padding: 12px; min-width: 0px; }
+.deck-title { margin-top: 14px; }
+.deck { display: flex; flex-wrap: wrap; gap: 8px; }
+.deck-card { flex: 1.2 1 340px; min-width: 0px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.deck-card.deck-filter { flex-grow: 1.3; }
+.deck .env-canvas { height: 48px; }
+.knob { width: 54px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0px 4px; border-radius: var(--r); cursor: ns-resize; touch-action: none; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--knob-color, var(--ink-dim)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; pointer-events: none; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); pointer-events: none; }
+.knob-readout { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; padding: 3px 3px 6px; min-width: 42px; }
+.knob-readout .readout-val { font-family: var(--f-num); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.knob-readout .readout-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1 1 0%; min-width: 44px; background: var(--inset); border: 0px; padding: 5px 4px; cursor: pointer; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--seg-color, var(--carrier)); color: rgb(17, 20, 22); }
+select.field, input.field { width: 100%; max-width: 260px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 7px; font-size: 12px; }
+.btn { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; color: var(--ink-dim); font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.field-label { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+.op-rows { --op-cell: 44px; --op-readout: 56px; --op-gap: 4px; --op-core-gap: 14px; --op-env: 560px; --op-env-min: 140px; --op-cols: 10; container-type: inline-size; display: flex; flex-direction: column; gap: 6px; }
+.op-row { display: grid; grid-template-columns: 138px minmax(0px, 1fr); gap: 6px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--op-color); border-radius: var(--r); padding: 7px 10px; }
+.op-id { display: flex; flex-direction: column; gap: 5px; min-width: 0px; }
+.op-id-head { display: flex; align-items: center; gap: 8px; }
+.op-letter { font-family: var(--f-panel); font-size: 17px; font-weight: 700; letter-spacing: 0.05em; color: var(--op-color); line-height: 1; }
+.op-role { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; background: color-mix(in srgb, var(--op-color) 18%, transparent); color: var(--op-color); }
+.op-id-line { display: flex; gap: 4px; }
+.op-id .btn { padding: 3px 6px; font-size: 10px; }
+.op-adv-btn { margin-left: auto; }
+.op-id select.field { flex: 1 1 0%; min-width: 0px; padding: 3px 4px; font-size: 11.5px; }
+.op-body { --op-main: calc(var(--op-cols) * (var(--op-cell) + var(--op-gap)) + var(--op-readout)); --op-adsr: calc(4 * var(--op-cell) + 3 * var(--op-gap)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0px; }
+@container (width < 920px) {
+  .op-row { column-gap: 8px; }
+  .op-body { --op-gap: 2px; --op-core-gap: 8px; }
+}
+.op-core { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--op-core-gap); flex: 1 1 calc(var(--op-main) + var(--op-adsr) + 2 * var(--op-core-gap) + var(--op-env)); min-width: 0px; }
+.op-knobs { display: flex; flex: 0 0 auto; align-items: center; gap: var(--op-core-gap); }
+.op-group { display: flex; gap: var(--op-gap); flex: 0 0 auto; align-items: flex-end; }
+.op-row .knob { width: var(--op-cell); }
+.op-row .knob-readout { width: var(--op-readout); }
+.op-row .knob.op-fixed { width: calc(2 * var(--op-cell) + var(--op-readout) + 2 * var(--op-gap)); }
+.op-main { min-width: var(--op-main); }
+.op-row .env-canvas { width: auto; flex: 1 1 var(--op-env-min); min-width: var(--op-env-min); height: 54px; }
+.env-canvas { width: 100%; height: 46px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); cursor: grab; touch-action: none; }
+/* Today a screen breakpoint (max-width: 1080px); a container query here. */
+@container frame (width < 1080px) {
+  .parts-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line-bright); }
+.tb .grp { display: flex; align-items: center; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb .grp button:first-of-type { border-radius: var(--r) 0 0 var(--r); margin-left: 0; }
+.tb .grp button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb .grp button:only-of-type { border-radius: var(--r); }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.notes { max-width: 980px; margin: 14px 16px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.55; color: var(--ink-dim); }
+.notes h2 { font: 700 14px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--carrier); margin: 12px 0 2px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ul { margin: 4px 0 0; padding-left: 18px; }
+.notes code { font: 12px var(--f-num); color: var(--ink); }
+.frame { container: frame / inline-size; border-top: 1px solid var(--line-bright); }
+.standin { background: var(--ground); padding: 12px 14px; }
+.standin-box { border: 1px dashed var(--line-bright); border-radius: var(--r); padding: 10px; color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; line-height: 1.6; }
+.standin-box b { display: block; color: var(--ink-dim); }
+body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px; }
+
+/* ---------- the proposal: the Sync picker ---------- */
+/* Placement: beside the ratio pair (a cell in the knob row) or beside the
+   wave picker (a button in the identity column). One shows at a time. */
+body[data-place="ratio"] .sync-inline,
+body[data-place="wave"] .sync-cell { display: none; }
+/* Beside the wave picker the identity column has to grow to fit a third
+   control on that line: 138px today, 170px here. */
+body[data-place="wave"] .op-row { grid-template-columns: 170px minmax(0, 1fr); }
+/* Beside the ratio pair the main group gains one cell. */
+body[data-place="ratio"] .op-rows { --op-cols: 11; }
+
+.sync-cell { width: var(--op-cell); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r); cursor: pointer; position: relative; user-select: none; }
+.sync-cell:hover { background: var(--panel-hi); }
+.sync-face { display: grid; place-items: center; width: 34px; height: 24px; margin: 7px 0; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); font: 600 12px var(--f-panel); color: var(--ink-faint); letter-spacing: .04em; position: relative; }
+.sync-face::after { content: ''; position: absolute; right: 3px; bottom: 3px; border: 3px solid transparent; border-top-color: var(--ink-faint); border-bottom: 0; }
+.sync-cell .knob-val { font-family: var(--f-num); font-size: 10px; color: var(--ink); }
+.sync-cell .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.sync-inline { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
+.sync-inline .sync-face { margin: 0; width: auto; min-width: 42px; height: auto; padding: 3px 12px 3px 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+/* At a glance: a synced operator's face takes its master's colour and
+   letter (or the note's sign), on a tint of that colour. */
+.synced .sync-face { color: var(--m-color); border-color: color-mix(in srgb, var(--m-color) 70%, var(--line)); background: color-mix(in srgb, var(--m-color) 18%, var(--inset)); }
+.synced .sync-face::after { border-top-color: var(--m-color); }
+
+.sync-menu { position: absolute; z-index: 40; top: calc(100% + 2px); left: 0; min-width: 220px; padding: 4px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 6px 18px rgb(0 0 0 / .45); text-align: left; cursor: default; }
+.sync-menu[hidden] { display: none; }
+.sync-menu .mh { font: 600 9px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); padding: 4px 6px 5px; }
+.sync-menu button { display: grid; grid-template-columns: 22px 1fr; column-gap: 6px; align-items: baseline; width: 100%; padding: 5px 6px; background: none; border: 0; border-radius: 2px; color: var(--ink); font: 12px var(--f-ui); text-align: left; cursor: pointer; }
+.sync-menu button:hover:not(:disabled) { background: var(--inset); }
+.sync-menu button[aria-checked="true"] { background: color-mix(in srgb, var(--carrier) 16%, transparent); }
+.sync-menu .g { font: 700 12px var(--f-panel); color: var(--m-color, var(--ink-dim)); text-align: center; }
+.sync-menu .h { grid-column: 2; font-size: 10.5px; color: var(--ink-faint); line-height: 1.35; }
+.sync-menu button:disabled { cursor: not-allowed; color: var(--ink-faint); }
+.sync-menu button:disabled .g { color: var(--ink-faint); text-decoration: line-through; }
+.sync-menu button:disabled .h { color: var(--hot); }
+</style>
+</head>
+<body data-place="ratio" class="show-new">
+<div class="tb">
+  <div class="grp"><span class="lbl">Sync placement</span><button type="button" data-place="ratio" class="on">Beside the ratio pair</button><button type="button" data-place="wave">Beside the wave picker</button></div>
+  <div class="grp"><span class="lbl">Additions</span><button type="button" id="newToggle" class="on">Outline new controls</button></div>
+  <div class="grp"><button type="button" id="resetSync">All Sync off</button></div>
+</div>
+
+<div class="notes">
+  <h2>Operator Sync and LFO Ratio</h2>
+  Today's Parts tab with <b>Digital Bass</b> loaded, plus a <b>Sync</b> picker on every operator row and
+  <b>Ratio A&ndash;D</b> on both LFO cards (dashed outlines mark them; the toggle above hides the outlines).
+  Every row's picker lists <b>Off</b>, <b>Note</b> and the other three operators; a letter that would close a
+  loop is struck through, with the reason under it. Try <b>B &rarr; A</b>, then open A's picker.
+  C starts synced to the note so the at-a-glance face shows from the start; <b>All Sync off</b> clears it.
+  The Ratio knobs drag (shift for fine, double-click resets) so the signed readout can be seen.
+
+  <h3>To decide</h3>
+  <ul>
+    <li><b>Where the picker sits.</b> <b>Beside the ratio pair</b>: a cell in the knob row after Coarse, Fine and
+      the Ratio readout, reading as part of the pitch controls; the main group grows by one cell.
+      <b>Beside the wave picker</b>: a button on the wave line, reading as part of what the operator is; the
+      identity column grows from 138&nbsp;px to 170&nbsp;px to fit it.</li>
+  </ul>
+
+  <h3>The proposal for the glance</h3>
+  <ul>
+    <li>A synced operator's picker face shows its master: the letter in that operator's colour, or
+      <b>&#9834;</b> for the note, on a tint of the same colour. Off reads as a dim dash (or <b>Sync</b> on the wave line).</li>
+    <li>The LFO Ratio readout is signed octaves, &minus;4 to +4, written <code>+1.25</code> as Width A&ndash;D
+      are; the unit is in the knob's hint, because <code>+1.25oct</code> overruns the cell.</li>
+  </ul>
+
+  <h3>Stand-ins</h3>
+  <ul>
+    <li>The left column (Output, Algorithm, Global) is a labelled box: it does not change.</li>
+    <li>Only the Sync picker, its menu and the Ratio knobs respond. The captured controls are pictures of
+      today's, at Digital Bass's real values; the Ratio knobs start at 0, the field's default.</li>
+    <li>The envelope plots are pictures taken at a 1440&nbsp;px window. At other widths they stretch, where
+      the console redraws them.</li>
+  </ul>
+</div>
+
+<div class="frame">
+<div class="parts-grid">
+<aside class="standin"><div class="standin-box"><b>Stand-in</b>Output, Algorithm and Global: unchanged, not drawn</div></aside>
+<main class="bays">
+<div class="section-title"><span>Operators</span></div>
+<div class="op-rows">
+<section class="op-row" style="--op-color: #E0A44E;">
+<div class="op-id">
+<div class="op-id-head"><span class="op-letter">A</span><span class="op-role">Carrier</span><button class="btn op-adv-btn" type="button" aria-pressed="false" aria-label="Operator A advanced envelope">Adv</button></div>
+<div class="op-id-line">
+<select class="field" aria-label="Operator A waveform"><option value="0">Sine</option><option value="1">Saw</option><option value="2">Square</option><option value="3">Triangle</option><option value="4">Noise</option><option value="5" selected>Saw D</option><option value="6">Square D</option><option value="7">Sine 4bit</option><option value="8">Sine 8bit</option><option value="9">User</option><option value="10">Pulse</option></select><button class="btn" type="button" aria-label="Operator A pitch mode" aria-pressed="false">Ratio</button></div></div>
+<div class="op-body">
+<div class="op-core">
+<div class="op-knobs">
+<div class="op-group op-main">
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Coarse" data-v="1" data-a="-123.75" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Fine" data-v="0.000" data-a="-135" data-z="-135"></div>
+<div class="knob-readout"><span class="readout-val">1.000</span><span class="readout-label">Ratio</span></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Detune" data-v="0c" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Level" data-v="1.00" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Fdbk" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Width" data-v="100%" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Vel" data-v="0.40" data-a="-27" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="LP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="HP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Key Trk" data-v="+0.00" data-a="-45" data-z="-45"></div></div>
+<div class="op-group">
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Attack" data-v="2m" data-a="-93.23073264860875" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Decay" data-v="600m" data-a="41.31227487197043" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Sustain" data-v="0.55" data-a="13.5" data-z="-135"></div>
+<div class="knob" style="--knob-color: #E0A44E;" data-l="Release" data-v="150m" data-a="1.6055666985253083" data-z="-135"></div></div></div>
+<img class="env-canvas" src="data:image/png;base64,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" alt=""></div></div>
+</section>
+<section class="op-row" style="--op-color: #5FA8A0;">
+<div class="op-id">
+<div class="op-id-head"><span class="op-letter">B</span><span class="op-role">Mod</span><button class="btn op-adv-btn" type="button" aria-pressed="false" aria-label="Operator B advanced envelope">Adv</button></div>
+<div class="op-id-line">
+<select class="field" aria-label="Operator B waveform"><option value="0" selected>Sine</option><option value="1">Saw</option><option value="2">Square</option><option value="3">Triangle</option><option value="4">Noise</option><option value="5">Saw D</option><option value="6">Square D</option><option value="7">Sine 4bit</option><option value="8">Sine 8bit</option><option value="9">User</option><option value="10">Pulse</option></select><button class="btn" type="button" aria-label="Operator B pitch mode" aria-pressed="false">Ratio</button></div></div>
+<div class="op-body">
+<div class="op-core">
+<div class="op-knobs">
+<div class="op-group op-main">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Coarse" data-v="1" data-a="-123.75" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fine" data-v="0.000" data-a="-135" data-z="-135"></div>
+<div class="knob-readout"><span class="readout-val">1.000</span><span class="readout-label">Ratio</span></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Detune" data-v="0c" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Level" data-v="0.64" data-a="36.82694782833107" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fdbk" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width" data-v="100%" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Vel" data-v="0.40" data-a="-27" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="LP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="HP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Key Trk" data-v="+0.00" data-a="-45" data-z="-45"></div></div>
+<div class="op-group">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Attack" data-v="1m" data-a="-111.41536632430437" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Decay" data-v="250m" data-a="17.921623177303502" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Sustain" data-v="0.20" data-a="-81" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Release" data-v="120m" data-a="-4.478023403974277" data-z="-135"></div></div></div>
+<img class="env-canvas" src="data:image/png;base64,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" alt=""></div></div>
+</section>
+<section class="op-row" style="--op-color: #5FA8A0;">
+<div class="op-id">
+<div class="op-id-head"><span class="op-letter">C</span><span class="op-role">Mod</span><button class="btn op-adv-btn" type="button" aria-pressed="false" aria-label="Operator C advanced envelope">Adv</button></div>
+<div class="op-id-line">
+<select class="field" aria-label="Operator C waveform"><option value="0" selected>Sine</option><option value="1">Saw</option><option value="2">Square</option><option value="3">Triangle</option><option value="4">Noise</option><option value="5">Saw D</option><option value="6">Square D</option><option value="7">Sine 4bit</option><option value="8">Sine 8bit</option><option value="9">User</option><option value="10">Pulse</option></select><button class="btn" type="button" aria-label="Operator C pitch mode" aria-pressed="false">Ratio</button></div></div>
+<div class="op-body">
+<div class="op-core">
+<div class="op-knobs">
+<div class="op-group op-main">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Coarse" data-v="2" data-a="-112.5" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fine" data-v="0.000" data-a="-135" data-z="-135"></div>
+<div class="knob-readout"><span class="readout-val">2.000</span><span class="readout-label">Ratio</span></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Detune" data-v="0c" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Level" data-v="0.57" data-a="17.735064736294305" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fdbk" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width" data-v="100%" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Vel" data-v="0.40" data-a="-27" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="LP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="HP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Key Trk" data-v="+0.00" data-a="-45" data-z="-45"></div></div>
+<div class="op-group">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Attack" data-v="1m" data-a="-111.41536632430437" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Decay" data-v="180m" data-a="9.144697305513887" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Sustain" data-v="0.10" data-a="-108" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Release" data-v="100m" data-a="-9.448678445769275" data-z="-135"></div></div></div>
+<img class="env-canvas" src="data:image/png;base64,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" alt=""></div></div>
+</section>
+<section class="op-row" style="--op-color: #5FA8A0;">
+<div class="op-id">
+<div class="op-id-head"><span class="op-letter">D</span><span class="op-role">Mod</span><button class="btn op-adv-btn" type="button" aria-pressed="false" aria-label="Operator D advanced envelope">Adv</button></div>
+<div class="op-id-line">
+<select class="field" aria-label="Operator D waveform"><option value="0">Sine</option><option value="1">Saw</option><option value="2" selected>Square</option><option value="3">Triangle</option><option value="4">Noise</option><option value="5">Saw D</option><option value="6">Square D</option><option value="7">Sine 4bit</option><option value="8">Sine 8bit</option><option value="9">User</option><option value="10">Pulse</option></select><button class="btn" type="button" aria-label="Operator D pitch mode" aria-pressed="false">Ratio</button></div></div>
+<div class="op-body">
+<div class="op-core">
+<div class="op-knobs">
+<div class="op-group op-main">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Coarse" data-v="4" data-a="-90" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fine" data-v="0.000" data-a="-135" data-z="-135"></div>
+<div class="knob-readout"><span class="readout-val">4.000</span><span class="readout-label">Ratio</span></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Detune" data-v="0c" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Level" data-v="0.42" data-a="-20.4487014477793" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fdbk" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width" data-v="100%" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Vel" data-v="0.40" data-a="-27" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="LP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="HP" data-v="Off" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Key Trk" data-v="+0.00" data-a="-45" data-z="-45"></div></div>
+<div class="op-group">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Attack" data-v="1m" data-a="-111.41536632430437" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Decay" data-v="90m" data-a="-9.374712448193904" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Sustain" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Release" data-v="100m" data-a="-9.448678445769275" data-z="-135"></div></div></div>
+<img class="env-canvas" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQEAAAA0CAYAAACKLI1XAAAFpklEQVR4AeycP4/cRBjG7UATRIGEEBIFFLSICorQZLenoIlEJCQSia+Bbq/nC0BDIgryLXbTXJXronyERKkjJUWkOO/P5/cy3rP3vOs/a4+fyE9m3lvPjOeZzS8zY59vJPojB+TArB0QBGY9/Oq8HEgSQUDfAjkwcweuQOD3Rw/W6N7//64CLSy/mLlX6v4eDty6c+fmYrH4eI8iOnUAB6qauAKB4qRFlqYngdaWBw6ZAQKRXxsYHBSCRGGckgsHPnr19pd3Nz/7+yLS32N2oA4Cm4e/3ktRmmXLQqeW5io6FILiCiQEiMIlJXJg5A7UQeDysh/cvb8ptLI0l8FhaaqEhBXcmOoAsQ7gwCxCSwwzS4ccOKYD10LguoszMGwKNQFEkqVpaZnhy4sADgLDdabrcznQwIGmp1RBoLN/hAUcgEQdIC6XFwEc2G/I9x0EhqbDqPPkwOEOVEHg8Nr2KFkAogSH9GL/oRYMgsIeButUOdDQgaNBoOr6doHBzt9szxYEBXNFhxxo6cCoIFDVFweDbUTmm5HhbKEOClX16GdyIGYH2vStEgL2D+1xm0r7LOtQsHRlYEjtWpemU2vzcqbAZqPPEuznOuSAHNjhQCUEdpw/uo8MBvnGowHBZwr5noLPEgSE0Q2ZLmhkDkweAtt+GhR8s5FZgoCwbZBiObDlQHQQCPvXBAjh+crLgSk40PU1Rg2B0KxtIPAZSwZfLhBLHTtwI3ndcY2qrgcHZgOB0DuAYHsIpeWCYBA61E0+y5LPu6lJtfTpwCwh4IYCA2R3F/I7DJoZuDNK5+RACQJ2W62zR4anZKKBwO8w5LMDwWBKoxf3tQ7RuxIEhmhw7G0YEPz5g1PBYOyjpevrwgFBoMZFYGDLhMuHkGzPYD3XmVKNRfpxJA4IAjsGEhDYBmK+X2Cn8Y4EQLCyvA45EI0DgkCDoSxgEO4XrBsU0ylyYC8HjnVyHQR4O9Cxrmm07QKDYomwsOVBZssDzQpGO1q6sKYO1EGgafnZnVeAYGkdz39hSSAwJ3RM2gFB4IDhMxDwItZ8r4A7CALBASaqyGgcEARaDIXBYMXyIEvTE1seaJ+ghZdzKzqm/goCLUfDQWDVsE8gEJgROqblwDYEZvnEYNshEwjaOqjyx3RgGwLHvJZJty0QTHr4Zn3xgkCHwy8QdGhmRFWNvSuCQMcjJBB8MDTNkjcfIuXG6oAg0MPIhCDQ7cMeDFaVnTpQCQH7EuuJwZY2m4crv30oELQ0U8V7daASAr22OKPKAYF1158s1J0XMyP2Y4r9EwR6HjVmAzSRpekJqSQHxuaAINDziNhsYGMg4HcNFloW9Gy2qj/IAUHgINv2KwQIrISWBWaCjvE5IAgMNCa8nISmtCzAhTgUSy8EgQFHUsuCAc1WU40dKEHA/pe63bikTtzbAS0L9rZMBQZwoASBAdqbfRM2G+DlpYkBV3cLZv9tGIcBgsDA4+CzAWuWuwV6dsCMmMIR8zUKAkcYXc0GjmC6mqx1oAoCemS41q5uPmA2UIBAs4FuLFUtLRyogkCL6lS0qQMGgvxNxdobaOqYzuvLgUoIfPfDT/kX1BslRh6TEiPyLmLkMSkxIu8iRh6TEiPyLmLkMSkxIu8iRh6TEiPyLmLkMSkxIu8iRh6TEiPyLmLkMSkxIu8iRh6TEr84Oyebv5aMdxTGpC9uff/nJ9989fMU+xT7NfOlC1WCAA+0nP/1z+PwBOX7c+D52Tl3CqJcfn367dcvv7z947P+3FPNXTlQggCVPn1ytkLkXcTIY1JiRN5FjDwmJUbkXcTIY1JiRN5FjDwmJUbkXcTIY1JiRN5FjDwmJUbkXcTIY1JiRN5FjDwmJUbkXcTIY1JiBHhj1H+//bF8ePf+Msa+Tb1PfP9CXYFA+KHyckAOxO+AIBD/GKuHOxzQR0nyHgAA///eroAeAAAABklEQVQDAAV3iLTvVIBfAAAAAElFTkSuQmCC" alt=""></div></div>
+</section></div>
+<div class="section-title deck-title"><span>Shape &amp; modulation</span></div>
+<div class="deck">
+<section class="deck-card deck-filter">
+<div class="section-title"><span>Filter</span></div>
+<div class="seg-slot" style="margin-bottom: 8px">
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="false">Off</button><button type="button" aria-pressed="true">LP</button><button type="button" aria-pressed="false">HP</button><button type="button" aria-pressed="false">BP</button><button type="button" aria-pressed="false">Notch</button><button type="button" aria-pressed="false">Formant</button><button type="button" aria-pressed="false">Acid</button></div></div>
+<div class="knob-row">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Cutoff" data-v="700" data-a="-2.0505315437612524" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Reso" data-v="2.40" data-a="-1.7340704577150348" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Env Amt" data-v="+2.50" data-a="56.25" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Wheel" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="LFO Amt" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="LFO 2 Amt" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Key Trk" data-v="+0.00" data-a="-45" data-z="-45"></div><div style="width: 100%; margin-top: 6px;"><span class="field-label">Slope</span>
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="false">12 dB</button><button type="button" aria-pressed="true">24 dB</button></div></div></div>
+<div class="section-title" style="margin-top: 11px"><span>Filter Env</span></div>
+<img class="env-canvas" src="data:image/png;base64,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" alt="">
+<div class="knob-row" style="margin-top: 6px">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Attack" data-v="1m" data-a="-111.41536632430437" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Decay" data-v="300m" data-a="22.792865118262597" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Sustain" data-v="0.15" data-a="-94.5" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Release" data-v="150m" data-a="1.6055666985253083" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Init" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Peak" data-v="1.00" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="End" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="A Crv" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="D Crv" data-v="+0.70" data-a="94.5" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="R Crv" data-v="+0.50" data-a="67.5" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Key" data-v="+0.00" data-a="0" data-z="0"></div></div>
+</section>
+<section class="deck-card deck-lfo">
+<div class="section-title"><span>LFO</span></div>
+<div class="seg-slot" style="margin-bottom: 8px">
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Sine</button><button type="button" aria-pressed="false">Tri</button><button type="button" aria-pressed="false">Saw Up</button><button type="button" aria-pressed="false">Saw Down</button><button type="button" aria-pressed="false">Square</button><button type="button" aria-pressed="false">S&amp;H</button><button type="button" aria-pressed="false">Drift</button></div></div>
+<div class="knob-row">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Rate" data-v="5.00H" data-a="61.13387433373532" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Amount" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Wheel" data-v="1.00" data-a="135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fade In" data-v="0m" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To Pitch" data-v="0.00st" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To A" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To B" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To C" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To D" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width A" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width B" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width C" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width D" data-v="+0.00" data-a="0" data-z="0"></div><div style="width: 100%; margin-top: 6px;"><span class="field-label">Phase</span>
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Free</button><button type="button" aria-pressed="false">Retrigger</button><button type="button" aria-pressed="false">One-shot</button></div></div><div style="width: 100%; margin-top: 6px;"><span class="field-label">Range</span>
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Bipolar</button><button type="button" aria-pressed="false">Unipolar</button></div></div></div>
+</section>
+<section class="deck-card deck-lfo">
+<div class="section-title"><span>LFO 2</span></div>
+<div class="seg-slot" style="margin-bottom: 8px">
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Sine</button><button type="button" aria-pressed="false">Tri</button><button type="button" aria-pressed="false">Saw Up</button><button type="button" aria-pressed="false">Saw Down</button><button type="button" aria-pressed="false">Square</button><button type="button" aria-pressed="false">S&amp;H</button><button type="button" aria-pressed="false">Drift</button></div></div>
+<div class="knob-row">
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Rate" data-v="5.00H" data-a="61.13387433373532" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Amount" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Wheel" data-v="0.00" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Fade In" data-v="0m" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To Pitch" data-v="0.00st" data-a="-135" data-z="-135"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To A" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To B" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To C" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="To D" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width A" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width B" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width C" data-v="+0.00" data-a="0" data-z="0"></div>
+<div class="knob" style="--knob-color: #5FA8A0;" data-l="Width D" data-v="+0.00" data-a="0" data-z="0"></div><div style="width: 100%; margin-top: 6px;"><span class="field-label">Phase</span>
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Free</button><button type="button" aria-pressed="false">Retrigger</button><button type="button" aria-pressed="false">One-shot</button></div></div><div style="width: 100%; margin-top: 6px;"><span class="field-label">Range</span>
+<div class="seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">Bipolar</button><button type="button" aria-pressed="false">Unipolar</button></div></div></div>
+</section>
+</div>
+</main>
+</div>
+</div>
+
+<script>
+// ---------- today's knob, as packages/app/src/knob.ts draws it ----------
+const KNOB = { r: 15, size: 38, start: -135, end: 135, faceInset: 3.5, pinInset: 5, arcMin: 0.4 };
+function polar(c, r, deg) {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [c + r * Math.cos(a), c + r * Math.sin(a)];
+}
+function arcPath(c, r, a0, a1) {
+  const [x0, y0] = polar(c, r, a0);
+  const [x1, y1] = polar(c, r, a1);
+  const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+/** Draw a knob: `a` is the pin's angle, `z` the arc's zero end, in degrees. */
+function drawKnob(node, a, z, val) {
+  const { r, size } = KNOB;
+  const c = size / 2;
+  const a0 = Math.min(z, a);
+  const a1 = Math.max(z, a);
+  const arc = Math.abs(a1 - a0) < KNOB.arcMin ? '' : arcPath(c, r, a0, a1);
+  node.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - KNOB.faceInset}"></circle>` +
+    `<path class="dial-track" d="${arcPath(c, r, KNOB.start, KNOB.end)}"></path>` +
+    `<path class="dial-arc" d="${arc}"></path>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + KNOB.pinInset}" transform="rotate(${a} ${c} ${c})"></line>` +
+    `</svg><span class="knob-val">${val}</span><span class="knob-label">${node.dataset.l}</span>`;
+}
+for (const k of document.querySelectorAll('.knob[data-a]')) drawKnob(k, +k.dataset.a, +k.dataset.z, k.dataset.v);
+
+// ---------- the proposal: Sync ----------
+const OPS = ['A', 'B', 'C', 'D'];
+const rows = [...document.querySelectorAll('.op-row')];
+const colorOf = (op) => rows[OPS.indexOf(op)].style.getPropertyValue('--op-color').trim();
+const NOTE_COLOR = 'var(--ink)';
+const sync = { A: 'off', B: 'off', C: 'note', D: 'off' };
+
+/** The chain from `op` through the operators it follows, as letters. */
+function chainFrom(op) {
+  const seen = [op];
+  let at = sync[op];
+  while (OPS.includes(at) && !seen.includes(at)) { seen.push(at); at = sync[at]; }
+  return seen;
+}
+/** Why `op` can't follow `master`, or '' when it can. */
+function loopHint(op, master) {
+  const chain = chainFrom(master);
+  if (!chain.includes(op)) return '';
+  const path = chain.slice(0, chain.indexOf(op) + 1).join(' → ');
+  return `${path} already, so ${op} → ${master} would close a loop`;
+}
+function faceText(v, inline) {
+  if (v === 'off') return inline ? 'Sync' : '–';
+  return v === 'note' ? '♪' : v;
+}
+function valText(v) {
+  if (v === 'off') return 'Off';
+  return v === 'note' ? 'Note' : `Op ${v}`;
+}
+function menuItems(op) {
+  const items = [{ v: 'off', g: '–', label: 'Off', hint: 'Runs free, as today' },
+    { v: 'note', g: '♪', label: 'Note', hint: "Restarts on every cycle of the note's pitch" }];
+  for (const m of OPS) {
+    if (m === op) continue;
+    const why = loopHint(op, m);
+    items.push({ v: m, g: m, label: `Operator ${m}`, hint: why || `Restarts on every cycle of ${m}`, disabled: !!why });
+  }
+  return items;
+}
+function openMenu(holder, op) {
+  closeMenus();
+  const menu = holder.querySelector('.sync-menu');
+  menu.innerHTML = `<div class="mh">${op} syncs to</div>` + menuItems(op).map((it) =>
+    `<button type="button" role="menuitemradio" data-v="${it.v}" aria-checked="${sync[op] === it.v}"` +
+    `${it.disabled ? ' disabled' : ''} style="--m-color: ${OPS.includes(it.v) ? colorOf(it.v) : NOTE_COLOR}">` +
+    `<span class="g">${it.g}</span><span>${it.label}</span><span class="h">${it.hint}</span></button>`).join('');
+  menu.hidden = false;
+}
+function closeMenus() { for (const m of document.querySelectorAll('.sync-menu')) m.hidden = true; }
+function paint() {
+  rows.forEach((row, i) => {
+    const v = sync[OPS[i]];
+    for (const holder of row.querySelectorAll('.sync-cell, .sync-inline')) {
+      const inline = holder.classList.contains('sync-inline');
+      holder.classList.toggle('synced', v !== 'off');
+      holder.style.setProperty('--m-color', OPS.includes(v) ? colorOf(v) : NOTE_COLOR);
+      holder.querySelector('.sync-face').textContent = faceText(v, inline);
+      const val = holder.querySelector('.knob-val');
+      if (val) val.textContent = valText(v);
+      holder.title = v === 'off' ? `Sync: off` : `Sync: ${OPS[i]} restarts on every cycle of ${v === 'note' ? 'the note' : v}`;
+    }
+  });
+}
+function syncHolder(cls, op) {
+  const holder = document.createElement('div');
+  holder.className = `${cls} is-new`;
+  holder.dataset.op = op;
+  holder.innerHTML = cls === 'sync-cell'
+    ? '<div class="sync-face"></div><span class="knob-val"></span><span class="knob-label">Sync</span><div class="sync-menu" role="menu" hidden></div>'
+    : '<div class="sync-face"></div><div class="sync-menu" role="menu" hidden></div>';
+  return holder;
+}
+rows.forEach((row, i) => {
+  const op = OPS[i];
+  row.querySelector('.op-main .knob-readout').after(syncHolder('sync-cell', op));
+  row.querySelector('.op-id-line select').after(syncHolder('sync-inline', op));
+});
+document.addEventListener('click', (e) => {
+  const item = e.target.closest('.sync-menu button');
+  if (item) {
+    if (item.disabled) return;
+    sync[item.closest('[data-op]').dataset.op] = item.dataset.v;
+    closeMenus(); paint(); return;
+  }
+  if (e.target.closest('.sync-menu')) return;
+  const holder = e.target.closest('.sync-cell, .sync-inline');
+  if (holder) {
+    const menu = holder.querySelector('.sync-menu');
+    if (menu.hidden) openMenu(holder, holder.dataset.op); else closeMenus();
+    return;
+  }
+  closeMenus();
+});
+paint();
+
+// ---------- the proposal: Ratio A-D on both LFOs ----------
+const RATIO = { min: -4, max: 4, dragPx: 200 };
+const fmtOct = (v) => `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}`;
+const toAngle = (v) => KNOB.start + ((v - RATIO.min) / (RATIO.max - RATIO.min)) * (KNOB.end - KNOB.start);
+function ratioKnob(op, color) {
+  const k = document.createElement('div');
+  k.className = 'knob is-new';
+  k.style.setProperty('--knob-color', color);
+  k.dataset.l = `Ratio ${op}`;
+  k.title = `Ratio ${op}: octaves of LFO on ${op}'s ratio - drag, shift-drag for fine, double-click to reset`;
+  let v = 0;
+  const render = () => drawKnob(k, toAngle(v), toAngle(0), fmtOct(v));
+  k.addEventListener('pointerdown', (e) => {
+    k.setPointerCapture(e.pointerId);
+    let y = e.clientY;
+    const move = (m) => {
+      const span = (RATIO.max - RATIO.min) / RATIO.dragPx / (m.shiftKey ? 10 : 1);
+      v = Math.min(RATIO.max, Math.max(RATIO.min, v + (y - m.clientY) * span));
+      y = m.clientY; render();
+    };
+    const up = () => { k.removeEventListener('pointermove', move); k.removeEventListener('pointerup', up); };
+    k.addEventListener('pointermove', move);
+    k.addEventListener('pointerup', up);
+  });
+  k.addEventListener('dblclick', () => { v = 0; render(); });
+  render();
+  return k;
+}
+for (const card of document.querySelectorAll('.deck-lfo')) {
+  const widthD = card.querySelector('.knob[data-l="Width D"]');
+  const color = widthD.style.getPropertyValue('--knob-color');
+  let at = widthD;
+  for (const op of OPS) { const k = ratioKnob(op, color); at.after(k); at = k; }
+}
+
+// ---------- mockup chrome ----------
+for (const b of document.querySelectorAll('.tb [data-place]')) {
+  b.addEventListener('click', () => {
+    document.body.dataset.place = b.dataset.place;
+    for (const o of document.querySelectorAll('.tb [data-place]')) o.classList.toggle('on', o === b);
+    closeMenus();
+  });
+}
+document.getElementById('newToggle').addEventListener('click', (e) => {
+  e.currentTarget.classList.toggle('on', document.body.classList.toggle('show-new'));
+});
+document.getElementById('resetSync').addEventListener('click', () => {
+  for (const op of OPS) sync[op] = 'off';
+  closeMenus(); paint();
+});
+</script>
+</body>
+</html>
