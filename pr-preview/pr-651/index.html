@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Windsor</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    />
+    <script type="module" crossorigin src="./assets/index-Dzul99Q5.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BS-VcslQ.css">
+  </head>
+  <body>
+    <div class="console">
+      <div class="chrome">
+        <header class="head">
+          <div class="head-row">
+            <nav class="tabs" id="tabBar" aria-label="Console tabs"></nav>
+            <button class="btn" id="power" type="button" hidden></button>
+            <div
+              class="undo-controls"
+              id="undoControls"
+              role="group"
+              aria-label="Undo history"
+            ></div>
+            <section class="transport-strip" id="transportStrip" aria-label="Transport"></section>
+          </div>
+          <section class="part-strip" id="partStrip" aria-label="Parts"></section>
+        </header>
+      </div>
+      <main class="tab-root" id="tabRoot"></main>
+    </div>
+    <section class="toasts" id="toasts" aria-label="Notifications" aria-live="polite"></section>
+
+    <!-- The audio gate (windsor#578, record 2026-10-04-audio-gate; the approved
+         mockup is docs/design/audio-gate-mockup.html): a modal that cannot be
+         dismissed, open on load and whenever the audio context is not running.
+         Its button is the gesture that starts or resumes audio; audioGate.ts
+         sets the words for each state. -->
+    <dialog class="audio-gate" id="audioGate" closedby="none" aria-labelledby="gateAction">
+      <div class="gate">
+        <div class="gate-brand">
+          <!-- The mark (also the favicon): a W drawn as one carrier stroke over a
+               modulator sine, the four vertices of its lower half the engine's
+               four operators. -->
+          <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="43" height="43" rx="7" fill="#0c0f10" stroke="#3d4950" />
+            <path
+              d="M5 22 C 9 13, 13 13, 17 22 S 25 31, 29 22 S 37 13, 41 22"
+              fill="none"
+              stroke="#5fa8a0"
+              stroke-width="1.4"
+              opacity="0.7"
+            />
+            <polyline
+              points="8,11 15,33 22,17 29,33 36,11"
+              fill="none"
+              stroke="#e0a44e"
+              stroke-width="3.2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+            <circle cx="15" cy="33" r="2.4" fill="#e0a44e" />
+            <circle cx="22" cy="17" r="2.4" fill="#e0a44e" />
+            <circle cx="29" cy="33" r="2.4" fill="#e0a44e" />
+            <circle cx="36" cy="11" r="2.4" fill="#e0a44e" />
+          </svg>
+          <span class="gate-wordmark">WINDSOR</span>
+        </div>
+        <p class="gate-tagline">FM sequencer</p>
+        <div class="gate-power-wrap">
+          <button
+            class="gate-power"
+            id="gatePower"
+            type="button"
+            aria-labelledby="gateAction"
+            aria-describedby="gateLede"
+            autofocus
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v8" />
+              <path d="M6.4 6.6a8 8 0 1 0 11.2 0" />
+            </svg>
+          </button>
+        </div>
+        <div class="gate-action" id="gateAction">Enable audio</div>
+        <p class="gate-lede" id="gateLede"></p>
+        <div class="gate-foot">
+          <span class="gate-build"><b>Windsor</b> <span id="gateBuild">dev</span></span>
+          <nav aria-label="About Windsor">
+            <a href="https://github.com/tacowars/windsor" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+              Source
+            </a>
+            <a
+              href="https://github.com/tacowars/windsor/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener"
+              >AGPL-3.0</a
+            >
+          </nav>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="jsonDlg">
+      <div class="dlg-body">
+        <div class="section-title" style="margin: 0"><span>Patch JSON</span></div>
+        <p class="hint" style="margin: 0">
+          The working patch of the selected part, as the document's <kbd>patches</kbd> section
+          stores it. Paste a patch (an older standalone export included) and press Load to put it in
+          the document under this part's patch name; Export in Settings carries it.
+        </p>
+        <textarea id="jsonText" spellcheck="false" aria-label="Patch JSON"></textarea>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button class="btn primary" id="jsonCopy" type="button">Copy</button>
+          <button class="btn" id="jsonLoad" type="button">Load</button>
+          <button class="btn" id="jsonClose" type="button">Close</button>
+          <span class="status" id="jsonStatus"></span>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- The library workflow's modals (#563): metadata for Save / Copy to new,
+         and the page's own confirm. Never window.confirm. -->
+    <dialog id="metaDlg" aria-labelledby="metaTitle">
+      <div class="dlg-body">
+        <div class="section-title" style="margin: 0"><span id="metaTitle">Save patch</span></div>
+        <p class="hint" id="metaHint" style="margin: 0"></p>
+        <label class="field-label" for="metaName">Display name</label>
+        <input class="field" id="metaName" name="patch-display-name" autocomplete="off" />
+        <p class="hint hot" id="metaNameProblem" role="alert" style="margin: 0"></p>
+        <label class="field-label" for="metaId">Id (the file name)</label>
+        <input class="field" id="metaId" name="patch-id" readonly aria-readonly="true" />
+        <label class="field-label" for="metaCategory">Category</label>
+        <select class="field" id="metaCategory" name="patch-category"></select>
+        <input
+          class="field"
+          id="metaNewCategory"
+          name="patch-new-category"
+          placeholder="New category name"
+          aria-label="New category"
+          hidden
+        />
+        <label class="field-label" for="metaTagInput">Tags</label>
+        <div class="chips" id="metaTags"></div>
+        <input
+          class="field"
+          id="metaTagInput"
+          name="patch-tag"
+          list="metaTagList"
+          placeholder="Type a tag; Enter or comma adds it"
+          autocomplete="off"
+        />
+        <datalist id="metaTagList"></datalist>
+        <label class="field-label" for="metaDescription">Description</label>
+        <textarea
+          class="field meta-text"
+          id="metaDescription"
+          name="patch-description"
+          rows="3"
+        ></textarea>
+        <p class="hint" id="metaLoudness" role="status" style="margin: 0"></p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button class="btn primary" id="metaConfirm" type="button">Write</button>
+          <button class="btn" id="metaCancel" type="button">Cancel</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="confirmDlg" aria-labelledby="confirmTitle">
+      <div class="dlg-body">
+        <div class="section-title" style="margin: 0"><span id="confirmTitle"></span></div>
+        <p class="hint" id="confirmBody" style="margin: 0"></p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button class="btn primary" id="confirmOk" type="button">OK</button>
+          <button class="btn" id="confirmCancel" type="button">Cancel</button>
+        </div>
+      </div>
+    </dialog>
+
+  </body>
+</html>
