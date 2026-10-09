@@ -17,6 +17,9 @@ const REGIONS: TakeRegion[] = [
 const n = (tick: number, ticks: number, pitch: number, velocity?: number): RollNote =>
   velocity === undefined ? { tick, ticks, pitch } : { tick, ticks, pitch, velocity };
 
+/** The computer keyboard's source, for the tests with one source. */
+const K = 'KeyA';
+
 /** The playhead run from `from` to `to`, a tick at a time. */
 function play(take: RollTake, from: number, to: number): void {
   for (let tick = from; tick <= to; tick++) take.advance(tick);
@@ -25,45 +28,47 @@ function play(take: RollTake, from: number, to: number): void {
 describe('RollTake', () => {
   it('stamps the onset at the region’s local tick, modulo its loop, and keeps velocity below 1', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 100);
-    take.release(60, 106);
-    take.press(62, 0.5, 96 + 50);
-    take.release(62, 150);
+    take.press(K, 60, 1, 100);
+    take.release(K, 60, 106);
+    take.press(K, 62, 0.5, 96 + 50);
+    take.release(K, 62, 150);
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 6, 60), n(2, 4, 62, 0.5)] }]);
     expect(take.drain()).toEqual([]);
   });
 
   it('freezes a note at its loop’s end and hands it out only on release, past two whole loops', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 100);
+    take.press(K, 60, 1, 100);
     play(take, 100, 110);
-    expect(take.held()).toEqual([{ regionIndex: 0, pitch: 60, velocity: 1, tick: 4, ticks: 10 }]);
+    expect(take.held()).toEqual([
+      { source: K, regionIndex: 0, pitch: 60, velocity: 1, tick: 4, ticks: 10 },
+    ]);
     play(take, 111, 100 + 2 * 48 + 10);
     expect(take.held()[0]?.ticks).toBe(48 - 4);
     expect(take.drain()).toEqual([]);
-    take.release(60, 210);
+    take.release(K, 60, 210);
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 44, 60)] }]);
   });
 
   it('cuts a note at its region’s end and waits for its release', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 280);
+    take.press(K, 60, 1, 280);
     play(take, 280, 300);
     expect(take.held()[0]).toMatchObject({ tick: 40, ticks: 4 });
     expect(take.drain()).toEqual([]);
-    take.release(60, 300);
+    take.release(K, 60, 300);
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(40, 4, 60)] }]);
   });
 
   it('ignores a press in a gap and records again in the next region, handing notes to both', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 270);
-    take.release(60, 276);
-    take.press(64, 1, 300);
+    take.press(K, 60, 1, 270);
+    take.release(K, 60, 276);
+    take.press(K, 64, 1, 300);
     expect(take.held()).toEqual([]);
-    take.release(64, 310);
-    take.press(67, 1, 390);
-    take.release(67, 402);
+    take.release(K, 64, 310);
+    take.press(K, 67, 1, 390);
+    take.release(K, 67, 402);
     expect(take.drain()).toEqual([
       { regionIndex: 0, notes: [n(270 - 96 - 3 * 48, 6, 60)] },
       { regionIndex: 1, notes: [n(6, 12, 67)] },
@@ -72,18 +77,28 @@ describe('RollTake', () => {
 
   it('ends a held pitch struck again at the new press, as a struck key restarts', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 100);
-    take.press(60, 1, 106);
+    take.press(K, 60, 1, 100);
+    take.press(K, 60, 1, 106);
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 6, 60)] }]);
     expect(take.held()).toMatchObject([{ tick: 10, pitch: 60 }]);
   });
 
+  it('holds one pitch from two sources apart, each released by its own source', () => {
+    const take = new RollTake([{ start: 0, duration: 96, loopTicks: 96 }]);
+    take.press('midi:a:60', 60, 1, 0);
+    take.press('midi:b:60', 60, 1, 5);
+    take.release('midi:a:60', 60, 10);
+    expect(take.held()).toMatchObject([{ source: 'midi:b:60', tick: 5 }]);
+    take.release('midi:b:60', 60, 15);
+    expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(0, 10, 60), n(5, 10, 60)] }]);
+  });
+
   it('on a jump back, freezes every held note at the last tick seen, pending until released', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 100);
+    take.press(K, 60, 1, 100);
     play(take, 100, 130);
     // Pressed after the jump, before the playhead saw it: the new pass's note, not cut.
-    take.press(64, 1, 98);
+    take.press(K, 64, 1, 98);
     take.advance(100);
     play(take, 101, 110);
     expect(take.held()).toMatchObject([
@@ -91,16 +106,16 @@ describe('RollTake', () => {
       { pitch: 64, tick: 2, ticks: 12 },
     ]);
     expect(take.drain()).toEqual([]);
-    take.release(60, 111);
+    take.release(K, 60, 111);
     expect(take.drain()).toEqual([{ regionIndex: 0, notes: [n(4, 30, 60)] }]);
   });
 
   it('end() cuts every growing note at its tick and finishes every pending one', () => {
     const take = new RollTake(REGIONS);
-    take.press(60, 1, 100);
+    take.press(K, 60, 1, 100);
     play(take, 100, 120);
     take.advance(96);
-    take.press(64, 1, 98);
+    take.press(K, 64, 1, 98);
     play(take, 98, 104);
     take.end(103);
     expect(take.held()).toEqual([]);

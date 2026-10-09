@@ -6,10 +6,12 @@
  * tacowars heard, not the one the scheduler was queueing ahead.
  *
  * Web MIDI and DOM events both stamp `timeStamp` in performance time (ms).
- * `getOutputTimestamp()` pairs a context time with the performance time it
- * left the output; `outputLatency` is how long the output then takes to be
- * heard. Before the output has run, a browser reports the pair missing or as
- * zeros, and the stamp falls back to the context's own clock.
+ * `getOutputTimestamp()` pairs the context time being heard at the output
+ * with the performance time it was heard at (the Web Audio spec's definition,
+ * so the output latency is already in it). Before the output has run, a
+ * browser reports the pair missing or as zeros, and the stamp falls back to
+ * the context's own clock, which renders ahead of what is heard by
+ * `outputLatency`.
  */
 
 const MS_PER_SECOND = 1000;
@@ -24,7 +26,7 @@ export interface OutputReading {
 export interface StampClock {
   /** `context.getOutputTimestamp()`. */
   readonly output: OutputReading | undefined;
-  /** `context.outputLatency`, in seconds; a browser without it passes undefined. */
+  /** `context.outputLatency`, in seconds, for the fallback only; a browser without it passes undefined. */
   readonly outputLatency: number | undefined;
   /** `context.currentTime`, the fallback. */
   readonly currentTime: number;
@@ -32,12 +34,13 @@ export interface StampClock {
 
 /**
  * The context time heard at performance time `timeStamp` (ms):
- * `contextTime + (timeStamp − performanceTime) / 1000 − outputLatency`, or,
- * with no usable output reading, `currentTime − outputLatency`.
+ * `contextTime + (timeStamp − performanceTime) / 1000`, or, with no usable
+ * output reading, `currentTime − outputLatency`.
  */
 export function heardContextTime(timeStamp: number, clock: StampClock): number {
-  const latency = clock.outputLatency ?? 0;
   const { contextTime, performanceTime } = clock.output ?? {};
-  if (contextTime === undefined || !performanceTime) return clock.currentTime - latency;
-  return contextTime + (timeStamp - performanceTime) / MS_PER_SECOND - latency;
+  if (contextTime === undefined || !performanceTime) {
+    return clock.currentTime - (clock.outputLatency ?? 0);
+  }
+  return contextTime + (timeStamp - performanceTime) / MS_PER_SECOND;
 }

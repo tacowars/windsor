@@ -5,6 +5,11 @@
  * `RollNote`s for the regions they started in, and `mergeTake`, the write of
  * one region's finished notes into its roll.
  *
+ * - **Sources.** A note is held by its input source (the console
+ *   `Keyboard`'s source key: a computer key, or one MIDI input's note) and
+ *   its pitch, so two sources can hold one pitch at once; a release ends
+ *   only its own source's note. Two such notes that overlap are settled by
+ *   `mergeTake`, as any overlap is.
  * - **Onset.** A press lands in the region under it, at its local tick
  *   modulo the region's loop. A press in a gap is ignored: recording pauses.
  * - **Length and write are separate.** A held note grows with the ticks the
@@ -41,6 +46,7 @@ export interface TakeRegion {
 
 /** A note still pending: its region, onset (local tick), and its length so far. */
 export interface HeldNote {
+  readonly source: string;
   readonly regionIndex: number;
   readonly pitch: number;
   readonly velocity: number;
@@ -56,6 +62,7 @@ export interface TakeWrite {
 
 /** A held note's state while the take runs. */
 interface Pending {
+  readonly source: string;
   readonly regionIndex: number;
   readonly pitch: number;
   readonly velocity: number;
@@ -71,6 +78,9 @@ interface Pending {
   /** Pressed since the playhead last moved. */
   fresh: boolean;
 }
+
+/** A held note's key: its source and its pitch (a number, so the first colon divides them). */
+const heldKey = (source: string, pitch: number): string => `${pitch}:${source}`;
 
 /** The index of the region holding song tick `songTick`, or −1 in a gap. */
 const regionAt = (regions: readonly TakeRegion[], songTick: number): number =>
@@ -91,27 +101,29 @@ function toRollNote(note: Pending, ticks: number): RollNote {
 
 /** One take: press, release and the playhead in, finished notes out per region. */
 export class RollTake {
-  /** Held notes by pitch, in press order. */
-  private readonly pending = new Map<number, Pending>();
+  /** Held notes by source and pitch (`heldKey`), in press order. */
+  private readonly pending = new Map<string, Pending>();
   private readonly finished = new Map<number, RollNote[]>();
   private playhead = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly regions: readonly TakeRegion[]) {}
 
   /**
-   * A key down at `songTick`, velocity 0..1. A pitch already held is ended
-   * there first, as `MidiPerformer` restarts a struck key; a press in a gap
-   * records nothing.
+   * A key down from `source` at `songTick`, velocity 0..1. A pitch that
+   * source already holds is ended there first, as `MidiPerformer` restarts a
+   * struck key; another source's note at the pitch is left alone. A press in
+   * a gap records nothing.
    */
-  press(pitch: number, velocity: number, songTick: number): void {
-    this.release(pitch, songTick);
+  press(source: string, pitch: number, velocity: number, songTick: number): void {
+    this.release(source, pitch, songTick);
     const regionIndex = regionAt(this.regions, songTick);
     const region = this.regions[regionIndex];
     if (!region) return;
     const local = songTick - region.start;
     const tick = local % region.loopTicks;
     const limit = Math.min(region.loopTicks - tick, region.duration - local);
-    this.pending.set(pitch, {
+    this.pending.set(heldKey(source, pitch), {
+      source,
       regionIndex,
       pitch,
       velocity,
@@ -124,12 +136,13 @@ export class RollTake {
     });
   }
 
-  /** A key up at `songTick`: its note, if held, is finished there (or at its cut). */
-  release(pitch: number, songTick: number): void {
+  /** A key up from `source` at `songTick`: that source's note, if held, is finished there (or at its cut). */
+  release(source: string, pitch: number, songTick: number): void {
     this.see(songTick);
-    const note = this.pending.get(pitch);
+    const key = heldKey(source, pitch);
+    const note = this.pending.get(key);
     if (!note) return;
-    this.pending.delete(pitch);
+    this.pending.delete(key);
     this.finish(note, songTick);
   }
 
@@ -153,6 +166,7 @@ export class RollTake {
   /** The notes still pending, in press order, each with its length so far. */
   held(): HeldNote[] {
     return [...this.pending.values()].map((note) => ({
+      source: note.source,
       regionIndex: note.regionIndex,
       pitch: note.pitch,
       velocity: note.velocity,
