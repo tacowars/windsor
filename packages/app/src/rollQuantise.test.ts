@@ -1,18 +1,19 @@
 /**
  * The Roll's Quantise (windsor#661, record `2026-10-09-roll-recording`
  * decision 10): the rounding at each Snap, the selection, the loop's end,
- * and the collisions the commit's settle resolves.
+ * the parked notes, and the collisions, where the first note wins.
  */
-import type { RollNote, RollSequencerConfig } from '@windsor/engine';
+import { ROLL_LOOP_TICKS_MAX, type RollNote, type RollSequencerConfig } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
-import { type RollEdit, settle } from './rollEdits';
+import type { RollEdit } from './rollEdits';
 import { quantiseNotes } from './rollQuantise';
 
 const BAR = 96;
 const FRAME = { loop: BAR, snap: 6 };
 
 const roll = (notes: RollNote[]): RollSequencerConfig => ({ loopTicks: BAR, notes });
-const n = (tick: number, ticks: number, pitch: number): RollNote => ({ tick, ticks, pitch });
+const n = (tick: number, ticks: number, pitch: number, velocity?: number): RollNote =>
+  velocity === undefined ? { tick, ticks, pitch } : { tick, ticks, pitch, velocity };
 const ticksOf = (config: RollSequencerConfig): number[] => config.notes.map((note) => note.tick);
 
 /** The quantise of `config`, which these fixtures always move. */
@@ -37,14 +38,26 @@ describe('quantiseNotes', () => {
 
   it('moves only the selected notes, and the selection follows them through the settle', () => {
     const config = roll([n(2, 3, 60), n(3, 3, 62), n(4, 3, 64), n(8, 3, 65)]);
-    const edit = settle(quantised(config, [1, 3]));
+    const edit = quantised(config, [1, 3]);
     expect(edit.config.notes).toEqual([n(2, 3, 60), n(4, 3, 64), n(6, 3, 62), n(6, 3, 65)]);
     expect(edit.selected).toEqual([2, 3]);
   });
 
-  it('moves a note rounding onto the loop’s end to its start, and leaves a note past the loop', () => {
-    const config = roll([n(BAR - 1, 1, 60), n(BAR + 1, 3, 62)]);
-    expect(ticksOf(quantised(config, []).config)).toEqual([0, BAR + 1]);
+  it('moves a note rounding onto the loop’s end to its start', () => {
+    expect(ticksOf(quantised(roll([n(BAR - 1, 1, 60)]), []).config)).toEqual([0]);
+  });
+
+  it('quantises a parked note past the loop with no wrap, rounding down at the roll’s cap', () => {
+    expect(ticksOf(quantised(roll([n(101, 3, 60)]), []).config)).toEqual([102]);
+    const capped = roll([n(ROLL_LOOP_TICKS_MAX - 2, 1, 60)]);
+    expect(ticksOf(quantised(capped, []).config)).toEqual([ROLL_LOOP_TICKS_MAX - 6]);
+  });
+
+  it('keeps the first C4 when a selected later one lands on it', () => {
+    const config = roll([n(6, 3, 60, 0.5), n(8, 6, 60)]);
+    const edit = quantised(config, [1]);
+    expect(edit.config.notes).toEqual([n(6, 3, 60, 0.5)]);
+    expect(edit.selected).toEqual([]);
   });
 
   it('rounds to the triplet steps and to 1/32', () => {
@@ -57,7 +70,7 @@ describe('quantiseNotes', () => {
   it('keeps the first of two C4s landing on one tick, trims an E4 that runs into the next, and leaves the original whole', () => {
     const notes = [n(0, 8, 64), n(5, 2, 60), n(7, 3, 60), n(8, 6, 64)];
     const config = roll(notes.map((note) => ({ ...note })));
-    const edit = settle(quantised(config, []));
+    const edit = quantised(config, []);
     expect(edit.config.notes).toEqual([n(0, 6, 64), n(6, 2, 60), n(6, 6, 64)]);
     // Undo restores the stored config, which the quantise never touched.
     expect(config.notes).toEqual(notes);

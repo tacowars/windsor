@@ -286,13 +286,17 @@ const byOnset = (a: RollNote, b: RollNote): number => a.tick - b.tick || a.pitch
  * The list as the normaliser keeps it, so the write changes nothing and the
  * selection survives it: sorted by onset then pitch; of two notes at one
  * onset and pitch, the selected (else the first) kept; and a note running
- * into the next onset at its pitch trimmed to end there.
+ * into the next onset at its pitch trimmed to end there. With
+ * `preferSelected` false (Quantise, windsor#661) the first in the list's
+ * order is kept whether or not either is selected, as the normaliser does.
  */
-export function settle(edit: RollEdit): RollEdit {
+export function settle(edit: RollEdit, { preferSelected = true } = {}): RollEdit {
   const chosen = new Set(edit.selected);
+  const rank = (item: { selected: boolean; i: number }): number =>
+    preferSelected ? -Number(item.selected) : item.i;
   const order = edit.config.notes
-    .map((note, i) => ({ note, selected: chosen.has(i) }))
-    .sort((a, b) => byOnset(a.note, b.note) || Number(b.selected) - Number(a.selected));
+    .map((note, i) => ({ note, selected: chosen.has(i), i }))
+    .sort((a, b) => byOnset(a.note, b.note) || rank(a) - rank(b));
   const kept: { note: RollNote; selected: boolean }[] = [];
   const lastAt = new Map<number, { note: RollNote; selected: boolean }>();
   for (const item of order) {
