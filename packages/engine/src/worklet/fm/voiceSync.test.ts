@@ -16,7 +16,7 @@ import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
-const { KIND_NOISE, waveKind } = await import('./waveTables');
+const { KIND_NOISE, getMips, waveKind } = await import('./waveTables');
 const { SYNC_NONE, SYNC_NOTE, SYNC_NOTE_BIT, VoiceSync, applySyncResets, bindVoiceSync } =
   await import('./voiceSync');
 
@@ -155,6 +155,26 @@ describe('applySyncResets', () => {
       expect(resetStep(start, inc, d)).toBeCloseTo(-2 * before, 9);
     },
   );
+
+  it('reads a table longer than TABLE_SIZE at its own length: a low Triangle steps as the wave does (windsor#655)', () => {
+    // A Sine's table holds one harmonic and is never longer than TABLE_SIZE;
+    // the Triangle's lowest octave holds hundreds and is 16384 long (#650).
+    const low = getMips(WAVE.TRIANGLE, 48000, 1, null)[0]!;
+    expect(low.length - 1).toBeGreaterThan(TABLE_SIZE);
+    const { voice } = voiceOf(['note', 'off', 'off', 'off'], [WAVE.TRIANGLE, 0, 0, 0]);
+    voice.tables[0] = low;
+    const s = voice.sync;
+    const d = 0.5;
+    s.noteInc = 0.5;
+    s.notePhase = d * s.noteInc;
+    // The free-running phase just before the reset is 0.6: the wave there is
+    // 2 − 4 · 0.6 = −0.4 on the ideal triangle, which peaks at 1 at 0.25.
+    voice.phaseInc[0] = 0.1;
+    voice.phase[0] = 0.6 + d * 0.1;
+    applySyncResets(voice);
+    const step = s.after[0]! / ((1 - d) * (1 - d) * SYNC_BLEP_GAIN);
+    expect(step).toBeCloseTo(0 - (2 - 4 * 0.6), 3);
+  });
 
   it('takes the step at the reset instant through a ratio sweep across a whole number', () => {
     // Synced to a note 128 samples long, at ratio r the operator reaches

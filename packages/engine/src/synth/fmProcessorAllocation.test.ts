@@ -311,7 +311,9 @@ function formantPad(): Patch {
  * the note, C on B, A on D (the Noise modulator, a master by its phase
  * accumulator), C's ratio swept by LFO 1 (`toRatio`). Synced, every voice
  * takes the generic loop whatever the part's `specialise`, and each wrap
- * resets its chain with the polyBLEP.
+ * resets its chain with the polyBLEP. B, which nothing modulates, takes the
+ * direct shape (windsor#655), and its feedback lane (`SYNC_SLOTS`) moves it
+ * to its table and back as the lanes toggle.
  */
 function syncedPad(): Patch {
   const patch = pad();
@@ -323,12 +325,12 @@ function syncedPad(): Patch {
   return patch;
 }
 
-/** The synced pad's lanes: both synced operators' ratios among the song lanes on every slot. */
+/** The synced pad's lanes: both synced operators' ratios, and the direct shape's feedback, among the song lanes on every slot. */
 const SYNC_SLOTS = [
   'ops.2.ratio',
   'ops.1.level',
   'ops.1.ratio',
-  'filter.resonance',
+  'ops.1.feedback',
   'lfo.rate',
   'lfo2.amount',
   'filter.cutoff',

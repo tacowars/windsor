@@ -22,9 +22,17 @@ import {
   LOOP_LOOP,
   LOOP_TRIGGER,
 } from './modeIds';
+import { makeMacro } from '../../patch/patch';
 import { normalisePatch } from './patchNormalise';
+import { compileMacros } from './voiceMacros';
 import { CONTROL_INTERVALS, controlInterval, controlIntervalTable } from './voiceControlInterval';
-import { VOICE_TARGET_COUNT } from './voiceTargetTables';
+import {
+  VOICE_TARGET_COUNT,
+  VT_MACRO_BASE,
+  VT_OP_BASE,
+  VT_OP_RATIO,
+  VT_OP_STRIDE,
+} from './voiceTargetTables';
 import { layoutVoiceTargets } from './voiceTargets';
 
 const SR = 48000;
@@ -37,7 +45,10 @@ const SLOW = { attackTime: 2, decayTime: 2, releaseTime: 2 };
 
 type PatchInput = Parameters<typeof normalisePatch>[0];
 
-/** The fields `controlInterval` reads, over `patch`: every envelope in its sustain, no glide. */
+/**
+ * The fields `controlInterval` reads, over `patch`: every envelope in its
+ * sustain, no glide, and the synced bits the bind sets from the ops' `sync`.
+ */
 function voiceOf({ op, ...input }: Record<string, unknown> = {}): Voice {
   const patch = normalisePatch({
     ...input,
@@ -52,9 +63,12 @@ function voiceOf({ op, ...input }: Record<string, unknown> = {}): Voice {
   };
   const liveValues = new Float64Array(VOICE_TARGET_COUNT);
   layoutVoiceTargets(patch, liveValues);
+  const synced = patch.ops.reduce((bits, o, i) => (o.sync === 'off' ? bits : bits | (1 << i)), 0);
   return {
     patch,
     liveValues,
+    sync: { synced },
+    partOffsets: new Float64Array(VOICE_TARGET_COUNT),
     fbRamp: 0,
     ampEnv: patch.ops.map((op) => envelope(op.env)),
     pitchEnv: envelope(patch.pitchEnv),
@@ -161,7 +175,7 @@ describe('controlInterval (windsor#326)', () => {
     ['toPitch', { toPitch: 0.5 }, {}],
     ['an operator level', { toOp: [0, 0, 0.5, 0] }, {}],
     ['an operator width', { toWidth: [0, 0.5, 0, 0] }, {}],
-    // An operator ratio (windsor#646) follows the LFO-on-pitch rule.
+    // An operator ratio (windsor#646) follows the LFO-on-pitch rule in a voice with no synced operator.
     ['an operator ratio', { toRatio: [0, 0, 0, 0.5] }, {}],
     ['the filter', {}, { mode: FILT_LP }],
   ])('reads fine for an LFO at 8 Hz on %s, and long at 7.99 Hz', (_name, target, filter) => {
@@ -207,6 +221,51 @@ describe('controlInterval (windsor#326)', () => {
     const voice = voiceOf();
     voice.fbRamp = 0b0100;
     expect(controlInterval(voice)).toBe(FINE);
+  });
+
+  // The fine interval for a ratio sweep is a synced voice's only (windsor#655,
+  // record `2026-10-09-sync-direct-shape` decision 4): an unsynced one keeps
+  // the LFO rule above.
+  const SYNCED = { op: { sync: 'note' } };
+
+  it('reads fine while a synced voice’s LFO ratio depth is not 0, at any rate, shape or amount (windsor#655)', () => {
+    for (const second of [false, true]) {
+      const lfo = second ? 'lfo2' : 'lfo';
+      const slow = { shape: LFO_TRI, rate: 0.25, amount: 0, toRatio: [0, 0, 0, 0.5] };
+      expect(controlInterval(voiceOf({ ...SYNCED, [lfo]: slow }))).toBe(FINE);
+      expect(controlInterval(voiceOf({ [lfo]: slow })), 'unsynced').toBe(LONG);
+      const none = { ...slow, amount: 1, toRatio: [0, 0, 0, 0] };
+      expect(controlInterval(voiceOf({ ...SYNCED, [lfo]: none }))).toBe(LONG);
+    }
+  });
+
+  it('reads fine while a song lane moves a synced voice’s ratio, directly or through a macro (windsor#655)', () => {
+    const ratio = VT_OP_BASE + 2 * VT_OP_STRIDE + VT_OP_RATIO;
+    const unsynced = voiceOf();
+    unsynced.partOffsets[ratio] = 0.25;
+    expect(controlInterval(unsynced), 'unsynced').toBe(LONG);
+    const voice = voiceOf(SYNCED);
+    voice.partOffsets[ratio] = 0.25;
+    expect(controlInterval(voice)).toBe(FINE);
+    voice.partOffsets[ratio] = 0;
+    // A lane on another row of the operator is not one on its ratio.
+    voice.partOffsets[ratio - 1] = 0.25;
+    expect(controlInterval(voice)).toBe(LONG);
+    for (const [target, interval] of [
+      ['ops.1.ratio', FINE],
+      ['ops.1.level', LONG],
+    ] as const) {
+      const mapped = voiceOf(SYNCED);
+      mapped.patch = compileMacros(
+        normalisePatch({
+          ops: [0, 1, 2, 3].map(() => ({ env: SLOW, sync: 'note' })),
+          macros: [makeMacro({ mappings: [{ target, min: 1, max: 4 }] })],
+        } as PatchInput),
+      );
+      expect(controlInterval(mapped), target).toBe(LONG);
+      mapped.partOffsets[VT_MACRO_BASE] = 0.1;
+      expect(controlInterval(mapped), target).toBe(interval);
+    }
   });
 
   it('takes its table: a long interval equal to the fine one, or another floor', () => {

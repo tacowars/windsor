@@ -23,7 +23,17 @@
  *   transient, and a long block would stretch its amplitude ramp from 32
  *   samples to 128 and move it by up to 128;
  * - an operator's feedback ramping under a song lane: the render loops time
- *   that ramp in fine blocks (`FEEDBACK_RAMP_STEP`).
+ *   that ramp in fine blocks (`FEEDBACK_RAMP_STEP`);
+ * - in a voice with a synced operator, an operator's ratio being modulated
+ *   (windsor#655, record `2026-10-09-sync-direct-shape` decision 4): an
+ *   LFO's `toRatio` on any operator that is not 0, whatever its rate, shape
+ *   or depth, or a song lane's offset that is not 0 on any `ops.<i>.ratio`
+ *   row, directly or through a macro that maps the row. A ratio stepped
+ *   every 128 samples puts a floor of about −43 dB under a sync sweep's
+ *   alias (`docs/research/2026-10-09-sync-antialias-study/`); a step's push
+ *   is fixed for the note, so it steps nothing. The study measured the
+ *   stepping with sync on only, so a voice with no synced operator reads
+ *   its ratio LFO by the LFO rule above, as it did before.
  * A segment end inside a long block is one of windsor#301's knots, at its
  * own sample (`voiceAmpRamp.ts`), so a long block holds a long segment's end
  * and the short one after it exactly.
@@ -41,6 +51,7 @@
 import type { Envelope } from './envelope';
 import type { Voice } from './voice';
 import { ST_ATTACK, ST_DECAY, ST_DONE, ST_IDLE, ST_RELEASE } from './envelope';
+import { OPERATOR_COUNT } from './patchDefaults';
 import {
   CTRL_INTERVAL,
   CTRL_INTERVAL_LONG,
@@ -60,6 +71,9 @@ import {
   VT_ENV_AMOUNT,
   VT_LFO2_AMOUNT,
   VT_LFO_AMOUNT,
+  VT_OP_BASE,
+  VT_OP_RATIO,
+  VT_OP_STRIDE,
   VT_PITCH_ENV_AMOUNT,
 } from './voiceTargetTables';
 
@@ -128,9 +142,34 @@ function lfoFast(voice: Voice, second: boolean, table: ControlIntervalTable): bo
   return f.mode !== FILT_OFF && (second ? f.lfo2Amount : f.lfoAmount) !== 0;
 }
 
+/** Whether `code` is an operator's ratio row. */
+function isRatioRow(code: number): boolean {
+  const k = code - VT_OP_BASE;
+  return k >= 0 && k < OPERATOR_COUNT * VT_OP_STRIDE && k % VT_OP_STRIDE === VT_OP_RATIO;
+}
+
+/**
+ * A synced voice's operator ratio is modulated: an LFO's `toRatio` on it, or
+ * a song lane's offset on its ratio row or on a macro mapped to that row.
+ * Never for a voice with no synced operator.
+ */
+function ratioModulated(voice: Voice): boolean {
+  if (voice.sync.synced === 0) return false;
+  const patch = voice.patch!;
+  const offsets = voice.partOffsets;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if (patch.lfo.toRatio[i] !== 0 || patch.lfo2.toRatio[i] !== 0) return true;
+    if (offsets[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_RATIO] !== 0) return true;
+  }
+  for (let j = 0; j < patch.macroMapCount; j++) {
+    if (isRatioRow(patch.macroMapTarget[j]) && offsets[patch.macroMapMacro[j]] !== 0) return true;
+  }
+  return false;
+}
+
 /** The voice's next control interval: the table's `fine` while anything is fast, else its `long`. */
 function controlInterval(voice: Voice, table: ControlIntervalTable = CONTROL_INTERVALS): number {
-  if (voice.fbRamp !== 0) return table.fine;
+  if (voice.fbRamp !== 0 || ratioModulated(voice)) return table.fine;
   for (let i = 0; i < voice.ampEnv.length; i++) {
     if (envelopeFast(voice.ampEnv[i], true, table)) return table.fine;
   }
