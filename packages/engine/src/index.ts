@@ -409,7 +409,9 @@ export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 // The operator width's bounds and the second LFO's defaults (windsor#54), an
 // operator's own filters' range, floor and key-tracking range (windsor#362,
-// windsor#590), and a macro's bounds (windsor#559).
+// windsor#590), a macro's bounds (windsor#559), and an operator ratio's range,
+// the console's and the ratio target's (windsor#646). `OpSync` and
+// `OP_SYNC_VALUES` come with the patch schema above.
 export {
   LFO2_DEFAULTS,
   MACRO_MAPPINGS_MAX,
@@ -417,6 +419,7 @@ export {
   OP_FILTER_FLOOR_HZ,
   OP_FILTER_RANGE,
   OP_FILTER_TRACK_RANGE,
+  RATIO_RANGE,
   VOWEL_RANGE,
   WIDTH_RANGE,
 } from './worklet/fm/patchDefaults';

@@ -41,6 +41,7 @@ import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
 import { updateVoiceLadder } from './voiceLadder';
+import { bindVoiceSync } from './voiceSync';
 import type { ControlIntervalTable } from './voiceControlInterval';
 import { controlInterval } from './voiceControlInterval';
 import { applyVoiceOffsets } from './voiceOffsets';
@@ -50,6 +51,7 @@ import {
   VT_LFO2_AMOUNT,
   VT_LFO_AMOUNT,
   VT_OP_BASE,
+  VT_OP_RATIO,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
@@ -87,9 +89,12 @@ function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
+  bindVoiceSync(voice, patch);
   // Any number of Noise operators takes the kernel (windsor#389): both
   // loops draw a sample's noise D..A, so only the algorithm's edges decide.
-  voice.kernel = voice.specialise && voice.edges >= 0;
+  // A synced operator (windsor#646) takes the generic loop, so the kernel
+  // never carries the resets.
+  voice.kernel = voice.specialise && voice.edges >= 0 && voice.sync.synced === 0;
 }
 
 /**
@@ -260,13 +265,24 @@ function advanceVoiceControl(voice: Voice, n: number): void {
     voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
 
+  // Hard sync's note master (windsor#646) runs at the note's own frequency.
+  voice.sync.noteInc = baseFreq / voice.sr;
+
   const specialise = voice.specialise;
+  const toRatio = lfoP.toRatio,
+    toRatio2 = lfo2P.toRatio;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
 
     // The same Math.pow results, computed once per note (#548).
     const detuneMul = specialise ? voice.detuneMul[i] : Math.pow(2, op.detune / 1200);
-    const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * op.ratio * detuneMul;
+    // The live ratio, a lane's or a step's (windsor#646), then both LFOs'
+    // octaves over it; with no depth the patch's ratio exactly.
+    let ratio = live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_RATIO];
+    if (toRatio[i] !== 0 || toRatio2[i] !== 0) {
+      ratio *= Math.pow(2, lfoVal * toRatio[i] + lfo2Val * toRatio2[i]);
+    }
+    const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * ratio * detuneMul;
     voice.phaseInc[i] = freq / voice.sr;
     voice.opFreq[i] = freq;
     updateOperatorWidth(voice, i, n);

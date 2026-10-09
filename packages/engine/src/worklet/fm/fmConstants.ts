@@ -9,7 +9,7 @@
  * filter's Q scale, cap and makeup (windsor#331), the Acid Ladder's
  * circuit, feedback, level and solver (windsor#573) and its output mix
  * (windsor#577), and the steal fade and
- * reserve (windsor#410). Data, not logic: every
+ * reserve (windsor#410), and hard sync's polyBLEP (windsor#646). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
@@ -269,6 +269,16 @@ const STEAL_FADE_SECONDS = 0.03;
 const STEAL_RESERVE_MIN = 16;
 const STEAL_STREAMED_RESERVE = 4;
 
+/*
+ * Hard sync's anti-aliasing (windsor#646, `voiceSync.ts`): a two-sample
+ * polyBLEP on the step a reset makes. For a step `h` whose discontinuity
+ * falls `d` of a sample before the first sample after it, the sample before
+ * gains `h · d² · SYNC_BLEP_GAIN` and the sample after loses
+ * `h · (1 − d)² · SYNC_BLEP_GAIN`: each meets half the step at the
+ * discontinuity, the band-limited step's two-sample polynomial residual.
+ */
+const SYNC_BLEP_GAIN = 0.5;
+
 export {
   TABLE_SIZE,
   TABLE_MASK,
@@ -322,4 +332,5 @@ export {
   STEAL_FADE_SECONDS,
   STEAL_RESERVE_MIN,
   STEAL_STREAMED_RESERVE,
+  SYNC_BLEP_GAIN,
 };

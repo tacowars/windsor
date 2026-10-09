@@ -13,7 +13,8 @@
  * `OPERATOR_DEFAULTS.level` (`2026-09-23-670-one-patch-defaults-table`).
  *
  * Data only, like `modeIds.ts`, but for `driveOnByDefault`, the one default
- * that is read from other values (windsor#309): it imports the two import-free id modules and
+ * that is read from other values (windsor#309), and `normaliseOpSyncs`, the
+ * sync fields' one rule (windsor#646): it imports the two import-free id modules and
  * nothing else, never touches the worklet scope or the wave cache, is listed
  * in the engine project's `files` and is on the generators' pure side
  * because `audioConstants.ts` re-exports `OPERATOR_COUNT` from here. A
@@ -73,7 +74,49 @@ const OPERATOR_DEFAULTS = {
   opLp: 0,
   opHp: 0,
   opTrack: 0,
+  /**
+   * Hard sync (windsor#646, record `2026-10-09-operator-hard-sync`): the
+   * master whose own-phase wrap restarts this operator's phase, `'note'` or
+   * an operator's letter, or `'off'`. `normaliseOpSyncs` keeps it valid.
+   */
+  sync: 'off' as OpSync,
 };
+
+/**
+ * An operator's hard-sync master (windsor#646): off, the note itself, or an
+ * operator by its letter (the letters are `OP_NAMES`, in operator order).
+ * A string, so a later master is an additive value.
+ */
+const OP_SYNC_VALUES = ['off', 'note', 'A', 'B', 'C', 'D'] as const;
+type OpSync = (typeof OP_SYNC_VALUES)[number];
+
+/** The operator masters among `OP_SYNC_VALUES`, in operator order: `'A'` is operator 0. */
+const OP_SYNC_OPERATORS: readonly OpSync[] = OP_SYNC_VALUES.slice(OP_SYNC_VALUES.indexOf('A'));
+
+/**
+ * The operators' sync fields as both fills keep them (windsor#646, record
+ * decision 4): an unknown value is `'off'`, and so is every operator in a
+ * cycle of operator masters, one synced to itself included. An operator
+ * that leads into a cycle without being in it keeps its master, which is
+ * then unsynced. The second rule read from other values, as
+ * `driveOnByDefault` is, so the worklet and `makePatch()` agree.
+ */
+function normaliseOpSyncs(raw: readonly unknown[]): OpSync[] {
+  const sync = raw.map((v): OpSync =>
+    OP_SYNC_VALUES.includes(v as OpSync) ? (v as OpSync) : 'off',
+  );
+  const masterOf = (i: number): number => OP_SYNC_OPERATORS.indexOf(sync[i]!);
+  const inCycle = sync.map((_, start) => {
+    let at = start;
+    for (let step = 0; step < sync.length; step++) {
+      at = masterOf(at);
+      if (at < 0) return false;
+      if (at === start) return true;
+    }
+    return false;
+  });
+  return sync.map((v, i) => (inCycle[i] ? 'off' : v));
+}
 
 /** Operator A's level: the one operator an empty patch hears. */
 const LEAD_OPERATOR_LEVEL = 1;
@@ -122,6 +165,13 @@ const LFO_TO_OP_DEFAULT = 0;
 
 /** Each operator's LFO width-modulation depth. */
 const LFO_TO_WIDTH_DEFAULT = 0;
+
+/**
+ * Each operator's LFO ratio-modulation depth (windsor#646), in octaves at
+ * full LFO swing: 0 is off, and the worklet clamps it to `LFO_TO_RATIO_RANGE`.
+ */
+const LFO_TO_RATIO_DEFAULT = 0;
+const LFO_TO_RATIO_RANGE = { min: -4, max: 4 };
 
 /** The filter, its envelope aside (`FILTER_ENV_DEFAULTS`). */
 const FILTER_DEFAULTS = {
@@ -199,6 +249,15 @@ const TONE_RANGE = { min: 0.02, max: 1 };
 /** Operator self-feedback is bipolar (#529) and clamped here by the worklet. */
 const FEEDBACK_RANGE = { min: -1, max: 1 };
 
+/**
+ * An operator's ratio as the console sets it and a ratio target moves it
+ * (windsor#646): four octaves under the note to 24 times it. The floor is the
+ * console's (`2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`);
+ * the worklet does not clamp a patch's own ratio, and the voice target row
+ * `ops.<i>.ratio` takes these bounds and its floor from here.
+ */
+const RATIO_RANGE = { min: 0.0625, max: 24 };
+
 /** Operator width is clamped here by the worklet: 1 is the plain wave, the floor keeps a sliver of it. */
 const WIDTH_RANGE = { min: 0.05, max: 1 };
 
@@ -253,20 +312,27 @@ export {
   LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_RATIO_DEFAULT,
+  LFO_TO_RATIO_RANGE,
   LFO_TO_WIDTH_DEFAULT,
   MACRO_DEFAULTS,
   MACRO_MAPPING_DEFAULTS,
   MACRO_MAPPINGS_MAX,
   MACRO_VALUE_RANGE,
   MACROS_MAX,
+  normaliseOpSyncs,
   OP_FILTER_FLOOR_HZ,
   OP_FILTER_RANGE,
   OP_FILTER_TRACK_RANGE,
+  OP_SYNC_OPERATORS,
+  OP_SYNC_VALUES,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
+  RATIO_RANGE,
   TONE_RANGE,
   VOWEL_RANGE,
   WIDTH_RANGE,
 };
+export type { OpSync };

@@ -134,7 +134,7 @@ describe('the picker', () => {
   it("groups the voice's options by the catalog's section, in its order (windsor#436)", () => {
     const operator = (name: string): readonly [string, string[]] => [
       `Voice · Op ${name}`,
-      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width'].map((f) => `Op ${name} ${f}`),
+      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width', 'Ratio'].map((f) => `Op ${name} ${f}`),
     ];
     const bare = pickerGroups(partWith([]));
     expect(bare.map((g) => [g.label, g.options.map((o) => o.label)])).toEqual([

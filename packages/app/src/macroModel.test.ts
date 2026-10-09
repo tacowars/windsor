@@ -144,7 +144,14 @@ describe('the target picker', () => {
       'Pitch',
     ]);
     const opA = groups.find((g) => g.label === 'Op A')!;
-    expect(opA.options.map((o) => o.label)).toEqual(['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width']);
+    expect(opA.options.map((o) => o.label)).toEqual([
+      'Level',
+      'Decay',
+      'Dcy Crv',
+      'Fdbk',
+      'Width',
+      'Ratio',
+    ]);
   });
 
   it('names the macro holding each mapped target', () => {

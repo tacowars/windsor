@@ -59,6 +59,7 @@ const op = (level: number, feedback: number, attackTime: number): Patch['ops'][n
   opLp: 0,
   opHp: 0,
   opTrack: 0,
+  sync: 'off',
   env: env({ attackTime }),
 });
 
@@ -94,6 +95,7 @@ export const CLICKS_PATCH: Patch = {
     modWheelDepth: 1,
     toOp: [0, 0, 0, 0],
     toWidth: [0, 0, 0, 0],
+    toRatio: [0, 0, 0, 0],
   },
   lfo2: {
     shape: 0,
@@ -107,6 +109,7 @@ export const CLICKS_PATCH: Patch = {
     modWheelDepth: 0,
     toOp: [0, 0, 0, 0],
     toWidth: [0, 0, 0, 0],
+    toRatio: [0, 0, 0, 0],
   },
   filter: {
     mode: 1,

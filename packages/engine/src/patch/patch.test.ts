@@ -30,8 +30,13 @@ describe('operator width, the LFO fields and LFO 2 (windsor#54)', () => {
   it('default to values that reproduce the old sound', () => {
     const patch = makePatch();
     for (const op of patch.ops) expect(op.width).toBe(1);
-    expect(patch.lfo).toMatchObject({ oneShot: false, unipolar: false, toWidth: zeros });
-    expect(patch.lfo2).toEqual({ ...LFO2_DEFAULTS, toOp: zeros, toWidth: zeros });
+    expect(patch.lfo).toMatchObject({
+      oneShot: false,
+      unipolar: false,
+      toWidth: zeros,
+      toRatio: zeros,
+    });
+    expect(patch.lfo2).toEqual({ ...LFO2_DEFAULTS, toOp: zeros, toWidth: zeros, toRatio: zeros });
     expect(patch.lfo2.modWheelDepth).toBe(0);
     expect(patch.filter.lfo2Amount).toBe(0);
   });
@@ -44,8 +49,15 @@ describe('operator width, the LFO fields and LFO 2 (windsor#54)', () => {
       oneShot: true,
       toOp: zeros,
       toWidth: zeros,
+      toRatio: zeros,
     });
-    expect(patch.lfo).toEqual({ ...LFO_DEFAULTS, rate: 2, toOp: zeros, toWidth: zeros });
+    expect(patch.lfo).toEqual({
+      ...LFO_DEFAULTS,
+      rate: 2,
+      toOp: zeros,
+      toWidth: zeros,
+      toRatio: zeros,
+    });
     expect(patch.lfo2.toWidth).not.toBe(patch.lfo.toWidth);
   });
 });

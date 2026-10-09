@@ -23,14 +23,17 @@
  * the next: turning Fine up at 0.999 stays at 0.999 and Coarse does not move.
  */
 
+import { RATIO_RANGE } from '@windsor/engine';
+
 /**
- * The stored field's range. The floor is the console's alone — the engine and
- * `patchNormalise` accept any positive ratio — and sits four octaves under the
+ * The stored field's range, the engine's `RATIO_RANGE` (windsor#646), which the
+ * ratio target's row takes too. The floor is the console's — `patchNormalise`
+ * accepts any positive ratio — and sits four octaves under the
  * note, two under the drum bodies that `drum-bank-ratio-floor` pinned at 0.25
  * (tacowars, 2026-09-18; `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`).
  */
-export const RATIO_MIN = 0.0625;
-export const RATIO_MAX = 24;
+export const RATIO_MIN = RATIO_RANGE.min;
+export const RATIO_MAX = RATIO_RANGE.max;
 
 export const COARSE_MIN = 0;
 export const COARSE_MAX = 24;

@@ -1,6 +1,7 @@
 /**
- * The one voice target table (windsor#419): thirty-eight rows in code order,
- * the last eight the macros' (windsor#559), the codes the voice addresses
+ * The one voice target table (windsor#419): forty-two rows in code order,
+ * the last eight the macros' (windsor#559), each operator's ratio its sixth
+ * (windsor#646), the codes the voice addresses
  * them by, bounds that mirror the patch's clamps and the knobs, the two
  * curves, and the spans a step pushes by.
  */
@@ -10,6 +11,7 @@ import {
   FEEDBACK_RANGE,
   MACRO_VALUE_RANGE,
   OPERATOR_COUNT,
+  RATIO_RANGE,
   VOWEL_RANGE,
   WIDTH_RANGE,
 } from './patchDefaults';
@@ -37,6 +39,7 @@ import {
   VT_OP_DECAY_CURVE,
   VT_OP_FEEDBACK,
   VT_OP_LEVEL,
+  VT_OP_RATIO,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
@@ -51,10 +54,11 @@ import {
 
 const row = (path: string) => VOICE_TARGET_TABLE.find((r) => r.path === path);
 const DECAY_TIME = /\.decayTime$/;
+const OP_RATIO = /^ops\.\d\.ratio$/;
 
 describe('the voice target table (windsor#419)', () => {
-  it('has five filter rows, five per operator, five more and eight macros, each path once', () => {
-    expect(VOICE_TARGET_COUNT).toBe(38);
+  it('has five filter rows, six per operator, five more and eight macros, each path once', () => {
+    expect(VOICE_TARGET_COUNT).toBe(42);
     expect(MACROS_MAX).toBe(8);
     expect(VOICE_TARGET_PATHS).toHaveLength(VOICE_TARGET_COUNT);
     expect(new Set(VOICE_TARGET_PATHS).size).toBe(VOICE_TARGET_COUNT);
@@ -73,14 +77,18 @@ describe('the voice target table (windsor#419)', () => {
       expect(VOICE_TARGET_PATHS[b + VT_OP_DECAY_CURVE]).toBe(`ops.${i}.env.decayCurve`);
       expect(VOICE_TARGET_PATHS[b + VT_OP_FEEDBACK]).toBe(`ops.${i}.feedback`);
       expect(VOICE_TARGET_PATHS[b + VT_OP_WIDTH]).toBe(`ops.${i}.width`);
+      expect(VOICE_TARGET_PATHS[b + VT_OP_RATIO]).toBe(`ops.${i}.ratio`);
     }
     expect(VOICE_TARGET_PATHS[VT_LFO_AMOUNT]).toBe('lfo.amount');
     expect(VOICE_TARGET_PATHS[VT_LFO_RATE]).toBe('lfo.rate');
     expect(VOICE_TARGET_PATHS[VT_LFO2_AMOUNT]).toBe('lfo2.amount');
     expect(VOICE_TARGET_PATHS[VT_LFO2_RATE]).toBe('lfo2.rate');
     expect(VOICE_TARGET_PATHS[VT_PITCH_ENV_AMOUNT]).toBe('pitchEnvAmount');
-    // The first 30 codes did not move when the macros came (windsor#559).
-    expect([VT_PITCH_ENV_AMOUNT, VT_MACRO_BASE]).toEqual([29, 30]);
+    // The ratio rows (windsor#646) moved every code after operator A's
+    // width; a lane or a step names its target by path, so only these move.
+    expect([VT_OP_STRIDE, VT_LFO_AMOUNT, VT_PITCH_ENV_AMOUNT, VT_MACRO_BASE]).toEqual([
+      6, 29, 33, 34,
+    ]);
     for (let i = 0; i < MACROS_MAX; i++) {
       expect(VOICE_TARGET_PATHS[VT_MACRO_BASE + i]).toBe(`macros.${i}.value`);
     }
@@ -106,23 +114,44 @@ describe('the voice target table (windsor#419)', () => {
     }
   });
 
-  it('scales the cutoff, the LFO rates and the decay times by a ratio and offsets the rest', () => {
+  it('scales the cutoff, the LFO rates, the decay times and the operator ratios by a ratio and offsets the rest', () => {
     const ratio = VOICE_TARGET_TABLE.filter((r) => r.curve === 'ratio').map((r) => r.path);
     expect(ratio).toEqual(
       VOICE_TARGET_PATHS.filter(
-        (p) => p === 'filter.cutoff' || p === 'lfo.rate' || p === 'lfo2.rate' || DECAY_TIME.test(p),
+        (p) =>
+          p === 'filter.cutoff' ||
+          p === 'lfo.rate' ||
+          p === 'lfo2.rate' ||
+          DECAY_TIME.test(p) ||
+          OP_RATIO.test(p),
       ),
     );
-    expect(ratio).toHaveLength(8);
+    expect(ratio).toHaveLength(12);
   });
 
-  it('takes a decay time’s ratio from its 1 ms floor, an LFO rate’s from 0.02 Hz, and no other row’s from one', () => {
+  it('takes a decay time’s ratio from its 1 ms floor, an LFO rate’s from 0.02 Hz, an operator ratio’s from 1/16, and no other row’s from one', () => {
     for (const r of VOICE_TARGET_TABLE) {
       const decay = DECAY_TIME.test(r.path);
       const lfoRate = r.path === 'lfo.rate' || r.path === 'lfo2.rate';
-      expect(r.floor, r.path).toBe(decay ? 0.001 : lfoRate ? 0.02 : 0);
+      const opRatio = OP_RATIO.test(r.path);
+      expect(r.floor, r.path).toBe(decay ? 0.001 : lfoRate ? 0.02 : opRatio ? 0.0625 : 0);
       if (decay) expect([r.min, r.max], r.path).toEqual([0.001, 20]);
       if (lfoRate) expect(r.floor, r.path).toBe(r.min);
+    }
+  });
+
+  it('moves an operator ratio over the console’s range, half its travel a step, and no slide keeps it (windsor#646)', () => {
+    expect(RATIO_RANGE).toEqual({ min: 0.0625, max: 24 });
+    for (let i = 0; i < OPERATOR_COUNT; i++) {
+      expect(row(`ops.${i}.ratio`)).toEqual({
+        path: `ops.${i}.ratio`,
+        curve: 'ratio',
+        min: 0.0625,
+        max: 24,
+        floor: 0.0625,
+        span: 0.5 * Math.log2(24 / 0.0625),
+        slideKeeps: false,
+      });
     }
   });
 

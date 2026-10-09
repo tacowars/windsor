@@ -20,7 +20,7 @@ import {
 } from './automationTargetTables';
 import { VOICE_AUTOMATION_ROWS, voiceTargetId } from './automationTargets';
 
-const OPERATOR_FIELDS = ['level', 'env.decayTime', 'env.decayCurve', 'feedback', 'width'];
+const OPERATOR_FIELDS = ['level', 'env.decayTime', 'env.decayCurve', 'feedback', 'width', 'ratio'];
 const MACROS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 const VOICE_IDS = [
@@ -39,15 +39,15 @@ const VOICE_IDS = [
 ];
 
 describe('the voice rows', () => {
-  it('are the 29 targets of decision 2, the Formant vowel (windsor#406) and eight macros (windsor#559)', () => {
-    expect(VOICE_AUTOMATION_ROWS).toHaveLength(38);
+  it('are the 29 targets of decision 2, the Formant vowel (windsor#406), eight macros (windsor#559) and the four ratios (windsor#646)', () => {
+    expect(VOICE_AUTOMATION_ROWS).toHaveLength(42);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.target)).toEqual(VOICE_IDS);
-    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(38);
+    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(42);
   });
 
   it('name each target once, short enough for a step lane header (windsor#424)', () => {
     const operator = (name: string): string[] =>
-      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width'].map((f) => `Op ${name} ${f}`);
+      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width', 'Ratio'].map((f) => `Op ${name} ${f}`);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.label)).toEqual([
       'Cutoff',
       'Filt Env Amt',
@@ -90,6 +90,19 @@ describe('the voice rows', () => {
       section: { kind: 'filter' },
     });
     expect([vowel.min, vowel.max]).toEqual([0, 4]);
+  });
+
+  it('carry an operator ratio as a log lane over the console’s ratio range (windsor#646)', () => {
+    expect(VOICE_AUTOMATION_ROWS.find((r) => r.target === 'voice.ops.1.ratio')).toEqual({
+      target: 'voice.ops.1.ratio',
+      label: 'Op B Ratio',
+      min: 0.0625,
+      max: 24,
+      scale: 'log',
+      unit: '',
+      path: 'ops.1.ratio',
+      section: { kind: 'operator', op: 1 },
+    });
   });
 
   it('carry their patch path (windsor#436)', () => {

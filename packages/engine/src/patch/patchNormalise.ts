@@ -19,7 +19,12 @@
  */
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { isRecord, show } from '../song/arrangementFields';
-import { MACRO_MAPPINGS_MAX, MACROS_MAX } from '../worklet/fm/patchDefaults';
+import {
+  MACRO_MAPPINGS_MAX,
+  MACROS_MAX,
+  OP_SYNC_VALUES,
+  normaliseOpSyncs,
+} from '../worklet/fm/patchDefaults';
 import { macroTargetProblem } from '../worklet/fm/voiceTargetTables';
 import type { Macro, MacroMapping, Patch } from './patch';
 import { driveOnByDefault, makeMacro, makeMacroMapping, makePatch } from './patch';
@@ -64,7 +69,23 @@ export function normalisePatch(
   if (!isRecord(drive) || typeof drive['on'] !== 'boolean') {
     patch.drive.on = driveOnByDefault(patch.drive.gain, patch.drive.bias);
   }
+  normaliseSyncs(patch, n, path);
   return patch;
+}
+
+/**
+ * The operators' sync fields by the worklet's rule (windsor#646,
+ * `normaliseOpSyncs`): an unknown master, and every operator in a cycle,
+ * is `'off'`, with a correction, so the document holds what plays.
+ */
+function normaliseSyncs(patch: Patch, n: FieldNormaliser, path: string): void {
+  normaliseOpSyncs(patch.ops.map((op) => op.sync)).forEach((sync, i) => {
+    const op = patch.ops[i]!;
+    if (op.sync === sync) return;
+    const why = OP_SYNC_VALUES.includes(op.sync) ? 'is in a sync cycle' : 'is not a sync master';
+    n.correction(`${path}.ops[${i}].sync: ${show(op.sync)} ${why} — using 'off'`);
+    op.sync = sync;
+  });
 }
 
 /** A list's items, the first `max` of them, with a correction for the rest; none for a non-list. */

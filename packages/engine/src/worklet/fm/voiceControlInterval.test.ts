@@ -161,6 +161,8 @@ describe('controlInterval (windsor#326)', () => {
     ['toPitch', { toPitch: 0.5 }, {}],
     ['an operator level', { toOp: [0, 0, 0.5, 0] }, {}],
     ['an operator width', { toWidth: [0, 0.5, 0, 0] }, {}],
+    // An operator ratio (windsor#646) follows the LFO-on-pitch rule.
+    ['an operator ratio', { toRatio: [0, 0, 0, 0.5] }, {}],
     ['the filter', {}, { mode: FILT_LP }],
   ])('reads fine for an LFO at 8 Hz on %s, and long at 7.99 Hz', (_name, target, filter) => {
     for (const second of [false, true]) {

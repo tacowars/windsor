@@ -81,7 +81,8 @@ describe('the factory bank through the kernel', () => {
     const generic = renderChord(patch, false);
     const kernel = renderChord(patch, true);
     expect(generic.kernel).toBe(false);
-    expect(kernel.kernel).toBe(true);
+    // A synced operator takes the generic loop in both (windsor#646).
+    expect(kernel.kernel).toBe(patch.ops.every((op) => op.sync === 'off'));
     expect(generic.samples.some((s) => s !== 0)).toBe(true);
     expect(sameBits(kernel.samples, generic.samples)).toBe(true);
   });

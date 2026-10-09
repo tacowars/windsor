@@ -48,6 +48,7 @@ import {
   MACRO_VALUE_RANGE,
   MACROS_MAX,
   OPERATOR_COUNT,
+  RATIO_RANGE,
   VOWEL_RANGE,
   WIDTH_RANGE,
 } from './patchDefaults';
@@ -88,7 +89,10 @@ const VOICE_TARGET_FILTER_ROWS = [
 /**
  * Each operator's rows, by field under `ops.<i>`. The decay curve reshapes a
  * segment already running and feedback is read per sample, so a slide keeps
- * both.
+ * both. The ratio (windsor#646) is last, so the five before it keep their
+ * offsets: an octave curve over the console's `RATIO_RANGE`, its floor that
+ * range's bottom, read where the frequency is worked out; a fixed-frequency
+ * operator ignores it, as it ignores its ratio.
  */
 const VOICE_TARGET_OPERATOR_ROWS = [
   { field: 'level', curve: 'add', min: 0, max: 1, floor: 0, span: 0.5, slideKeeps: false },
@@ -118,6 +122,15 @@ const VOICE_TARGET_OPERATOR_ROWS = [
     max: WIDTH_RANGE.max,
     floor: 0,
     span: 0.5,
+    slideKeeps: false,
+  },
+  {
+    field: 'ratio',
+    curve: 'ratio',
+    min: RATIO_RANGE.min,
+    max: RATIO_RANGE.max,
+    floor: RATIO_RANGE.min,
+    span: halfTravel(RATIO_RANGE.min, RATIO_RANGE.max),
     slideKeeps: false,
   },
 ] as const;
@@ -187,7 +200,7 @@ interface VoiceTargetRow {
 }
 
 /**
- * Every row, in code order: the filter's five, operator A's five, B's, C's
+ * Every row, in code order: the filter's five, operator A's six, B's, C's
  * and D's, the LFOs' and the pitch envelope's, then the eight macros'.
  */
 const VOICE_TARGET_TABLE: readonly VoiceTargetRow[] = [
@@ -226,6 +239,7 @@ const VT_OP_DECAY = 1;
 const VT_OP_DECAY_CURVE = 2;
 const VT_OP_FEEDBACK = 3;
 const VT_OP_WIDTH = 4;
+const VT_OP_RATIO = 5;
 /** The LFOs' and the pitch envelope's codes. */
 const VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
 const VT_LFO_RATE = VT_LFO_AMOUNT + 1;
@@ -310,6 +324,7 @@ export {
   VT_OP_DECAY_CURVE,
   VT_OP_FEEDBACK,
   VT_OP_LEVEL,
+  VT_OP_RATIO,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,

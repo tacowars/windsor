@@ -57,9 +57,10 @@ describe('voiceKnobRange', () => {
 describe('the Parts tab knobs over voice targets', () => {
   const knobs = new Map(allPatchKnobs().map((knob) => [knob.path, knob.entry.o]));
 
-  it('cover every voice target but the macros, whose knobs are the Macros card’s (windsor#558)', () => {
+  it('cover every voice target but the macros, whose knobs are the Macros card’s (windsor#558), and the ratios, the Coarse / Fine pair’s (#587, windsor#646)', () => {
     for (const row of VOICE_AUTOMATION_ROWS) {
-      expect(knobs.has(row.path), row.path).toBe(row.section.kind !== 'macro');
+      const own = row.section.kind !== 'macro' && !row.path.endsWith('.ratio');
+      expect(knobs.has(row.path), row.path).toBe(own);
     }
   });
 

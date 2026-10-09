@@ -96,7 +96,7 @@ type MacroPath = Extract<VoiceTargetPath, `macros.${string}`>;
 type VoicePath = Exclude<VoiceTargetPath, OperatorPath | MacroPath>;
 /** The field an operator path names, `env.decayTime` of `ops.2.env.decayTime`. */
 type FieldOf<P> = P extends `ops.${number}.${infer F}` ? F : never;
-/** An operator's five fields. */
+/** An operator's six fields. */
 type OperatorField = FieldOf<OperatorPath>;
 
 /**
@@ -121,13 +121,18 @@ const VOICE_LOOKS: Readonly<Record<VoicePath, VoiceLook>> = {
   pitchEnvAmount: { label: 'Pitch Env', scale: 'linear', unit: 'st' },
 };
 
-/** An operator's five fields' looks, under `ops.<i>`; the label follows `Op <name> `. */
+/**
+ * An operator's six fields' looks, under `ops.<i>`; the label follows
+ * `Op <name> `. The ratio (windsor#646) reads on a log scale, as a multiple
+ * of the note.
+ */
 const OPERATOR_LOOKS: Readonly<Record<OperatorField, VoiceLook>> = {
   level: { label: 'Level', scale: 'linear', unit: '' },
   'env.decayTime': { label: 'Decay', scale: 'log', unit: 's', zeroEnd: true },
   'env.decayCurve': { label: 'Dcy Crv', scale: 'linear', unit: '' },
   feedback: { label: 'Fdbk', scale: 'linear', unit: '' },
   width: { label: 'Width', scale: 'linear', unit: '' },
+  ratio: { label: 'Ratio', scale: 'log', unit: '' },
 };
 
 /**

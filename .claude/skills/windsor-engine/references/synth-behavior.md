@@ -65,10 +65,34 @@ glide), the global pitch envelope, bend and pitch LFO, then its ratio and
 detune. The console shows that ratio as Operator does, as **Coarse** (the whole
 multiple) plus **Fine** (the fraction) over the one stored field, while **Level**
 is the modulation index — the two are not the same control (#587). The console
-floors the stored ratio at `RATIO_MIN`, four octaves below the note (#618,
+floors the stored ratio at `RATIO_RANGE.min`, four octaves below the note (#618,
 record `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`); the
 engine and `patchNormalise.ts` are unclamped, so a hand-written or older file
-may sit below the floor and plays as written.
+may sit below the floor and plays as written. The ratio is a voice target
+(`ops.<i>.ratio`, windsor#646): a step lane, a song lane or a macro moves it
+in octaves over `RATIO_RANGE` (1/16 to 24), and each LFO's `toRatio` (one
+depth per operator, octaves at full swing, −4 to 4) multiplies the frequency
+by `2^(lfo × depth)` on top. A fixed-frequency operator ignores all three, as
+it ignores its ratio.
+
+**Hard sync** (windsor#646, record `2026-10-09-operator-hard-sync`):
+`Operator.sync` restarts the operator's own phase each time its master's
+own phase wraps, `'note'` (the played note's period) or another operator's
+letter (whatever that one's level, wave or fixed mode, so a silent master at
+level 0 still syncs). Synced to the note any ratio is harmonic: 2.37 is a
+pitched, formant-like tone, not a bell, and sweeping the ratio (an LFO's
+`toRatio`, a lane) is the tearing sync sweep. Synced to a detuned operator,
+the operator repeats at that operator's period. FM it receives still applies
+over the restarted phase; FM on a master does not move its wraps. Chains
+(C → B → note) reset together; a cycle or self-sync is off. A synced
+operator renders through the generic loop, about 2.5–3.3× the kernel's
+cost per voice, and a corrected wave reaches what it feeds a sample late.
+A synced Noise operator does nothing. A two-sample polyBLEP smooths the
+reset of a Sine, Triangle or User wave by 12–20 dB; the Saw, Square and
+Pulse take it uncorrected, as Saw D does, pending tacowars's listen
+(`docs/research/2026-10-09-operator-hard-sync/`): judge a bright synced
+saw high up by ear. Factory examples: `lead-sync-sweep`,
+`lead-sync-detune`.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,

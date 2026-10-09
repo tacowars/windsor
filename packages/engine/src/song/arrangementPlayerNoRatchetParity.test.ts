@@ -109,8 +109,11 @@ describe('a song with no ratchet plays as before (windsor#366)', () => {
     // to code 0). Remapped onto the new codes, every call matched `main`'s.
     // Re-pinned for windsor#559: the table grew to 38 rows, so a note-on's
     // step array carries eight trailing zeros for the macro rows; every call
-    // otherwise matched.
-    expect(play(GRID)).toEqual({ count: 84, digest: 'd00c74d8db900434' });
+    // otherwise matched. Re-pinned for windsor#646: the table grew to 42 rows,
+    // a Ratio row per operator (codes 10, 16, 22 and 28), so a note-on's step
+    // array carries four more zeros; with them taken out, the calls hash to
+    // the old `d00c74d8db900434`.
+    expect(play(GRID)).toEqual({ count: 84, digest: '9229d9fbc99166f2' });
   });
 
   it('an Arp part', () => {

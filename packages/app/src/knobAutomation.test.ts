@@ -206,13 +206,13 @@ describe('a patch knob', () => {
   });
 
   it('is free on a path off the catalog and on a target with no lane', () => {
-    expect(voiceKnobTarget('ops.0.ratio')).toBeNull();
-    expect(voiceKnobAutomation(AUTOMATION_PART, 'ops.0.ratio', 0)).toBeNull();
+    expect(voiceKnobTarget('ops.0.fixedHz')).toBeNull();
+    expect(voiceKnobAutomation(AUTOMATION_PART, 'ops.0.fixedHz', 0)).toBeNull();
     expect(voiceKnobAutomation(AUTOMATION_PART, 'filter.resonance', 0)).toBeNull();
   });
 
-  it('knows the 38 voice targets and no more, the Formant vowel and the macros among them', () => {
-    expect(VOICE_TARGET_IDS).toHaveLength(38);
+  it('knows the 42 voice targets and no more, the Formant vowel, the macros and the ratios among them', () => {
+    expect(VOICE_TARGET_IDS).toHaveLength(42);
     expect(voiceKnobTarget('filter.vowel')).toBe('voice.filter.vowel');
     for (const row of VOICE_AUTOMATION_ROWS) {
       expect(voiceKnobTarget(row.path)).toBe(row.target);
