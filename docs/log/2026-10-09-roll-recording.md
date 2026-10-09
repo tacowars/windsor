@@ -48,16 +48,25 @@ the build tickets.
    A new note at the same tick and pitch as an existing one replaces it.
    The normaliser settles the rest: where same-pitch notes overlap, the
    earlier is trimmed. There is no Replace mode in v1.
-5. **When a note is written.** A note is written when it stops sounding,
-   never at its onset, so the performer never retriggers a note still held
-   across the loop's wrap. Until then the device draws it growing. Its
-   length is what sounded: up to the key's release, extended by the sustain
-   pedal or the console's Hold, and cut at the first of these:
+5. **When a note is written.** A note's length and the moment it is
+   written are separate. Its length is what sounded: up to the key's
+   release, extended by the sustain pedal or the console's Hold, and cut
+   at the first of these:
    - the loop's end;
    - the region's end;
    - a transport stop;
    - a seek or a loop jump;
    - a part switch.
+
+   It is written only when it stops sounding (the release reaches the
+   part, or Panic) or when the take ends, never at its onset and never at
+   a cut. A key held past the loop's end keeps its length frozen at the
+   cut, stays pending while it rings, and is written on release. So the
+   performer never starts it again at its onset while the played voice is
+   still sounding, even when it is held for more than a whole loop. Until
+   it is written the device draws it growing, then frozen. A note still
+   latched by Hold when the take ends is written then; if its onset comes
+   round while the latched voice rings, both sound until Panic.
 6. **What is kept.** Pitch, velocity (the MIDI velocity, 0..1, as the
    note's `velocity`) and length. Pitch bend and the mod wheel are played
    live and not recorded: the Roll has no controller lanes.
