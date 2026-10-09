@@ -57,6 +57,7 @@ var LADDER_OVERSAMPLE = 2;
 var STEAL_FADE_SECONDS = 0.03;
 var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
+var SYNC_BLEP_GAIN = 0.5;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -343,8 +344,32 @@ var OPERATOR_DEFAULTS = {
    */
   opLp: 0,
   opHp: 0,
-  opTrack: 0
+  opTrack: 0,
+  /**
+   * Hard sync (windsor#646, record `2026-10-09-operator-hard-sync`): the
+   * master whose own-phase wrap restarts this operator's phase, `'note'` or
+   * an operator's letter, or `'off'`. `normaliseOpSyncs` keeps it valid.
+   */
+  sync: "off"
 };
+var OP_SYNC_VALUES = ["off", "note", "A", "B", "C", "D"];
+var OP_SYNC_OPERATORS = OP_SYNC_VALUES.slice(OP_SYNC_VALUES.indexOf("A"));
+function normaliseOpSyncs(raw) {
+  const sync = raw.map(
+    (v) => OP_SYNC_VALUES.includes(v) ? v : "off"
+  );
+  const masterOf = (i) => OP_SYNC_OPERATORS.indexOf(sync[i]);
+  const inCycle = sync.map((_, start) => {
+    let at = start;
+    for (let step = 0; step < sync.length; step++) {
+      at = masterOf(at);
+      if (at < 0) return false;
+      if (at === start) return true;
+    }
+    return false;
+  });
+  return sync.map((v, i) => inCycle[i] ? "off" : v);
+}
 var LEAD_OPERATOR_LEVEL = 1;
 var PATCH_DEFAULTS = {
   name: "untitled",
@@ -375,6 +400,8 @@ var LFO_DEFAULTS = {
 var LFO2_DEFAULTS = { ...LFO_DEFAULTS, modWheelDepth: 0 };
 var LFO_TO_OP_DEFAULT = 0;
 var LFO_TO_WIDTH_DEFAULT = 0;
+var LFO_TO_RATIO_DEFAULT = 0;
+var LFO_TO_RATIO_RANGE = { min: -4, max: 4 };
 var FILTER_DEFAULTS = {
   mode: FILT_OFF,
   cutoff: 8e3,
@@ -412,6 +439,7 @@ var DRIVE_BIAS_RANGE = { min: -1, max: 1 };
 var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
 var FEEDBACK_RANGE = { min: -1, max: 1 };
+var RATIO_RANGE = { min: 0.0625, max: 24 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
 var OP_FILTER_RANGE = { min: 0, max: 2e4 };
 var OP_FILTER_FLOOR_HZ = 20;
@@ -476,6 +504,15 @@ var VOICE_TARGET_OPERATOR_ROWS = [
     floor: 0,
     span: 0.5,
     slideKeeps: false
+  },
+  {
+    field: "ratio",
+    curve: "ratio",
+    min: RATIO_RANGE.min,
+    max: RATIO_RANGE.max,
+    floor: RATIO_RANGE.min,
+    span: halfTravel(RATIO_RANGE.min, RATIO_RANGE.max),
+    slideKeeps: false
   }
 ];
 var LFO_RATE_MIN = 0.02;
@@ -538,6 +575,7 @@ var VT_OP_DECAY = 1;
 var VT_OP_DECAY_CURVE = 2;
 var VT_OP_FEEDBACK = 3;
 var VT_OP_WIDTH = 4;
+var VT_OP_RATIO = 5;
 var VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
 var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
 var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
@@ -666,6 +704,8 @@ function opDefaults(o, index) {
     opHp: clamp(num(o.opHp, d.opHp), OP_FILTER_RANGE),
     opTrack: clamp(num(o.opTrack, d.opTrack), OP_FILTER_TRACK_RANGE),
     // octaves an octave of note
+    sync: d.sync,
+    // the patch's, once every operator is read (`normaliseOpSyncs`, windsor#646)
     env: envDefaults(o.env)
   };
 }
@@ -690,7 +730,11 @@ function lfoDefaults(raw, ld) {
     // semitones
     modWheelDepth: num(raw.modWheelDepth, ld.modWheelDepth),
     toOp: perOperator(raw.toOp, LFO_TO_OP_DEFAULT),
-    toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT)
+    toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT),
+    // Octaves at full swing (windsor#646), clamped so the ratio stays finite.
+    toRatio: perOperator(raw.toRatio, LFO_TO_RATIO_DEFAULT).map(
+      (d) => clamp(d, LFO_TO_RATIO_RANGE)
+    )
   };
 }
 function driveDefaults(raw) {
@@ -727,7 +771,10 @@ function macrosDefaults(raw) {
 function normalisePatch(raw) {
   raw = raw || {};
   const ops = [];
-  for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
+  const rawOps = raw.ops;
+  for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(rawOps && rawOps[i], i));
+  const syncs = normaliseOpSyncs(ops.map((_, i) => rawOps?.[i]?.sync));
+  for (let i = 0; i < OPERATOR_COUNT; i++) ops[i].sync = syncs[i];
   const filtRaw = raw.filter || {};
   const pd = PATCH_DEFAULTS, fd = FILTER_DEFAULTS;
   const mode = num(filtRaw.mode, fd.mode) | 0;
@@ -2121,6 +2168,124 @@ function renderVoiceLadder(voice, outL, outR, off, n) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceSync.ts
+var SYNC_NONE = -1;
+var SYNC_NOTE = OPERATOR_COUNT;
+var SYNC_NOTE_BIT = 1 << SYNC_NOTE;
+var SYNC_POINT = new Float64Array(1);
+var VoiceSync = class {
+  constructor() {
+    this.notePhase = this.noteInc = NaN;
+    this.synced = 0;
+    this.blep = 0;
+    this.masters = 0;
+    this.master = new Int32Array(OPERATOR_COUNT).fill(SYNC_NONE);
+    this.order = new Int32Array(OPERATOR_COUNT);
+    this.count = 0;
+    this.notePhase = 0;
+    this.noteInc = 0;
+    this.mod = new Float64Array(OPERATOR_COUNT);
+    this.held = new Float64Array(OPERATOR_COUNT);
+    this.after = new Float64Array(OPERATOR_COUNT);
+  }
+  /** A note from rest: the note's phase at 0 and nothing held. A legato retarget keeps both. */
+  start() {
+    this.notePhase = 0;
+    this.held.fill(0);
+    this.after.fill(0);
+  }
+};
+function syncMasterOf(sync) {
+  if (sync === "note") return SYNC_NOTE;
+  return OP_SYNC_OPERATORS.indexOf(sync);
+}
+function syncCorrected(kind, wave) {
+  if (kind !== KIND_TABLE) return false;
+  return wave === WAVE.SINE || wave === WAVE.TRIANGLE || wave === WAVE.USER;
+}
+function bindVoiceSync(voice, patch) {
+  const s = voice.sync;
+  const master = s.master;
+  let synced = 0;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const m = voice.kind[i] === KIND_NOISE ? SYNC_NONE : syncMasterOf(patch.ops[i].sync);
+    master[i] = m;
+    if (m !== SYNC_NONE) synced |= 1 << i;
+  }
+  let placed = 0;
+  let count = 0;
+  for (let pass = 0; pass < OPERATOR_COUNT; pass++) {
+    for (let i = 0; i < OPERATOR_COUNT; i++) {
+      const bit = 1 << i;
+      const m = master[i];
+      if ((synced & bit) === 0 || (placed & bit) !== 0) continue;
+      if (m === SYNC_NOTE || (synced & 1 << m) === 0 || (placed & 1 << m) !== 0) {
+        s.order[count++] = i;
+        placed |= bit;
+      }
+    }
+  }
+  let blep = 0;
+  let masters = 0;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((placed & 1 << i) === 0) {
+      master[i] = SYNC_NONE;
+      continue;
+    }
+    masters |= 1 << master[i];
+    if (syncCorrected(voice.kind[i], patch.ops[i].wave)) blep |= 1 << i;
+  }
+  const fresh = blep & ~s.blep;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((fresh & 1 << i) !== 0) s.held[i] = s.after[i] = 0;
+  }
+  s.synced = placed;
+  s.blep = blep;
+  s.masters = masters;
+  s.count = count;
+}
+function syncWaveAt(voice, i) {
+  const ph = SYNC_POINT[0];
+  const x = (ph < 1 ? ph : 0) * voice.width[i];
+  if (x >= 1) {
+    SYNC_POINT[0] = 0;
+    return;
+  }
+  const t = voice.tables[i];
+  const fi = x * TABLE_SIZE;
+  const i0 = fi | 0;
+  const s0 = t[i0];
+  SYNC_POINT[0] = s0 + (t[i0 + 1] - s0) * (fi - i0);
+}
+function applySyncResets(voice) {
+  const s = voice.sync;
+  const phase = voice.phase;
+  const phaseInc = voice.phaseInc;
+  for (let k = 0; k < s.count; k++) {
+    const i = s.order[k];
+    const m = s.master[i];
+    const pm = m === SYNC_NOTE ? s.notePhase : phase[m];
+    const im = m === SYNC_NOTE ? s.noteInc : phaseInc[m];
+    if (!(pm < im && im > 0)) continue;
+    const d = pm / im;
+    const reset = d * phaseInc[i];
+    const before = phase[i] - reset;
+    phase[i] = reset;
+    if ((s.blep & 1 << i) === 0) continue;
+    const mod = s.mod[i];
+    SYNC_POINT[0] = mod - Math.floor(mod);
+    syncWaveAt(voice, i);
+    const after = SYNC_POINT[0];
+    const ph = before + mod;
+    SYNC_POINT[0] = ph - Math.floor(ph);
+    syncWaveAt(voice, i);
+    const step = after - SYNC_POINT[0];
+    const e = 1 - d;
+    s.held[i] += step * d * d * SYNC_BLEP_GAIN;
+    s.after[i] = step * e * e * SYNC_BLEP_GAIN;
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceControlInterval.ts
 var CONTROL_INTERVALS = {
   fine: CTRL_INTERVAL,
@@ -2155,7 +2320,7 @@ function lfoFast(voice, second, table) {
   if (amount === 0 && p.modWheelDepth === 0) return false;
   if (p.toPitch !== 0) return true;
   for (let i = 0; i < p.toOp.length; i++) {
-    if (p.toOp[i] !== 0 || p.toWidth[i] !== 0) return true;
+    if (p.toOp[i] !== 0 || p.toWidth[i] !== 0 || p.toRatio[i] !== 0) return true;
   }
   const f = patch.filter;
   return f.mode !== FILT_OFF && (second ? f.lfo2Amount : f.lfoAmount) !== 0;
@@ -2288,6 +2453,7 @@ function layoutVoiceTargets(patch, out) {
     out[b + VT_OP_DECAY_CURVE] = op.env.decayCurve;
     out[b + VT_OP_FEEDBACK] = op.feedback;
     out[b + VT_OP_WIDTH] = op.width;
+    out[b + VT_OP_RATIO] = op.ratio;
   }
   out[VT_LFO_AMOUNT] = patch.lfo.amount;
   out[VT_LFO_RATE] = patch.lfo.rate;
@@ -2468,7 +2634,8 @@ function bindVoiceConstants(voice, patch) {
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
-  voice.kernel = voice.specialise && voice.edges >= 0;
+  bindVoiceSync(voice, patch);
+  voice.kernel = voice.specialise && voice.edges >= 0 && voice.sync.synced === 0;
 }
 function restingWidth(kind, width) {
   return kind === KIND_PULSE ? width : 1 / width;
@@ -2560,11 +2727,17 @@ function advanceVoiceControl(voice, n) {
   const pEnv = voice.pitchEnv.value * live[VT_PITCH_ENV_AMOUNT];
   const semis = voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
+  voice.sync.noteInc = baseFreq / voice.sr;
   const specialise = voice.specialise;
+  const toRatio = lfoP.toRatio, toRatio2 = lfo2P.toRatio;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
     const detuneMul = specialise ? voice.detuneMul[i] : Math.pow(2, op.detune / 1200);
-    const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * op.ratio * detuneMul;
+    let ratio = live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_RATIO];
+    if (toRatio[i] !== 0 || toRatio2[i] !== 0) {
+      ratio *= Math.pow(2, lfoVal * toRatio[i] + lfo2Val * toRatio2[i]);
+    }
+    const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * ratio * detuneMul;
     voice.phaseInc[i] = freq / voice.sr;
     voice.opFreq[i] = freq;
     updateOperatorWidth(voice, i, n);
@@ -3145,6 +3318,11 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const at = CTRL_INTERVAL - voice.ctrlCount;
   const filters = voice.opFilter;
   const draws = voice.noiseDraw;
+  const sync = voice.sync;
+  const synced = sync.synced, blep = sync.blep, masters = sync.masters;
+  const syncMod = sync.mod, syncHeld = sync.held, syncAfter = sync.after;
+  const noteInc = sync.noteInc;
+  let notePhase = sync.notePhase;
   let ramping = 0, squeezed = 0, filtered = 0, noisy = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
@@ -3181,6 +3359,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         const y = (fb1[i] + fb2[i]) * 0.5;
         mod += fb > 0 ? y * fb * FEEDBACK_SAW_CYCLES : -y * y * fb * FEEDBACK_SQUARE_CYCLES;
       }
+      if ((blep & 1 << i) !== 0) syncMod[i] = mod;
       let ph = phase[i] + mod;
       ph -= Math.floor(ph);
       let v;
@@ -3236,6 +3415,12 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       }
       fb2[i] = fb1[i];
       fb1[i] = v * a;
+      if ((blep & 1 << i) !== 0) {
+        const late = syncHeld[i];
+        syncHeld[i] = v - syncAfter[i];
+        syncAfter[i] = 0;
+        v = late;
+      }
       if ((filtered & 1 << i) !== 0) {
         const filter = filters[i];
         filter.point = v;
@@ -3252,6 +3437,18 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         amp[i] = knotAmp[j];
         ampInc[i] = knotInc[j];
         ampBreak[i] = knotGap[j];
+      }
+    }
+    if (synced !== 0) {
+      notePhase += noteInc;
+      if (notePhase >= 1) notePhase -= Math.floor(notePhase);
+      let wrapped = (masters & SYNC_NOTE_BIT) !== 0 && notePhase < noteInc;
+      for (let m = 0; m < 4 && !wrapped; m++) {
+        wrapped = (masters & 1 << m) !== 0 && phase[m] < phaseInc[m];
+      }
+      if (wrapped) {
+        sync.notePhase = notePhase;
+        applySyncResets(voice);
       }
     }
     let sig = 0;
@@ -3320,6 +3517,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   }
   if (mode === FILT_LADDER) renderVoiceLadder(voice, outL, outR, off, n);
   drive.toneState = driveTone;
+  sync.notePhase = notePhase;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();
@@ -3428,6 +3626,7 @@ var Voice = class {
     this.opFilter = [0, 1, 2, 3].map(() => new OperatorFilter());
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
+    this.sync = new VoiceSync();
     this.noiseSeed = randomSeed32(random);
     this.active = false;
     this.gate = false;
@@ -3528,6 +3727,7 @@ var Voice = class {
       this.ampEnv[i].noteOn();
       this.opFilter[i].reset();
     }
+    this.sync.start();
     this.bindConstants(patch);
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);

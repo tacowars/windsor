@@ -203,6 +203,7 @@ var LADDER_OVERSAMPLE = 2;
 var STEAL_FADE_SECONDS = 0.03;
 var STEAL_RESERVE_MIN = 16;
 var STEAL_STREAMED_RESERVE = 4;
+var SYNC_BLEP_GAIN = 0.5;
 
 // packages/engine/src/worklet/fm/ladderTables.ts
 var LADDER_SATURATOR = {
