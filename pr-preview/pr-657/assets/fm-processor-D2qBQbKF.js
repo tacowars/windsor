@@ -2181,10 +2181,12 @@ var SyncShape = class {
     this.table = [null, null, null, null];
     this.prev = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.next = new Float64Array(OPERATOR_COUNT).fill(NaN);
+    this.width = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.reset = new Float64Array(OPERATOR_COUNT).fill(NaN);
     this.gain.fill(0);
     this.prev.fill(0);
     this.next.fill(0);
+    this.width.fill(1);
   }
   /** A note from rest: every eligible operator enters the shape afresh at its first block. */
   start() {
@@ -2213,6 +2215,7 @@ function readNext(voice, sh, i) {
   let p = voice.phase[i];
   p -= Math.floor(p);
   sh.prev[i] = p;
+  sh.width[i] = voice.width[i];
   const g = sh.gain[i];
   const k = sh.kind[i];
   if (k === SHAPE_SAW) sh.next[i] = g * HALF_PI * (1 - 2 * p);
@@ -2255,8 +2258,12 @@ function syncShapeEdges(voice) {
     const k = sh.kind[i];
     const d = sh.reset[i];
     const isReset = d === d;
-    const end = isReset ? p0 + (1 - d) * inc : p0 + inc;
-    const duty = k === SHAPE_SAW ? -1 : k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - voice.width[i];
+    const span = isReset ? 1 - d : 1;
+    const end = p0 + span * inc;
+    const duty = k === SHAPE_SAW ? -1 : k === SHAPE_SQUARE ? SQUARE_DUTY : 1 - sh.width[i];
+    const slope = k === SHAPE_PULSE ? sh.width[i] - voice.width[i] : 0;
+    const rate = inc - slope;
+    const edgeEnd = end - span * slope;
     const jump = k === SHAPE_SQUARE ? g * HALF_PI : g * Math.PI;
     let hold = 0;
     let owe = 0;
@@ -2266,26 +2273,37 @@ function syncShapeEdges(voice) {
       hold += jump * dd * dd;
       owe += jump * e * e;
     }
-    if (duty >= 0) {
-      for (let x = Math.floor(p0 - duty) + 1 + duty; isReset ? x < end : x <= end; x++) {
-        const dd = 1 - (x - p0) / inc;
+    if (duty >= 0 && rate > 0) {
+      for (let x = Math.floor(p0 - duty) + 1 + duty; isReset ? x < edgeEnd : x <= edgeEnd; x++) {
+        const dd = 1 - (x - p0) / rate;
         const e = 1 - dd;
         hold -= jump * dd * dd;
         owe -= jump * e * e;
       }
+    } else if (duty >= 0 && rate < 0) {
+      for (let x = Math.floor(p0 - duty) + duty; x > edgeEnd; x--) {
+        const dd = 1 - (x - p0) / rate;
+        const e = 1 - dd;
+        hold += jump * dd * dd;
+        owe += jump * e * e;
+      }
     }
     if (isReset) {
+      const dutyAt = duty + span * slope;
       let x = end - Math.floor(end);
       if (x === 0) x = 1;
-      const h = k === SHAPE_SAW ? g * Math.PI * x : x <= duty || duty === 0 ? 0 : jump;
+      const h = k === SHAPE_SAW ? g * Math.PI * x : x <= dutyAt || dutyAt === 0 ? 0 : jump;
       const e = 1 - d;
       hold += h * d * d;
       owe += h * e * e;
-      if (duty > 0 && duty <= d * inc) {
-        const dd = d - duty / inc;
+      if (dutyAt > 0 && dutyAt <= d * rate) {
+        const dd = d - dutyAt / rate;
         const f = 1 - dd;
         hold -= jump * dd * dd;
         owe -= jump * f * f;
+      } else if (dutyAt === 0 && rate < 0) {
+        hold += jump * d * d;
+        owe += jump * e * e;
       }
       sh.reset[i] = NaN;
     }
@@ -2466,6 +2484,7 @@ function isRatioRow(code) {
   return k >= 0 && k < OPERATOR_COUNT * VT_OP_STRIDE && k % VT_OP_STRIDE === VT_OP_RATIO;
 }
 function ratioModulated(voice) {
+  if (voice.sync.synced === 0) return false;
   const patch = voice.patch;
   const offsets = voice.partOffsets;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
