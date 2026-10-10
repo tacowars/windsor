@@ -14,9 +14,10 @@ import { paintHeld } from './rollNotesPaint';
 import type { RollPanes } from './rollPanes';
 import { rollRecorder } from './rollRecMount';
 import { type RecLook, recOn } from './rollRecState';
-import type { RollScene } from './rollScene';
+import { type RollScene, heldOffRows } from './rollScene';
 import type { RollSource } from './rollSource';
 import { ROLL_REC } from './rollTables';
+import type { HeldNote } from './rollTake';
 
 /** What Rec reads of its device. */
 export interface RecViewHost {
@@ -29,6 +30,8 @@ export interface RecViewHost {
   scene(): RollScene | null;
   /** The notes' layer of the last whole paint. */
   layer(): HTMLElement | null;
+  /** Paint the whole roll again, its rows laid out with the held pitches (`heldPitches`). */
+  repaint(): void;
 }
 
 /** Rec's switch for the controls, and what the device calls on each frame and paint. */
@@ -38,6 +41,8 @@ export interface RollRecView {
   frame(): void;
   /** The summary line as the device words it, kept under a full region's. */
   summary(text: string): void;
+  /** The pitches held in this device's region, which its rows make room for. */
+  heldPitches(): number[];
 }
 
 /** The item's class for each look (the mockup's: a full region records on, its dot blinking). */
@@ -133,6 +138,18 @@ class RecView implements RollRecView {
     this.showSummary();
   }
 
+  heldPitches(): number[] {
+    return this.heldNotes().map((note) => note.pitch);
+  }
+
+  /** The take's held notes in this device's region; none while it is full. */
+  private heldNotes(): HeldNote[] {
+    const recorder = rollRecorder();
+    if (this.full || !recorder) return [];
+    const region = this.host.source().regionIndex;
+    return recorder.held(this.host.slot).filter((note) => note.regionIndex === region);
+  }
+
   private set(on: boolean): void {
     rollRecorder()?.setOn(on);
     this.frame();
@@ -154,18 +171,18 @@ class RecView implements RollRecView {
    * The take's held notes in this device's region, redrawn when they moved
    * or the roll was repainted. Drawn whatever the look: a note held from
    * its region into a gap stays pending, frozen at the region's end, and
-   * leaves only when it is written or dropped (decision 5).
+   * leaves only when it is written or dropped (decision 5). A held pitch
+   * with no row (under Fold or Scale) lays the rows out again first, so it
+   * is drawn in the row it will have once written (windsor#667).
    */
   private drawHeld(): void {
     const { host } = this;
-    const recorder = rollRecorder();
-    const region = host.source().regionIndex;
-    const notes =
-      !this.full && recorder
-        ? recorder.held(host.slot).filter((note) => note.regionIndex === region)
-        : [];
+    const notes = this.heldNotes();
     const key = notes.map((n) => `${n.pitch}:${n.local}:${n.ticks}`).join(' ');
     if (key === this.heldKey && this.held.every((node) => node.isConnected)) return;
+    const before = host.scene();
+    const pitches = notes.map((note) => note.pitch);
+    if (before && heldOffRows(before, pitches)) host.repaint();
     for (const node of this.held) node.remove();
     this.heldKey = key;
     const scene = host.scene();
