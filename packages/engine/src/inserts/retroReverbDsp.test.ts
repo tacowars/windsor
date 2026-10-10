@@ -188,6 +188,39 @@ describe('retro reverb shipped DSP', () => {
     expect(energy(left!, Math.floor(rate * 0.3), Math.floor(rate * 0.39))).toBeGreaterThan(1e-7);
     expect(energy(left!, Math.floor(rate * 0.43))).toBeLessThan(1e-12);
   });
+  // RV-6: 30 dB of gain ranging keeps a tail the 12-bit linear converter truncates at -66 dBFS.
+  it(
+    'a slow fade below -70 dBFS stays in the ranging converter and ends in the linear one',
+    SLOW,
+    () => {
+      const seconds = 3,
+        rate = 48000;
+      const fade = (converter: RetroReverbSpec['converter']): Float32Array => {
+        const p = retroParams({ converter, character: 1, mix: 1, decay: 0.5 }),
+          node = loadRetro(rate, p);
+        const input = [new Float32Array(128)],
+          output = [new Float32Array(128), new Float32Array(128)];
+        const left = new Float32Array(rate * seconds);
+        for (let frame = 0; frame < left.length; frame += 128) {
+          // A 220 Hz sine from -40 to -80 dBFS.
+          for (let i = 0; i < 128; i++) {
+            const t = (frame + i) / rate;
+            input[0]![i] =
+              10 ** ((-40 - (40 * t) / seconds) / 20) * Math.sin(2 * Math.PI * 220 * t);
+          }
+          node.process([input], [output], p);
+          left.set(output[0]!, frame);
+        }
+        return left;
+      };
+      // From 2.4 s the input is under -72 dBFS.
+      const from = rate * 2.4;
+      const linear = fade('linear');
+      expect(energy(fade('ranging'), from)).toBeGreaterThan(0);
+      expect(energy(linear, 0, rate / 2)).toBeGreaterThan(0);
+      expect(energy(linear, from)).toBe(0);
+    },
+  );
   it.each([{ mix: 0 }, { enabled: false }])('keeps stereo dry exact: %j', (spec) => {
     const p = retroParams(spec),
       node = loadRetro(48000, p);

@@ -2,9 +2,10 @@
  * The Retro reverb's run for `workletAllocationProbe.ts` (windsor#230): every
  * path its render takes, over and over. A cycle is stereo noise with one
  * parameter changed every `period` quanta (size, decay, tone, diffusion, drift
- * depth and rate, pre-delay, character, mix, duration, early, density, the gated
- * and reverse modes and the enable, so the finite field, the early taps, the
- * line taps, the pre-delay line, the mix glide, the
+ * depth and rate, pre-delay, character, mix, duration, early, density, the
+ * converter, the gated and reverse modes and the enable, so the finite field,
+ * the early taps, the line taps, the gain-ranging converters and their
+ * crossfade, the pre-delay line, the mix glide, the
  * switch's fade and its cleared, dormant off (windsor#630) all run),
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
@@ -53,6 +54,7 @@ interface RetroState {
   wetToneLeft: number;
   wetToneRight: number;
   tank: { density: number; sizeTicks: number };
+  ranging: number;
 }
 
 /**
@@ -76,15 +78,17 @@ const TOGGLES: [string, number][] = [
   ['early', 0.8],
   ['driftRate', 3],
   ['density', 0.7],
+  ['converter', 1],
   ['enabled', 0],
 ];
 
 /**
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
  * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
- * and off, the line taps, the line taps placed on every tick of a Size move.
+ * and off, the line taps, the line taps placed on every tick of a Size move, the gain-ranging
+ * converters.
  */
-const PATHS = 15;
+const PATHS = 16;
 
 /** No input. */
 const none: Float32Array[][] = [];
@@ -134,6 +138,7 @@ function notePaths(
   // A Size move ran with Density on: a ramp counts its ticks down to 0, a held Size never starts,
   // and the taps were placed on each of them.
   if (dsp.tank.density !== 0 && dsp.tank.sizeTicks === 0 && !dsp.dormant) seen[14] = 1;
+  if (dsp.ranging !== 0 && !dsp.dormant) seen[15] = 1;
 }
 
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {

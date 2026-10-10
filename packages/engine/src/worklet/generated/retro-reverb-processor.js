@@ -58,6 +58,18 @@ var RETRO_REVERB_DSP = {
   stateLimit: 4,
   silenceFloor: 1e-12,
   converterSteps: 2048,
+  // Gain ranging (RV-6), Windsor's own values. Five 6 dB steps (gains 1 to 32) in front of the
+  // same 12-bit quantiser: 30 dB more range, so a tail keeps its grain to -96 dBFS where Linear
+  // truncates it at -66. Unity gain is Linear to the bit, so a switch starts seamlessly.
+  rangingSteps: 5,
+  // The gain rises only as far as keeps a window's peak 6 dB under full scale: 6 dB of hysteresis
+  // over the step down, which comes on the sample that would clip.
+  rangingCeiling: 0.5,
+  // A window's least length. Its peak reads at least sin(π × 0.01 × 20) = 0.59 of a 20 Hz wave's
+  // wherever it falls, so with the 6 dB above a step up never clips the next peak (0.5 / 0.59 of
+  // full scale) and the range cannot flap on a low note. Longer windows trail a fast tail: Decay
+  // 0.2 s falls 3 dB in 10 ms.
+  rangingHoldSeconds: 0.01,
   reflectionCount: 192,
   reflectionSeed: 682,
   reflectionTrim: 0.55,
@@ -742,6 +754,56 @@ var RetroEarly = class {
   }
 };
 
+// packages/engine/src/worklet/retro/retroConverter.ts
+var HOLD_TICKS = Math.round(RETRO_REVERB_DSP.rangingHoldSeconds * RETRO_REVERB_DSP.rate);
+var RetroConverter = class {
+  constructor() {
+    this.input = this.output = this.character = this.ranging = this.gain = NaN;
+    this.peak = this.previous = NaN;
+    this.input = this.output = this.character = this.ranging = 0;
+    this.range = this.hold = 0;
+    this.gain = 1;
+    this.peak = this.previous = 0;
+  }
+  /** Unity gain and a fresh window, as a switch to ranging or a clear starts the detector. */
+  reset() {
+    this.range = this.hold = 0;
+    this.gain = 1;
+    this.peak = this.previous = 0;
+  }
+  tick() {
+    const bounded = Math.max(-1, Math.min(1, this.input));
+    const quantized = Math.trunc(bounded * RETRO_REVERB_DSP.converterSteps) / RETRO_REVERB_DSP.converterSteps;
+    if (this.ranging === 0) {
+      this.output = bounded + this.character * (quantized - bounded);
+      return;
+    }
+    const magnitude = Math.abs(bounded);
+    if (magnitude * this.gain >= 1 && this.range > 0) {
+      while (this.range > 0 && magnitude * this.gain >= 1) {
+        this.range--;
+        this.gain /= 2;
+      }
+      this.hold = 0;
+      this.peak = magnitude;
+    } else if (magnitude > this.peak) this.peak = magnitude;
+    if (this.hold < HOLD_TICKS) this.hold++;
+    else if (bounded * this.previous <= 0) {
+      while (this.range < RETRO_REVERB_DSP.rangingSteps && this.peak * this.gain * 2 <= RETRO_REVERB_DSP.rangingCeiling) {
+        this.range++;
+        this.gain *= 2;
+      }
+      this.hold = 0;
+      this.peak = magnitude;
+    }
+    this.previous = bounded;
+    const steps = this.gain * RETRO_REVERB_DSP.converterSteps;
+    const ranged = Math.trunc(bounded * steps) / steps;
+    const blended = quantized + this.ranging * (ranged - quantized);
+    this.output = bounded + this.character * (blended - bounded);
+  }
+};
+
 // packages/engine/src/worklet/retro/retroReverbDsp.ts
 var RetroReverbDsp = class {
   constructor(rate, params) {
@@ -750,15 +812,18 @@ var RetroReverbDsp = class {
     this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
-    this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
+    this.level = this.targetLevel = this.levelStep = this.ranging = NaN;
     this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.ticks = 0;
-    this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
+    this.inputLeft = this.inputRight = this.internalInput = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
     this.earlyTaps = new RetroEarly(this.reflections.delay);
+    this.inputConverter = new RetroConverter();
+    this.leftConverter = new RetroConverter();
+    this.rightConverter = new RetroConverter();
     this.pre = new RetroDelay(RETRO_REVERB_DSP.rate * RETRO_REVERB_BOUNDS.preDelay[1]);
     this.inputFilter = new RetroFilter(rate);
     this.leftFilter = new RetroFilter(rate);
@@ -773,6 +838,7 @@ var RetroReverbDsp = class {
     this.density = params.density[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
+    this.ranging = params.converter[0] > 0 ? 1 : 0;
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
@@ -789,6 +855,7 @@ var RetroReverbDsp = class {
     this.reflections.configure(this);
     this.earlyTaps.size = this.size;
     this.earlyTaps.configure();
+    this.configureConverters();
   }
   configure(params, frames) {
     const k = 1 - Math.exp(-frames / (RETRO_REVERB_DSP.smoothSeconds * this.rate));
@@ -806,6 +873,10 @@ var RetroReverbDsp = class {
       this.density = params.density[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
+    const ranging = params.converter[0] > 0 ? 1 : 0;
+    if (this.ranging === 0 && ranging !== 0) this.resetConverters();
+    this.ranging += k * (ranging - this.ranging);
+    if (Math.abs(ranging - this.ranging) < RETRO_REVERB_DSP.silenceFloor) this.ranging = ranging;
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
@@ -825,6 +896,19 @@ var RetroReverbDsp = class {
       this.earlyTaps.size = this.size;
       this.earlyTaps.configure();
     }
+    this.configureConverters();
+  }
+  /** The block's Character and converter share, into each conversion point. */
+  configureConverters() {
+    this.inputConverter.character = this.leftConverter.character = this.character;
+    this.rightConverter.character = this.character;
+    this.inputConverter.ranging = this.leftConverter.ranging = this.ranging;
+    this.rightConverter.ranging = this.ranging;
+  }
+  resetConverters() {
+    this.inputConverter.reset();
+    this.leftConverter.reset();
+    this.rightConverter.reset();
   }
   /**
    * `ticks`: the internal ticks the coming block of `frames` runs, counted from `phase` with the
@@ -860,30 +944,22 @@ var RetroReverbDsp = class {
     this.rightFilter.z.fill(0);
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
+    this.resetConverters();
     this.dormant = true;
-  }
-  /** `convertInput` through the converter's clip and quantiser, into `converted`. */
-  convert() {
-    const bounded = Math.max(-1, Math.min(1, this.convertInput));
-    const quantized = Math.trunc(bounded * RETRO_REVERB_DSP.converterSteps) / RETRO_REVERB_DSP.converterSteps;
-    this.converted = bounded + this.character * (quantized - bounded);
   }
   /** One sample of the internal clock, of `internalInput`. */
   internal() {
-    const input = this.internalInput;
+    const converter = this.inputConverter;
+    converter.input = this.internalInput;
+    converter.tick();
     let delayed;
-    if (this.preDelay < 1 / RETRO_REVERB_DSP.rate) {
-      this.convertInput = input;
-      this.convert();
-      delayed = this.converted;
-    } else {
+    if (this.preDelay < 1 / RETRO_REVERB_DSP.rate) delayed = converter.output;
+    else {
       this.pre.delay = this.preDelay * RETRO_REVERB_DSP.rate;
       this.pre.read();
       delayed = this.pre.output;
     }
-    this.convertInput = input;
-    this.convert();
-    this.pre.input = this.converted;
+    this.pre.input = converter.output;
     this.pre.write();
     this.tank.input = delayed;
     this.tank.tick();
@@ -907,12 +983,12 @@ var RetroReverbDsp = class {
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < RETRO_REVERB_DSP.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < RETRO_REVERB_DSP.silenceFloor) this.wetToneRight = 0;
-    this.convertInput = this.wetToneLeft;
-    this.convert();
-    this.heldLeft = this.converted;
-    this.convertInput = this.wetToneRight;
-    this.convert();
-    this.heldRight = this.converted;
+    this.leftConverter.input = this.wetToneLeft;
+    this.leftConverter.tick();
+    this.heldLeft = this.leftConverter.output;
+    this.rightConverter.input = this.wetToneRight;
+    this.rightConverter.tick();
+    this.heldRight = this.rightConverter.output;
   }
   /** One host sample: `inputLeft`/`inputRight` in, `left`/`right` out. */
   tick() {
@@ -964,7 +1040,7 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
       })),
       { name: "enabled", minValue: 0, maxValue: 1, defaultValue: 1, automationRate: "k-rate" },
       { name: "mode", minValue: 0, maxValue: 2, defaultValue: 0, automationRate: "k-rate" },
-      // The index in RETRO_REVERB_CONVERTERS; nothing reads it until RV-6.
+      // The index in RETRO_REVERB_CONVERTERS: 0 linear, 1 gain ranging (RV-6).
       { name: "converter", minValue: 0, maxValue: 1, defaultValue: 0, automationRate: "k-rate" }
     ];
   }

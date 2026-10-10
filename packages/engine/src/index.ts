@@ -348,7 +348,11 @@ export { CHORUS_PRESETS, applyChorusPreset, matchingChorusPreset } from './inser
 export * from './inserts/insertConstants';
 export { DEFAULT_RETRO_REVERB } from './inserts/retroReverbSpec';
 export type { RetroReverbSpec } from './inserts/retroReverbSpec';
-export { RETRO_REVERB_BOUNDS, RETRO_REVERB_MODES } from './inserts/retroReverbConstants';
+export {
+  RETRO_REVERB_BOUNDS,
+  RETRO_REVERB_CONVERTERS,
+  RETRO_REVERB_MODES,
+} from './inserts/retroReverbConstants';
 export {
   RETRO_REVERB_PRESETS,
   applyRetroPreset,

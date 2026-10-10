@@ -56,6 +56,18 @@ export const RETRO_REVERB_DSP = {
   stateLimit: 4,
   silenceFloor: 1e-12,
   converterSteps: 2048,
+  // Gain ranging (RV-6), Windsor's own values. Five 6 dB steps (gains 1 to 32) in front of the
+  // same 12-bit quantiser: 30 dB more range, so a tail keeps its grain to -96 dBFS where Linear
+  // truncates it at -66. Unity gain is Linear to the bit, so a switch starts seamlessly.
+  rangingSteps: 5,
+  // The gain rises only as far as keeps a window's peak 6 dB under full scale: 6 dB of hysteresis
+  // over the step down, which comes on the sample that would clip.
+  rangingCeiling: 0.5,
+  // A window's least length. Its peak reads at least sin(π × 0.01 × 20) = 0.59 of a 20 Hz wave's
+  // wherever it falls, so with the 6 dB above a step up never clips the next peak (0.5 / 0.59 of
+  // full scale) and the range cannot flap on a low note. Longer windows trail a fast tail: Decay
+  // 0.2 s falls 3 dB in 10 ms.
+  rangingHoldSeconds: 0.01,
   reflectionCount: 192,
   reflectionSeed: 682,
   reflectionTrim: 0.55,

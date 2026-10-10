@@ -142,14 +142,14 @@ rules 2 and 7 through `__fixtures__/filterChangeScenario.ts`.
 worklet lifecycle/load reports; `retroReverbDsp.ts` owns host/internal-clock
 conversion and mode blending; `retroTank.ts`, `retroReflections.ts`,
 `retroDelay.ts` and `retroFilter.ts` own the two networks and storage/filter
-primitives. Its separate `tsconfig.json` uses the same erased-field settings.
+primitives; `retroConverter.ts` owns a conversion point, linear or gain-ranging. Its separate `tsconfig.json` uses the same erased-field settings.
 Tests under `inserts/retroReverb*.test.ts` run the generated processor through
 `__fixtures__/retroReverbHarness.ts`. Settings and original tunables are in
 `inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the editable
 approximation bank is `retroReverbPresets.ts` / `retroReverbPresetTables.ts`.
 The render allocates nothing (windsor#230): samples cross every call in
-fields (`inputLeft`/`inputRight`, `internalInput`, `convertInput`/`converted`,
-each network's `input`, each line's `delay`/`output`/`input`, each filter's
+fields (`inputLeft`/`inputRight`, `internalInput`, each converter's
+`input`/`output` (`retroConverter.ts`, RV-6), each network's `input`, each line's `delay`/`output`/`input`, each filter's
 `input`/`output`), never as arguments or returns, and every double field is
 first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
 through `__fixtures__/retroReverbChangeScenario.ts`.
