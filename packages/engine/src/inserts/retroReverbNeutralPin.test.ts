@@ -9,9 +9,10 @@
  * `WINDSOR_REFRESH_RETRO_NEUTRAL_PIN=1 npx vitest run packages/engine/src/inserts/retroReverbNeutralPin.test.ts`,
  * then `npx prettier --write` the fixture.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
+import pinned from '../__fixtures__/retroReverbNeutralPin.json';
 import { mulberry32 } from '../sequencing/mulberry32';
 import type { RetroReverbSpec } from './retroReverbSpec';
 
@@ -72,9 +73,12 @@ function renderAll(): Record<string, number[][]> {
 
 it('renders as before at the neutral defaults', () => {
   const actual = renderAll();
-  if (process.env.WINDSOR_REFRESH_RETRO_NEUTRAL_PIN === '1')
+  // The import holds the fixture as it was before this run, so a refresh writes and stops here.
+  if (process.env.WINDSOR_REFRESH_RETRO_NEUTRAL_PIN === '1') {
     writeFileSync(FIXTURE, `${JSON.stringify(actual)}\n`);
-  const expected = JSON.parse(readFileSync(FIXTURE, 'utf8')) as Record<string, number[][]>;
+    return;
+  }
+  const expected: Record<string, number[][]> = pinned;
   expect(Object.keys(actual)).toEqual(Object.keys(expected));
   for (const [name, channels] of Object.entries(expected))
     channels.forEach((windows, channel) =>
