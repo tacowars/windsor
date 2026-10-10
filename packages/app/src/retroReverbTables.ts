@@ -14,6 +14,9 @@ export interface RetroReverbKnobEntry extends InsertKnobEntry<RetroReverbSpec> {
 
 type RetroField = keyof typeof RETRO_REVERB_BOUNDS;
 
+/** Low decay reads as a multiple of Decay. */
+const fmtTimes = (v: number): string => `×${v.toFixed(2)}`;
+
 const fields: readonly { f: RetroField; label: string; page?: 'space' }[] = [
   { f: 'decay', label: 'Decay' },
   { f: 'size', label: 'Size' },
@@ -27,7 +30,26 @@ const fields: readonly { f: RetroField; label: string; page?: 'space' }[] = [
   { f: 'driftRate', label: 'Drift rate', page: 'space' },
   { f: 'driftDepth', label: 'Drift depth', page: 'space' },
   { f: 'density', label: 'Density', page: 'space' },
+  { f: 'lowDecay', label: 'Low decay', page: 'space' },
+  { f: 'lowCross', label: 'Low cross', page: 'space' },
 ];
+/**
+ * On a log curve: Low decay's range, 0.25 to 4, is symmetric in its log, so ×1 (neutral) sits at
+ * mid-travel.
+ */
+const LOG_FIELDS: readonly RetroField[] = [
+  'tone',
+  'decay',
+  'size',
+  'driftRate',
+  'lowDecay',
+  'lowCross',
+];
+function formatOf(f: RetroField): (v: number) => string {
+  if (f === 'tone' || f === 'lowCross') return fmtHz;
+  if (f === 'decay' || f === 'preDelay' || f === 'duration') return fmtMs;
+  return f === 'lowDecay' ? fmtTimes : fmt2;
+}
 export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
   ({ f, label, page }) => ({
     f,
@@ -37,11 +59,8 @@ export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
       min: RETRO_REVERB_BOUNDS[f][0],
       max: RETRO_REVERB_BOUNDS[f][1],
       def: DEFAULT_RETRO_REVERB[f],
-      fmt:
-        f === 'tone' ? fmtHz : f === 'decay' || f === 'preDelay' || f === 'duration' ? fmtMs : fmt2,
-      ...(f === 'tone' || f === 'decay' || f === 'size' || f === 'driftRate'
-        ? { curve: 'log' as const }
-        : {}),
+      fmt: formatOf(f),
+      ...(LOG_FIELDS.includes(f) ? { curve: 'log' as const } : {}),
     },
   }),
 );

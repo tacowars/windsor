@@ -39,22 +39,38 @@ function energy(data: Float32Array, from = 0, to = data.length): number {
   return total;
 }
 
-/**
- * Seconds to fall 60 dB below 3 kHz: four one-pole lowpasses at 3 kHz, the backward-integrated
- * energy, and its fall from -5 to -25 dB scaled to 60.
- */
+/** Seconds to fall 60 dB: the backward-integrated energy's fall from -5 to -25 dB, scaled to 60. */
+function rt60(filtered: Float64Array, rate: number): number {
+  const tail = filtered.map((v) => v * v);
+  for (let i = tail.length - 2; i >= 0; i--) tail[i]! += tail[i + 1]!;
+  const crossing = (db: number): number => tail.findIndex((e) => e < tail[0]! * 10 ** (db / 10));
+  return ((crossing(-25) - crossing(-5)) / rate) * 3;
+}
+/** RT60 below 3 kHz: four one-pole lowpasses at 3 kHz first. */
 function rt60Below3k(data: Float32Array, rate = 48000): number {
   const pole = 1 - Math.exp((-2 * Math.PI * 3000) / rate);
   const state = [0, 0, 0, 0];
-  const tail = new Float64Array(data.length);
+  const filtered = new Float64Array(data.length);
   for (let i = 0; i < data.length; i++) {
     let v = data[i]!;
     for (let k = 0; k < state.length; k++) v = state[k]! += pole * (v - state[k]!);
-    tail[i] = v * v;
+    filtered[i] = v;
   }
-  for (let i = data.length - 2; i >= 0; i--) tail[i]! += tail[i + 1]!;
-  const crossing = (db: number): number => tail.findIndex((e) => e < tail[0]! * 10 ** (db / 10));
-  return ((crossing(-25) - crossing(-5)) / rate) * 3;
+  return rt60(filtered, rate);
+}
+/** RT60 in the octave around `f`: a one-octave bandpass (RBJ's constant-peak form), run twice. */
+function rt60Around(data: Float32Array, f: number, rate = 48000): number {
+  const w = (2 * Math.PI * f) / rate;
+  const alpha = Math.sin(w) * Math.sinh((Math.LN2 / 2) * (w / Math.sin(w)));
+  const [b, a1, a2] = [alpha, -2 * Math.cos(w), 1 - alpha].map((c) => c / (1 + alpha));
+  let x = Float64Array.from(data);
+  for (let pass = 0; pass < 2; pass++) {
+    const y = new Float64Array(x.length);
+    for (let i = 2; i < x.length; i++)
+      y[i] = b! * (x[i]! - x[i - 2]!) - a1! * y[i - 1]! - a2! * y[i - 2]!;
+    x = y;
+  }
+  return rt60(x, rate);
 }
 
 describe('retro reverb shipped DSP', () => {
@@ -141,6 +157,22 @@ describe('retro reverb shipped DSP', () => {
         expect(Math.abs(10 * Math.log10(energy(data) / energy(levels[channel]!)))).toBeLessThan(1),
       );
     }
+  });
+  // A low note's decay (RV-5). Today's Decay is the RT60 at DC, and Tone shortens the top, so above
+  // Low cross the band keeps today's RT60 rather than Decay itself. Each band is an octave three
+  // octaves from Low cross, where the first-order split is within 3 % of its target; the second
+  // setting is a corner of the box (Decay and Low decay at their ends, Low cross at its bottom).
+  it.each([
+    { size: 1, decay: 2, lowCross: 300, lowDecay: 4 },
+    { size: 3, decay: RETRO_REVERB_BOUNDS.decay[1], lowCross: 80, lowDecay: 0.25 },
+  ])('low decay sets the RT60 below Low cross and keeps it above: %j', SLOW, (spec) => {
+    const seconds = 1 + 0.4 * spec.decay * Math.max(1, spec.lowDecay);
+    const [split] = render({ ...spec, tone: 9000 }, 48000, seconds);
+    const [today] = render({ ...spec, tone: 9000, lowDecay: 1 }, 48000, seconds);
+    const low = rt60Around(split!, spec.lowCross / 8);
+    expect(Math.abs(low / (spec.decay * spec.lowDecay) - 1)).toBeLessThan(0.1);
+    const high = spec.lowCross * 8;
+    expect(Math.abs(rt60Around(split!, high) / rt60Around(today!, high) - 1)).toBeLessThan(0.1);
   });
   it.each(['gated', 'reverse'] as const)(
     '%s skips Drift, which only the tank plays',
@@ -262,7 +294,7 @@ describe('retro reverb shipped DSP', () => {
     };
     const tank = node.dsp.tank;
     const ticks = 8;
-    const settings = { ticks, decay: 1.4, tone: 6000, diffusion: 0.5, driftRate: 0.5 };
+    const settings = { ticks, decay: 1.4, tone: 6000, diffusion: 0.5, driftRate: 0.5, lowDecay: 1 };
     tank.configure({ ...settings, size: 3, driftDepth: 0, density: 1, finite: 0 });
     for (let t = 1; t <= ticks; t++) {
       tank.tick();
