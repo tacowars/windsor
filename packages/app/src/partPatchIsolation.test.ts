@@ -7,11 +7,19 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { ArrangementDocument } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, makePatch, partAt } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, makePatch, partAt, serialisePatchFile } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { openGestureConsole } from './__fixtures__/gestureConsole';
 import { DocumentModel } from './documentModel';
 import { initPresetId } from './libraryConstants';
-import { library, loadPageLibrary } from './libraryModel';
+import type { PatchFolder } from './libraryFolder';
+import {
+  awaitUserLibrary,
+  connectUserLibrary,
+  library,
+  loadPageLibrary,
+  pageLibrary,
+} from './libraryModel';
 import { initPatchDefaults } from './patchActions';
 import { isolatePartPatches } from './partPatchIsolation';
 
@@ -103,5 +111,39 @@ describe('opening a song splits shared patches (windsor#669)', () => {
     const raw = song([part(0, 'ice-needle-copy'), part(1, 'score-ice-needle')]);
     await ctx.importDoc(raw);
     expect(ctx.model.doc).toEqual(doc(raw));
+  });
+
+  it("waits for the user's library, so a shared user patch keeps its source and a free id", async () => {
+    // The boot reads the user's library while the song opens: it arrives after the switch starts.
+    let arrive = (): void => undefined;
+    const gate = new Promise<void>((resolve) => (arrive = resolve));
+    const kick = PATCH_LIBRARY['kick']!;
+    const userFile = (id: string) =>
+      serialisePatchFile({ ...kick, name: id, patch: { ...kick.patch, name: id } });
+    const files = new Map(['user-bell', 'user-bell-2'].map((id) => [`${id}.json`, userFile(id)]));
+    const user: PatchFolder = {
+      name: 'user',
+      list: () => gate.then(() => [...files.keys()]),
+      read: (name) => Promise.resolve(files.get(name)!),
+      write: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+    };
+    awaitUserLibrary(connectUserLibrary(library, user));
+    try {
+      const ctx = openGestureConsole();
+      const opened = ctx.importDoc(
+        song([part(0, 'user-bell'), part(1, 'user-bell')], { 'user-bell': ICE }),
+      );
+      arrive();
+      await opened;
+      expect(partAt(ctx.model.doc, 1)).toMatchObject({
+        preset: 'user-bell-3',
+        patchSource: 'user-bell',
+      });
+    } finally {
+      Object.assign(library, pageLibrary());
+      awaitUserLibrary(Promise.resolve());
+      await loadPageLibrary(library);
+    }
   });
 });

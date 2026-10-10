@@ -74,7 +74,10 @@ export interface SessionHost {
 export interface SessionOptions {
   now?: () => Date;
   newId?: () => string;
-  /** What must have arrived before a stored song opens: the built-ins, for an older song's library fill (#562). */
+  /**
+   * What must have arrived before a song opens: the built-ins (an older
+   * song's library fill, #562); the console adds the user's library (windsor#669).
+   */
   ready?: () => Promise<unknown>;
 }
 

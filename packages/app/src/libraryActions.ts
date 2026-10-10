@@ -24,6 +24,7 @@ import {
   wrapDirectoryHandle,
 } from './libraryFolder';
 import {
+  awaitUserLibrary,
   connectLibrary,
   createProblemReporter,
   disconnectLibrary,
@@ -74,9 +75,16 @@ export function reportLibraryProblems(ctx: AppCtx, force = false): void {
 /**
  * At boot: attach the user's library (null where the browser has no
  * IndexedDB), load the built-ins beside it, then reconnect a remembered
- * folder whose grant still stands.
+ * folder whose grant still stands. A song opening meanwhile waits for all
+ * of it (`libraryLoaded`).
  */
-export async function bootLibrary(user: PatchFolder | null): Promise<void> {
+export function bootLibrary(user: PatchFolder | null): Promise<void> {
+  const load = loadBootLibrary(user);
+  awaitUserLibrary(load);
+  return load;
+}
+
+async function loadBootLibrary(user: PatchFolder | null): Promise<void> {
   library.user = user;
   await loadPageLibrary(library);
   if (!folderApiAvailable()) return;

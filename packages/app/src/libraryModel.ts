@@ -63,6 +63,22 @@ export const libraryPatch = (model: LibraryModel, id: string): Patch | undefined
 export const isWritable = (model: LibraryModel, id: string): boolean =>
   model.folder ? Object.hasOwn(model.entries, id) : model.userIds.has(id);
 
+/** The boot's load of the user's library (IndexedDB, or a reconnected folder), failure swallowed. */
+let userLibraryLoad: Promise<unknown> = Promise.resolve();
+
+/** Record the boot's user-library load, so a song opening meanwhile waits for it (windsor#669). */
+export function awaitUserLibrary(load: Promise<unknown>): void {
+  userLibraryLoad = load.catch(() => undefined);
+}
+
+/**
+ * The complete active library has arrived: the built-ins, then whatever
+ * user-library load the boot recorded. A song's open split
+ * (`isolatePartPatches`) reads `entries`, so it waits for this. A failed
+ * user load still lets the song open; a failed built-in load stops it.
+ */
+export const libraryLoaded = (): Promise<unknown> => Promise.all([loadBuiltIns(), userLibraryLoad]);
+
 /** Load the built-ins, and show them (with the user's patches) if the model is on the page library. */
 export async function loadPageLibrary(model: LibraryModel): Promise<void> {
   await loadBuiltIns();

@@ -29,7 +29,7 @@ import type { DocumentModel } from './documentModel';
 import { deepMerge } from './documentModel';
 import { setGestureHook } from './gestureHooks';
 import type { BuildOptions, EngineHost } from './host';
-import { library } from './libraryModel';
+import { library, libraryLoaded } from './libraryModel';
 import { loadRenames } from './partAutoName';
 import { isolatePartPatches } from './partPatchIsolation';
 import { PartsSession, type PatchPartsEdit } from './partsSession';
@@ -110,12 +110,17 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     });
     // The opening document's first part, should it lack slot 0.
     this.parts.resolve(0);
-    this.songs = new SongSession({
-      model: this.model,
-      replace: (raw, amend) => this.replaceDocument(raw, amend),
-      change: (partial, label) => this.change(partial, label),
-      notify: (message, tone) => this.notify(message, tone),
-    });
+    // A switch waits for the whole library, not only the built-ins: the open's
+    // split reads its ids (windsor#669).
+    this.songs = new SongSession(
+      {
+        model: this.model,
+        replace: (raw, amend) => this.replaceDocument(raw, amend),
+        change: (partial, label) => this.change(partial, label),
+        notify: (message, tone) => this.notify(message, tone),
+      },
+      { ready: libraryLoaded },
+    );
     setGestureHook({ begin: (label) => this.beginGesture(label), end: () => this.endGesture() });
   }
 
