@@ -3,9 +3,10 @@
  * path its render takes, over and over. A cycle is stereo noise with one
  * parameter changed every `period` quanta (size, decay, tone, diffusion, drift
  * depth and rate, pre-delay, character, mix, duration, early, density, the
- * converter, the gated and reverse modes and the enable, so the finite field,
- * the early taps, the line taps, the gain-ranging converters and their
- * crossfade, the pre-delay line, the mix glide, the
+ * converter, low decay and low cross, the gated and reverse modes and the
+ * enable, so the finite field, the early taps, the line taps, the gain-ranging
+ * converters and their crossfade, the low band's split (alone and with the
+ * line taps), the pre-delay line, the mix glide, the
  * switch's fade and its cleared, dormant off (windsor#630) all run),
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
@@ -53,7 +54,7 @@ interface RetroState {
   dormant: boolean;
   wetToneLeft: number;
   wetToneRight: number;
-  tank: { density: number; sizeTicks: number };
+  tank: { density: number; sizeTicks: number; low: { on: boolean } };
   ranging: number;
 }
 
@@ -79,6 +80,8 @@ const TOGGLES: [string, number][] = [
   ['driftRate', 3],
   ['density', 0.7],
   ['converter', 1],
+  ['lowDecay', 3],
+  ['lowCross', 900],
   ['enabled', 0],
 ];
 
@@ -86,9 +89,9 @@ const TOGGLES: [string, number][] = [
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
  * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
  * and off, the line taps, the line taps placed on every tick of a Size move, the gain-ranging
- * converters.
+ * converters, the low band's split, and the split with the line taps.
  */
-const PATHS = 16;
+const PATHS = 18;
 
 /** No input. */
 const none: Float32Array[][] = [];
@@ -139,6 +142,7 @@ function notePaths(
   // and the taps were placed on each of them.
   if (dsp.tank.density !== 0 && dsp.tank.sizeTicks === 0 && !dsp.dormant) seen[14] = 1;
   if (dsp.ranging !== 0 && !dsp.dormant) seen[15] = 1;
+  if (dsp.tank.low.on) seen[dsp.tank.density !== 0 ? 17 : 16] = 1;
 }
 
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {

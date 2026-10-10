@@ -35,6 +35,11 @@
  * at the block's Tone, Size and Decay (`RetroDensityLevel`, a measured table), so ends and taps
  * together keep the level of the ends alone. Like Drift, Density is scaled by the tank's share;
  * at 0 no tap is read and the outputs are today's expressions, to the bit.
+ *
+ * Low decay (RV-5): each line's feedback is split at Low cross and its low part decays over
+ * Decay × Low decay (`retroLowBand.ts`, which owns the band and says how). At Low decay exactly 1,
+ * or once the tank's share is under the floor, the split is skipped and `write` and the outputs
+ * are today's expressions, to the bit.
  */
 import {
   RETRO_REVERB_BOUNDS as B,
@@ -42,12 +47,31 @@ import {
 } from '../../inserts/retroReverbConstants';
 import { RetroDelay } from './retroDelay';
 import { RetroDensityLevel } from './retroDensityLevel';
+import { RetroLowBand } from './retroLowBand';
+import type { RetroLowSettings } from './retroLowBand';
+
+/** A block's settings (`RetroReverbDsp` passes itself). */
+interface RetroTankSettings extends RetroLowSettings {
+  /**
+   * Internal ticks the block runs, which the move to `size` spans; 0 (the first block, or a dormant
+   * one) lands on it at once.
+   */
+  ticks: number;
+  diffusion: number;
+  driftRate: number;
+  driftDepth: number;
+  density: number;
+  /** The finite field's share of the wet output (`RetroReverbDsp.finite`). */
+  finite: number;
+}
 
 class RetroTank {
   lines: RetroDelay[];
   diffusers: RetroDelay[];
   damping: Float64Array;
   gains: Float64Array;
+  /** Low decay's band (RV-5). */
+  low: RetroLowBand;
   values: Float64Array;
   /**
    * The lines' Size now, the block's target, the step a tick towards it (0 when there) and the
@@ -126,6 +150,7 @@ class RetroTank {
     this.tapGainsLeft = new Float64Array(taps);
     this.tapGainsRight = new Float64Array(taps);
     this.level = new RetroDensityLevel();
+    this.low = new RetroLowBand(C.tankSeconds.length, taps);
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = 0;
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
@@ -139,32 +164,9 @@ class RetroTank {
     this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
   }
 
-  configure({
-    size,
-    ticks,
-    decay,
-    tone,
-    diffusion,
-    driftRate,
-    driftDepth,
-    density,
-    finite,
-  }: {
-    size: number;
-    /**
-     * Internal ticks the block runs, which the move to `size` spans; 0 (the first block, or a
-     * dormant one) lands on it at once.
-     */
-    ticks: number;
-    decay: number;
-    tone: number;
-    diffusion: number;
-    driftRate: number;
-    driftDepth: number;
-    density: number;
-    /** The finite field's share of the wet output (`RetroReverbDsp.finite`). */
-    finite: number;
-  }): void {
+  configure(settings: RetroTankSettings): void {
+    const { size, ticks, decay, tone, diffusion, driftRate, driftDepth, density, finite } =
+      settings;
     this.sizeTarget = size;
     this.sizeStep = 0;
     this.sizeTicks = ticks;
@@ -189,7 +191,11 @@ class RetroTank {
     this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / C.rate);
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(C.decayTarget, (C.tankSeconds[i] * size) / decay);
+    const low = this.low;
+    low.configure(settings, share > C.silenceFloor && settings.lowDecay !== 1, this.gains);
     this.density = share > C.silenceFloor ? density * share : 0;
+    // The outputs' low-band lowpasses run only while both play; idle, they wait at silence.
+    if (this.density === 0 || !low.on) low.stateLeft = low.stateRight = 0;
     if (this.density === 0) return;
     this.placeTaps();
     this.level.point[0] = tone;
@@ -238,6 +244,7 @@ class RetroTank {
       this.tapGainsLeft[k] *= this.endLeft;
       this.tapGainsRight[k] *= this.endRight;
     }
+    if (this.low.on) this.low.weigh(this);
   }
 
   /**
@@ -245,6 +252,10 @@ class RetroTank {
    * back, moved `fraction` of the way to the one after it, as `RetroDelay.read` interpolates.
    */
   readTaps(): void {
+    if (this.low.on) {
+      this.readTapsSplit();
+      return;
+    }
     let left = 0,
       right = 0;
     for (let k = 0; k < this.tapWhole.length; k++) {
@@ -259,6 +270,60 @@ class RetroTank {
     }
     this.tapLeft = left;
     this.tapRight = right;
+  }
+
+  /** `readTaps` with Low decay on: the same reads, summed for the low band's mix as well. */
+  readTapsSplit(): void {
+    const low = this.low;
+    let left = 0,
+      right = 0,
+      lowLeft = 0,
+      lowRight = 0;
+    for (let k = 0; k < this.tapWhole.length; k++) {
+      const line = this.lines[this.tapLines[k]];
+      const buffer = line.buffer;
+      let index = line.head - this.tapWhole[k];
+      if (index < 0) index += buffer.length;
+      const next = index + 1 === buffer.length ? 0 : index + 1;
+      const value = buffer[index] + this.tapFraction[k] * (buffer[next] - buffer[index]);
+      left += this.tapGainsLeft[k] * value;
+      right += this.tapGainsRight[k] * value;
+      lowLeft += low.tapExtrasLeft[k] * value;
+      lowRight += low.tapExtrasRight[k] * value;
+    }
+    this.tapLeft = left;
+    this.tapRight = right;
+    low.tapLeft = lowLeft;
+    low.tapRight = lowRight;
+  }
+
+  /** The outputs while the taps play: the ends turned down to match, and the taps. */
+  denseOutputs(): void {
+    const y = this.values;
+    this.left = (y[0] + y[1] - y[2] - y[3]) * this.endLeft + this.tapLeft;
+    this.right = (y[0] - y[1] + y[2] - y[3]) * this.endRight + this.tapRight;
+    if (this.low.on) this.lowOutputs();
+  }
+
+  /**
+   * With Density and Low decay both on: each output's low band takes its own mix, the difference
+   * between the two bands' mixes through the lowpass at Low cross, added to `left`/`right`.
+   */
+  lowOutputs(): void {
+    const low = this.low;
+    const y = this.values;
+    const left = (y[0] + y[1] - y[2] - y[3]) * low.endExtraLeft + low.tapLeft;
+    const right = (y[0] - y[1] + y[2] - y[3]) * low.endExtraRight + low.tapRight;
+    let state = low.stateLeft;
+    let step = (left - state) * low.cross;
+    this.left += state + step;
+    state += 2 * step;
+    low.stateLeft = Math.abs(state) < C.silenceFloor ? 0 : state;
+    state = low.stateRight;
+    step = (right - state) * low.cross;
+    this.right += state + step;
+    state += 2 * step;
+    low.stateRight = Math.abs(state) < C.silenceFloor ? 0 : state;
   }
 
   /**
@@ -318,10 +383,7 @@ class RetroTank {
     if (this.density === 0) {
       this.left = (y[0] + y[1] - y[2] - y[3]) * C.outputTrim;
       this.right = (y[0] - y[1] + y[2] - y[3]) * C.outputTrim;
-    } else {
-      this.left = (y[0] + y[1] - y[2] - y[3]) * this.endLeft + this.tapLeft;
-      this.right = (y[0] - y[1] + y[2] - y[3]) * this.endRight + this.tapRight;
-    }
+    } else this.denseOutputs();
     if (this.detune === 0) return;
     this.detuneLeft.input = this.left;
     this.detuneLeft.write();
@@ -336,9 +398,31 @@ class RetroTank {
     this.right = this.detuneRight.output;
   }
 
-  /** Line `i` takes `lineInput` and `feedback`, mixed and clamped. */
+  /** Line `i` takes `lineInput` and `feedback`, mixed and clamped (`writeSplit` with Low decay). */
   write(i: number): void {
+    if (this.low.on) {
+      this.writeSplit(i);
+      return;
+    }
     const value = this.lineInput * C.inputTrim + this.feedback * this.gains[i];
+    const line = this.lines[i];
+    line.input = Math.max(-C.stateLimit, Math.min(C.stateLimit, value));
+    line.write();
+  }
+
+  /**
+   * `write` while the split runs: the feedback's low part (a trapezoidal one-pole at Low cross)
+   * takes the low band's gain on top of the line's.
+   */
+  writeSplit(i: number): void {
+    const band = this.low;
+    const state = band.lineStates[i];
+    const step = (this.feedback - state) * band.cross;
+    const low = state + step;
+    const next = low + step;
+    band.lineStates[i] = Math.abs(next) < C.silenceFloor ? 0 : next;
+    const value =
+      this.lineInput * C.inputTrim + this.feedback * this.gains[i] + low * band.lineExtras[i];
     const line = this.lines[i];
     line.input = Math.max(-C.stateLimit, Math.min(C.stateLimit, value));
     line.write();

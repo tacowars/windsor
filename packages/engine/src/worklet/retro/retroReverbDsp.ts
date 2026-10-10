@@ -70,6 +70,9 @@ class RetroReverbDsp {
   driftDepth: number;
   /** Density (RV-3), smoothed like Drift's depth: within the floor of its target it lands on it. */
   density: number;
+  /** Low decay and Low cross (RV-5), smoothed; Low decay within the floor of its target lands on it. */
+  lowDecay: number;
+  lowCross: number;
   preDelay: number;
   character: number;
   /** The gain-ranging converter's share (RV-6): 0 linear, 1 ranging, smoothed per block. */
@@ -106,6 +109,7 @@ class RetroReverbDsp {
     this.level = this.targetLevel = this.levelStep = this.ranging = NaN;
     this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
+    this.lowDecay = this.lowCross = NaN;
     this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = 0;
     this.rate = rate;
@@ -127,6 +131,8 @@ class RetroReverbDsp {
     this.driftRate = params.driftRate[0];
     this.driftDepth = params.driftDepth[0];
     this.density = params.density[0];
+    this.lowDecay = params.lowDecay[0];
+    this.lowCross = params.lowCross[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
     this.ranging = params.converter[0] > 0 ? 1 : 0;
@@ -163,6 +169,10 @@ class RetroReverbDsp {
     this.density += k * (params.density[0] - this.density);
     if (Math.abs(params.density[0] - this.density) < C.silenceFloor)
       this.density = params.density[0];
+    this.lowDecay += k * (params.lowDecay[0] - this.lowDecay);
+    if (Math.abs(params.lowDecay[0] - this.lowDecay) < C.silenceFloor)
+      this.lowDecay = params.lowDecay[0];
+    this.lowCross += k * (params.lowCross[0] - this.lowCross);
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
     const ranging = params.converter[0] > 0 ? 1 : 0;
@@ -233,6 +243,8 @@ class RetroReverbDsp {
     tank.detuneLeft.buffer.fill(0);
     tank.detuneRight.buffer.fill(0);
     tank.damping.fill(0);
+    tank.low.lineStates.fill(0);
+    tank.low.stateLeft = tank.low.stateRight = 0;
     tank.values.fill(0);
     tank.left = tank.right = 0;
     this.reflections.delay.buffer.fill(0);
