@@ -41,7 +41,8 @@ export function badgeText(ctx: AppCtx, slot: number): string {
 
 /**
  * Rename the document patch the part plays, and the part playing it (one
- * part since windsor#669; its `patchSource` stays) — one live partial
+ * part since windsor#669; its `patchSource` stays, and a copy renamed off
+ * a library id takes that id as its `patchSource`, windsor#671) — one live partial
  * (#629): the patch under its new id, `null` under the old, and the playing
  * part's `preset` switched, so the engine validates the three together and
  * no part is ever left naming a patch that has gone. `name` is
@@ -61,9 +62,14 @@ export function renamePatch(ctx: AppCtx, from: string, to: string, name?: string
   }
   if (ctx.model.doc.patches?.[to])
     return ctx.notify(`a document patch "${to}" already exists`, 'warning');
-  const parts: Record<number, { preset: string }> = {};
-  for (const part of ctx.model.doc.parts)
-    if (part.preset === from) parts[part.slot] = { preset: to };
+  // A copy renamed off its library id keeps the link (windsor#671 decision 5).
+  const link = Object.hasOwn(library.entries, from) ? from : undefined;
+  const parts: Record<number, { preset: string; patchSource?: string }> = {};
+  for (const part of ctx.model.doc.parts) {
+    if (part.preset !== from) continue;
+    const source = part.patchSource ?? link;
+    parts[part.slot] = source === undefined ? { preset: to } : { preset: to, patchSource: source };
+  }
   const renamed: Patch = { ...patch, name: shown };
   const result = ctx.change({ patches: { [from]: null, [to]: renamed }, parts });
   if (!result.ok) return;

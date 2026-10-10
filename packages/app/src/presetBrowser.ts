@@ -11,6 +11,7 @@ import { el } from './dom';
 import { withGesture } from './gestureHooks';
 import { library, libraryPatch } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
+import { leftCopyDrop } from './partCopyCleanup';
 import { copyId, copySource, playerElsewhere } from './partPatchIsolation';
 import { PATCH_SOURCE_LABELS } from './patchLibrary';
 import { stepListing } from './patchStepModel';
@@ -24,7 +25,8 @@ export const patchFilter: PresetFilter = { query: '', category: '', tag: '', sou
  * part plays `name`, this part gets the same sound under a fresh id, linked
  * to its library entry by `patchSource`, so neither part's knobs move the
  * other's. A part re-picking what it plays keeps its link; any other pick
- * clears it.
+ * clears it. The unedited automatic copy the part leaves goes in the same
+ * change (windsor#671), so undo brings it back with the part's old patch.
  */
 export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const doc = ctx.model.doc;
@@ -38,9 +40,10 @@ export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const fields = assignPatchFields(doc, slot, id, patch.name);
   const keepsLink = !holder && partAt(doc, slot)?.preset === name;
   const link = keepsLink ? {} : { patchSource: holder && copySource(holder, name, ids) };
+  const dropped = leftCopyDrop(doc, slot, id, library);
   return ctx.change({
     ...partChange(slot, { ...fields, ...link }),
-    patches: { [id]: clonePatch(patch) },
+    patches: { [id]: clonePatch(patch), ...dropped },
   }).ok;
 }
 

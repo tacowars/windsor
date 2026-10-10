@@ -80,3 +80,47 @@ existing copy when the picked id was already in `patches`.
   song for each step that lands there, as a pick always left the library
   patch it embedded. Unplayed copies are kept (decision 5), so they list
   under "this song" until the song's Delete removes them.
+
+## Addendum: an unedited automatic copy goes when its part moves on (windsor#671)
+
+Stepping a part through a patch another part plays left a copy behind on
+every pass (Consequences above). tacowars's direction: a copy the part
+never edited is deleted when the part moves on. The pure function is
+`leftCopyDrop` in `packages/app/src/partCopyCleanup.ts`.
+
+1. **When.** Whenever a part's `preset` changes away from id `P` through
+   the picker, ◀ ▶, the browser's Load into (all `choosePreset`), Save as…
+   (`copyToNew`) or Init (`initPatch`). The removal rides in the same
+   `ctx.change` as the move, so it is the same undo step, and undo brings
+   the copy back together with the part's old `preset`. Rename removes the
+   old id itself and needs no check.
+2. **What is dropped.** `P` leaves `patches` only when all of these hold:
+   - no other part plays `P`;
+   - `P` is not a library id, and not an Init sentinel (`dropInit` owns
+     those);
+   - `P` is an automatic copy: its id has the shape `uniqueId` gives a copy,
+     `<base>-<n>` with n from 2, and either the part has a `patchSource` or
+     `<base>` is still in the song (the open-time split and a load's copy
+     of a song-only patch, which carry no `patchSource`). A renamed copy
+     has lost the shape, so a rename keeps it even where the display name
+     did not change;
+   - `P` is leaf-identical (`patchLeafDifferences` empty, the name
+     included) to its `patchSource` library entry or to another patch
+     already in the song. The patch the move loads is no witness: Save as…
+     writes the part's edits into its new patch, and the copy holding the
+     same edits stays, as any edited copy does.
+
+   Deleting it therefore loses no sound.
+3. **Never dropped:** a patch another part still plays, a library id
+   (which includes everything Save as… made), an edited or renamed copy,
+   and an unplayed song patch no part just left. A song that opens with
+   orphaned copies keeps them.
+4. **A rename keeps the library link** (windsor#671 decision 5; amends
+   decision 7). Renaming a song copy off a library id, when the part
+   playing it has no `patchSource`, sets `patchSource` to that old id, so
+   Save, Revert and the modified marker still reach the library entry. A
+   part that already has `patchSource` keeps it, and a copy whose old id
+   is no library id gets none. This holds for the patch bar's Rename and the browser's,
+   which share `renamePatch` (`packages/app/src/patchLibrary.ts`).
+
+No format change: nothing new is stored, and `ARRANGEMENT_VERSION` stays.
