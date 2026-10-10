@@ -4,9 +4,11 @@
  * (`patches` section) or a built-in (`PRESETS`); the first knob edit on a
  * built-in copies it into the document under the same name — a document
  * patch shadows the built-in it was forked from — and from then on the
- * export carries it. Rename moves the document patch and every part that
- * plays it; revert puts the library's version back under the same id. Both
- * are live edits (#629): nothing here rebuilds the system.
+ * export carries it. Each part plays its own copy (windsor#669), linked to
+ * its library entry by `patchSource` when the ids differ. Rename moves the
+ * document patch and the part that plays it; revert puts the library's
+ * version back under the same id. Both are live edits (#629): nothing here
+ * rebuilds the system.
  */
 import type { Patch, PresetListing } from '@windsor/engine';
 import { clonePatch, partAt } from '@windsor/engine';
@@ -38,10 +40,11 @@ export function badgeText(ctx: AppCtx, slot: number): string {
 }
 
 /**
- * Rename the document patch the part plays, and every part playing it — one
- * live partial (#629): the patch under its new id, `null` under the old, and
- * each playing part's `preset` switched, so the engine validates the three
- * together and no part is ever left naming a patch that has gone. `name` is
+ * Rename the document patch the part plays, and the part playing it (one
+ * part since windsor#669; its `patchSource` stays) — one live partial
+ * (#629): the patch under its new id, `null` under the old, and the playing
+ * part's `preset` switched, so the engine validates the three together and
+ * no part is ever left naming a patch that has gone. `name` is
  * the browser's (windsor#522): the display name to give it, else the name
  * follows the id only where the two were the same.
  */
@@ -74,20 +77,26 @@ export function renamePatch(ctx: AppCtx, from: string, to: string, name?: string
 }
 
 /**
- * Back to the library's version: the document copy is overwritten with the
- * library entry, live (#629). For an id baked into the page that is exactly
+ * Back to the library's version: the document copy `name` is overwritten
+ * with the library entry `source` (the part's `patchSource` when it has one,
+ * windsor#669), live (#629). For an id baked into the page that is exactly
  * what dropping the fork used to leave behind — the normaliser's library fill
  * re-embedded the built-in under the same id on the rebuild — without the
  * rebuild; a folder-only id (#563) has no baked fallback and took this path
  * already.
  */
-export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = library): void {
-  const entry = libraryPatch(model, name);
+export function revertPatch(
+  ctx: AppCtx,
+  name: string,
+  model: LibraryModel = library,
+  source = name,
+): void {
+  const entry = libraryPatch(model, source);
   if (!entry) return;
   if (!ctx.change({ patches: { [name]: clonePatch(entry) } }).ok) return;
   ctx.render();
   ctx.notify(
-    Object.hasOwn(builtInPresets(), name)
+    Object.hasOwn(builtInPresets(), source)
       ? `document patch "${name}" reset to the built-in`
       : `document patch "${name}" reset to the library copy`,
     'success',
@@ -114,14 +123,18 @@ export function patchSummary(
   slot: number,
   entries: readonly PresetListing[],
 ): { name: string; detail: string } {
-  const preset = partAt(ctx.model.doc, slot)?.preset ?? '';
+  const part = partAt(ctx.model.doc, slot);
+  const preset = part?.preset ?? '';
   const listed = entries.find((entry) => entry.id === preset);
+  // A part's own copy (windsor#669) shows its library entry's category.
+  const linked = part?.patchSource && entries.find((entry) => entry.id === part.patchSource);
+  const category = (linked || listed)?.category;
   const name = ctx.model.doc.patches?.[preset]?.name ?? listed?.name ?? preset;
   const source =
     patchHome(ctx, slot) === 'document'
       ? PATCH_SOURCE_LABELS.document
       : listed && PATCH_SOURCE_LABELS[listed.source];
-  return { name, detail: [listed?.category, source].filter(Boolean).join(' · ') };
+  return { name, detail: [category, source].filter(Boolean).join(' · ') };
 }
 
 /** Rename's field in the ⋯ menu: the document patch's id, committed on Enter or the button. */
@@ -145,23 +158,25 @@ function renameForm(ctx: AppCtx, preset: string): HTMLElement {
 
 /** Rename and Revert to library for the ⋯ menu, offered only for a document patch. */
 export function patchMenuEntries(ctx: AppCtx, slot: number): MenuItem[] {
-  const preset = partAt(ctx.model.doc, slot)?.preset;
-  if (preset === undefined || patchHome(ctx, slot) !== 'document') return [];
+  const part = partAt(ctx.model.doc, slot);
+  if (part === undefined || patchHome(ctx, slot) !== 'document') return [];
+  const { preset } = part;
+  const source = part.patchSource ?? preset;
   const items: MenuItem[] = [
     {
       kind: 'form',
       label: 'Rename…',
-      title: "Rename the song's copy of this patch; parts playing it follow",
+      title: "Rename the song's copy of this patch; the part playing it follows",
       form: () => renameForm(ctx, preset),
     },
   ];
-  if (libraryPatch(library, preset))
+  if (libraryPatch(library, source))
     items.push({
       kind: 'action',
       label: 'Revert to library',
-      title: 'Back to the library file; parts playing this patch follow',
+      title: 'Back to the library file; the part playing this patch follows',
       enabled: true,
-      run: () => revertPatch(ctx, preset),
+      run: () => revertPatch(ctx, preset, library, source),
     });
   return items;
 }

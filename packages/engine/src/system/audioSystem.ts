@@ -59,6 +59,7 @@ import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
 import { withoutAutomation, withoutGroupAutomation } from './automationPartial';
+import { withoutPatchSource } from './patchSourcePartial';
 import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
@@ -363,8 +364,9 @@ export class AudioSystem {
     // A group's lanes are the automation's, as a part's are (windsor#614).
     const groupPlan = this.groups.plan(withoutGroupAutomation(groups));
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
-    // A part's lanes are the automation's, after everything else has landed (windsor#344).
-    const { arrangementParts, strips } = splitStrips(withoutAutomation(parts));
+    // A part's lanes are the automation's, after everything else has landed (windsor#344);
+    // its `patchSource` is the app's library link, which nothing here plays (windsor#669).
+    const { arrangementParts, strips } = splitStrips(withoutPatchSource(withoutAutomation(parts)));
     this.sidechains.begin();
     const result = player.apply(
       arrangementParts === undefined

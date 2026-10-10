@@ -67,6 +67,14 @@ export interface DocumentPart extends MusicPart {
    * partial replaces the whole list. `automation/automationPlayer.ts` plays them (windsor#344).
    */
   readonly automation?: readonly AutomationLane[];
+  /**
+   * The library id this part's own copy of its patch came from (windsor#669,
+   * record `2026-10-10-each-part-owns-its-patch`): set only when `preset`
+   * differs from that id, so the app's Save, Revert and modified marker can
+   * still find the library entry. Absent when the part's `preset` is its own
+   * library link or it has none. Nothing that plays reads it.
+   */
+  readonly patchSource?: string;
 }
 
 /**

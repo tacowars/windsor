@@ -1,0 +1,82 @@
+# Each part owns its patch
+
+- **Date:** 2026-10-10
+- **Status:** accepted (tacowars's direction on windsor#669: each part,
+  whatever patch it plays, is isolated from every other part)
+- **Links:** windsor#669 · `2026-09-28-format-versions-refuse-never-destroy`
+  · `2026-09-27-user-library-in-indexeddb`
+
+## Context
+
+A part's `preset` names an entry in the song's `patches`, and a patch knob
+writes into that entry. Two parts could name the same entry, so a knob
+turned on one part changed the other. tacowars hit this in a song whose two
+parts both played `ice-needle-copy`: the patch's Volume moved both parts,
+and it went unnoticed for a while. The sharing came from `choosePreset`
+(`packages/app/src/presetBrowser.ts`), which pointed the part at the song's
+existing copy when the picked id was already in `patches`.
+
+## Decisions
+
+1. **The invariant.** In the open song, no two parts play the same
+   `patches` id. Every path that sets a part's patch keeps it: the patch
+   bar's picker and ◀ ▶ step buttons, the patch browser's Load into, Save
+   as…, Init (already one id per slot), Rename, and every way a song opens
+   (import, restore, a stored song).
+2. **Load.** Choosing patch `id` for slot S when no other part plays `id`
+   is unchanged. When another part plays `id`, S gets a copy under
+   `uniqueId(id, [...library ids, ...song ids])` (`patchMetadata.ts`). The
+   copy holds the same sound the pick loaded before
+   (`documentPatch ?? libraryPatch`). Only the id is new. The patch's
+   display name is unchanged, and the load stays one undo step.
+3. **Library link: `patchSource`.** `DocumentPart` gets an optional
+   `patchSource?: string`: the library id this part's copy came from. It is
+   set only when the part's `preset` differs from that library id. The
+   engine's normaliser keeps a non-empty string, and drops anything else
+   with a report, the way it handles the part's other optional fields. It
+   round-trips through export and import. The field is additive, and its
+   absence reproduces the old behaviour, so `ARRANGEMENT_VERSION` does not
+   change. Nothing that plays reads it: `AudioSystem.apply` takes it out of
+   a live partial before the player's merge, as it does a part's
+   `automation`, so setting or clearing it is never reported as an unknown
+   field.
+4. **Origin, Save and the modified marker.** `patchOrigin` looks the
+   library up by `part.patchSource ?? part.preset`. Save writes that
+   library entry and updates only this part's song copy
+   (`patches[part.preset]`), never another part's. The modified dot's
+   baseline is that library entry, and a confirmed discard and Revert to
+   library write the entry into this part's copy only. Save as… is
+   unchanged: this part switches to a new unique id, with no
+   `patchSource`, because the new id is a library id. When the library
+   entry is deleted, the origin falls back to `document`, as before.
+5. **Opening a song splits sharing.** For each id played by more than one
+   part, the lowest slot keeps the id. Every other part gets an identical
+   copy under a fresh `uniqueId`, and its `patchSource` is set as follows:
+   - the part's existing `patchSource`, if it has one;
+   - otherwise the shared id, if that id is a library id;
+   - otherwise absent.
+
+   This is a pure function, `isolatePartPatches` in
+   `packages/app/src/partPatchIsolation.ts`, applied in
+   `AppContext.replaceDocument`'s open amend beside `loadRenames`, so it is
+   a document edit made on open in the same way. Part names do not change.
+   The split never deletes a patch: a song's unplayed copies stay. A load
+   that copies (decision 2) takes its `patchSource` by the same rule, from
+   the part it copies.
+6. **The engine stays permissive.** The engine still plays a document where
+   parts share an id. The invariant belongs to the app's edits and its open
+   path. Apart from `patchSource`, the engine does not change.
+7. **Rename.** Rename keeps working as before; it now moves only one part,
+   and it keeps `patchSource`. The browser's Rename tooltip for a song copy
+   reads "Rename the song's copy; the part playing it follows".
+
+## Consequences
+
+- A part playing its own copy steps ◀ ▶ from its library entry's place in
+  the listing, not from the head of the song's own patches, where the copy's
+  fresh id would otherwise list it. Its patch box shows the library
+  entry's category.
+- Stepping a part through a patch another part plays leaves a copy in the
+  song for each step that lands there, as a pick always left the library
+  patch it embedded. Unplayed copies are kept (decision 5), so they list
+  under "this song" until the song's Delete removes them.

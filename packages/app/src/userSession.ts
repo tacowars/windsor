@@ -20,6 +20,8 @@ import type { SongAutosave } from './songAutosave';
 import { isNamedSession } from './songAutosave';
 import { touchWatch } from './songRestore';
 import { browserPersist, persistOnce } from './storagePersistence';
+import { pendUserLibrary } from './libraryModel';
+import type { UserStores } from './userLibraryStore';
 import { openUserStores } from './userLibraryStore';
 import { bootSongs } from './userSessionSongs';
 
@@ -30,20 +32,28 @@ import { bootSongs } from './userSessionSongs';
 export async function bootUserState(ctx: AppCtx, gatePassed: Promise<void>): Promise<void> {
   // Taken first: the open below can wait on an older tab for as long as it stays open.
   const touched = touchWatch(ctx);
+  // Before any await: a song opened during the database open waits for the user's library (windsor#669).
+  const settleLibrary = pendUserLibrary();
   const ensurePersisted = persistOnce(browserPersist(), () =>
     ctx.notify(EVICTABLE_WARNING, 'warning'),
   );
-  const stores = await openUserStores(
-    () => void ensurePersisted(),
-    () => ctx.notify(BLOCKED_UPGRADE_WARNING, 'warning'),
-  );
+  let stores: UserStores | null;
+  try {
+    stores = await openUserStores(
+      () => void ensurePersisted(),
+      () => ctx.notify(BLOCKED_UPGRADE_WARNING, 'warning'),
+    );
+  } catch (error) {
+    settleLibrary(Promise.resolve());
+    throw error;
+  }
   const confirm = async (request: ConfirmRequest): Promise<boolean> => {
     await gatePassed;
     return openConfirm(request);
   };
   // The question and the library load run together; an open waits for the built-ins itself.
   const [, { stored, outcome, autosave }] = await Promise.all([
-    bootLibrary(stores?.patches ?? null).then(() => {
+    bootLibrary(stores?.patches ?? null, settleLibrary).then(() => {
       reportLibraryProblems(ctx);
       ctx.render();
     }),

@@ -26,9 +26,12 @@ import { partAt, songTicksOf } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
 import { deepEqual, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
+import { deepMerge } from './documentModel';
 import { setGestureHook } from './gestureHooks';
 import type { BuildOptions, EngineHost } from './host';
+import { library, libraryLoaded } from './libraryModel';
 import { loadRenames } from './partAutoName';
+import { isolatePartPatches } from './partPatchIsolation';
 import { PartsSession, type PatchPartsEdit } from './partsSession';
 import { followSongLength } from './regionModel';
 import { fitFollowedRolls } from './rollRegionFit';
@@ -107,12 +110,17 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     });
     // The opening document's first part, should it lack slot 0.
     this.parts.resolve(0);
-    this.songs = new SongSession({
-      model: this.model,
-      replace: (raw, amend) => this.replaceDocument(raw, amend),
-      change: (partial, label) => this.change(partial, label),
-      notify: (message, tone) => this.notify(message, tone),
-    });
+    // A switch waits for the whole library, not only the built-ins: the open's
+    // split reads its ids (windsor#669).
+    this.songs = new SongSession(
+      {
+        model: this.model,
+        replace: (raw, amend) => this.replaceDocument(raw, amend),
+        change: (partial, label) => this.change(partial, label),
+        notify: (message, tone) => this.notify(message, tone),
+      },
+      { ready: libraryLoaded },
+    );
     setGestureHook({ begin: (label) => this.beginGesture(label), end: () => this.endGesture() });
   }
 
@@ -364,7 +372,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * decision 4): a document edit like a typed rename, so it exports, made
    * inside `open` so the import report stays the raw document's; `amend` is
    * the session's own edit of the open (an imported file's name), made the
-   * same way. The rebuild below builds from the amended document. A restore
+   * same way. So is the split that gives each part its own patch
+   * (windsor#669 decision 5, `isolatePartPatches`): a song where two parts
+   * play one `patches` id opens with a copy for every part but the lowest
+   * slot. The rebuild below builds from the amended document. A restore
    * or a stored song autosaves it only when the report is clean
    * (`saveOpenIfClean`); an import autosaves on open as it always has, and
    * its file is left untouched.
@@ -372,9 +383,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private replaceDocument(raw: unknown, amend?: OpenAmend): void {
     this.editing('song');
     this.model.open(raw, (doc) => {
-      const renames = loadRenames(doc);
-      const own = amend?.(doc) ?? null;
-      return renames || own ? { ...renames, ...own } : null;
+      const libraryIds = new Set(Object.keys(library.entries));
+      const edits = [loadRenames(doc), isolatePartPatches(doc, libraryIds), amend?.(doc) ?? null];
+      const made = edits.filter((edit) => edit !== null);
+      return made.length > 0 ? made.reduce((a, b) => deepMerge(a, b) as DocumentPartial) : null;
     });
     // A new document starts a new history (decision 4). A gesture open
     // across it records nothing: its "before" belongs to the other song.

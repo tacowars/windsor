@@ -45,12 +45,18 @@ export interface PatchScope {
 /** A fresh Init patch: `makePatch()` defaults under the Init overrides. */
 export const initPatchDefaults = (): Patch => makePatch(INIT_PATCH_OVERRIDES);
 
-/** Where the selected part's patch came from. */
+/**
+ * Where the selected part's patch came from: the library entry its
+ * `patchSource` names (windsor#669 decision 4), else the one its own id
+ * names; a deleted entry leaves the song's copy, a `document` patch.
+ */
 export function patchOrigin({ ctx, library, slot }: PatchScope): PatchOrigin {
-  const preset = partAt(ctx.model.doc, slot)?.preset;
-  if (preset === undefined) return { kind: 'none' };
+  const part = partAt(ctx.model.doc, slot);
+  if (part === undefined) return { kind: 'none' };
+  const { preset } = part;
   if (isInitPreset(preset)) return { kind: 'init' };
-  if (Object.hasOwn(library.entries, preset)) return { kind: 'library', id: preset };
+  const source = part.patchSource ?? preset;
+  if (Object.hasOwn(library.entries, source)) return { kind: 'library', id: source };
   return { kind: 'document', id: preset };
 }
 
@@ -118,7 +124,11 @@ export function copyPrefill(scope: PatchScope, working: Patch): PatchMetadata {
 export function initPatch({ ctx, slot }: PatchScope): Patch {
   const patch = initPatchDefaults();
   const id = initPresetId(String(slot));
-  ctx.change({ ...partChange(slot, { preset: id }), patches: { [id]: patch } });
+  // Init is no library entry's copy: the part's `patchSource` goes (windsor#669).
+  ctx.change({
+    ...partChange(slot, { preset: id, patchSource: undefined }),
+    patches: { [id]: patch },
+  });
   return patch;
 }
 
@@ -150,7 +160,9 @@ export function discardEdits(scope: PatchScope): Patch | null {
   const origin = patchOrigin(scope);
   const baseline = baselinePatch(scope, origin);
   if (baseline === null || origin.kind === 'none' || origin.kind === 'document') return null;
-  const id = origin.kind === 'init' ? initPresetId(String(scope.slot)) : origin.id;
+  // The part's own copy (windsor#669): a library origin may be another id's.
+  const id = partAt(scope.ctx.model.doc, scope.slot)?.preset;
+  if (id === undefined) return null;
   const restored = clonePatch(baseline);
   scope.ctx.change({ patches: { [id]: restored } });
   return restored;
@@ -163,8 +175,9 @@ export interface WriteRequest extends PatchScope {
 }
 
 /**
- * Save over the current library id; the open song's copy follows, since the
- * part plays it. A built-in forks instead: Copy to new under `meta`'s name.
+ * Save over the current library id; this part's song copy follows, and no
+ * other part's (windsor#669 decision 4), even one linked to the same entry.
+ * A built-in forks instead: Copy to new under `meta`'s name.
  */
 export async function savePatch(request: WriteRequest): Promise<string> {
   const origin = patchOrigin(request);
@@ -172,14 +185,23 @@ export async function savePatch(request: WriteRequest): Promise<string> {
   if (saveForks(request)) return copyToNew(request);
   const { ctx, library, meta, working } = request;
   const file = buildPatchFile(meta, working);
+  // Pinned before the write, with the song it belongs to: a patch loaded into
+  // the slot, or another song opened, meanwhile is not this save's to change.
+  const own = partAt(ctx.model.doc, request.slot)?.preset;
+  const song = ctx.model.openings;
   await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
-  if (ctx.model.doc.patches && Object.hasOwn(ctx.model.doc.patches, origin.id)) {
-    ctx.change({ patches: { [origin.id]: file.patch } });
+  const patches = ctx.model.doc.patches;
+  if (own !== undefined && ctx.model.openings === song && patches && Object.hasOwn(patches, own)) {
+    ctx.change({ patches: { [own]: file.patch } });
   }
   return origin.id;
 }
 
-/** Save the working patch as a new entry in the user's library (or the folder), and switch the part to it. */
+/**
+ * Save the working patch as a new entry in the user's library (or the
+ * folder), and switch the part to it. The new id is a library id, so the
+ * part's `patchSource` goes (windsor#669 decision 4).
+ */
 export async function copyToNew(request: WriteRequest): Promise<string> {
   const { ctx, library, slot, meta, working } = request;
   const wasInit = patchOrigin(request).kind === 'init';
@@ -192,7 +214,10 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
   withGesture('Copy to new', () => {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
-    ctx.change({ ...partChange(slot, fields), patches: { [id]: file.patch } });
+    ctx.change({
+      ...partChange(slot, { ...fields, patchSource: undefined }),
+      patches: { [id]: file.patch },
+    });
     if (wasInit) dropInit(ctx);
   });
   return id;

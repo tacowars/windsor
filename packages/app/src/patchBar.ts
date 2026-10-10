@@ -25,7 +25,7 @@ import {
 } from './patchBrowser';
 import { togglePatchPopover, wirePatchSearchKey } from './patchPopover';
 import type { StepDirection } from './patchStepModel';
-import { stepPatch } from './patchStepModel';
+import { stepPartPatch } from './patchStepModel';
 import type { PatchLoader } from './presetBrowser';
 import { filteredListing, loadPreset, presetListing } from './presetBrowser';
 
@@ -50,15 +50,16 @@ function stepButton(ctx: AppCtx, by: StepDirection, actions: PatchBarActions): H
   node.title = `${STEP_LABELS[by]} in the search's filter`;
   node.setAttribute('aria-label', STEP_LABELS[by]);
   node.onclick = (): void => {
-    const current = partAt(ctx.model.doc, ctx.parts.selected)?.preset ?? '';
+    // A part's own copy steps from its library entry's place when its row is hidden (windsor#669).
+    const part = partAt(ctx.model.doc, ctx.parts.selected);
     const listing = presetListing(ctx);
-    const order = filteredListing(listing).map((entry) => entry.id);
-    const next = stepPatch(
-      order,
-      current,
+    const next = stepPartPatch({
+      order: filteredListing(listing).map((entry) => entry.id),
+      all: listing.map((entry) => entry.id),
+      preset: part?.preset ?? '',
+      patchSource: part?.patchSource,
       by,
-      listing.map((entry) => entry.id),
-    );
+    });
     if (next !== null) loadPreset(ctx, next, actions, focusById(node.id));
   };
   return node;

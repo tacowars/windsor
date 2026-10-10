@@ -24,6 +24,7 @@ import {
   wrapDirectoryHandle,
 } from './libraryFolder';
 import {
+  awaitUserLibrary,
   connectLibrary,
   createProblemReporter,
   disconnectLibrary,
@@ -31,7 +32,7 @@ import {
   library,
   refreshLibrary,
 } from './libraryModel';
-import type { LibraryModel } from './libraryModel';
+import type { LibraryModel, SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
@@ -74,9 +75,19 @@ export function reportLibraryProblems(ctx: AppCtx, force = false): void {
 /**
  * At boot: attach the user's library (null where the browser has no
  * IndexedDB), load the built-ins beside it, then reconnect a remembered
- * folder whose grant still stands.
+ * folder whose grant still stands. A song opening meanwhile waits for all
+ * of it (`libraryLoaded`).
  */
-export async function bootLibrary(user: PatchFolder | null): Promise<void> {
+export function bootLibrary(
+  user: PatchFolder | null,
+  settle: SettleUserLibrary = awaitUserLibrary,
+): Promise<void> {
+  const load = loadBootLibrary(user);
+  settle(load);
+  return load;
+}
+
+async function loadBootLibrary(user: PatchFolder | null): Promise<void> {
   library.user = user;
   await loadPageLibrary(library);
   if (!folderApiAvailable()) return;
@@ -129,7 +140,14 @@ async function connectFolder(ctx: AppCtx): Promise<void> {
   ctx.render();
 }
 
-async function forgetFolder(ctx: AppCtx): Promise<void> {
+/** Pended at once (windsor#669): a song opening while the handle is forgotten waits for the page library. */
+function forgetFolder(ctx: AppCtx): Promise<void> {
+  const load = forgetAndDisconnect(ctx);
+  awaitUserLibrary(load);
+  return load;
+}
+
+async function forgetAndDisconnect(ctx: AppCtx): Promise<void> {
   await forgetHandle();
   await disconnectLibrary(library);
   remembered = null;
