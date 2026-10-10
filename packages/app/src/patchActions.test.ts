@@ -16,6 +16,7 @@ import {
 } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { DocumentPartial } from '@windsor/engine';
+import { AutoCopies } from './autoCopies';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -73,6 +74,7 @@ function context(): AppCtx {
   const model = new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT });
   const ctx = {
     model,
+    autoCopies: new AutoCopies(),
     change: (partial: DocumentPartial) => {
       model.merge(partial);
       return { ok: true, ignored: [] };

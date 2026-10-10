@@ -98,26 +98,34 @@ never edited is deleted when the part moves on. The pure function is
    - no other part plays `P`;
    - `P` is not a library id, and not an Init sentinel (`dropInit` owns
      those);
-   - `P` is an automatic copy: its id is exactly `<base>-<n>`, n from 2,
-     the id `uniqueId` gives a copy of `<base>`, where `<base>` is the
-     copy's own base. That is the part's `patchSource` when it has one;
-     with none (the open-time split and a load's copy of a song-only
-     patch), it is an id still in the song's `patches`. A renamed copy has
-     lost its base's shape, so a rename keeps it even where the display
-     name did not change, and even when the new id looks like a copy:
-     `custom-2` on a part linked to `bell` is no automatic copy;
+   - `P` is an automatic copy: the app recorded it as one it made since
+     this song opened. The record is a session-scoped set of ids
+     (`AutoCopies`, `packages/app/src/autoCopies.ts`, held by the app
+     context). Only two paths add to it: a load that makes a copy because
+     another part plays the picked id (decision 2), and the open-time
+     split (`isolatePartPatches`). A rename removes the old id and never
+     adds the new one, so a renamed copy is kept whatever its new id looks
+     like: `custom-2`, or `score-ice-needle-3` on a part linked to
+     `score-ice-needle`. Opening a song clears the set, so a copy an
+     earlier session or another song made is never dropped. The set is
+     never written to the document or exported. An undo or a redo that
+     brings a copy back does not re-add it; an id may stay in the set
+     across undo and redo, because the next condition still guards
+     against dropping an edit. The id's shape is never consulted;
    - `P` is leaf-identical (`patchLeafDifferences` empty, the name
-     included) to its base: with a `patchSource`, that library entry or
-     another patch already in the song; with none, the song patch `<base>`
-     itself. The patch the move loads is no witness: Save as…
+     included) to a patch that stays: the library entry its part's
+     `patchSource` names, when it has one, or another patch already in
+     the song (with no `patchSource`, the patch it was copied from is
+     among them). The patch the move loads is no witness: Save as…
      writes the part's edits into its new patch, and the copy holding the
      same edits stays, as any edited copy does.
 
    Deleting it therefore loses no sound.
 3. **Never dropped:** a patch another part still plays, a library id
    (which includes everything Save as… made), an edited or renamed copy,
-   and an unplayed song patch no part just left. A song that opens with
-   orphaned copies keeps them.
+   an unplayed song patch no part just left, and any patch the song had
+   when it opened beyond what its own split made. A song that opens with
+   orphaned copies keeps them, unedited and copy-shaped or not.
 4. **A rename keeps the library link** (windsor#671 decision 5; amends
    decision 7). Renaming a song copy off a library id, when the part
    playing it has no `patchSource`, sets `patchSource` to that old id, so

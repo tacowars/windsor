@@ -3,6 +3,7 @@ import { choosePreset, pickPreset } from './presetBrowser';
 import { openGestureConsole } from './__fixtures__/gestureConsole';
 import { dropInit } from './patchActions';
 import { DocumentModel } from './documentModel';
+import { AutoCopies } from './autoCopies';
 import type { AppCtx } from './context';
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { ARRANGEMENT_VERSION, clonePatch, makePatch, partAt } from '@windsor/engine';
@@ -18,6 +19,7 @@ function context(): AppCtx {
   const model = new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT });
   return {
     model,
+    autoCopies: new AutoCopies(),
     change: (partial) => {
       model.merge(partial);
       return { ok: true };

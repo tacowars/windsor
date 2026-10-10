@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { DocumentPartial } from '@windsor/engine';
 import { clonePatch, partAt } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
+import { AutoCopies } from './autoCopies';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -32,6 +33,7 @@ function context(): AppCtx {
   const model = new DocumentModel(added.doc);
   return {
     model,
+    autoCopies: new AutoCopies(),
     change: (partial: DocumentPartial) => {
       model.merge(partial);
       return { ok: true, ignored: [] };

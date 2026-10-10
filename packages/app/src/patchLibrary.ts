@@ -73,6 +73,8 @@ export function renamePatch(ctx: AppCtx, from: string, to: string, name?: string
   const renamed: Patch = { ...patch, name: shown };
   const result = ctx.change({ patches: { [from]: null, [to]: renamed }, parts });
   if (!result.ok) return;
+  // A renamed copy is the user's, never an automatic one (windsor#671).
+  ctx.autoCopies.renamed(from, to);
   ctx.render();
   ctx.notify(
     name === undefined

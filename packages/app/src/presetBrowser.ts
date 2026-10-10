@@ -40,11 +40,14 @@ export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const fields = assignPatchFields(doc, slot, id, patch.name);
   const keepsLink = !holder && partAt(doc, slot)?.preset === name;
   const link = keepsLink ? {} : { patchSource: holder && copySource(holder, name, ids) };
-  const dropped = leftCopyDrop(doc, slot, id, library);
-  return ctx.change({
+  const dropped = leftCopyDrop(doc, slot, id, library, ctx.autoCopies);
+  const ok = ctx.change({
     ...partChange(slot, { ...fields, ...link }),
     patches: { [id]: clonePatch(patch), ...dropped },
   }).ok;
+  // The copy is recorded as the app's own, so it may go when unedited (windsor#671).
+  if (ok && holder) ctx.autoCopies.add(id);
+  return ok;
 }
 
 /**

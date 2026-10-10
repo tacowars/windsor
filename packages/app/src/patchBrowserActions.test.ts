@@ -8,6 +8,7 @@ import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullAr
 import { ARRANGEMENT_VERSION, makePatch, partAt } from '@windsor/engine';
 import type { DocumentPartial } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
+import { AutoCopies } from './autoCopies';
 import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
 import type { PatchFolder } from './libraryFolder';
@@ -32,6 +33,7 @@ function context(): AppCtx {
   const model = new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT });
   return {
     model,
+    autoCopies: new AutoCopies(),
     change: (partial: DocumentPartial) => {
       model.merge(partial);
       return { ok: true, ignored: [] };

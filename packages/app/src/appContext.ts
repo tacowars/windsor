@@ -23,6 +23,7 @@ import type {
   Patch,
 } from '@windsor/engine';
 import { partAt, songTicksOf } from '@windsor/engine';
+import { AutoCopies } from './autoCopies';
 import type { AppCtx, ConsoleTransport } from './context';
 import { deepEqual, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
@@ -82,6 +83,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   readonly notify: (message: string, tone?: ToastTone) => void;
   /** The open-song session (windsor#433); its storage is attached at boot. */
   readonly songs: SongSession;
+  /** The copies the app made since this song opened (windsor#671); each open resets it. */
+  readonly autoCopies = new AutoCopies();
 
   private readonly tabs = new Map<string, Tab<P>>();
   private active: string | null = null;
@@ -384,7 +387,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.editing('song');
     this.model.open(raw, (doc) => {
       const libraryIds = new Set(Object.keys(library.entries));
-      const edits = [loadRenames(doc), isolatePartPatches(doc, libraryIds), amend?.(doc) ?? null];
+      const split = isolatePartPatches(doc, libraryIds);
+      // A new song forgets the last one's copies and records its own split's (windsor#671).
+      this.autoCopies.reset(Object.keys(split?.patches ?? {}));
+      const edits = [loadRenames(doc), split, amend?.(doc) ?? null];
       const made = edits.filter((edit) => edit !== null);
       return made.length > 0 ? made.reduce((a, b) => deepMerge(a, b) as DocumentPartial) : null;
     });

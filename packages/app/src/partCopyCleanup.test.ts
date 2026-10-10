@@ -111,15 +111,14 @@ describe('dropping an unedited automatic copy (windsor#671)', () => {
     expect(ctx.model.doc.patches?.[COPY]).toBeUndefined();
   });
 
-  it('keeps a copy renamed to a copy-shaped id with another base, and drops `<source>-2`', () => {
-    const renamed = onCopy();
-    renamePatch(renamed, COPY, 'custom-2');
-    expect(partAt(renamed.model.doc, 1)).toMatchObject({ preset: 'custom-2', patchSource: ICE });
-    step(renamed, STEPS[0]!);
-    expect(renamed.model.doc.patches?.['custom-2']).toBeDefined();
-    const copy = onCopy();
-    step(copy, STEPS[0]!);
-    expect(copy.model.doc.patches?.[COPY]).toBeUndefined();
+  it("keeps a copy renamed to any copy-shaped id, its own base's included", () => {
+    for (const to of ['custom-2', `${ICE}-3`]) {
+      const renamed = onCopy();
+      renamePatch(renamed, COPY, to);
+      expect(partAt(renamed.model.doc, 1)).toMatchObject({ preset: to, patchSource: ICE });
+      step(renamed, STEPS[0]!);
+      expect(renamed.model.doc.patches?.[to]).toBeDefined();
+    }
   });
 
   it('drops an unedited copy of a song-only patch, and keeps an edited one', () => {
@@ -139,9 +138,39 @@ describe('dropping an unedited automatic copy (windsor#671)', () => {
   it('never drops a library id, a patch another part plays, or a part staying put', () => {
     const ctx = onCopy();
     const doc = ctx.model.doc;
-    expect(leftCopyDrop(doc, 0, STEPS[0]!, library)).toBeNull();
-    expect(leftCopyDrop(doc, 1, COPY, library)).toBeNull();
-    expect(leftCopyDrop(doc, 1, STEPS[0]!, library)).toEqual({ [COPY]: null });
+    expect(leftCopyDrop(doc, 0, STEPS[0]!, library, ctx.autoCopies)).toBeNull();
+    expect(leftCopyDrop(doc, 1, COPY, library, ctx.autoCopies)).toBeNull();
+    expect(leftCopyDrop(doc, 1, STEPS[0]!, library, ctx.autoCopies)).toEqual({ [COPY]: null });
+  });
+});
+
+describe('only the copies the app made since the song opened go (windsor#671)', () => {
+  /** The song `ctx` holds, as a raw document to open again. */
+  const saved = (ctx: ReturnType<typeof twoParts>) => JSON.parse(ctx.model.toJson()) as unknown;
+
+  it('drops an unedited copy the open-time split made', async () => {
+    const ctx = twoParts();
+    const raw = saved(ctx) as { parts: Array<{ slot: number; preset: string }> };
+    raw.parts.find((part) => part.slot === 1)!.preset = ICE;
+    await ctx.importDoc(raw);
+    expect(partAt(ctx.model.doc, 1)).toMatchObject({ preset: COPY, patchSource: ICE });
+    step(ctx, STEPS[0]!);
+    expect(ctx.model.doc.patches?.[COPY]).toBeUndefined();
+  });
+
+  it('keeps an unedited copy-shaped patch the song had before this session', () => {
+    const ctx = openGestureConsole(saved(onCopy()));
+    step(ctx, STEPS[0]!);
+    expect(ctx.model.doc.patches?.[COPY]).toBeDefined();
+  });
+
+  it('forgets every copy when another song opens', async () => {
+    const ctx = onCopy();
+    expect(ctx.autoCopies.has(COPY)).toBe(true);
+    await ctx.importDoc(saved(ctx));
+    expect(ctx.autoCopies.has(COPY)).toBe(false);
+    step(ctx, STEPS[0]!);
+    expect(ctx.model.doc.patches?.[COPY]).toBeDefined();
   });
 });
 

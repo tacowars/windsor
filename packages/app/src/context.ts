@@ -6,6 +6,7 @@
  * they stay put when the implementation moves (#620).
  */
 import type { ApplyResult, DocumentPartial } from '@windsor/engine';
+import type { AutoCopies } from './autoCopies';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import type { PartsSession } from './partsSession';
@@ -40,6 +41,8 @@ export interface AppCtx {
   parts: PartsSession;
   /** ▶ ■ ‖ and the audible position (#708). */
   transport: ConsoleTransport;
+  /** The patch copies the app made this session, which may go when unedited (windsor#671). */
+  autoCopies: AutoCopies;
   /**
    * A live change: applied to the live system (when audio is enabled) and
    * merged into the document. Refused by the engine → nothing changes.

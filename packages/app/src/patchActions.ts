@@ -128,7 +128,7 @@ export function copyPrefill(scope: PatchScope, working: Patch): PatchMetadata {
 export function initPatch({ ctx, library, slot }: PatchScope): Patch {
   const patch = initPatchDefaults();
   const id = initPresetId(String(slot));
-  const dropped = leftCopyDrop(ctx.model.doc, slot, id, library);
+  const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
   // Init is no library entry's copy: the part's `patchSource` goes (windsor#669).
   ctx.change({
     ...partChange(slot, { preset: id, patchSource: undefined }),
@@ -221,7 +221,7 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
   withGesture('Copy to new', () => {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
-    const dropped = leftCopyDrop(ctx.model.doc, slot, id, library);
+    const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
     ctx.change({
       ...partChange(slot, { ...fields, patchSource: undefined }),
       patches: { [id]: file.patch, ...dropped },
