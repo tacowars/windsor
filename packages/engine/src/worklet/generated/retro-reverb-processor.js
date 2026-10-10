@@ -287,7 +287,8 @@ var RetroTank = class {
     this.tapFractions = Float64Array.from(RETRO_REVERB_DSP.densityFractions.flat());
     this.tapSignsLeft = Float64Array.from(RETRO_REVERB_DSP.densityLeft.flat());
     this.tapSignsRight = Float64Array.from(RETRO_REVERB_DSP.densityRight.flat());
-    this.tapDelays = new Float64Array(taps);
+    this.tapWhole = new Int32Array(taps);
+    this.tapFraction = new Float64Array(taps);
     this.tapGainsLeft = new Float64Array(taps);
     this.tapGainsRight = new Float64Array(taps);
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
@@ -340,10 +341,12 @@ var RetroTank = class {
   /** The taps' delays at this Size, and their gains at this Density and the lines' gains. */
   configureTaps() {
     let left = 0, right = 0;
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.tapLines[k];
       const fraction = this.tapFractions[k];
-      this.tapDelays[k] = fraction * RETRO_REVERB_DSP.tankSeconds[line] * this.size * RETRO_REVERB_DSP.rate;
+      const delay = fraction * RETRO_REVERB_DSP.tankSeconds[line] * this.size * RETRO_REVERB_DSP.rate;
+      this.tapWhole[k] = Math.ceil(delay);
+      this.tapFraction[k] = this.tapWhole[k] - delay;
       const weight = this.density * Math.pow(this.gains[line], fraction - 1);
       this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
       this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
@@ -352,20 +355,26 @@ var RetroTank = class {
     }
     this.endLeft = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + left / RETRO_REVERB_DSP.densityEndEnergy[0]);
     this.endRight = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + right / RETRO_REVERB_DSP.densityEndEnergy[1]);
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       this.tapGainsLeft[k] *= this.endLeft;
       this.tapGainsRight[k] *= this.endRight;
     }
   }
-  /** Every tap, read before this sample's writes, into `tapLeft`/`tapRight`. */
+  /**
+   * Every tap, read before this sample's writes, into `tapLeft`/`tapRight`: the sample `whole`
+   * back, moved `fraction` of the way to the one after it, as `RetroDelay.read` interpolates.
+   */
   readTaps() {
     let left = 0, right = 0;
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.lines[this.tapLines[k]];
-      line.delay = this.tapDelays[k];
-      line.read();
-      left += this.tapGainsLeft[k] * line.output;
-      right += this.tapGainsRight[k] * line.output;
+      const buffer = line.buffer;
+      let index = line.head - this.tapWhole[k];
+      if (index < 0) index += buffer.length;
+      const next = index + 1 === buffer.length ? 0 : index + 1;
+      const value = buffer[index] + this.tapFraction[k] * (buffer[next] - buffer[index]);
+      left += this.tapGainsLeft[k] * value;
+      right += this.tapGainsRight[k] * value;
     }
     this.tapLeft = left;
     this.tapRight = right;

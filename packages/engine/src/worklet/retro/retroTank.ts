@@ -77,8 +77,13 @@ class RetroTank {
   tapFractions: Float64Array;
   tapSignsLeft: Float64Array;
   tapSignsRight: Float64Array;
-  /** Per tap, set each block: its delay in samples and its gain in each output. */
-  tapDelays: Float64Array;
+  /**
+   * Per tap, set each block: its delay in samples as whole samples (rounded up) less a fraction,
+   * read in place rather than through `RetroDelay.read` (the same interpolation, at a third of the
+   * cost), and its gain in each output.
+   */
+  tapWhole: Int32Array;
+  tapFraction: Float64Array;
   tapGainsLeft: Float64Array;
   tapGainsRight: Float64Array;
   /** The line ends' gain in each output while the taps play, and the taps' sums a sample. */
@@ -106,7 +111,8 @@ class RetroTank {
     this.tapFractions = Float64Array.from(C.densityFractions.flat());
     this.tapSignsLeft = Float64Array.from(C.densityLeft.flat());
     this.tapSignsRight = Float64Array.from(C.densityRight.flat());
-    this.tapDelays = new Float64Array(taps);
+    this.tapWhole = new Int32Array(taps);
+    this.tapFraction = new Float64Array(taps);
     this.tapGainsLeft = new Float64Array(taps);
     this.tapGainsRight = new Float64Array(taps);
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
@@ -180,10 +186,12 @@ class RetroTank {
   configureTaps(): void {
     let left = 0,
       right = 0;
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.tapLines[k];
       const fraction = this.tapFractions[k];
-      this.tapDelays[k] = fraction * C.tankSeconds[line] * this.size * C.rate;
+      const delay = fraction * C.tankSeconds[line] * this.size * C.rate;
+      this.tapWhole[k] = Math.ceil(delay);
+      this.tapFraction[k] = this.tapWhole[k] - delay;
       const weight = this.density * Math.pow(this.gains[line], fraction - 1);
       this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
       this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
@@ -193,22 +201,28 @@ class RetroTank {
     // The taps' energy against the ends' sum's, in lines (`densityEndEnergy`).
     this.endLeft = C.outputTrim / Math.sqrt(1 + left / C.densityEndEnergy[0]);
     this.endRight = C.outputTrim / Math.sqrt(1 + right / C.densityEndEnergy[1]);
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       this.tapGainsLeft[k] *= this.endLeft;
       this.tapGainsRight[k] *= this.endRight;
     }
   }
 
-  /** Every tap, read before this sample's writes, into `tapLeft`/`tapRight`. */
+  /**
+   * Every tap, read before this sample's writes, into `tapLeft`/`tapRight`: the sample `whole`
+   * back, moved `fraction` of the way to the one after it, as `RetroDelay.read` interpolates.
+   */
   readTaps(): void {
     let left = 0,
       right = 0;
-    for (let k = 0; k < this.tapDelays.length; k++) {
+    for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.lines[this.tapLines[k]];
-      line.delay = this.tapDelays[k];
-      line.read();
-      left += this.tapGainsLeft[k] * line.output;
-      right += this.tapGainsRight[k] * line.output;
+      const buffer = line.buffer;
+      let index = line.head - this.tapWhole[k];
+      if (index < 0) index += buffer.length;
+      const next = index + 1 === buffer.length ? 0 : index + 1;
+      const value = buffer[index] + this.tapFraction[k] * (buffer[next] - buffer[index]);
+      left += this.tapGainsLeft[k] * value;
+      right += this.tapGainsRight[k] * value;
     }
     this.tapLeft = left;
     this.tapRight = right;
