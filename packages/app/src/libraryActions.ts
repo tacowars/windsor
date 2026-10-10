@@ -32,7 +32,7 @@ import {
   library,
   refreshLibrary,
 } from './libraryModel';
-import type { LibraryModel } from './libraryModel';
+import type { LibraryModel, SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
@@ -78,9 +78,12 @@ export function reportLibraryProblems(ctx: AppCtx, force = false): void {
  * folder whose grant still stands. A song opening meanwhile waits for all
  * of it (`libraryLoaded`).
  */
-export function bootLibrary(user: PatchFolder | null): Promise<void> {
+export function bootLibrary(
+  user: PatchFolder | null,
+  settle: SettleUserLibrary = awaitUserLibrary,
+): Promise<void> {
   const load = loadBootLibrary(user);
-  awaitUserLibrary(load);
+  settle(load);
   return load;
 }
 

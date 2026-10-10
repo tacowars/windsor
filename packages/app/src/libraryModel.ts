@@ -66,9 +66,26 @@ export const isWritable = (model: LibraryModel, id: string): boolean =>
 /** The boot's load of the user's library (IndexedDB, or a reconnected folder), failure swallowed. */
 let userLibraryLoad: Promise<unknown> = Promise.resolve();
 
-/** Record the boot's user-library load, so a song opening meanwhile waits for it (windsor#669). */
+/** Hands the pending user-library readiness its load; a failed load still settles it. */
+export type SettleUserLibrary = (load: Promise<unknown>) => void;
+
+/**
+ * Mark the user's library as still to come, at once: a song opening from
+ * now on waits until the returned settle is handed a load and that load
+ * ends (windsor#669). The boot calls this before its first await, so an
+ * import during a slow IndexedDB open never splits against the built-ins alone.
+ */
+export function pendUserLibrary(): SettleUserLibrary {
+  let settle: SettleUserLibrary = () => undefined;
+  userLibraryLoad = new Promise<unknown>((resolve) => {
+    settle = (load) => resolve(load.catch(() => undefined));
+  });
+  return settle;
+}
+
+/** Record a user-library load, so a song opening meanwhile waits for it (windsor#669). */
 export function awaitUserLibrary(load: Promise<unknown>): void {
-  userLibraryLoad = load.catch(() => undefined);
+  pendUserLibrary()(load);
 }
 
 /**

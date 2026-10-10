@@ -185,8 +185,9 @@ export async function savePatch(request: WriteRequest): Promise<string> {
   if (saveForks(request)) return copyToNew(request);
   const { ctx, library, meta, working } = request;
   const file = buildPatchFile(meta, working);
-  await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
+  // Pinned before the write: a patch loaded into the slot meanwhile is not this save's to change.
   const own = partAt(ctx.model.doc, request.slot)?.preset;
+  await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
   if (own !== undefined && ctx.model.doc.patches && Object.hasOwn(ctx.model.doc.patches, own)) {
     ctx.change({ patches: { [own]: file.patch } });
   }

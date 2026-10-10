@@ -9,10 +9,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import type { DocumentPartial, Patch } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, clonePatch, partAt, serialisePatchFile } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  clonePatch,
+  makePatch,
+  partAt,
+  serialisePatchFile,
+} from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { DocumentModel } from './documentModel';
 import type { PatchFolder } from './libraryFolder';
 import type { LibraryModel } from './libraryModel';
@@ -100,6 +107,26 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
     expect(patchOf(scope.ctx, 'kick-2')?.volume).toBe(0.1);
     expect([patchOf(scope.ctx, 'kick'), patchOf(scope.ctx, 'kick-3')]).toEqual(others);
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe('kick-2');
+  });
+
+  it('updates the copy the part had when Save started, not a patch loaded during the write', async () => {
+    const scope = await linkedScope();
+    let finish = (): void => undefined;
+    const written = new Promise<void>((resolve) => (finish = resolve));
+    const write = scope.files.write;
+    scope.files.write = (name, text) => written.then(() => write(name, text));
+    const working = { ...patchOf(scope.ctx, 'kick-2')!, volume: 0.1 };
+    const saving = savePatch({ ...scope, working, meta: META });
+    // The user loads another patch into the slot while the write is slow.
+    const chosen = makePatch({ name: 'Chosen', volume: 0.7 });
+    scope.ctx.change({
+      ...partChange(hat, { preset: 'chosen', patchSource: undefined }),
+      patches: { chosen },
+    });
+    finish();
+    await saving;
+    expect(patchOf(scope.ctx, 'chosen')).toEqual(chosen);
+    expect(patchOf(scope.ctx, 'kick-2')?.volume).toBe(0.1);
   });
 
   it("discards and reverts into this part's copy only", async () => {
