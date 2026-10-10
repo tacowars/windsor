@@ -13,6 +13,12 @@
  * the tank's share of the wet output, `1 - finite` (a finite mode replaces the tank), so its depth
  * is scaled by that share: 1 exactly in reverb mode, so reverb mode is unchanged, and once the
  * share is under the floor Drift is off, as at depth 0, and costs nothing.
+ *
+ * Size (RV-4): `configure` takes the block's Size as a target and `tick` moves the lines' `size`
+ * to it in equal steps over the internal ticks the block runs (`sizeTicks` counts them down), and
+ * the last of them sets it to the target, so it lands exactly at any host rate and block size, so a Size move
+ * sweeps the reads rather than jumping them once a block (a zipper). A Size that holds has a step
+ * of 0 and reads exactly as before. The lines are sized for the largest Size plus Drift's reach.
  */
 import {
   RETRO_REVERB_BOUNDS as B,
@@ -26,7 +32,14 @@ class RetroTank {
   damping: Float64Array;
   gains: Float64Array;
   values: Float64Array;
+  /**
+   * The lines' Size now, the block's target, the step a tick towards it (0 when there) and the
+   * ticks left in the move.
+   */
   size: number;
+  sizeTarget: number;
+  sizeStep: number;
+  sizeTicks: number;
   diffusion: number;
   pole: number;
   left: number;
@@ -63,9 +76,11 @@ class RetroTank {
     this.gains = new Float64Array(C.tankSeconds.length);
     this.values = new Float64Array(C.tankSeconds.length);
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
+    this.sizeTarget = this.sizeStep = this.sizeTicks = NaN;
     this.input = this.lineInput = this.feedback = NaN;
     this.driftPhase = this.driftStep = this.excursion = this.detune = NaN;
-    this.size = 1;
+    this.size = this.sizeTarget = 1;
+    this.sizeStep = this.sizeTicks = 0;
     this.diffusion = this.pole = this.left = this.right = 0;
     this.input = this.lineInput = this.feedback = 0;
     this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
@@ -73,6 +88,7 @@ class RetroTank {
 
   configure({
     size,
+    ticks,
     decay,
     tone,
     diffusion,
@@ -81,6 +97,11 @@ class RetroTank {
     finite,
   }: {
     size: number;
+    /**
+     * Internal ticks the block runs, which the move to `size` spans; 0 (the first block, or a
+     * dormant one) lands on it at once.
+     */
+    ticks: number;
     decay: number;
     tone: number;
     diffusion: number;
@@ -89,7 +110,11 @@ class RetroTank {
     /** The finite field's share of the wet output (`RetroReverbDsp.finite`). */
     finite: number;
   }): void {
-    this.size = size;
+    this.sizeTarget = size;
+    this.sizeStep = 0;
+    this.sizeTicks = ticks;
+    if (ticks > 0) this.sizeStep = (size - this.size) / ticks;
+    else this.size = size;
     this.driftStep = (2 * driftRate) / C.rate;
     const share = 1 - finite;
     const depth = share > C.silenceFloor ? driftDepth * share : 0;
@@ -130,6 +155,12 @@ class RetroTank {
       if (phase >= 1) phase -= 2;
       this.driftPhase = phase;
       triangle = 2 * Math.abs(phase) - 1;
+    }
+    // The block's last tick sets the target itself, so rounding in the steps never leaves it short.
+    if (this.sizeStep !== 0) {
+      this.sizeTicks--;
+      this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+      if (this.sizeTicks === 0) this.sizeStep = 0;
     }
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {

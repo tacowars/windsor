@@ -5,7 +5,8 @@ export const RETRO_REVERB_MODES = ['reverb', 'gated', 'reverse'] as const;
 export const RETRO_REVERB_CONVERTERS = ['linear', 'ranging'] as const;
 export const RETRO_REVERB_BOUNDS = {
   decay: [0.2, 20],
-  size: [0.25, 3],
+  // RV-4 raised the top from 3 to 10: the tank lines reach about 540 ms. A Size keeps its meaning.
+  size: [0.25, 10],
   tone: [800, 9000],
   diffusion: [0, 1],
   preDelay: [0, 0.25],
@@ -42,6 +43,10 @@ export const RETRO_REVERB_DSP = {
   rate: 23437.5,
   bandwidth: 9000,
   smoothSeconds: 0.05,
+  // The fastest Size moves, in Size a second (RV-4). Today's widest move, 0.25 to 3, starts at
+  // 2.75 / smoothSeconds = 55 a second, so no move within 0.25-3 reaches the limit and the
+  // longest line's read never moves faster than it did before the range grew.
+  sizeSlew: 55,
   // Independently chosen, unequal lengths; seconds, never ROM offsets.
   tankSeconds: [0.0311, 0.0377, 0.0433, 0.0539],
   diffuserSeconds: [0.0031, 0.0053, 0.0097],
@@ -68,9 +73,12 @@ export const RETRO_REVERB_DSP = {
   earlyGainsLeft: [1, -0.67, 0.55, -0.48],
   earlyGainsRight: [0.88, 0.62, -0.52, -0.46],
   // The times follow Size within these bounds: the first tap never closer than about 1.5 ms (a
-  // comb colour, not a reflection), the last never past about 120 ms (a separate echo pattern).
+  // comb colour, not a reflection). Above, they follow Size to its top (RV-4), so the last still
+  // lands before the shortest line's first return; held at 4, Size 10 left about 190 ms of silence
+  // between the last tap (117 ms) and the bloom (311 ms). The finite field's history (0.6 s)
+  // holds the last tap at Size 10, 293 ms.
   earlyScaleMin: 0.5,
-  earlyScaleMax: 4,
+  earlyScaleMax: 10,
   // Measured, not estimated: an impulse at Size 1, Decay 1.4 and Character 0 gives the taps at
   // Early 0.5 the same energy as the whole tank response, so Early 1 sits 6 dB above it.
   earlyTrim: 0.58,

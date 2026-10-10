@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
+import type { RetroProcessorLike } from '../__fixtures__/retroReverbHarness';
 import type { RetroReverbSpec } from './retroReverbSpec';
 import { RETRO_REVERB_BOUNDS, RETRO_REVERB_MODES } from './retroReverbConstants';
 
@@ -63,14 +64,22 @@ describe('retro reverb shipped DSP', () => {
     expect(energy(long!, 48000)).toBeGreaterThan(energy(short!, 48000) * 100);
     expect(energy(short!, 48000)).toBeLessThan(1e-12);
   });
-  it('drift moves the tail and keeps its decay below 3 kHz', () => {
-    const decay = 2;
-    const still = render({ decay, tone: 9000 }, 48000, 4);
-    const [left, right] = render({ decay, tone: 9000, driftDepth: 1, driftRate: 2 }, 48000, 4);
-    expect(left).not.toEqual(still[0]);
-    expect(right).not.toEqual(still[1]);
-    expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
-  });
+  // Size 10 is the top of the range (RV-4): 540 ms lines, sized with Drift's reach.
+  it.each([1, RETRO_REVERB_BOUNDS.size[1]])(
+    'drift at Size %s moves the tail and keeps its decay below 3 kHz',
+    (size) => {
+      const decay = 2;
+      const still = render({ decay, size, tone: 9000 }, 48000, 4);
+      const [left, right] = render(
+        { decay, size, tone: 9000, driftDepth: 1, driftRate: 2 },
+        48000,
+        4,
+      );
+      expect(left).not.toEqual(still[0]);
+      expect(right).not.toEqual(still[1]);
+      expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
+    },
+  );
   it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
     expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
       render({ mode }, 48000, 0.5),
@@ -123,6 +132,21 @@ describe('retro reverb shipped DSP', () => {
     const output = [new Float32Array(128), new Float32Array(128)];
     node.process([input], [output], p);
     expect(output).toEqual(input);
+  });
+  // 46,875 Hz runs exactly 64 internal ticks a 128-frame block; 44.1 and 48 kHz alternate counts.
+  it.each([44100, 46875, 48000])('a live Size move lands on each block target at %s Hz', (rate) => {
+    const p = retroParams({ size: 1 }),
+      node = loadRetro(rate, p) as RetroProcessorLike & {
+        dsp: { tank: { size: number; sizeTarget: number } };
+      };
+    const input = [[new Float32Array(128).fill(0.1)]];
+    const output = [new Float32Array(128), new Float32Array(128)];
+    p.size![0] = RETRO_REVERB_BOUNDS.size[1];
+    for (let block = 0; block < 40; block++) {
+      node.process(input, [output], p);
+      expect(node.dsp.tank.size).not.toBe(1);
+      expect(node.dsp.tank.size).toBe(node.dsp.tank.sizeTarget);
+    }
   });
   it('handles absent input, different block sizes, live extremes, telemetry and stop', () => {
     const p = retroParams(),

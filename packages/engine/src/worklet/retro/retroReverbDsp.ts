@@ -11,6 +11,11 @@
  * Early times the reverb mode's share, so they fade out with the tank in gated and reverse. At
  * Early 0 the taps do not run and the path is the one without them (`retroReverbNeutralPin.test.ts`).
  *
+ * Size (RV-4) is smoothed per block like the others, but never faster than `sizeSlew` a second,
+ * and the tank ramps its lines to each block's Size over the internal ticks the block actually runs
+ * (`ticks`, counted by `countTicks` from the clock's phase), so a large move sweeps the reads instead of stepping them once a block. A Size that holds still is
+ * read as before, to the bit.
+ *
  * The on/off switch (windsor#630) is `level`, moved linearly over `INSERT_SWITCH_FADE_S` and landing
  * on its target exactly; the wet share is the smoothed Mix times it, so fully off is the input to
  * the bit. The first quantum that starts fully off clears the networks, lines and filters in place,
@@ -46,6 +51,8 @@ class RetroReverbDsp {
   left: number;
   right: number;
   size: number;
+  /** Internal ticks in the current block, which the tank's Size ramp spans; 0 snaps it. */
+  ticks: number;
   decay: number;
   tone: number;
   diffusion: number;
@@ -87,7 +94,8 @@ class RetroReverbDsp {
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.early = this.earlyLevel = NaN;
-    this.driftRate = this.driftDepth = NaN;
+    this.driftRate = this.driftDepth = this.ticks = NaN;
+    this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
@@ -126,7 +134,8 @@ class RetroReverbDsp {
 
   configure(params: RetroParams, frames: number): void {
     const k = 1 - Math.exp(-frames / (C.smoothSeconds * this.rate));
-    this.size += k * (params.size[0] - this.size);
+    const slew = (C.sizeSlew * frames) / this.rate;
+    this.size += Math.max(-slew, Math.min(slew, k * (params.size[0] - this.size)));
     this.decay += k * (params.decay[0] - this.decay);
     this.tone += k * (params.tone[0] - this.tone);
     this.diffusion += k * (params.diffusion[0] - this.diffusion);
@@ -148,6 +157,7 @@ class RetroReverbDsp {
     else if (!this.dormant) this.clear();
     // Back on: the networks run again from the silence `clear` left.
     if (this.targetLevel !== 0) this.dormant = false;
+    this.countTicks(frames);
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
     this.tank.configure(this);
     if (this.finite > C.silenceFloor) this.reflections.configure(this);
@@ -155,6 +165,24 @@ class RetroReverbDsp {
       this.earlyTaps.size = this.size;
       this.earlyTaps.configure();
     }
+  }
+
+  /**
+   * `ticks`: the internal ticks the coming block of `frames` runs, counted from `phase` with the
+   * same steps `tick` takes (62 or 63 for 128 frames at 48 kHz, not 62.5), and 0 while dormant.
+   */
+  countTicks(frames: number): void {
+    const step = C.rate / this.rate;
+    let phase = this.phase,
+      ticks = 0;
+    for (let i = 0; i < frames; i++) {
+      phase += step;
+      while (phase >= 1) {
+        phase -= 1;
+        ticks++;
+      }
+    }
+    this.ticks = this.dormant ? 0 : ticks;
   }
 
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */

@@ -198,7 +198,7 @@ const R = RETRO_REVERB_BOUNDS;
 const tank = (spec: RetroReverbSpec): boolean => spec.mode === 'reverb';
 const RETRO_REVERB_ROWS: InsertFieldRow<RetroReverbSpec>[] = [
   when(row('decay', 'Decay', R.decay, 'log', 's'), tank),
-  when(row('size', 'Size', R.size), tank),
+  when(row('size', 'Size', R.size, 'log'), tank),
   row('tone', 'Tone', R.tone, 'log', 'Hz'),
   row('diffusion', 'Diffusion', R.diffusion),
   row('preDelay', 'Pre-delay', R.preDelay, 'linear', 's'),
