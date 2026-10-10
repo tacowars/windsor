@@ -1,7 +1,12 @@
 /** Fixed insert graph; the stage owns DSP lifetime and the mixer owns output edges. */
 import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
-import { RETRO_REVERB_BOUNDS, RETRO_REVERB_NAME, RETRO_REVERB_MODES } from './retroReverbConstants';
+import {
+  RETRO_REVERB_BOUNDS,
+  RETRO_REVERB_CONVERTERS,
+  RETRO_REVERB_NAME,
+  RETRO_REVERB_MODES,
+} from './retroReverbConstants';
 import {
   DEFAULT_RETRO_REVERB,
   RETRO_REVERB_FIELDS,
@@ -16,16 +21,13 @@ function retroValues(spec: RetroReverbSpec): Record<string, number> {
   for (const name of RETRO_REVERB_NUMBERS) values[name] = spec[name];
   values.enabled = Number(spec.enabled);
   values.mode = RETRO_REVERB_MODES.indexOf(spec.mode);
+  values.converter = RETRO_REVERB_CONVERTERS.indexOf(spec.converter);
   return values;
 }
 
 function create(context: BaseAudioContext, spec: RetroReverbSpec): InsertStage<RetroReverbSpec> {
   let current = spec;
-  const parameterData: Record<string, number> = {
-    enabled: Number(spec.enabled),
-    mode: RETRO_REVERB_MODES.indexOf(spec.mode),
-  };
-  for (const name of RETRO_REVERB_NUMBERS) parameterData[name] = spec[name];
+  const parameterData = retroValues(spec);
   const processor = new AudioWorkletNode(context, RETRO_REVERB_NAME, {
     numberOfInputs: 1,
     numberOfOutputs: 1,

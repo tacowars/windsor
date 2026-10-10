@@ -22,6 +22,7 @@ describe('retro insert and preset song contract', () => {
         decay: Infinity,
         duration: 50,
         enabled: 'false',
+        converter: 'tube',
         rom: 'not allowed',
       },
       'fx',
@@ -33,8 +34,9 @@ describe('retro insert and preset song contract', () => {
       decay: DEFAULT_RETRO_REVERB.decay,
       duration: RETRO_REVERB_BOUNDS.duration[1],
       enabled: true,
+      converter: 'linear',
     });
-    expect(n.corrections).toHaveLength(6);
+    expect(n.corrections).toHaveLength(7);
   });
   it('has all 63 approximation starting points, preserving user mix/bypass on selection', () => {
     expect(RETRO_REVERB_PRESETS.map((p) => p.number)).toEqual(
@@ -51,7 +53,15 @@ describe('retro insert and preset song contract', () => {
       expect(spec).toMatchObject({ mix: 0.17, enabled: false });
       expect(matchingRetroPreset(spec)).toBe(preset.number);
       expect(matchingRetroPreset({ ...spec, preDelay: 0.123 })).toBeUndefined();
+      expect(matchingRetroPreset({ ...spec, early: 0.5 })).toBeUndefined();
+      expect(matchingRetroPreset({ ...spec, converter: 'ranging' })).toBeUndefined();
     }
+    const moved = { ...DEFAULT_RETRO_REVERB, early: 1, lowDecay: 2, converter: 'ranging' as const };
+    expect(applyRetroPreset(moved, 1)).toMatchObject({
+      early: DEFAULT_RETRO_REVERB.early,
+      lowDecay: DEFAULT_RETRO_REVERB.lowDecay,
+      converter: DEFAULT_RETRO_REVERB.converter,
+    });
   });
   it('round trips every preset as settings on both track and master, without preset-bank references', () => {
     for (const preset of RETRO_REVERB_PRESETS) {
