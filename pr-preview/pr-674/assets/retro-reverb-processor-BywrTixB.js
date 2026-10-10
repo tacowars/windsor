@@ -168,6 +168,7 @@ var RetroDelay = class {
     const length = this.buffer.length;
     let position = this.head - Math.max(1, Math.min(length - 2, this.delay));
     if (position < 0) position += length;
+    if (position >= length) position -= length;
     const index = Math.floor(position);
     const next = index + 1 === length ? 0 : index + 1;
     this.output = this.buffer[index] + (position - index) * (this.buffer[next] - this.buffer[index]);
@@ -245,8 +246,10 @@ var RetroTank = class {
     this.excursion = driftDepth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
     const detune = driftDepth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
     if (this.detune === 0 && detune !== 0) {
-      this.detuneLeft.buffer.fill(this.left);
-      this.detuneRight.buffer.fill(this.right);
+      const left = this.detuneLeft.buffer;
+      const right = this.detuneRight.buffer;
+      for (let i = 0; i < left.length; i++) left[i] = this.left;
+      for (let i = 0; i < right.length; i++) right[i] = this.right;
     }
     this.detune = detune;
     this.diffusion = diffusion * RETRO_REVERB_DSP.maxDiffusion;
