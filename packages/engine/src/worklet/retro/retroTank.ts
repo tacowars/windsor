@@ -9,7 +9,10 @@
  * excursion (delay-line modulation as in Dattorro 1997, Part 2), and sweeps a short delay on each
  * wet output, L and R in opposite directions, for a stereo detune. At depth 0 both excursions
  * are exactly 0: the LFO holds, the line reads are today's and the output delays are skipped, so
- * the output is today's to the bit (`retroReverbNeutralPin.test.ts`).
+ * the output is today's to the bit (`retroReverbNeutralPin.test.ts`). Drift is heard only through
+ * the tank's share of the wet output, `1 - finite` (a finite mode replaces the tank), so its depth
+ * is scaled by that share: 1 exactly in reverb mode, so reverb mode is unchanged, and once the
+ * share is under the floor Drift is off, as at depth 0, and costs nothing.
  */
 import {
   RETRO_REVERB_BOUNDS as B,
@@ -75,6 +78,7 @@ class RetroTank {
     diffusion,
     driftRate,
     driftDepth,
+    finite,
   }: {
     size: number;
     decay: number;
@@ -82,11 +86,15 @@ class RetroTank {
     diffusion: number;
     driftRate: number;
     driftDepth: number;
+    /** The finite field's share of the wet output (`RetroReverbDsp.finite`). */
+    finite: number;
   }): void {
     this.size = size;
     this.driftStep = (2 * driftRate) / C.rate;
-    this.excursion = driftDepth * C.driftExcursion * C.rate;
-    const detune = driftDepth * C.detuneExcursion * C.rate;
+    const share = 1 - finite;
+    const depth = share > C.silenceFloor ? driftDepth * share : 0;
+    this.excursion = depth * C.driftExcursion * C.rate;
+    const detune = depth * C.detuneExcursion * C.rate;
     // The output delays are written only while Drift is on. Coming back on, they hold the last
     // output, so the first reads, a few samples back, never reach an old tail. Filled by index:
     // `fill(this.left)` would pass a double to a call V8 may not inline, which boxes it.

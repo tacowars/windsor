@@ -101,3 +101,11 @@ settings are reverb at defaults, Size 3 with Decay 8, Size 0.25 with Decay
 0.5, gated, reverse, and Mix 0.3 with pre-delay. Every one of the 3.4 million
 output samples from the RV-2 bundle equals main's bit for bit.
 `retroReverbNeutralPin.test.ts` is unchanged and green.
+
+## Gated and reverse skip Drift
+
+Drift's depth is scaled by the tank's share of the wet output, `1 - finite`,
+and is off once that share is under the floor. In reverb mode the share is 1
+exactly, so reverb mode is unchanged: renders at depth 0.5 and 1 (rates 0.7
+and 3 Hz) hash the same as before. In gated and reverse Drift costs nothing,
+and their output at depth 1 equals depth 0 (`retroReverbDsp.test.ts`).

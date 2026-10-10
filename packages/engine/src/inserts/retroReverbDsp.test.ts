@@ -71,6 +71,11 @@ describe('retro reverb shipped DSP', () => {
     expect(right).not.toEqual(still[1]);
     expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
   });
+  it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
+    expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
+      render({ mode }, 48000, 0.5),
+    );
+  });
   it.each(['gated', 'reverse'] as const)('%s ends after its selected duration', (mode) => {
     const duration = 0.3;
     const [left] = render({ mode, duration });

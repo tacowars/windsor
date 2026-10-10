@@ -255,12 +255,15 @@ var RetroTank = class {
     tone,
     diffusion,
     driftRate,
-    driftDepth
+    driftDepth,
+    finite
   }) {
     this.size = size;
     this.driftStep = 2 * driftRate / RETRO_REVERB_DSP.rate;
-    this.excursion = driftDepth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
-    const detune = driftDepth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
+    const share = 1 - finite;
+    const depth = share > RETRO_REVERB_DSP.silenceFloor ? driftDepth * share : 0;
+    this.excursion = depth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
+    const detune = depth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
     if (this.detune === 0 && detune !== 0) {
       const left = this.detuneLeft.buffer;
       const right = this.detuneRight.buffer;
