@@ -71,7 +71,8 @@ function renderAll(): Record<string, number[][]> {
   return result;
 }
 
-it('renders as before at the neutral defaults', () => {
+// Ten 2 s renders: about 5 s on a loaded machine, past vitest's 5 s default.
+it('renders as before at the neutral defaults', { timeout: 30_000 }, () => {
   const actual = renderAll();
   // The import holds the fixture as it was before this run, so a refresh writes and stops here.
   if (process.env.WINDSOR_REFRESH_RETRO_NEUTRAL_PIN === '1') {

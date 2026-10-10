@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
 import type { RetroProcessorLike } from '../__fixtures__/retroReverbHarness';
 import type { RetroReverbSpec } from './retroReverbSpec';
-import { RETRO_REVERB_BOUNDS, RETRO_REVERB_MODES } from './retroReverbConstants';
+import {
+  RETRO_REVERB_BOUNDS,
+  RETRO_REVERB_DSP as DSP,
+  RETRO_REVERB_MODES,
+} from './retroReverbConstants';
+
+/** The multi-second renders take about 5 s on a loaded machine, past vitest's 5 s default. */
+const SLOW = { timeout: 30_000 };
 
 function render(spec: Partial<RetroReverbSpec>, rate = 48000, seconds = 1.5): Float32Array[] {
   const params = retroParams({ mix: 1, character: 0, ...spec });
@@ -67,6 +74,7 @@ describe('retro reverb shipped DSP', () => {
   // Size 10 is the top of the range (RV-4): 540 ms lines, sized with Drift's reach.
   it.each([1, RETRO_REVERB_BOUNDS.size[1]])(
     'drift at Size %s moves the tail and keeps its decay below 3 kHz',
+    SLOW,
     (size) => {
       const decay = 2;
       const still = render({ decay, size, tone: 9000 }, 48000, 4);
@@ -80,24 +88,82 @@ describe('retro reverb shipped DSP', () => {
       expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
     },
   );
-  it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
-    expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
-      render({ mode }, 48000, 0.5),
-    );
+  it('density adds echoes in the first 50 ms and keeps the decay below 3 kHz', SLOW, () => {
+    const decay = 2;
+    const [sparse] = render({ decay, tone: 9000 }, 48000, 3);
+    const [dense] = render({ decay, tone: 9000, density: 1 }, 48000, 3);
+    expect(Math.abs(rt60Below3k(dense!) / rt60Below3k(sparse!) - 1)).toBeLessThan(0.05);
+    // Diffusion 0 keeps each path one click: a rise past 10 % of the peak after a fall below 2.5 %.
+    const echoes = (data: Float32Array): number => {
+      const peak = data.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+      let count = 0,
+        armed = true;
+      for (const v of data) {
+        if (armed && Math.abs(v) > peak / 10) count++;
+        armed = armed ? Math.abs(v) <= peak / 10 : Math.abs(v) < peak / 40;
+      }
+      return count;
+    };
+    const [few] = render({ diffusion: 0 }, 48000, 0.05);
+    const [many] = render({ diffusion: 0, density: 1 }, 48000, 0.05);
+    expect(echoes(many!)).toBeGreaterThanOrEqual(echoes(few!) + 6);
+    // At the box's corners the knob is a spread control: each step moves the output further from
+    // Density 0, and 0.25 is well short of 1. Unheld, the largest Size at the shortest Decay
+    // weighted its taps so far over the ends that any Density above 0 played as 1.
+    const { size: sizes, decay: decays } = RETRO_REVERB_BOUNDS;
+    for (const [size, decay] of [
+      [sizes[1], decays[0]],
+      [sizes[0], decays[1]],
+    ] as const) {
+      const spec = { size, decay, tone: 9000 };
+      const [left0, right0] = render({ ...spec, density: 0 });
+      const distances = [0.25, 0.5, 0.75, 1].map((density) => {
+        const [left, right] = render({ ...spec, density });
+        let moved = 0;
+        for (let i = 0; i < left!.length; i++)
+          moved += (left![i]! - left0![i]!) ** 2 + (right![i]! - right0![i]!) ** 2;
+        return Math.sqrt(moved / (energy(left0!) + energy(right0!)));
+      });
+      const full = distances[distances.length - 1]!;
+      expect(distances[0]).toBeLessThan(0.75 * full);
+      for (let k = 1; k < distances.length; k++)
+        expect(distances[k]! - distances[k - 1]!).toBeGreaterThan(0.05 * full);
+    }
+    // Level-neutral within 1 dB at the darkest Tone too: the ends' energy against the taps' follows
+    // Tone, Size and Decay. A fixed match measured at 9 kHz played the box's corner (Size 10,
+    // Decay 0.2 s) 3 dB louder at Tone 800, and a setting between the table's nodes 1.7 dB.
+    for (const spec of [
+      { tone: RETRO_REVERB_BOUNDS.tone[0], size: sizes[1], decay: decays[0] },
+      { tone: 1100, size: 2, decay: 1 },
+    ]) {
+      const levels = render({ ...spec, density: 0 }, 48000, 3);
+      render({ ...spec, density: 1 }, 48000, 3).forEach((data, channel) =>
+        expect(Math.abs(10 * Math.log10(energy(data) / energy(levels[channel]!)))).toBeLessThan(1),
+      );
+    }
   });
-  it.each(['gated', 'reverse'] as const)('%s ends after its selected duration', (mode) => {
+  it.each(['gated', 'reverse'] as const)(
+    '%s skips Drift, which only the tank plays',
+    SLOW,
+    (mode) => {
+      expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
+        render({ mode }, 48000, 0.5),
+      );
+    },
+  );
+  it.each(['gated', 'reverse'] as const)('%s ends after its selected duration', SLOW, (mode) => {
     const duration = 0.3;
     const [left] = render({ mode, duration });
     expect(energy(left!, 0, 48000 * duration)).toBeGreaterThan(1e-6);
     expect(energy(left!, 48000 * (duration + 0.03))).toBeLessThan(1e-12);
   });
-  it('reverse builds towards its end instead of applying an ordinary decay', () => {
+  it('reverse builds towards its end instead of applying an ordinary decay', SLOW, () => {
     const [left] = render({ mode: 'reverse', duration: 0.6 });
     const early = energy(left!, 0, 48000 * 0.2);
     const late = energy(left!, 48000 * 0.4, 48000 * 0.59);
     expect(late).toBeGreaterThan(early * 4);
   });
-  it('pre-delay shifts the finite response and character changes conversion', () => {
+  it('pre-delay shifts the finite response and character changes conversion', SLOW, () => {
     const preDelay = 0.15;
     const [dryStart] = render({ mode: 'gated', preDelay: 0 });
     const [delayed] = render({ mode: 'gated', preDelay });
@@ -107,7 +173,7 @@ describe('retro reverb shipped DSP', () => {
     expect(energy(dryStart!, 0, 48000 * preDelay)).toBeGreaterThan(1e-6);
     expect(coloured).not.toEqual(dryStart);
   });
-  it('tone reduces rapid changes in the finite field', () => {
+  it('tone reduces rapid changes in the finite field', SLOW, () => {
     const [dark] = render({ mode: 'gated', tone: RETRO_REVERB_BOUNDS.tone[0] });
     const [bright] = render({ mode: 'gated', tone: RETRO_REVERB_BOUNDS.tone[1] });
     const roughness = (data: Float32Array): number => {
@@ -147,6 +213,35 @@ describe('retro reverb shipped DSP', () => {
       expect(node.dsp.tank.size).not.toBe(1);
       expect(node.dsp.tank.size).toBe(node.dsp.tank.sizeTarget);
     }
+  });
+  it("density's taps glide with a Size move, tick by tick, and land with the line ends", () => {
+    interface Tank {
+      size: number;
+      tapWhole: Int32Array;
+      tapFraction: Float64Array;
+      tapFractions: Float64Array;
+      tapLines: Uint8Array;
+      configure(settings: Record<string, number>): void;
+      tick(): void;
+    }
+    const node = loadRetro(48000, retroParams({ density: 1 })) as unknown as {
+      dsp: { tank: Tank };
+    };
+    const tank = node.dsp.tank;
+    const ticks = 8;
+    const settings = { ticks, decay: 1.4, tone: 6000, diffusion: 0.5, driftRate: 0.5 };
+    tank.configure({ ...settings, size: 3, driftDepth: 0, density: 1, finite: 0 });
+    for (let t = 1; t <= ticks; t++) {
+      tank.tick();
+      expect(tank.size).toBeCloseTo(1 + (2 * t) / ticks, 12);
+      tank.tapWhole.forEach((whole, k) =>
+        expect(whole - tank.tapFraction[k]!).toBeCloseTo(
+          tank.tapFractions[k]! * DSP.tankSeconds[tank.tapLines[k]!]! * tank.size * DSP.rate,
+          9,
+        ),
+      );
+    }
+    expect(tank.size).toBe(3);
   });
   it('handles absent input, different block sizes, live extremes, telemetry and stop', () => {
     const p = retroParams(),

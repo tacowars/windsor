@@ -98,5 +98,43 @@ export const RETRO_REVERB_DSP = {
   // opposite directions: a triangle at r Hz detunes each side by ±4 r × this, about ±3.5 cents
   // at 0.5 Hz and ±14 cents at 2 Hz.
   detuneExcursion: 0.001,
+  // Density (RV-3), Windsor's own values: four taps inside each tank line, as fractions of its
+  // current length (so they follow Size), read beside the line ends (the output-tap idea of
+  // Dattorro 1997, Part 1, applied to the four lines). Chosen by a search for the widest smallest
+  // gap between the arrival times of the taps, the line ends and their sums with one more line,
+  // up to 110 ms (0.13 ms at Size 1); no fraction is within 0.012 of a ratio with a denominator
+  // up to 8, so a tap's echoes never fall in step with its line's. All sit between 0.2 and 0.82,
+  // clear of the read Drift moves (at most 0.07 of the shortest line at the smallest Size).
+  densityFractions: [
+    [0.229, 0.359, 0.551, 0.812],
+    [0.235, 0.482, 0.638, 0.774],
+    [0.219, 0.479, 0.612, 0.815],
+    [0.223, 0.416, 0.585, 0.818],
+  ],
+  // Each tap's sign in the left and the right sum, 0 where it plays in the other: each channel
+  // takes two taps of every line, one early and one late, so L and R share none.
+  densityLeft: [
+    [1, 0, 1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0],
+    [0, -1, 0, 1],
+  ],
+  densityRight: [
+    [0, 1, 0, -1],
+    [-1, 0, -1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0],
+  ],
+  // The loudness match's end energies vary with Tone, Size and Decay: a measured table,
+  // `retroReverbDensityTables.ts`.
+  // The most a tap's envelope weight raises it over its line end: 6 dB. The weight, gain^(f - 1),
+  // grows without bound with a pass's loss (126 dB for line 3's first tap at Size 10, Decay 0.2),
+  // and the loudness match then turns the ends down to nothing at any Density above 0, so the
+  // knob played as off or full. The largest weight at the auditioned settings (Size 0.5 to 3,
+  // Decay 1.4 and 2 s) is 5.4 dB (Size 3, Decay 1.4, line 3's first tap), so 6 dB leaves them
+  // unchanged to the bit. Measured where every tap is held (Size 10, Decay 0.2): Density 0.25
+  // moves the output 52 % as far as Density 1 does, against 62 % with a 9 dB cap, 71 % with
+  // 12 dB, 100 % with none, and 38 to 45 % at settings where no tap is held.
+  densityMaxBoost: 10 ** (6 / 20),
   millisecondsPerSecond: 1000,
 } as const;
