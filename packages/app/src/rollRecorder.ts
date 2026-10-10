@@ -11,7 +11,10 @@
  *   stops at once. The Roll's own Audition never reaches it.
  * - **Ordering.** Before the take is handed a press or a release it is
  *   advanced to the tick heard now (`TapClock`), so a loop's jump is seen
- *   before the event after it.
+ *   before the event after it. An event stamped past the tick heard now was
+ *   played before a loop's jump it arrives after (a stamp never runs ahead
+ *   of the playhead): the take is advanced to its stamp, handed it, then
+ *   advanced through the loop's end and on to now, in stamp order.
  * - **The take** opens at the first press that can record (Rec on, the
  *   transport running, the selected part a Roll part), reading the part's
  *   regions then. It ends, every held note cut at the last tick heard and
@@ -31,9 +34,9 @@
  *   written when the gesture ends (`gestureEnded`), as a step of their own
  *   after the gesture's.
  */
-import type { ArrangementDocument, AudioPart, DocumentPartial } from '@windsor/engine';
+import type { ArrangementDocument, AudioPart, DocumentPartial, TickLoop } from '@windsor/engine';
 import { songTicksOf, tickLoopOf } from '@windsor/engine';
-import { type TapReading, TapClock } from './rollRecClock';
+import { type TapReading, TapClock, nextLoopEnd } from './rollRecClock';
 import {
   type RecLook,
   type RecPlace,
@@ -75,6 +78,10 @@ export interface NoteTap {
   release(part: AudioPart, source: string, pitch: number, timeStamp?: number): void;
   panic(): void;
 }
+
+/** A loop the transport wraps in, as `TapClock` judges one: not empty, inverted or the whole song. */
+const wraps = (loop: TickLoop | null): loop is TickLoop =>
+  loop !== null && loop.end > loop.start && loop.end - loop.start < loop.songTicks;
 
 export class RollRecorder implements NoteTap {
   private armed = false;
@@ -121,12 +128,8 @@ export class RollRecorder implements NoteTap {
 
   /** The playhead: the take ends at a stop or a part switch, and otherwise follows it. */
   sync(): void {
-    if (!this.take) return;
-    if (!this.host.running() || this.host.selected() !== this.slot) this.close();
-    else {
-      const take = this.current();
-      if (take) this.observe(take);
-    }
+    const take = this.live();
+    if (take) this.observe(take);
   }
 
   press(
@@ -137,20 +140,22 @@ export class RollRecorder implements NoteTap {
     timeStamp?: number,
   ): void {
     if (!this.armed || part !== this.host.livePart()) return;
-    this.sync();
+    const live = this.live();
     if (!this.host.running()) return;
-    const take = this.current() ?? this.open();
+    const take = live ?? this.open();
     const tick = this.host.stamp(timeStamp);
-    if (take && tick !== null) take.press(source, pitch, velocity, tick);
+    if (take && tick !== null)
+      this.order(take, tick, () => take.press(source, pitch, velocity, tick));
   }
 
   release(_part: AudioPart, source: string, pitch: number, timeStamp?: number): void {
-    this.sync();
-    const take = this.current();
+    const take = this.live();
     if (!take) return;
-    const tick = this.host.stamp(timeStamp) ?? this.last;
-    if (tick === null) return;
-    take.release(source, pitch, tick);
+    const stamp = this.host.stamp(timeStamp);
+    this.order(take, stamp, () => {
+      const tick = stamp ?? this.last;
+      if (tick !== null) take.release(source, pitch, tick);
+    });
     this.flush(take);
   }
 
@@ -206,6 +211,14 @@ export class RollRecorder implements NoteTap {
     }
   }
 
+  /** The open take, unread: ended first at a stop or a part switch. */
+  private live(): RollTake | null {
+    if (!this.take) return null;
+    if (this.host.running() && this.host.selected() === this.slot) return this.current();
+    this.close();
+    return null;
+  }
+
   /** The open take, its held notes handed to a new take first if an edit landed since it opened. */
   private current(): RollTake | null {
     const take = this.take;
@@ -219,7 +232,7 @@ export class RollRecorder implements NoteTap {
     return next;
   }
 
-  /** A new take on the selected part, at the tick heard now; null when it is not a Roll part. */
+  /** A new take on the selected part, not yet advanced; null when it is not a Roll part. */
   private open(): RollTake | null {
     const { host } = this;
     const doc = host.doc();
@@ -229,7 +242,7 @@ export class RollRecorder implements NoteTap {
     this.take = take;
     this.slot = slot;
     this.clock.reset();
-    this.observe(take);
+    this.last = null;
     return take;
   }
 
@@ -242,6 +255,30 @@ export class RollRecorder implements NoteTap {
       take.advance(tick);
     }
     this.last = now.tick;
+  }
+
+  /**
+   * Hand the take an event stamped at `stamp` (`apply`) in its place against
+   * the playhead heard now: after the ticks up to now, or, when the stamp
+   * lies past now's tick in a loop that wraps and the take has not yet been
+   * advanced through that jump, ahead of the jump it was played before.
+   */
+  private order(take: RollTake, stamp: number | null, apply: () => void): void {
+    const now = this.host.now();
+    if (!now) return apply();
+    const loop = tickLoopOf(this.host.doc().transport);
+    const ticks = this.clock.observe(now, loop, this.host.secondsPerTick());
+    const last = this.last;
+    this.last = now.tick;
+    const unseen = last === null || last > now.tick || ticks.length > 1;
+    if (stamp === null || !wraps(loop) || stamp <= now.tick || !unseen) {
+      for (const tick of ticks) take.advance(tick);
+      return apply();
+    }
+    if (last === null || stamp > last) take.advance(stamp);
+    apply();
+    take.advance(nextLoopEnd(stamp, loop));
+    take.advance(now.tick);
   }
 
   /** Write what the take has finished into part `slot`; held back while another gesture is open. */

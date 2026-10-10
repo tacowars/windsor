@@ -1,7 +1,6 @@
 /**
- * The Roll recorder (windsor#663) over the real context and its undo history,
- * with a fake engine and a fake clock: the tap stamps each note at the tick
- * it is handed, and the clock's time moves with the transport. What the
+ * The Roll recorder (windsor#663) over the real context and its undo history
+ * (the rig is `__fixtures__/rollRecorderRig.ts`). What the
  * tests pin is the issue's boundary cases: where a take writes, where a held
  * note is cut and when it is written, the ordering that sees a loop's jump
  * before the release after it, and one undo step per take, split by every
@@ -9,145 +8,16 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type {
-  ApplyResult,
-  ArrangementDocument,
-  AudioPart,
-  PartRegion,
-  RollNote,
-} from '@windsor/engine';
-import { TICKS_PER_BAR, partAt } from '@windsor/engine';
-import { AppContext, type ContextHost, type TabPanel } from './appContext';
+import type { PartRegion } from '@windsor/engine';
+import { partAt } from '@windsor/engine';
+import { BAR, SPT, VEL, armed, n, rig } from './__fixtures__/rollRecorderRig';
 import { partChange } from './context';
-import { DocumentModel } from './documentModel';
 import { withGesture } from './gestureHooks';
-import type { EngineHost } from './host';
 import { library, loadPageLibrary } from './libraryModel';
-import { RollRecorder } from './rollRecorder';
 import { heldStart } from './rollRepeats';
-import { newSong } from './songParts';
 import { bpmChange } from './transportModel';
 
 beforeAll(() => loadPageLibrary(library));
-
-const BAR = TICKS_PER_BAR;
-/** The seconds a tick lasts on the fake clock. */
-const SPT = 0.01;
-const VEL = 0.9;
-
-/** An eight-bar song: region 0 over bars 1–4 looping all four, a one-bar gap, region 1 over bars 6–8 looping one. */
-const REGIONS = [
-  { start: 0, duration: 4 * BAR, pattern: { kind: 'roll', loopTicks: 4 * BAR, notes: [] } },
-  { start: 5 * BAR, duration: 3 * BAR, pattern: { kind: 'roll', loopTicks: BAR, notes: [] } },
-];
-
-function rollSong(loop?: { start: number; end: number }): ArrangementDocument {
-  const raw = newSong();
-  const part = (slot: number): Record<string, unknown> => ({
-    ...(raw.parts as Record<string, unknown>[])[0],
-    slot,
-    name: `Keys ${slot}`,
-    sequencer: { kind: 'roll', loopTicks: BAR, notes: [] },
-    regions: REGIONS,
-  });
-  const transport = { ...(raw.transport as object), bars: 8, loop: { ...loop, on: !!loop } };
-  return new DocumentModel({ ...raw, transport, parts: [part(0), part(1)] }).doc;
-}
-
-interface Rig {
-  ctx: AppContext<TabPanel>;
-  rec: RollRecorder;
-  clock: { running: boolean; tick: number; time: number };
-  part(slot?: number): AudioPart;
-  /** The playhead moves to `tick`, the clock's time with it (or to `time`). */
-  at(tick: number, time?: number): void;
-  /** ‖ or ■: the transport's halt listeners, as `rollRecMount.ts` wires them, then the halt. */
-  stop(): void;
-  press(tick: number, pitch?: number, source?: string): void;
-  release(tick: number, pitch?: number, source?: string): void;
-  notes(region: number): readonly RollNote[];
-}
-
-function rig(loop?: { start: number; end: number }): Rig {
-  const model = new DocumentModel(rollSong(loop));
-  const parts = new Map<number, AudioPart>();
-  const part = (slot = 0): AudioPart => {
-    if (!parts.has(slot)) parts.set(slot, { slot } as unknown as AudioPart);
-    return parts.get(slot) as AudioPart;
-  };
-  const engine: ContextHost = {
-    apply: (): ApplyResult => ({ ok: true, ignored: [] }),
-    build: () => Promise.resolve(),
-    isBuilding: false,
-    capturePattern: () => null,
-    part: (slot) => part(slot),
-  };
-  const clock = { running: true, tick: 0, time: 0 };
-  const ctx = new AppContext<TabPanel>({
-    host: { ...engine, transport: { position: () => clock.tick } } as unknown as EngineHost,
-    model,
-    notify: () => {},
-  });
-  ctx.addTab('song', { hidden: false }, () => {});
-  const rec = new RollRecorder({
-    doc: () => ctx.model.doc,
-    selected: () => ctx.parts.selected,
-    livePart: () => ctx.livePart(),
-    running: () => clock.running,
-    position: () => clock.tick,
-    now: () => ({ tick: clock.tick, time: clock.time }),
-    stamp: (timeStamp) => timeStamp ?? clock.tick,
-    secondsPerTick: () => SPT,
-    editOpen: () => ctx.gestureOpen,
-    write: (partial) => ctx.recordTake(partial, 'Record')?.ok === true,
-    closeStep: () => ctx.closeTake(),
-  });
-  ctx.onBeforeEdit((kind) => (kind === 'song' ? rec.close() : rec.split()));
-  ctx.onGestureEnd(() => rec.gestureEnded());
-  const at = (tick: number, time = tick * SPT): void => {
-    clock.tick = tick;
-    clock.time = time;
-  };
-  return {
-    ctx,
-    rec,
-    clock,
-    part,
-    at,
-    stop: () => {
-      rec.close();
-      clock.running = false;
-    },
-    press: (tick, pitch = 60, source = 'KeyA') => {
-      if (tick > clock.tick) at(tick);
-      rec.press(part(ctx.parts.selected), source, pitch, VEL, tick);
-    },
-    release: (tick, pitch = 60, source = 'KeyA') => {
-      if (tick > clock.tick) at(tick);
-      rec.release(part(ctx.parts.selected), source, pitch, tick);
-    },
-    notes: (region) => {
-      const pattern = partAt(ctx.model.doc, 0)?.regions[region]?.pattern;
-      return pattern?.kind === 'roll' ? pattern.notes : [];
-    },
-  };
-}
-
-/** A recorded note at full key velocity. */
-const n = (tick: number, ticks: number, pitch = 60): RollNote => ({
-  tick,
-  ticks,
-  pitch,
-  velocity: VEL,
-});
-
-/** Rec armed with the playhead at `tick`, running. */
-function armed(r: Rig, tick = 0): Rig {
-  r.at(tick);
-  r.rec.setOn(true);
-  expect(r.rec.on).toBe(true);
-  return r;
-}
 
 describe('the Rec switch', () => {
   it('arms only over a region, and disarms anywhere, paused in a gap included', () => {
@@ -242,6 +112,42 @@ describe('a take', () => {
     r.at(100, (2 * BAR - 98 + 100 - BAR) * SPT + 98 * SPT);
     r.release(100);
     expect(r.notes(0)).toEqual([n(98, 2 * BAR - 98)]);
+  });
+
+  it('orders an event stamped before a loop’s jump ahead of the jump, though it arrives after it', () => {
+    // The loop is bar 2. A press stamped at 190 arrives with the clock
+    // already wrapped to 100: it is pressed at 190 and cut at the loop's
+    // end, so the release at 110 of the next pass does not make it one tick.
+    const loop = { start: BAR, end: 2 * BAR };
+    // The clock's time at `to` in the next pass, having been at `from`.
+    const wrapped = (from: number, to: number): number =>
+      (from + (2 * BAR - from) + (to - BAR)) * SPT;
+    const press = armed(rig(loop), 180);
+    press.at(100, wrapped(180, 100));
+    press.rec.press(press.part(), 'KeyA', 60, VEL, 190);
+    press.at(110, wrapped(180, 110));
+    press.rec.release(press.part(), 'KeyA', 60, 110);
+    expect(press.notes(0)).toEqual([n(190, 2)]);
+
+    // A release stamped at 190 arriving after the wrap ends its note at 190,
+    // not at the loop's end.
+    const release = armed(rig(loop), 150);
+    release.press(150);
+    release.at(100, wrapped(150, 100));
+    release.rec.release(release.part(), 'KeyA', 60, 190);
+    expect(release.notes(0)).toEqual([n(150, 40)]);
+  });
+
+  it('keeps a note held from a region into a gap pending and frozen at the region’s end, Rec still armed', () => {
+    const r = armed(rig(), 4 * BAR - 4);
+    r.press(4 * BAR - 4);
+    r.at(4 * BAR + 16);
+    r.rec.sync();
+    expect(r.rec.look()).toBe('paused');
+    expect(r.rec.held(0).map(({ tick, ticks }) => [tick, ticks])).toEqual([[4 * BAR - 4, 4]]);
+    expect(r.notes(0)).toEqual([]);
+    r.release(4 * BAR + 20);
+    expect([r.rec.held(0), r.notes(0)]).toEqual([[], [n(4 * BAR - 4, 4)]]);
   });
 
   it('cuts a note held across the song’s own wrap at its region’s end, polled coarsely or released late', () => {

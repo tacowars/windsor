@@ -125,7 +125,7 @@ class RecView implements RollRecView {
       this.full = full;
       this.showSummary();
     }
-    this.drawHeld(look === 'recording' || look === 'full');
+    this.drawHeld();
   }
 
   summary(text: string): void {
@@ -150,13 +150,18 @@ class RecView implements RollRecView {
     summary.textContent = this.full ? ROLL_REC.full(ROLL_NOTES_MAX) : this.words;
   }
 
-  /** The take's held notes in this device's region, redrawn when they moved or the roll was repainted. */
-  private drawHeld(recording: boolean): void {
+  /**
+   * The take's held notes in this device's region, redrawn when they moved
+   * or the roll was repainted. Drawn whatever the look: a note held from
+   * its region into a gap stays pending, frozen at the region's end, and
+   * leaves only when it is written or dropped (decision 5).
+   */
+  private drawHeld(): void {
     const { host } = this;
     const recorder = rollRecorder();
     const region = host.source().regionIndex;
     const notes =
-      recording && !this.full && recorder
+      !this.full && recorder
         ? recorder.held(host.slot).filter((note) => note.regionIndex === region)
         : [];
     const key = notes.map((n) => `${n.pitch}:${n.local}:${n.ticks}`).join(' ');
