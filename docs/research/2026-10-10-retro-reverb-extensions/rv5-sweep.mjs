@@ -147,6 +147,28 @@ function measure(Processor, spec) {
   return result;
 }
 
+/** Every combination of the grid's axes, the first axis outermost, as settings. */
+const settings = (grid) =>
+  Object.entries(grid).reduce(
+    (all, [axis, values]) => all.flatMap((spec) => values.map((v) => ({ ...spec, [axis]: v }))),
+    [{}],
+  );
+
+/** One setting at Low decay 0.25, 1 and 4, with today's tank at Decay × 0.25 and × 4. */
+function sweepRow(Processor, base) {
+  const row = { ...base, at: {} };
+  for (const lowDecay of [0.25, 1, 4]) {
+    row.at[lowDecay] = measure(Processor, { ...base, lowDecay });
+    if (lowDecay !== 1)
+      row.at[`ref${lowDecay}`] = measure(Processor, {
+        ...base,
+        decay: base.decay * lowDecay,
+        lowDecay: 1,
+      });
+  }
+  return row;
+}
+
 function run([bundleArg, part = '0/1']) {
   const Processor = load(
     bundleArg && bundleArg !== '-'
@@ -154,28 +176,13 @@ function run([bundleArg, part = '0/1']) {
       : new URL('packages/engine/src/worklet/generated/retro-reverb-processor.js', root),
   );
   const [shard, shards] = part.split('/').map(Number);
-  let index = 0;
-  for (const size of GRID.size)
-    for (const decay of GRID.decay)
-      for (const tone of GRID.tone)
-        for (const lowCross of GRID.lowCross) {
-          if (index++ % shards !== shard) continue;
-          for (const density of [0, 1])
-            for (const driftDepth of [0, 1]) {
-              const base = { size, decay, tone, lowCross, density, driftDepth, driftRate: 0.5 };
-              const row = { ...base, at: {} };
-              for (const lowDecay of [0.25, 1, 4]) {
-                row.at[lowDecay] = measure(Processor, { ...base, lowDecay });
-                if (lowDecay !== 1)
-                  row.at[`ref${lowDecay}`] = measure(Processor, {
-                    ...base,
-                    decay: decay * lowDecay,
-                    lowDecay: 1,
-                  });
-              }
-              console.log(JSON.stringify(row));
-            }
-        }
+  const mine = settings(GRID).filter((_, index) => index % shards === shard);
+  for (const spec of mine)
+    for (const density of [0, 1])
+      for (const driftDepth of [0, 1])
+        console.log(
+          JSON.stringify(sweepRow(Processor, { ...spec, density, driftDepth, driftRate: 0.5 })),
+        );
 }
 
 // The tank's lines (seconds at Size 1) and clock, for the prediction below.
@@ -198,6 +205,61 @@ function predict({ size, decay, tone }, f) {
   return (60 * seconds) / loss;
 }
 
+const db = (r) => 10 * Math.log10(r);
+const key = (r) => `${r.size}/${r.decay}/${r.tone}/${r.lowCross}/${r.driftDepth}`;
+
+/** Whether each band reads at a setting: see `predict`, and the low octave holds a mode. */
+function readable(r, ld) {
+  const { low, high } = bands(r.lowCross);
+  const longest = 6 * 0.0539 * r.size;
+  // The tank holds about 0.166 × Size modes a hertz; the low octave is 0.0884 × Low cross wide.
+  const modes = 0.0884 * r.lowCross * 0.166 * r.size;
+  const lowPredicted = predict({ ...r, decay: r.decay * ld }, low);
+  const highPredicted = predict(r, high);
+  return {
+    low:
+      modes >= 1 &&
+      Math.abs(r.at[`ref${ld}`].lowRt / lowPredicted - 1) < 0.15 &&
+      lowPredicted > Math.max(0.4, longest),
+    high:
+      Math.abs(r.at[1].highRt / highPredicted - 1) < 0.15 && highPredicted > Math.max(0.4, longest),
+  };
+}
+
+/** Per Low decay and Low cross: the ratios and levels; and the settings off by over 10 %. */
+function collect(rows) {
+  const quiet = new Map(rows.filter((r) => r.density === 0).map((r) => [key(r), r]));
+  const groups = new Map();
+  const outliers = [];
+  const counts = { low: 0, high: 0, lowSkipped: 0, highSkipped: 0 };
+  for (const r of rows)
+    for (const ld of [0.25, 4]) {
+      const name = `${ld}|${r.lowCross}`;
+      const g = groups.get(name) ?? { low: [], high: [], lowE: [], highE: [], dens: [] };
+      groups.set(name, g);
+      const at = r.at[ld];
+      const reads = readable(r, ld);
+      const tag = `Size ${r.size}, Decay ${r.decay}, Tone ${r.tone}, Low cross ${r.lowCross}, Density ${r.density}, Drift ${r.driftDepth}, Low decay ${ld}`;
+      for (const [band, reference] of [
+        ['low', r.at[`ref${ld}`]],
+        ['high', r.at[1]],
+      ]) {
+        if (!reads[band]) {
+          counts[`${band}Skipped`]++;
+          continue;
+        }
+        counts[band]++;
+        const ratio = at[`${band}Rt`] / reference[`${band}Rt`];
+        g[band].push(ratio);
+        g[`${band}E`].push(db(at[`${band}E`] / reference[`${band}E`]));
+        if (Math.abs(ratio - 1) > 0.1) outliers.push(`${band}: ${tag}: ${ratio.toFixed(3)}`);
+      }
+      if (r.density === 1)
+        for (const c of ['eL', 'eR']) g.dens.push(db(at[c] / quiet.get(key(r)).at[ld][c]));
+    }
+  return { groups, outliers, counts };
+}
+
 function summary(files) {
   const rows = files.flatMap((f) =>
     readFileSync(f, 'utf8')
@@ -206,49 +268,7 @@ function summary(files) {
       .filter(Boolean)
       .map((l) => JSON.parse(l)),
   );
-  const db = (r) => 10 * Math.log10(r);
-  const key = (r) => `${r.size}/${r.decay}/${r.tone}/${r.lowCross}/${r.driftDepth}`;
-  const quiet = new Map(rows.filter((r) => r.density === 0).map((r) => [key(r), r]));
-  const groups = new Map();
-  const outliers = [];
-  const counts = { low: 0, high: 0, lowSkipped: 0, highSkipped: 0 };
-  for (const r of rows)
-    for (const ld of [0.25, 4]) {
-      const g = groups.get(`${ld}|${r.lowCross}`) ?? { low: [], high: [], lowE: [], highE: [], dens: [] };
-      groups.set(`${ld}|${r.lowCross}`, g);
-      const at = r.at[ld],
-        one = r.at[1],
-        ref = r.at[`ref${ld}`];
-      const { low, high } = bands(r.lowCross);
-      const longest = 6 * 0.0539 * r.size;
-      // The low octave holds at least one of the tank's modes (about 0.166 × Size a hertz).
-      const modes = 0.0884 * r.lowCross * 0.166 * r.size;
-      const lowPredicted = predict({ ...r, decay: r.decay * ld }, low);
-      const highPredicted = predict(r, high);
-      const lowReads =
-        modes >= 1 &&
-        Math.abs(ref.lowRt / lowPredicted - 1) < 0.15 &&
-        lowPredicted > Math.max(0.4, longest);
-      const highReads =
-        Math.abs(one.highRt / highPredicted - 1) < 0.15 && highPredicted > Math.max(0.4, longest);
-      const tag = `Size ${r.size}, Decay ${r.decay}, Tone ${r.tone}, Low cross ${r.lowCross}, Density ${r.density}, Drift ${r.driftDepth}, Low decay ${ld}`;
-      if (lowReads) {
-        counts.low++;
-        g.low.push(at.lowRt / ref.lowRt);
-        g.lowE.push(db(at.lowE / ref.lowE));
-        if (Math.abs(at.lowRt / ref.lowRt - 1) > 0.1)
-          outliers.push(`low: ${tag}: ${at.lowRt.toFixed(2)} s against ${ref.lowRt.toFixed(2)} s`);
-      } else counts.lowSkipped++;
-      if (highReads) {
-        counts.high++;
-        g.high.push(at.highRt / one.highRt);
-        g.highE.push(db(at.highE / one.highE));
-        if (Math.abs(at.highRt / one.highRt - 1) > 0.1)
-          outliers.push(`high: ${tag}: ${at.highRt.toFixed(2)} s against ${one.highRt.toFixed(2)} s`);
-      } else counts.highSkipped++;
-      if (r.density === 1)
-        for (const c of ['eL', 'eR']) g.dens.push(db(at[c] / quiet.get(key(r)).at[ld][c]));
-    }
+  const { groups, outliers, counts } = collect(rows);
   const range = (a, f = 3) =>
     a.length ? `${Math.min(...a).toFixed(f)} to ${Math.max(...a).toFixed(f)}` : '—';
   console.log(

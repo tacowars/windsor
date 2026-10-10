@@ -34,11 +34,11 @@ let Processor;
 class Base {
   port = { onmessage: null, postMessage() {} };
 }
-const [C, LEVEL] = new Function(
+const LEVEL = new Function(
   'AudioWorkletProcessor',
   'sampleRate',
   'registerProcessor',
-  `${source}\nreturn [RETRO_REVERB_DSP, RETRO_REVERB_DENSITY_LEVEL];`,
+  `${source}\nreturn RETRO_REVERB_DENSITY_LEVEL;`,
 )(Base, 48000, (_name, ctor) => {
   Processor = ctor;
 });
@@ -180,26 +180,20 @@ function fitNode(tone, size, decay) {
   return result;
 }
 
-const grid = GRIDS[gridName];
-let index = 0;
-if (mode === 'fit') {
-  for (const tone of grid.tone)
-    for (const size of grid.size)
-      for (const decay of grid.decay) {
-        if (index++ % shards !== shard) continue;
-        const [left, right] = fitNode(tone, size, decay);
-        console.log(
-          JSON.stringify({ tone, size, decay, left: +left.toFixed(2), right: +right.toFixed(2) }),
-        );
-      }
-} else
-  for (const tone of grid.tone)
-    for (const size of grid.size)
-      for (const decay of grid.decay)
-        for (const lowDecay of grid.lowDecay)
-          for (const lowCross of grid.lowCross) {
-            if (index++ % shards !== shard) continue;
-            const spec = { tone, size, decay, lowDecay, lowCross };
-            const dbs = levels(spec);
-            console.log(JSON.stringify({ ...spec, dbs: dbs.map((d) => +d.toFixed(3)) }));
-          }
+/** Every combination of the grid's axes, the first axis outermost, as settings. */
+const settings = (grid) =>
+  Object.entries(grid).reduce(
+    (all, [axis, values]) => all.flatMap((spec) => values.map((v) => ({ ...spec, [axis]: v }))),
+    [{}],
+  );
+
+const mine = settings(GRIDS[gridName]).filter((_, index) => index % shards === shard);
+for (const spec of mine) {
+  if (mode === 'fit') {
+    const [left, right] = fitNode(spec.tone, spec.size, spec.decay);
+    console.log(JSON.stringify({ ...spec, left: +left.toFixed(2), right: +right.toFixed(2) }));
+  } else {
+    const dbs = levels(spec);
+    console.log(JSON.stringify({ ...spec, dbs: dbs.map((d) => +d.toFixed(3)) }));
+  }
+}
