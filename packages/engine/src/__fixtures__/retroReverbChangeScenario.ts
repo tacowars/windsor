@@ -2,8 +2,8 @@
  * The Retro reverb's run for `workletAllocationProbe.ts` (windsor#230): every
  * path its render takes, over and over. A cycle is stereo noise with one
  * parameter changed every `period` quanta (size, decay, tone, diffusion,
- * pre-delay, character, mix, duration, the gated and reverse modes and the
- * enable, so the finite field, the pre-delay line, the mix glide, the
+ * pre-delay, character, mix, duration, early, the gated and reverse modes and
+ * the enable, so the finite field, the early taps, the pre-delay line, the mix glide, the
  * switch's fade and its cleared, dormant off (windsor#630) all run),
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
@@ -36,6 +36,7 @@ export interface RetroReverbChangeConfig {
 /** The DSP's fields the run reads (`RetroReverbDsp`). */
 interface RetroState {
   finite: number;
+  earlyLevel: number;
   preDelay: number;
   mix: number;
   targetMix: number;
@@ -63,14 +64,15 @@ const TOGGLES: [string, number][] = [
   ['enabled', 0],
   ['mix', 0.8],
   ['duration', 0.55],
+  ['early', 0.8],
   ['enabled', 0],
 ];
 
 /**
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
- * mono, no input, the switch fading, switched off and dormant.
+ * mono, no input, the switch fading, switched off and dormant, the early taps.
  */
-const PATHS = 11;
+const PATHS = 12;
 
 type Phase = 'loud' | 'quiet' | 'mono' | 'none';
 
@@ -153,6 +155,7 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
     if (phase === 'none') seen[8] = 1;
     if (dsp.level !== dsp.targetLevel) seen[9] = 1;
     if (dsp.dormant) seen[10] = 1;
+    if (dsp.earlyLevel > config.floor) seen[11] = 1;
   };
   return { step, note, seen };
 }

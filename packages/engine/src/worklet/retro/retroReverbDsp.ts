@@ -7,6 +7,10 @@
  * NaN, then its start value, so none changes representation (rule 7).
  * `inserts/retroReverbAllocation.test.ts` holds it to both on V8.
  *
+ * Early reflections (RV-1, `retroEarly.ts`) join the tank's output ahead of the wet tone, scaled by
+ * Early times the reverb mode's share, so they fade out with the tank in gated and reverse. At
+ * Early 0 the taps do not run and the path is the one without them (`retroReverbNeutralPin.test.ts`).
+ *
  * The on/off switch (windsor#630) is `level`, moved linearly over `INSERT_SWITCH_FADE_S` and landing
  * on its target exactly; the wet share is the smoothed Mix times it, so fully off is the input to
  * the bit. The first quantum that starts fully off clears the networks, lines and filters in place,
@@ -22,12 +26,14 @@ import { RetroDelay } from './retroDelay';
 import { RetroFilter } from './retroFilter';
 import { RetroTank } from './retroTank';
 import { RetroReflections } from './retroReflections';
+import { RetroEarly } from './retroEarly';
 
 type RetroParams = Record<string, Float32Array>;
 
 class RetroReverbDsp {
   tank: RetroTank;
   reflections: RetroReflections;
+  earlyTaps: RetroEarly;
   pre: RetroDelay;
   inputFilter: RetroFilter;
   leftFilter: RetroFilter;
@@ -47,6 +53,9 @@ class RetroReverbDsp {
   character: number;
   mix: number;
   targetMix: number;
+  /** Early (smoothed), and its level on the wet output: Early times the reverb mode's share. */
+  early: number;
+  earlyLevel: number;
   /** The switch's fade (0 off, 1 on), its target and its step a sample. */
   level: number;
   targetLevel: number;
@@ -74,10 +83,12 @@ class RetroReverbDsp {
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
+    this.early = this.earlyLevel = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
+    this.earlyTaps = new RetroEarly(this.reflections.delay);
     this.pre = new RetroDelay(C.rate * B.preDelay[1]);
     this.inputFilter = new RetroFilter(rate);
     this.leftFilter = new RetroFilter(rate);
@@ -92,6 +103,8 @@ class RetroReverbDsp {
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
+    this.early = params.early[0];
+    this.earlyLevel = this.early * (1 - this.finite);
     this.mix = this.targetMix = params.mix[0];
     this.level = this.targetLevel = params.enabled[0] ? 1 : 0;
     this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
@@ -101,6 +114,8 @@ class RetroReverbDsp {
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
     this.tank.configure(this);
     this.reflections.configure(this);
+    this.earlyTaps.size = this.size;
+    this.earlyTaps.configure();
   }
 
   configure(params: RetroParams, frames: number): void {
@@ -114,6 +129,9 @@ class RetroReverbDsp {
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
+    this.early += k * (params.early[0] - this.early);
+    if (Math.abs(params.early[0] - this.early) < C.silenceFloor) this.early = params.early[0];
+    this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
     if (this.level !== 0) this.dormant = false;
@@ -123,6 +141,10 @@ class RetroReverbDsp {
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
     this.tank.configure(this);
     if (this.finite > C.silenceFloor) this.reflections.configure(this);
+    if (this.earlyLevel > C.silenceFloor) {
+      this.earlyTaps.size = this.size;
+      this.earlyTaps.configure();
+    }
   }
 
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
@@ -172,6 +194,10 @@ class RetroReverbDsp {
     this.tank.tick();
     let left = this.tank.left,
       right = this.tank.right;
+    // Early 0 (or a finite mode) skips the taps, so the path is exactly the one without them.
+    const early = this.earlyLevel > C.silenceFloor;
+    // Read before the finite field's history takes this sample.
+    if (early) this.earlyTaps.tick();
     // Only finite modes pay for the dense tap field; fades retain it until inaudible.
     if (this.finite > C.silenceFloor) {
       this.reflections.input = delayed;
@@ -182,6 +208,10 @@ class RetroReverbDsp {
       // Keep the finite history current so changing modes never revives stale audio.
       this.reflections.delay.input = delayed;
       this.reflections.delay.write();
+    }
+    if (early) {
+      left += this.earlyLevel * this.earlyTaps.left;
+      right += this.earlyLevel * this.earlyTaps.right;
     }
     this.wetToneLeft += this.wetPole * (left - this.wetToneLeft);
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);

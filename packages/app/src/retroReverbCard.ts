@@ -1,8 +1,10 @@
 /**
- * The retro reverb's card, on one page (windsor#173): its preset and mode
- * pickers, then the knobs the mode uses in columns of two. Presets are
- * editable starting points: the song stores values, never a dependency on a
- * preset ID. The on/off switch is the rack's rail.
+ * The retro reverb's card (windsor#173): its preset and mode pickers, then the
+ * knobs the mode uses in columns of two. In reverb mode a second page, Space,
+ * holds the tank's extra knobs: the table's entries marked `page: 'space'`
+ * (`retroReverbTables.ts`). Presets are editable starting points: the song
+ * stores values, never a dependency on a preset ID. The on/off switch is the
+ * rack's rail.
  */
 import {
   DEFAULT_RETRO_REVERB,
@@ -55,8 +57,9 @@ export const retroReverbCard: InsertCard = (ctx, slot, index) => {
       const value = RETRO_REVERB_MODES.find((entry) => entry === mode.value);
       if (value) commit({ ...current(), mode: value });
     };
-    const knobs = RETRO_REVERB_KNOBS.filter(({ f }) =>
-      current().mode === 'reverb' ? f !== 'duration' : f !== 'decay' && f !== 'size',
+    const knobs = RETRO_REVERB_KNOBS.filter(
+      ({ f, page }) =>
+        !page && (current().mode === 'reverb' ? f !== 'duration' : f !== 'decay' && f !== 'size'),
     );
     const page = insertPage(
       wideColumn(labelled('Preset approximation', preset), labelled('Mode', mode)),
@@ -67,5 +70,19 @@ export const retroReverbCard: InsertCard = (ctx, slot, index) => {
     page.classList.add('retro-reverb-card');
     return page;
   };
-  return [{ name: 'Reverb', build }];
+  const space = (): HTMLElement =>
+    insertPage(
+      ...insertKnobs(
+        ctx,
+        slot,
+        index,
+        RETRO_REVERB_KNOBS.filter(({ page }) => page === 'space'),
+      ),
+    );
+  return current().mode === 'reverb'
+    ? [
+        { name: 'Reverb', build },
+        { name: 'Space', build: space },
+      ]
+    : [{ name: 'Reverb', build }];
 };

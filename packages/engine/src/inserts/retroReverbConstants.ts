@@ -58,6 +58,22 @@ export const RETRO_REVERB_DSP = {
   reflectionJitterSpan: 0.6,
   reflectionSparseStride: 4,
   reflectionEdgeFraction: 0.02,
+  // Early reflections (RV-1), Windsor's own: per channel, seconds at Size 1 after the pre-delay
+  // point. The first tap sits within 5 ms of it (the slap); the last lands before the shortest
+  // tank line's first return (tankSeconds[0] × Size), so the reflections fill the gap ahead of
+  // the bloom. Each gain falls as the cube root of its time (gentler than spherical spreading, so
+  // the later taps still read); L and R differ in time and in the signs of the later taps.
+  earlySecondsLeft: [0.0029, 0.0097, 0.0173, 0.0269],
+  earlySecondsRight: [0.0043, 0.0121, 0.0211, 0.0293],
+  earlyGainsLeft: [1, -0.67, 0.55, -0.48],
+  earlyGainsRight: [0.88, 0.62, -0.52, -0.46],
+  // The times follow Size within these bounds: the first tap never closer than about 1.5 ms (a
+  // comb colour, not a reflection), the last never past about 120 ms (a separate echo pattern).
+  earlyScaleMin: 0.5,
+  earlyScaleMax: 4,
+  // Measured, not estimated: an impulse at Size 1, Decay 1.4 and Character 0 gives the taps at
+  // Early 0.5 the same energy as the whole tank response, so Early 1 sits 6 dB above it.
+  earlyTrim: 0.58,
   filterSections: 2,
   filterPoleDivisor: 8,
   hostBandwidthRatio: 0.4,
