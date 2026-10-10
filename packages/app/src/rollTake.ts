@@ -216,29 +216,31 @@ export class RollTake {
   /**
    * Hand the notes this take still holds, and its finished notes not yet
    * drained, to `next`, the take that follows it across an edit (decision
-   * 8). A held note carries where its region keeps its index, start and
-   * loop and still holds its onset; its limit is cut to the region's end
-   * as it is now. A note whose region no longer holds its place is dropped:
-   * there is nowhere to write it. This take is then empty.
+   * 8). A note follows its region by identity, not by index: to the region
+   * of `next` with the same start and loop, wherever an edit to another
+   * region moved it in the list. A held note carries there while that
+   * region still holds its onset, its limit cut to the region's end as it
+   * is now. A note whose region did not survive is dropped: there is
+   * nowhere to write it. This take is then empty.
    */
   handOver(next: RollTake): void {
     const infinite = isInfiniteRegion(next.regions, next.songTicks);
     for (const note of this.pending) {
-      const region = next.regions[note.regionIndex];
-      const old = this.regions[note.regionIndex];
-      const same =
-        region && old && region.start === old.start && region.loopTicks === old.loopTicks;
-      const toRegionEnd = !region
-        ? 0
-        : infinite
-          ? Number.POSITIVE_INFINITY
-          : region.duration - note.local;
-      if (!same || toRegionEnd <= 0) continue;
-      note.limit = Math.min(note.limit, toRegionEnd);
-      next.pending.push(note);
+      const index = this.followed(note.regionIndex, next);
+      const region = next.regions[index];
+      if (!region) continue;
+      const toRegionEnd = infinite ? Number.POSITIVE_INFINITY : region.duration - note.local;
+      if (toRegionEnd <= 0) continue;
+      next.pending.push({
+        ...note,
+        regionIndex: index,
+        limit: Math.min(note.limit, toRegionEnd),
+      });
     }
     for (const [regionIndex, notes] of this.finished) {
-      next.finished.set(regionIndex, [...(next.finished.get(regionIndex) ?? []), ...notes]);
+      const index = this.followed(regionIndex, next);
+      if (index < 0) continue;
+      next.finished.set(index, [...(next.finished.get(index) ?? []), ...notes]);
     }
     next.playhead = this.playhead;
     this.pending.length = 0;
@@ -252,6 +254,15 @@ export class RollTake {
       .map(([regionIndex, notes]) => ({ regionIndex, notes }));
     this.finished.clear();
     return out;
+  }
+
+  /** The index in `next` of this take's region `regionIndex`: the one with its start and loop, or -1. */
+  private followed(regionIndex: number, next: RollTake): number {
+    const old = this.regions[regionIndex];
+    if (!old) return -1;
+    return next.regions.findIndex(
+      (region) => region.start === old.start && region.loopTicks === old.loopTicks,
+    );
   }
 
   /** Every held note has now seen `songTick`. */

@@ -165,6 +165,44 @@ describe('RollTake', () => {
   });
 });
 
+/** Region A and B of `REGIONS`, and a region drawn before both. */
+const [A, B] = REGIONS as [TakeRegion, TakeRegion];
+const BEFORE: TakeRegion = { start: 0, duration: 48, loopTicks: 48 };
+
+/** A take holding 60 in B from 400, handed over to a take over `regions` and released at 420. */
+function holdInBAcross(regions: TakeRegion[]): ReturnType<RollTake['drain']> {
+  const take = new RollTake(SONG, REGIONS);
+  play(take, 396, 400);
+  take.press(K, 60, 1, 400);
+  play(take, 400, 410);
+  const next = new RollTake(SONG, regions);
+  take.handOver(next);
+  play(next, 410, 420);
+  next.release(K, 60, 420);
+  return next.drain();
+}
+
+describe('RollTake.handOver', () => {
+  it('carries a held note to its region wherever an edit to another region moved it', () => {
+    expect(holdInBAcross([BEFORE, A, B])).toEqual([{ regionIndex: 2, notes: [n(16, 20, 60)] }]);
+    expect(holdInBAcross([B])).toEqual([{ regionIndex: 0, notes: [n(16, 20, 60)] }]);
+  });
+
+  it('drops a held note whose region was deleted or moved to a new start', () => {
+    expect(holdInBAcross([A])).toEqual([]);
+    expect(holdInBAcross([A, { ...B, start: 400 }])).toEqual([]);
+  });
+
+  it('writes finished notes not yet drained to their region’s new index', () => {
+    const take = new RollTake(SONG, REGIONS);
+    take.press(K, 60, 1, 100);
+    take.release(K, 60, 106);
+    const next = new RollTake(SONG, [BEFORE, A, B]);
+    take.handOver(next);
+    expect(next.drain()).toEqual([{ regionIndex: 1, notes: [n(4, 6, 60)] }]);
+  });
+});
+
 /** A 4-bar roll. */
 const roll = (notes: RollNote[]): RollSequencerConfig => ({ loopTicks: 384, notes });
 

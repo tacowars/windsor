@@ -185,6 +185,7 @@ class RollDevice {
       source: () => this.source,
       scene: () => this.scene,
       layer: () => this.notesLayer,
+      repaint: () => this.paint(),
     });
   }
 
@@ -317,6 +318,7 @@ class RollDevice {
       rowPx: rowPxOf(this.zoom()),
       panePx: panes.body.clientHeight,
       beatPx: this.beatPx(),
+      held: this.rec.heldPitches(),
     });
     this.scene = scene;
     const head = paintHead(panes, scene);

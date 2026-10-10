@@ -2,7 +2,9 @@
  * Everything one paint of the Roll draws (windsor#602), gathered from the
  * document and the view without the DOM: the rows, the scale, the region's
  * length and the loop, the chord strip, the notes, and the px a
- * tick takes. The DOM files only place what this hands them.
+ * tick takes. The DOM files only place what this hands them. The rows are
+ * laid out from the stored notes and the pitches Rec holds (windsor#667), so
+ * a held note sits in the row it will have once written.
  */
 import type { Harmony, RollNote } from '@windsor/engine';
 import { PPQ } from '@windsor/engine';
@@ -26,6 +28,8 @@ export interface SceneInput {
   /** The notes pane's height, which Fold fills. */
   readonly panePx: number;
   readonly beatPx: number;
+  /** The pitches of the notes Rec holds in the region, laid out as if already written. */
+  readonly held?: readonly number[];
 }
 
 /** One paint's worth of the roll. */
@@ -49,7 +53,7 @@ export interface RollScene {
 /** The scene for `input`. */
 export function rollScene(input: SceneInput): RollScene {
   const scalePcs = scalePitchClasses(input.harmony);
-  const used = new Set(input.notes.map((note) => note.pitch));
+  const used = new Set([...input.notes.map((note) => note.pitch), ...(input.held ?? [])]);
   const rows = rollRows({
     keys: input.keys,
     fold: input.fold,
@@ -78,6 +82,10 @@ export function rollScene(input: SceneInput): RollScene {
     width: input.regionTicks * pxPerTick,
   };
 }
+
+/** Whether a held pitch has no row in `scene`, so its rows must be laid out again to draw it. */
+export const heldOffRows = (scene: RollScene, held: readonly number[]): boolean =>
+  held.some((pitch) => !scene.rowByPitch.has(pitch));
 
 /** The bars the ruler numbers: every bar the region starts, the last perhaps cut short. */
 export const barCount = (regionTicks: number, barTicks: number): number =>
