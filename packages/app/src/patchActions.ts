@@ -25,6 +25,7 @@ import {
 import type { LibraryModel } from './libraryModel';
 import { isWritable, removeLibraryFile, writeLibraryFile } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
+import { leftCopyDrop } from './partCopyCleanup';
 import { buildPatchFile, patchFileText } from './patchFileWriter';
 import type { PatchMetadata } from './patchMetadata';
 import { copyMetadata, slugify, uniqueId } from './patchMetadata';
@@ -120,14 +121,18 @@ export function copyPrefill(scope: PatchScope, working: Patch): PatchMetadata {
     : copyMetadata(current);
 }
 
-/** Load Init into the part: its own sentinel document patch, replaced whole each time. */
-export function initPatch({ ctx, slot }: PatchScope): Patch {
+/**
+ * Load Init into the part: its own sentinel document patch, replaced whole
+ * each time. The unedited automatic copy it leaves goes too (windsor#671).
+ */
+export function initPatch({ ctx, library, slot }: PatchScope): Patch {
   const patch = initPatchDefaults();
   const id = initPresetId(String(slot));
+  const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
   // Init is no library entry's copy: the part's `patchSource` goes (windsor#669).
   ctx.change({
     ...partChange(slot, { preset: id, patchSource: undefined }),
-    patches: { [id]: patch },
+    patches: { [id]: patch, ...dropped },
   });
   return patch;
 }
@@ -200,7 +205,9 @@ export async function savePatch(request: WriteRequest): Promise<string> {
 /**
  * Save the working patch as a new entry in the user's library (or the
  * folder), and switch the part to it. The new id is a library id, so the
- * part's `patchSource` goes (windsor#669 decision 4).
+ * part's `patchSource` goes (windsor#669 decision 4). The automatic copy it
+ * leaves goes only when unedited (windsor#671): an edit made before Save as…
+ * is in that copy too.
  */
 export async function copyToNew(request: WriteRequest): Promise<string> {
   const { ctx, library, slot, meta, working } = request;
@@ -214,9 +221,10 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
   withGesture('Copy to new', () => {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
+    const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
     ctx.change({
       ...partChange(slot, { ...fields, patchSource: undefined }),
-      patches: { [id]: file.patch },
+      patches: { [id]: file.patch, ...dropped },
     });
     if (wasInit) dropInit(ctx);
   });

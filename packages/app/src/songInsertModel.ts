@@ -36,6 +36,9 @@ export function songPaneCtx(ctx: AppCtx, edited: () => void): AppCtx {
     get transport() {
       return ctx.transport;
     },
+    get autoCopies() {
+      return ctx.autoCopies;
+    },
     change(partial) {
       const result = ctx.change(partial);
       if (result.ok) {
