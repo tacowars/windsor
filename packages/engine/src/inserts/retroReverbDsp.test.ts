@@ -63,14 +63,22 @@ describe('retro reverb shipped DSP', () => {
     expect(energy(long!, 48000)).toBeGreaterThan(energy(short!, 48000) * 100);
     expect(energy(short!, 48000)).toBeLessThan(1e-12);
   });
-  it('drift moves the tail and keeps its decay below 3 kHz', () => {
-    const decay = 2;
-    const still = render({ decay, tone: 9000 }, 48000, 4);
-    const [left, right] = render({ decay, tone: 9000, driftDepth: 1, driftRate: 2 }, 48000, 4);
-    expect(left).not.toEqual(still[0]);
-    expect(right).not.toEqual(still[1]);
-    expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
-  });
+  // Size 10 is the top of the range (RV-4): 540 ms lines, sized with Drift's reach.
+  it.each([1, RETRO_REVERB_BOUNDS.size[1]])(
+    'drift at Size %s moves the tail and keeps its decay below 3 kHz',
+    (size) => {
+      const decay = 2;
+      const still = render({ decay, size, tone: 9000 }, 48000, 4);
+      const [left, right] = render(
+        { decay, size, tone: 9000, driftDepth: 1, driftRate: 2 },
+        48000,
+        4,
+      );
+      expect(left).not.toEqual(still[0]);
+      expect(right).not.toEqual(still[1]);
+      expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
+    },
+  );
   it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
     expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
       render({ mode }, 48000, 0.5),

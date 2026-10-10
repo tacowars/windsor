@@ -38,7 +38,9 @@ export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
       def: DEFAULT_RETRO_REVERB[f],
       fmt:
         f === 'tone' ? fmtHz : f === 'decay' || f === 'preDelay' || f === 'duration' ? fmtMs : fmt2,
-      ...(f === 'tone' || f === 'decay' || f === 'driftRate' ? { curve: 'log' as const } : {}),
+      ...(f === 'tone' || f === 'decay' || f === 'size' || f === 'driftRate'
+        ? { curve: 'log' as const }
+        : {}),
     },
   }),
 );
