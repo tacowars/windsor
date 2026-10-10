@@ -5,9 +5,10 @@ import { dropInit } from './patchActions';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { ARRANGEMENT_VERSION, clonePatch, partAt } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, clonePatch, makePatch, partAt } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { library, loadPageLibrary } from './libraryModel';
+import { addPart, newSong } from './songParts';
 
 // The built-in library loads on demand in the page; these tests read it
 // through the console's shared model, as the page does after boot.
@@ -74,5 +75,74 @@ describe('choosing a preset as an undo step (windsor#130)', () => {
     const ctx = openGestureConsole();
     expect(pickPreset(ctx, 0, 'not-a-patch', () => dropInit(ctx))).toBe(false);
     expect(ctx.canUndo).toBe(false);
+  });
+});
+
+describe('each part owns its patch (windsor#669)', () => {
+  const ID = 'score-concrete-chord';
+
+  /** A console over a new song with Init parts on slots 0, 1 and 2. */
+  function threeParts() {
+    const first = new DocumentModel(newSong());
+    const second = new DocumentModel(addPart(first.doc)!.doc);
+    return openGestureConsole(addPart(second.doc)!.doc);
+  }
+
+  it('copies a song patch another part plays, so a knob edit on either moves only its own', () => {
+    const ctx = threeParts();
+    ctx.change({ patches: { 'my-pad': makePatch({ name: 'My Pad', volume: 0.4 }) } });
+    expect(choosePreset(ctx, 0, 'my-pad')).toBe(true);
+    expect(choosePreset(ctx, 1, 'my-pad')).toBe(true);
+    const doc = ctx.model.doc;
+    expect(partAt(doc, 1)?.preset).toBe('my-pad-2');
+    expect(partAt(doc, 1)?.patchSource).toBeUndefined();
+    expect(doc.patches?.['my-pad-2']).toEqual(doc.patches?.['my-pad']);
+    ctx.change({ patches: { 'my-pad-2': { volume: 0.9 } } });
+    expect(ctx.model.doc.patches?.['my-pad']?.volume).toBe(0.4);
+    ctx.change({ patches: { 'my-pad': { volume: 0.1 } } });
+    expect(ctx.model.doc.patches?.['my-pad-2']?.volume).toBe(0.9);
+  });
+
+  it('loads a library patch no other part plays under its own id, with no patchSource', () => {
+    const ctx = threeParts();
+    expect(choosePreset(ctx, 0, ID)).toBe(true);
+    expect(partAt(ctx.model.doc, 0)?.preset).toBe(ID);
+    expect(partAt(ctx.model.doc, 0)?.patchSource).toBeUndefined();
+  });
+
+  it('gives three parts picking one library patch three ids, the copies linked to it', () => {
+    const ctx = threeParts();
+    for (const slot of [0, 1, 2]) expect(choosePreset(ctx, slot, ID)).toBe(true);
+    const parts = ctx.model.doc.parts.map((part) => [part.preset, part.patchSource]);
+    expect(parts).toEqual([
+      [ID, undefined],
+      [`${ID}-2`, ID],
+      [`${ID}-3`, ID],
+    ]);
+  });
+
+  it("keeps a copy's link on a re-pick, and drops it on any other pick", () => {
+    const ctx = threeParts();
+    choosePreset(ctx, 0, ID);
+    choosePreset(ctx, 1, ID);
+    expect(choosePreset(ctx, 1, `${ID}-2`)).toBe(true);
+    expect(partAt(ctx.model.doc, 1)?.patchSource).toBe(ID);
+    expect(choosePreset(ctx, 1, 'score-amber-stab')).toBe(true);
+    expect(partAt(ctx.model.doc, 1)?.preset).toBe('score-amber-stab');
+    expect(partAt(ctx.model.doc, 1)?.patchSource).toBeUndefined();
+  });
+
+  it('undoes a load that made a copy in one step, and redoes it', () => {
+    const ctx = threeParts();
+    pickPreset(ctx, 0, ID, () => dropInit(ctx));
+    const before = ctx.model.doc;
+    expect(pickPreset(ctx, 1, ID, () => dropInit(ctx))).toBe(true);
+    const after = ctx.model.doc;
+    expect(partAt(after, 1)?.preset).toBe(`${ID}-2`);
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc).toEqual(before);
+    expect(ctx.model.doc.patches?.[`${ID}-2`]).toBeUndefined();
+    expect(ctx.redo()).toBe(true);
+    expect(ctx.model.doc).toEqual(after);
   });
 });

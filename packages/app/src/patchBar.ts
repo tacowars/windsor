@@ -50,7 +50,9 @@ function stepButton(ctx: AppCtx, by: StepDirection, actions: PatchBarActions): H
   node.title = `${STEP_LABELS[by]} in the search's filter`;
   node.setAttribute('aria-label', STEP_LABELS[by]);
   node.onclick = (): void => {
-    const current = partAt(ctx.model.doc, ctx.parts.selected)?.preset ?? '';
+    // A part's own copy steps from its library entry's place (windsor#669), not the song's own list.
+    const part = partAt(ctx.model.doc, ctx.parts.selected);
+    const current = part?.patchSource ?? part?.preset ?? '';
     const listing = presetListing(ctx);
     const order = filteredListing(listing).map((entry) => entry.id);
     const next = stepPatch(

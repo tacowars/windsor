@@ -63,6 +63,7 @@ const PART_KEYS = [
   'regions',
   'sequencer',
   'automation',
+  'patchSource',
 ];
 
 export class ArrangementNormaliser extends FieldNormaliser {
@@ -190,8 +191,8 @@ export class ArrangementNormaliser extends FieldNormaliser {
   }
 
   /**
-   * One part of the list (#597): identity, patch, strip, regions, sequencer
-   * and automation lanes (windsor#342). Null drops it, reported. The lanes
+   * One part of the list (#597): identity, patch, strip, regions, sequencer,
+   * automation lanes (windsor#342) and the patch's library link (windsor#669). Null drops it, reported. The lanes
    * come after the strip, whose insert ids they name. Its colour is read
    * raw and assigned once the whole list is known (`partColours.ts`).
    */
@@ -234,6 +235,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
       // Absent stays absent: a song without lanes reads and exports as before (decision 15).
       ...(automation && { automation }),
+      ...this.patchSource(o.patchSource, path),
     };
     return { part, path, colour: o.colour };
   }
@@ -281,6 +283,17 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const kept: Record<string, unknown> = { ...spec };
     delete kept.source;
     return kept as S;
+  }
+
+  /**
+   * The library id the part's copy came from (windsor#669): a non-empty
+   * string is kept, anything else is dropped, reported. Absent stays absent.
+   */
+  private patchSource(raw: unknown, path: string): { patchSource?: string } {
+    if (raw === undefined) return {};
+    if (typeof raw === 'string' && raw !== '') return { patchSource: raw };
+    this.correction(`${path}.patchSource: ${show(raw)} is not a library id — dropped`);
+    return {};
   }
 
   /** A part's identity has no default: a missing or out-of-range slot drops the part. */

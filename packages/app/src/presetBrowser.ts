@@ -11,21 +11,36 @@ import { el } from './dom';
 import { withGesture } from './gestureHooks';
 import { library, libraryPatch } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
+import { copyId, copySource, playerElsewhere } from './partPatchIsolation';
 import { PATCH_SOURCE_LABELS } from './patchLibrary';
 import { stepListing } from './patchStepModel';
 
 /** Retained across a rail rebuild, a part switch and the popover closing. */
 export const patchFilter: PresetFilter = { query: '', category: '', tag: '', source: '' };
 
-/** Copy on selection: the exported song owns the sound even before its first knob edit. */
+/**
+ * Copy on selection: the exported song owns the sound even before its first
+ * knob edit. Each part owns its patch (windsor#669 decision 2): when another
+ * part plays `name`, this part gets the same sound under a fresh id, linked
+ * to its library entry by `patchSource`, so neither part's knobs move the
+ * other's. A part re-picking what it plays keeps its link; any other pick
+ * clears it.
+ */
 export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
-  const existing = ctx.model.doc.patches;
+  const doc = ctx.model.doc;
+  const existing = doc.patches;
   const documentPatch = existing && Object.hasOwn(existing, name) ? existing[name] : undefined;
   const patch = documentPatch ?? libraryPatch(library, name);
   if (!patch) return false;
+  const holder = playerElsewhere(doc, slot, name);
+  const ids = new Set(Object.keys(library.entries));
+  const id = holder ? copyId(doc, name, ids) : name;
+  const fields = assignPatchFields(doc, slot, id, patch.name);
+  const keepsLink = !holder && partAt(doc, slot)?.preset === name;
+  const link = keepsLink ? {} : { patchSource: holder && copySource(holder, name, ids) };
   return ctx.change({
-    ...partChange(slot, assignPatchFields(ctx.model.doc, slot, name, patch.name)),
-    patches: { [name]: clonePatch(patch) },
+    ...partChange(slot, { ...fields, ...link }),
+    patches: { [id]: clonePatch(patch) },
   }).ok;
 }
 

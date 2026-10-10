@@ -226,7 +226,7 @@ export function browserInfo(ctx: AppCtx, row: PresetListing | null, hooks: InfoH
   const renameButton = actionButton(
     'Rename',
     rename === 'song'
-      ? "Rename the song's copy; parts playing it follow"
+      ? "Rename the song's copy; the part playing it follows"
       : 'Rename your library patch',
     rename !== null,
     'btn ghost',
