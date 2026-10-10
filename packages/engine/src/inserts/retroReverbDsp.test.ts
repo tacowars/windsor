@@ -107,6 +107,28 @@ describe('retro reverb shipped DSP', () => {
     const [few] = render({ diffusion: 0 }, 48000, 0.05);
     const [many] = render({ diffusion: 0, density: 1 }, 48000, 0.05);
     expect(echoes(many!)).toBeGreaterThanOrEqual(echoes(few!) + 6);
+    // At the box's corners the knob is a spread control: each step moves the output further from
+    // Density 0, and 0.25 is well short of 1. Unheld, the largest Size at the shortest Decay
+    // weighted its taps so far over the ends that any Density above 0 played as 1.
+    const { size: sizes, decay: decays } = RETRO_REVERB_BOUNDS;
+    for (const [size, decay] of [
+      [sizes[1], decays[0]],
+      [sizes[0], decays[1]],
+    ] as const) {
+      const spec = { size, decay, tone: 9000 };
+      const [left0, right0] = render({ ...spec, density: 0 });
+      const distances = [0.25, 0.5, 0.75, 1].map((density) => {
+        const [left, right] = render({ ...spec, density });
+        let moved = 0;
+        for (let i = 0; i < left!.length; i++)
+          moved += (left![i]! - left0![i]!) ** 2 + (right![i]! - right0![i]!) ** 2;
+        return Math.sqrt(moved / (energy(left0!) + energy(right0!)));
+      });
+      const full = distances[distances.length - 1]!;
+      expect(distances[0]).toBeLessThan(0.75 * full);
+      for (let k = 1; k < distances.length; k++)
+        expect(distances[k]! - distances[k - 1]!).toBeGreaterThan(0.05 * full);
+    }
   });
   it.each(['gated', 'reverse'] as const)(
     '%s skips Drift, which only the tank plays',

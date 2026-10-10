@@ -128,8 +128,18 @@ export const RETRO_REVERB_DSP = {
   // Each output's line-end sum's energy, in lines, for the loudness match (left, right). Four
   // unrelated ends at ±1 would make 4; the feedback matrix makes the left signs add up and the
   // right ones partly cancel. Measured, not estimated: with these, an impulse at Size 0.25 to 3 and
-  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.2 dB where a short
-  // decay at a large Size leaves the first pass most of the energy.
+  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.3 dB (Size up to
+  // 10, Decay down to 0.2 s) where a short decay at a large Size leaves the first pass most of the
+  // energy.
   densityEndEnergy: [5.2, 3.3],
+  // The most a tap's envelope weight raises it over its line end: 6 dB. The weight, gain^(f - 1),
+  // grows without bound with a pass's loss (126 dB for line 3's first tap at Size 10, Decay 0.2),
+  // and the loudness match then turns the ends down to nothing at any Density above 0, so the
+  // knob played as off or full. The largest weight at the auditioned settings (Size 0.5 to 3,
+  // Decay 1.4 and 2 s) is 5.4 dB (Size 3, Decay 1.4, line 3's first tap), so 6 dB leaves them
+  // unchanged to the bit. Measured where every tap is held (Size 10, Decay 0.2): Density 0.25
+  // moves the output 52 % as far as Density 1 does, against 62 % with a 9 dB cap, 71 % with
+  // 12 dB, 100 % with none, and 38 to 45 % at settings where no tap is held.
+  densityMaxBoost: 10 ** (6 / 20),
   millisecondsPerSecond: 1000,
 } as const;

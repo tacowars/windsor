@@ -77,6 +77,67 @@ favour the early taps. The behaviour test in `inserts/retroReverbDsp.test.ts`
 asserts the RT60 below 3 kHz at Density 1 within 5 % of Density 0 at Decay
 2 s and Size 1, and at least six more echoes in the first 50 ms.
 
+## The boost cap (fix round 1)
+
+A tap's envelope weight `gain^(f - 1)` grows without bound with a pass's
+loss: at Size 10, Decay 0.2 line 3's first tap would sit 126 dB over its
+line end. The loudness match then turned the ends down to nothing at any
+Density above 0, so the knob played as off or full. Each weight is now held
+at `densityMaxBoost`, 6 dB over the end.
+
+- **Why 6 dB.** The largest weight at the auditioned settings (Size 0.5 to
+  3, Decay 1.4 and 2 s) is 5.4 dB (Size 3, Decay 1.4, line 3's first tap),
+  so 6 dB holds none of them. Where every tap is held (Size 10, Decay 0.2),
+  Density 0.25 moves the output 52 % as far as Density 1, against 62 % with a
+  9 dB cap, 71 % with 12 dB, and 38 to 45 % at settings where no tap is
+  held.
+- **Auditioned settings unchanged.** Size 0.5, 1 and 3 × Decay 1.4 and 2 s ×
+  Density 0, 0.5 and 1 × Mix 0.5 and 1 × an impulse and a 100 ms noise
+  burst, 3 s each: 20,736,000 of 20,736,000 output samples equal the
+  previous head's (`08eb9a7`). Their Density 1 levels and RT60s are the
+  previous head's: for example Size 1, Decay 1.4 at −0.08 / −0.02 dB and
+  1.36 → 1.35 s.
+
+Distance from Density 0: the RMS of the difference over both channels,
+relative to Density 0's RMS (impulse, Tone 9 kHz, Character 0, Mix 1, 3 s).
+
+| Size | Decay | before: 0.01 / 0.25 / 0.5 / 0.75 / 1 | after |
+|---|---|---|---|
+| 10 | 0.2 | 1.439 / 1.440 / 1.440 / 1.440 / 1.440 | 0.029 / 0.618 / 0.942 / 1.099 / 1.186 |
+| 3 | 0.5 | 0.040 / 0.777 / 1.078 / 1.204 / 1.269 | 0.027 / 0.590 / 0.919 / 1.085 / 1.178 |
+| 10 | 6 | 0.018 / 0.410 / 0.702 / 0.886 / 1.002 | unchanged (no tap held) |
+| 0.25 | 20 | 0.013 / 0.322 / 0.584 / 0.771 / 0.902 | unchanged (no tap held) |
+
+**Where taps are held.** A held tap still decays at the tank's rate; it sits
+up to (its weight − 6 dB) under the line end's envelope, so its share of the
+tail is smaller. The level at Density 1 stays within 1.3 dB of Density 0
+(L / R: +1.14 / −0.58 dB at Size 10, Decay 0.2; +1.25 / −0.40 at Size 3,
+Decay 0.3; +1.02 / −0.70 at Size 5, Decay 0.5). RT60 below 3 kHz, Density 0
+→ 1, after (before):
+
+| Size | Decay | RT60 d0 → d1 (s) |
+|---|---|---|
+| 3 | 0.5 | 0.47 → 0.53 (0.53) |
+| 5 | 0.5 | 0.52 → 0.47 (0.49) |
+| 5 | 1 | 1.05 → 1.05 (1.07) |
+| 10 | 1 | 1.10 → 0.95 (0.96) |
+| 10 | 2 | 1.98 → 2.09 (2.17) |
+| 10 | 0.2 and 0.5 | 0.38 → 0.79 (0.43 and 0.18) |
+
+At Size 10 with Decay 0.5 s or less a line loses 65 dB or more in a pass,
+so the response is its first pass alone: Density 0 is the four line ends'
+echoes at 0.31 to 0.54 s, and the −5 to −25 dB fit reads a handful of
+echoes rather than a decay. Held at 6 dB, the taps fill that window evenly
+instead of front-loading it, so the fit reads longer; nothing sounds later
+(the last sample within 60 dB of the peak is at 0.625 s against Density 0's
+0.635 s at Decay 0.2).
+
+The Density test in `inserts/retroReverbDsp.test.ts` now also renders the
+box's corners (Size 10 with Decay 0.2, Size 0.25 with Decay 20) at Density
+0.25, 0.5, 0.75 and 1, and asserts that each step moves further from
+Density 0 by at least 5 % of Density 1's distance and that 0.25 stays under
+75 % of it. It fails on `08eb9a7`'s bundle (1.440 against a limit of 1.080).
+
 ## Density 0 is today's sound
 
 Eight settings, an impulse and a 100 ms noise burst each, 3 s at 48 kHz:

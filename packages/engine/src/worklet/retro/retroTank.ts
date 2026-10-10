@@ -25,7 +25,13 @@
  * line's whole loss is applied on write, so a tap a fraction f along it reads a sample that will
  * lose nothing more before the end: weighted by the line's gain to the power f - 1, it sits on the
  * same decay envelope as the end, and the RT60 is unchanged (the taps only read; nothing feeds
- * back). Each channel is scaled by 1 / sqrt(1 + Σ (d × weight)² / E), E its ends' sum's energy in
+ * back). The weight is held at `densityMaxBoost` (6 dB over the end): past it, where a line loses
+ * most of its level in one pass, the envelope would put a tap tens of dB over anything the input
+ * played, and the loudness match would then mute the ends at any Density above 0. A held tap still
+ * decays at the tank's rate, a little under the envelope; where the first pass is nearly the whole
+ * response (Size 10, Decay 0.5 s and under), the taps fill it evenly instead of front-loading it,
+ * which lengthens its -5 to -25 dB fit, though nothing sounds later than at Density 0 (rv3.md).
+ * Each channel is scaled by 1 / sqrt(1 + Σ (d × weight)² / E), E its ends' sum's energy in
  * lines (`densityEndEnergy`), so ends and taps together keep the level of the ends alone. Like
  * Drift, Density is scaled by the tank's share; at 0 no tap is read and the outputs are today's
  * expressions, to the bit.
@@ -200,14 +206,18 @@ class RetroTank {
     }
   }
 
-  /** The taps' gains at this Density and the lines' gains, once a block. */
+  /**
+   * The taps' gains at this Density and the lines' gains, once a block: each on its line end's
+   * envelope, held at `densityMaxBoost` over the end.
+   */
   weighTaps(): void {
     let left = 0,
       right = 0;
     for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.tapLines[k];
       const fraction = this.tapFractions[k];
-      const weight = this.density * Math.pow(this.gains[line], fraction - 1);
+      const weight =
+        this.density * Math.min(Math.pow(this.gains[line], fraction - 1), C.densityMaxBoost);
       this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
       this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
       left += this.tapGainsLeft[k] * this.tapGainsLeft[k];
