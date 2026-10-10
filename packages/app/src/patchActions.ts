@@ -207,7 +207,7 @@ export async function savePatch(request: WriteRequest): Promise<string> {
  * folder), and switch the part to it. The new id is a library id, so the
  * part's `patchSource` goes (windsor#669 decision 4). The automatic copy it
  * leaves goes only when unedited (windsor#671): an edit made before Save as…
- * is in that copy too.
+ * is in that copy too. Only into the song and the slot it started in.
  */
 export async function copyToNew(request: WriteRequest): Promise<string> {
   const { ctx, library, slot, meta, working } = request;
@@ -217,7 +217,13 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
     ...Object.keys(ctx.model.doc.patches ?? {}),
   ]);
   const file = buildPatchFile(meta, working);
+  // Pinned before the write, as Save pins them (windsor#677): another song
+  // opened, or another patch loaded into the slot, meanwhile gets no switch
+  // and no cleanup. The file is still written and the id still returned.
+  const own = partAt(ctx.model.doc, slot)?.preset;
+  const song = ctx.model.openings;
   await writeLibraryFile(library, id, patchFileText(file), request.download);
+  if (ctx.model.openings !== song || partAt(ctx.model.doc, slot)?.preset !== own) return id;
   // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
   withGesture('Copy to new', () => {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
