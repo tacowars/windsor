@@ -127,13 +127,8 @@ var RETRO_REVERB_DSP = {
     [0, 1, 0, -1],
     [-1, 0, 1, 0]
   ],
-  // Each output's line-end sum's energy, in lines, for the loudness match (left, right). Four
-  // unrelated ends at ±1 would make 4; the feedback matrix makes the left signs add up and the
-  // right ones partly cancel. Measured, not estimated: with these, an impulse at Size 0.25 to 3 and
-  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.3 dB (Size up to
-  // 10, Decay down to 0.2 s) where a short decay at a large Size leaves the first pass most of the
-  // energy.
-  densityEndEnergy: [5.2, 3.3],
+  // The loudness match's end energies vary with Tone, Size and Decay: a measured table,
+  // `retroReverbDensityTables.ts`.
   // The most a tap's envelope weight raises it over its line end: 6 dB. The weight, gain^(f - 1),
   // grows without bound with a pass's loss (126 dB for line 3's first tap at Size 10, Decay 0.2),
   // and the loudness match then turns the ends down to nothing at any Density above 0, so the
@@ -278,6 +273,141 @@ var RetroFilter = class {
   }
 };
 
+// packages/engine/src/inserts/retroReverbDensityTables.ts
+var RETRO_REVERB_DENSITY_LEVEL = {
+  tone: [800, 1500, 2500, 4200, 9e3],
+  size: [0.25, 0.5, 1, 3, 10],
+  decay: [0.2, 0.5, 1.4, 2, 6, 20],
+  left: [
+    // Tone 800
+    [
+      [5.07, 5.2, 5.27, 5.53, 7.04, 11.06],
+      [3.71, 4.95, 5.2, 5.2, 5.2, 5.68],
+      [2.99, 3.73, 5.06, 5.2, 5.2, 5.2],
+      [2.82, 2.91, 3.61, 4.01, 5.2, 5.2],
+      [2.85, 2.85, 2.89, 2.98, 3.81, 5.16]
+    ],
+    // Tone 1500
+    [
+      [5.16, 5.2, 5.2, 5.2, 5.24, 7.06],
+      [3.77, 4.9, 5.2, 5.2, 5.2, 5.2],
+      [3.31, 4.08, 5.2, 5.2, 5.2, 5.4],
+      [3.13, 3.22, 3.96, 4.37, 5.2, 5.2],
+      [3.16, 3.16, 3.21, 3.31, 4.2, 5.2]
+    ],
+    // Tone 2500
+    [
+      [5.2, 5.2, 5.2, 5.2, 5.2, 5.64],
+      [3.97, 5.09, 5.2, 5.2, 5.2, 5.2],
+      [3.7, 4.51, 5.2, 5.2, 5.2, 5.53],
+      [3.5, 3.6, 4.37, 4.79, 5.2, 5.2],
+      [3.51, 3.51, 3.57, 3.68, 4.64, 5.2]
+    ],
+    // Tone 4200
+    [
+      [5.2, 5.2, 5.2, 5.2, 5.2, 5.2],
+      [4.38, 5.2, 5.2, 5.2, 5.2, 5.2],
+      [4.15, 5.01, 5.2, 5.2, 5.2, 5.45],
+      [3.94, 4.05, 4.89, 5.2, 5.2, 5.2],
+      [3.97, 3.97, 4.04, 4.16, 5.2, 5.2]
+    ],
+    // Tone 9000
+    [
+      [5.2, 5.2, 5.2, 5.2, 5.2, 5.2],
+      [5, 5.2, 5.2, 5.2, 5.2, 5.2],
+      [4.7, 5.2, 5.2, 5.2, 5.2, 5.32],
+      [4.47, 4.6, 5.2, 5.2, 5.2, 5.2],
+      [4.58, 4.58, 4.67, 4.82, 5.2, 5.2]
+    ]
+  ],
+  right: [
+    // Tone 800
+    [
+      [2.51, 2.56, 2.74, 2.85, 3.3, 3.48],
+      [2.97, 3.03, 3.23, 3.3, 3.3, 3.3],
+      [2.89, 2.9, 3.08, 3.19, 3.3, 3.3],
+      [2.83, 2.83, 2.87, 2.91, 3.14, 3.3],
+      [2.86, 2.86, 2.87, 2.88, 2.96, 3.16]
+    ],
+    // Tone 1500
+    [
+      [2.99, 3.07, 3.16, 3.2, 3.3, 3.3],
+      [3.27, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.09, 3.08, 3.2, 3.29, 3.3, 3.3],
+      [3.13, 3.12, 3.16, 3.19, 3.3, 3.3],
+      [3.19, 3.19, 3.2, 3.21, 3.23, 3.3]
+    ],
+    // Tone 2500
+    [
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3]
+    ],
+    // Tone 4200
+    [
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3]
+    ],
+    // Tone 9000
+    [
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.3, 3.3, 3.3, 3.3, 3.3, 3.3],
+      [3.32, 3.32, 3.3, 3.3, 3.3, 3.3]
+    ]
+  ]
+};
+
+// packages/engine/src/worklet/retro/retroDensityLevel.ts
+var RetroDensityLevel = class {
+  constructor(table = RETRO_REVERB_DENSITY_LEVEL) {
+    const axes = [table.tone, table.size, table.decay];
+    this.logs = Float64Array.from(axes.flat(), Math.log);
+    this.counts = Int32Array.from(axes, (axis) => axis.length);
+    this.starts = Int32Array.from(axes, (_, i) => axes.slice(0, i).flat().length);
+    this.inverseLeft = Float64Array.from(table.left.flat(2), (e) => 1 / e);
+    this.inverseRight = Float64Array.from(table.right.flat(2), (e) => 1 / e);
+    this.point = new Float64Array(axes.length);
+    this.below = new Int32Array(axes.length);
+    this.past = new Float64Array(axes.length);
+    this.left = this.right = NaN;
+    this.left = 1 / table.left[0][0][0];
+    this.right = 1 / table.right[0][0][0];
+  }
+  /** Axis `axis`'s node at or below its point (the last but one at most) and the fraction past it. */
+  locate(axis) {
+    const start = this.starts[axis];
+    const value = Math.log(this.point[axis]);
+    let node = 0;
+    while (node < this.counts[axis] - 2 && value >= this.logs[start + node + 1]) node++;
+    const low = this.logs[start + node];
+    const fraction = (value - low) / (this.logs[start + node + 1] - low);
+    this.below[axis] = node;
+    this.past[axis] = Math.max(0, Math.min(1, fraction));
+  }
+  match() {
+    for (let axis = 0; axis < this.point.length; axis++) this.locate(axis);
+    const sizes = this.counts[1], decays = this.counts[2];
+    let left = 0, right = 0;
+    for (let a = 0; a < 2; a++)
+      for (let b = 0; b < 2; b++)
+        for (let c = 0; c < 2; c++) {
+          const weight = (a ? this.past[0] : 1 - this.past[0]) * (b ? this.past[1] : 1 - this.past[1]) * (c ? this.past[2] : 1 - this.past[2]);
+          const index = ((this.below[0] + a) * sizes + this.below[1] + b) * decays + this.below[2] + c;
+          left += weight * this.inverseLeft[index];
+          right += weight * this.inverseRight[index];
+        }
+    this.left = left;
+    this.right = right;
+  }
+};
+
 // packages/engine/src/worklet/retro/retroTank.ts
 var RetroTank = class {
   constructor() {
@@ -301,6 +431,7 @@ var RetroTank = class {
     this.tapFraction = new Float64Array(taps);
     this.tapGainsLeft = new Float64Array(taps);
     this.tapGainsRight = new Float64Array(taps);
+    this.level = new RetroDensityLevel();
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = 0;
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
@@ -348,6 +479,10 @@ var RetroTank = class {
     this.density = share > RETRO_REVERB_DSP.silenceFloor ? density * share : 0;
     if (this.density === 0) return;
     this.placeTaps();
+    this.level.point[0] = tone;
+    this.level.point[1] = size;
+    this.level.point[2] = decay;
+    this.level.match();
     this.weighTaps();
   }
   /**
@@ -366,7 +501,7 @@ var RetroTank = class {
   }
   /**
    * The taps' gains at this Density and the lines' gains, once a block: each on its line end's
-   * envelope, held at `densityMaxBoost` over the end.
+   * envelope, held at `densityMaxBoost` over the end, and the ends turned down to match.
    */
   weighTaps() {
     let left = 0, right = 0;
@@ -379,8 +514,8 @@ var RetroTank = class {
       left += this.tapGainsLeft[k] * this.tapGainsLeft[k];
       right += this.tapGainsRight[k] * this.tapGainsRight[k];
     }
-    this.endLeft = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + left / RETRO_REVERB_DSP.densityEndEnergy[0]);
-    this.endRight = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + right / RETRO_REVERB_DSP.densityEndEnergy[1]);
+    this.endLeft = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + left * this.level.left);
+    this.endRight = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + right * this.level.right);
     for (let k = 0; k < this.tapWhole.length; k++) {
       this.tapGainsLeft[k] *= this.endLeft;
       this.tapGainsRight[k] *= this.endRight;

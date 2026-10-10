@@ -129,6 +129,18 @@ describe('retro reverb shipped DSP', () => {
       for (let k = 1; k < distances.length; k++)
         expect(distances[k]! - distances[k - 1]!).toBeGreaterThan(0.05 * full);
     }
+    // Level-neutral within 1 dB at the darkest Tone too: the ends' energy against the taps' follows
+    // Tone, Size and Decay. A fixed match measured at 9 kHz played the box's corner (Size 10,
+    // Decay 0.2 s) 3 dB louder at Tone 800, and a setting between the table's nodes 1.7 dB.
+    for (const spec of [
+      { tone: RETRO_REVERB_BOUNDS.tone[0], size: sizes[1], decay: decays[0] },
+      { tone: 1100, size: 2, decay: 1 },
+    ]) {
+      const levels = render({ ...spec, density: 0 }, 48000, 3);
+      render({ ...spec, density: 1 }, 48000, 3).forEach((data, channel) =>
+        expect(Math.abs(10 * Math.log10(energy(data) / energy(levels[channel]!)))).toBeLessThan(1),
+      );
+    }
   });
   it.each(['gated', 'reverse'] as const)(
     '%s skips Drift, which only the tank plays',

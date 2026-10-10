@@ -7,9 +7,11 @@ weighted by its line's gain to the power `f - 1`, where `f` is how far along
 the line it sits, which puts it on the line end's decay envelope (the line's
 whole loss is applied on write). Each channel is scaled by
 `1 / sqrt(1 + Σ (d × weight)² / E)`, with `E` its line-end sum's energy in
-lines, so Density 1 plays at the level of Density 0. The tunables are
-`densityFractions`, `densityLeft`, `densityRight` and `densityEndEnergy` in
-`packages/engine/src/inserts/retroReverbConstants.ts`.
+taps, so Density 1 plays at the level of Density 0. The tunables are
+`densityFractions`, `densityLeft`, `densityRight` and `densityMaxBoost` in
+`packages/engine/src/inserts/retroReverbConstants.ts`; `E` is a measured
+table over Tone, Size and Decay in `retroReverbDensityTables.ts` (fix round 2,
+below), where the first version had one value per channel.
 
 All figures below: Apple M1, macOS (Darwin 25.6.0), arm64. Backend: Node
 v24.21.0 / V8 13.6.233.17-node.53, offline, running the shipped
@@ -137,6 +139,66 @@ box's corners (Size 10 with Decay 0.2, Size 0.25 with Decay 20) at Density
 0.25, 0.5, 0.75 and 1, and asserts that each step moves further from
 Density 0 by at least 5 % of Density 1's distance and that 0.25 stays under
 75 % of it. It fails on `08eb9a7`'s bundle (1.440 against a limit of 1.080).
+
+## The loudness match across Tone (fix round 2)
+
+One `E` per channel (5.2 left, 3.3 right), set at Tone 9 kHz, did not hold
+at a dark Tone. A tap reads its line before the line's Tone lowpass and the
+end after it, so the darker the Tone, the more top a tap keeps over its end;
+and over many passes the feedback lines up the left sum's signs on the low
+notes a small Size and a dark Tone leave in the tail. At Tone 800, Size 10,
+Decay 0.2 s an impulse played 3.02 / 1.26 dB (L / R) louder at Density 1.
+
+`E` is now read per block from a table of nodes at Tone 800, 1500, 2500,
+4200 and 9000 Hz, Size 0.25, 0.5, 1, 3 and 10 and Decay 0.2, 0.5, 1.4, 2, 6
+and 20 s, trilinear in their logs on `1 / E`
+(`worklet/retro/retroDensityLevel.ts`). `rv3-density-level.mjs fit`
+(beside this file) wrote it from `c97b098`'s bundle. For each node and
+channel it renders Density 0 and 1 for two probes, an impulse (whose
+response energy is the expected energy for any white input) and three
+seeded 100 ms white-noise bursts with their energies summed, at Mix 1,
+Character 0 and Diffusion 0.7. From the two renders and the tank's own
+gains it separates the ends' energy from the taps', so the measure holds
+whatever match the bundle used. Each node keeps the old value unless it
+leaves a probe more than 0.7 dB off Density 0, and then moves only as far
+as it must. So the auditioned settings keep their level, and the table
+differs from 5.2 / 3.3 only where the old values missed.
+
+Density 1 against Density 0, the largest |dB| over both channels and both
+probes (`rv3-density-level.mjs check`), same machine and backend as above:
+
+| Grid | `c97b098` | after |
+|---|---|---|
+| the 150 nodes | 3.07 | 0.71 |
+| 192 settings between them (Tone 1100, 3200, 6000; Size 0.35, 0.7, 2, 6; Decay 0.3, 1, 4, 12 s) | 2.78 | 0.88 |
+| Diffusion 0 and 1 at the box's corners (Tone 800 and 9000, Size 0.25 and 10, Decay 0.2 and 20 s) | 3.06 | 0.74 |
+
+So the tolerance is ±1 dB for the expected level of a white input across
+the valid box. Diffusion moves it by under 0.2 dB, so it is not an axis.
+A single 100 ms burst scatters around that: at Tone 800, Size 0.25,
+Decay 20 s, where the tail is a few low modes, the three bursts read
+−1.8 to +0.9 dB on their own (6 s each). No fixed match can follow one
+burst's low notes. Examples (impulse L / R, then the pooled bursts):
+
+| Tone, Size, Decay | `c97b098` | after |
+|---|---|---|
+| 800, 10, 0.2 | 3.02 / 1.26, 3.03 / 1.02 | 0.69 / 0.70, 0.70 / 0.45 |
+| 800, 0.25, 20 | −2.39 / −0.86, −2.24 / −0.50 | −0.70 / −0.70, −0.56 / −0.34 |
+| 9000, 10, 0.2 | 1.14 / −0.58, 1.18 / −0.73 | 0.66 / −0.56, 0.70 / −0.71 |
+
+**Auditioned settings.** Size 0.5, 1 and 3 × Decay 1.4 and 2 s at Tone
+4200, Density 0.5 and 1, an impulse and a 100 ms burst, 3 s, against
+`c97b098`: every level is within 0.001 dB except Size 3, Decay 1.4 s on
+the left, −0.11 dB at Density 0.5 and −0.20 dB at Density 1 (Density 1
+was 0.85 to 0.90 dB over Density 0 there, and is now 0.65 to 0.70). The RT60 below 3 kHz at
+Density 1 is the same to the millisecond: 1.252, 1.797, 1.295, 1.832, 1.373
+and 1.921 s. At Density 0 the table is never read: 1,920,000 of 1,920,000
+samples (five settings, both probes, 2 s) equal `c97b098`'s.
+
+The Density test now also asserts Density 1 within 1 dB of Density 0 at
+Tone 800, Size 10, Decay 0.2 s and at Tone 1100, Size 2, Decay 1 s (between
+nodes). On `c97b098`'s bundle they read 3.02 / 1.26 and 1.68 / 0.99 dB and
+fail; after, 0.69 / 0.70 and 0.70 / 0.68.
 
 ## Density 0 is today's sound
 

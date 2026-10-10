@@ -125,13 +125,8 @@ export const RETRO_REVERB_DSP = {
     [0, 1, 0, -1],
     [-1, 0, 1, 0],
   ],
-  // Each output's line-end sum's energy, in lines, for the loudness match (left, right). Four
-  // unrelated ends at ±1 would make 4; the feedback matrix makes the left signs add up and the
-  // right ones partly cancel. Measured, not estimated: with these, an impulse at Size 0.25 to 3 and
-  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.3 dB (Size up to
-  // 10, Decay down to 0.2 s) where a short decay at a large Size leaves the first pass most of the
-  // energy.
-  densityEndEnergy: [5.2, 3.3],
+  // The loudness match's end energies vary with Tone, Size and Decay: a measured table,
+  // `retroReverbDensityTables.ts`.
   // The most a tap's envelope weight raises it over its line end: 6 dB. The weight, gain^(f - 1),
   // grows without bound with a pass's loss (126 dB for line 3's first tap at Size 10, Decay 0.2),
   // and the loudness match then turns the ends down to nothing at any Density above 0, so the

@@ -31,16 +31,17 @@
  * decays at the tank's rate, a little under the envelope; where the first pass is nearly the whole
  * response (Size 10, Decay 0.5 s and under), the taps fill it evenly instead of front-loading it,
  * which lengthens its -5 to -25 dB fit, though nothing sounds later than at Density 0 (rv3.md).
- * Each channel is scaled by 1 / sqrt(1 + Σ (d × weight)² / E), E its ends' sum's energy in
- * lines (`densityEndEnergy`), so ends and taps together keep the level of the ends alone. Like
- * Drift, Density is scaled by the tank's share; at 0 no tap is read and the outputs are today's
- * expressions, to the bit.
+ * Each channel is scaled by 1 / sqrt(1 + Σ (d × weight)² / E), E its ends' sum's energy in taps
+ * at the block's Tone, Size and Decay (`RetroDensityLevel`, a measured table), so ends and taps
+ * together keep the level of the ends alone. Like Drift, Density is scaled by the tank's share;
+ * at 0 no tap is read and the outputs are today's expressions, to the bit.
  */
 import {
   RETRO_REVERB_BOUNDS as B,
   RETRO_REVERB_DSP as C,
 } from '../../inserts/retroReverbConstants';
 import { RetroDelay } from './retroDelay';
+import { RetroDensityLevel } from './retroDensityLevel';
 
 class RetroTank {
   lines: RetroDelay[];
@@ -93,6 +94,8 @@ class RetroTank {
   tapFraction: Float64Array;
   tapGainsLeft: Float64Array;
   tapGainsRight: Float64Array;
+  /** The ends' energy in taps at the block's Tone, Size and Decay, for the loudness match. */
+  level: RetroDensityLevel;
   /** The line ends' gain in each output while the taps play, and the taps' sums a sample. */
   endLeft: number;
   endRight: number;
@@ -122,6 +125,7 @@ class RetroTank {
     this.tapFraction = new Float64Array(taps);
     this.tapGainsLeft = new Float64Array(taps);
     this.tapGainsRight = new Float64Array(taps);
+    this.level = new RetroDensityLevel();
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
     this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = 0;
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
@@ -188,6 +192,10 @@ class RetroTank {
     this.density = share > C.silenceFloor ? density * share : 0;
     if (this.density === 0) return;
     this.placeTaps();
+    this.level.point[0] = tone;
+    this.level.point[1] = size;
+    this.level.point[2] = decay;
+    this.level.match();
     this.weighTaps();
   }
 
@@ -208,7 +216,7 @@ class RetroTank {
 
   /**
    * The taps' gains at this Density and the lines' gains, once a block: each on its line end's
-   * envelope, held at `densityMaxBoost` over the end.
+   * envelope, held at `densityMaxBoost` over the end, and the ends turned down to match.
    */
   weighTaps(): void {
     let left = 0,
@@ -223,9 +231,9 @@ class RetroTank {
       left += this.tapGainsLeft[k] * this.tapGainsLeft[k];
       right += this.tapGainsRight[k] * this.tapGainsRight[k];
     }
-    // The taps' energy against the ends' sum's, in lines (`densityEndEnergy`).
-    this.endLeft = C.outputTrim / Math.sqrt(1 + left / C.densityEndEnergy[0]);
-    this.endRight = C.outputTrim / Math.sqrt(1 + right / C.densityEndEnergy[1]);
+    // The taps' energy against the ends' sum's (`level` holds 1 / E for each output).
+    this.endLeft = C.outputTrim / Math.sqrt(1 + left * this.level.left);
+    this.endRight = C.outputTrim / Math.sqrt(1 + right * this.level.right);
     for (let k = 0; k < this.tapWhole.length; k++) {
       this.tapGainsLeft[k] *= this.endLeft;
       this.tapGainsRight[k] *= this.endRight;
