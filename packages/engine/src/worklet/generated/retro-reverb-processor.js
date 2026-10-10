@@ -250,11 +250,11 @@ var RetroTank = class {
     this.gains = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.values = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
-    this.sizeTarget = this.sizeStep = NaN;
+    this.sizeTarget = this.sizeStep = this.sizeTicks = NaN;
     this.input = this.lineInput = this.feedback = NaN;
     this.driftPhase = this.driftStep = this.excursion = this.detune = NaN;
     this.size = this.sizeTarget = 1;
-    this.sizeStep = 0;
+    this.sizeStep = this.sizeTicks = 0;
     this.diffusion = this.pole = this.left = this.right = 0;
     this.input = this.lineInput = this.feedback = 0;
     this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
@@ -271,6 +271,7 @@ var RetroTank = class {
   }) {
     this.sizeTarget = size;
     this.sizeStep = 0;
+    this.sizeTicks = ticks;
     if (ticks > 0) this.sizeStep = (size - this.size) / ticks;
     else this.size = size;
     this.driftStep = 2 * driftRate / RETRO_REVERB_DSP.rate;
@@ -310,10 +311,9 @@ var RetroTank = class {
       triangle = 2 * Math.abs(phase) - 1;
     }
     if (this.sizeStep !== 0) {
-      const next = this.size + this.sizeStep;
-      const landed = this.sizeStep > 0 ? next >= this.sizeTarget : next <= this.sizeTarget;
-      this.size = landed ? this.sizeTarget : next;
-      if (landed) this.sizeStep = 0;
+      this.sizeTicks--;
+      this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+      if (this.sizeTicks === 0) this.sizeStep = 0;
     }
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
@@ -532,7 +532,6 @@ var RetroReverbDsp = class {
     const k = 1 - Math.exp(-frames / (RETRO_REVERB_DSP.smoothSeconds * this.rate));
     const slew = RETRO_REVERB_DSP.sizeSlew * frames / this.rate;
     this.size += Math.max(-slew, Math.min(slew, k * (params.size[0] - this.size)));
-    this.ticks = frames * RETRO_REVERB_DSP.rate / this.rate;
     this.decay += k * (params.decay[0] - this.decay);
     this.tone += k * (params.tone[0] - this.tone);
     this.diffusion += k * (params.diffusion[0] - this.diffusion);
@@ -553,6 +552,7 @@ var RetroReverbDsp = class {
     if (this.level !== 0) this.dormant = false;
     else if (!this.dormant) this.clear();
     if (this.targetLevel !== 0) this.dormant = false;
+    this.countTicks(frames);
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
     this.tank.configure(this);
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) this.reflections.configure(this);
@@ -560,6 +560,22 @@ var RetroReverbDsp = class {
       this.earlyTaps.size = this.size;
       this.earlyTaps.configure();
     }
+  }
+  /**
+   * `ticks`: the internal ticks the coming block of `frames` runs, counted from `phase` with the
+   * same steps `tick` takes (62 or 63 for 128 frames at 48 kHz, not 62.5), and 0 while dormant.
+   */
+  countTicks(frames) {
+    const step = RETRO_REVERB_DSP.rate / this.rate;
+    let phase = this.phase, ticks = 0;
+    for (let i = 0; i < frames; i++) {
+      phase += step;
+      while (phase >= 1) {
+        phase -= 1;
+        ticks++;
+      }
+    }
+    this.ticks = this.dormant ? 0 : ticks;
   }
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear() {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
+import type { RetroProcessorLike } from '../__fixtures__/retroReverbHarness';
 import type { RetroReverbSpec } from './retroReverbSpec';
 import { RETRO_REVERB_BOUNDS, RETRO_REVERB_MODES } from './retroReverbConstants';
 
@@ -131,6 +132,21 @@ describe('retro reverb shipped DSP', () => {
     const output = [new Float32Array(128), new Float32Array(128)];
     node.process([input], [output], p);
     expect(output).toEqual(input);
+  });
+  // 46,875 Hz runs exactly 64 internal ticks a 128-frame block; 44.1 and 48 kHz alternate counts.
+  it.each([44100, 46875, 48000])('a live Size move lands on each block target at %s Hz', (rate) => {
+    const p = retroParams({ size: 1 }),
+      node = loadRetro(rate, p) as RetroProcessorLike & {
+        dsp: { tank: { size: number; sizeTarget: number } };
+      };
+    const input = [[new Float32Array(128).fill(0.1)]];
+    const output = [new Float32Array(128), new Float32Array(128)];
+    p.size![0] = RETRO_REVERB_BOUNDS.size[1];
+    for (let block = 0; block < 40; block++) {
+      node.process(input, [output], p);
+      expect(node.dsp.tank.size).not.toBe(1);
+      expect(node.dsp.tank.size).toBe(node.dsp.tank.sizeTarget);
+    }
   });
   it('handles absent input, different block sizes, live extremes, telemetry and stop', () => {
     const p = retroParams(),
