@@ -37,7 +37,7 @@ describe('Copy to new as an undo step', () => {
     const ctx = openGestureConsole();
     const before = ctx.model.doc;
     const init = partAt(before, 0)?.preset ?? '';
-    const id = await copyToNew({
+    const { id } = await copyToNew({
       ctx,
       library,
       slot: 0,

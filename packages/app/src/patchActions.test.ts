@@ -264,9 +264,13 @@ describe('Copy to new', () => {
     const prefill = copyPrefill(scope, working);
     expect(prefill.name).toBe('FM Kick copy');
     expect(prefill.category).toBe('Drums');
-    const id = await copyToNew({ ...scope, working, meta: { ...prefill, name: 'FM Kick' } });
+    const { id } = await copyToNew({ ...scope, working, meta: { ...prefill, name: 'FM Kick' } });
     expect(id).toBe('fm-kick');
-    const again = await copyToNew({ ...scope, working, meta: { ...prefill, name: 'FM Kick' } });
+    const { id: again } = await copyToNew({
+      ...scope,
+      working,
+      meta: { ...prefill, name: 'FM Kick' },
+    });
     expect(again).toBe('fm-kick-2');
     expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('fm-kick-2');
     expect(scope.ctx.model.doc.patches?.['fm-kick-2']?.name).toBe('FM Kick');
@@ -280,7 +284,7 @@ describe('Copy to new', () => {
     const scope = await folderScope();
     const working = initPatch(scope);
     expect(copyPrefill(scope, working).name).toBe(INIT_PATCH_NAME);
-    const id = await copyToNew({
+    const { id } = await copyToNew({
       ...scope,
       working,
       meta: { name: 'Init', category: 'Leads', tags: [], description: '' },
@@ -365,7 +369,7 @@ describe('Revert to library', () => {
   it("resets a folder-only id to the library file instead of dropping the part's only copy", async () => {
     const scope = await folderScope();
     const working = clonePatch(PATCH_LIBRARY['kick']!.patch);
-    const id = await copyToNew({
+    const { id } = await copyToNew({
       ...scope,
       working,
       meta: { name: 'Folder Only', category: 'Drums', tags: [], description: '' },

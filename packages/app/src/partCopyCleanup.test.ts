@@ -182,7 +182,7 @@ describe('Save as… from an automatic copy (windsor#671)', () => {
     if (edit) ctx.change({ patches: { [COPY]: { volume: 0.123 } } });
     const working = ctx.model.doc.patches![COPY]!;
     const meta = { name: 'Needle Mine', category: '', tags: [], description: '' };
-    const id = await copyToNew({ ctx, library: userLibrary, slot: 1, working, meta });
+    const { id } = await copyToNew({ ctx, library: userLibrary, slot: 1, working, meta });
     expect(partAt(ctx.model.doc, 1)?.preset).toBe(id);
     return ctx.model.doc.patches?.[COPY];
   }

@@ -231,11 +231,13 @@ async function runCopy(
   );
   if (!meta) return;
   const named = partAt(ctx.model.doc, scope.slot)?.name;
-  const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
-  ctx.notify(`${writtenText(library, id)} — this part now plays it`, 'success');
+  const { id, switched } = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
+  // Skipped when another song opened or the slot moved on (windsor#677): only the file was written.
+  const written = writtenText(library, id);
+  ctx.notify(switched ? `${written} — this part now plays it` : written, 'success');
   refresh();
   // A generic part just took its patch's name (windsor#103): the part picker shows it too.
-  if (partAt(ctx.model.doc, scope.slot)?.name !== named) ctx.render();
+  if (switched && partAt(ctx.model.doc, scope.slot)?.name !== named) ctx.render();
 }
 
 async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {

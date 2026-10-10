@@ -166,7 +166,7 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
   it('drops the link on Save as… and on Init', async () => {
     const scope = await linkedScope();
     const working = patchOf(scope.ctx, 'kick-2')!;
-    const id = await copyToNew({ ...scope, working, meta: { ...META, name: 'Kick Mine' } });
+    const { id } = await copyToNew({ ...scope, working, meta: { ...META, name: 'Kick Mine' } });
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe(id);
     expect(partAt(scope.ctx.model.doc, hat)?.patchSource).toBeUndefined();
     initPatch({ ...scope, slot: arp });
@@ -198,7 +198,8 @@ describe('Save as… pinned to the song and slot it started in (windsor#677)', (
       patches: scope.ctx.model.doc.patches,
     });
     finish();
-    const id = await saving;
+    const { id, switched } = await saving;
+    expect(switched).toBe(false);
     expect(scope.library.entries[id]?.patch.name).toBe('Kick Mine');
     expect({ parts: scope.ctx.model.doc.parts, patches: scope.ctx.model.doc.patches }).toEqual(
       before,
@@ -216,7 +217,8 @@ describe('Save as… pinned to the song and slot it started in (windsor#677)', (
       patches: { chosen },
     });
     finish();
-    const id = await saving;
+    const { id, switched } = await saving;
+    expect(switched).toBe(false);
     expect(scope.library.entries[id]).toBeDefined();
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe('chosen');
     expect(patchOf(scope.ctx, 'chosen')).toEqual(chosen);
@@ -229,7 +231,8 @@ describe('Save as… pinned to the song and slot it started in (windsor#677)', (
     const working = patchOf(scope.ctx, 'kick-2')!;
     const saving = copyToNew({ ...scope, working, meta: MINE });
     finish();
-    const id = await saving;
+    const { id, switched } = await saving;
+    expect(switched).toBe(true);
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe(id);
     expect(patchOf(scope.ctx, id)?.name).toBe('Kick Mine');
   });
