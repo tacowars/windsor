@@ -2,9 +2,9 @@
  * Block-configured vintage reverb. Fixed internal clock; original networks; stereo dry is untouched.
  * No double crosses a call as an argument or a result: V8 boxes one across a call it does not
  * inline (worklet rule 2). `tick` takes `inputLeft`/`inputRight` and leaves `left`/`right`,
- * `internal` takes `internalInput`, `convert` turns `convertInput` into `converted`, and the
- * networks, lines and filters have fields of their own. Every double field is first written as
- * NaN, then its start value, so none changes representation (rule 7).
+ * `internal` takes `internalInput`, and the converters, networks, lines and filters have fields of
+ * their own. Every double field is first written as NaN, then its start value, so none changes
+ * representation (rule 7).
  * `inserts/retroReverbAllocation.test.ts` holds it to both on V8.
  *
  * Early reflections (RV-1, `retroEarly.ts`) join the tank's output ahead of the wet tone, scaled by
@@ -15,6 +15,11 @@
  * and the tank ramps its lines to each block's Size over the internal ticks the block actually runs
  * (`ticks`, counted by `countTicks` from the clock's phase), so a large move sweeps the reads instead of stepping them once a block. A Size that holds still is
  * read as before, to the bit.
+ *
+ * The converter (RV-6, `retroConverter.ts`) runs at three points: the input, once a tick, and
+ * each wet output. `ranging` is the share of the gain-ranging quantiser, smoothed per block like
+ * the mode, so a switch crossfades; at exactly 0 the converters take the linear path alone, and
+ * a switch away from 0 starts their detectors at unity gain, where ranging is linear to the bit.
  *
  * The on/off switch (windsor#630) is `level`, moved linearly over `INSERT_SWITCH_FADE_S` and landing
  * on its target exactly; the wet share is the smoothed Mix times it, so fully off is the input to
@@ -32,6 +37,7 @@ import { RetroFilter } from './retroFilter';
 import { RetroTank } from './retroTank';
 import { RetroReflections } from './retroReflections';
 import { RetroEarly } from './retroEarly';
+import { RetroConverter } from './retroConverter';
 
 type RetroParams = Record<string, Float32Array>;
 
@@ -39,6 +45,9 @@ class RetroReverbDsp {
   tank: RetroTank;
   reflections: RetroReflections;
   earlyTaps: RetroEarly;
+  inputConverter: RetroConverter;
+  leftConverter: RetroConverter;
+  rightConverter: RetroConverter;
   pre: RetroDelay;
   inputFilter: RetroFilter;
   leftFilter: RetroFilter;
@@ -63,6 +72,8 @@ class RetroReverbDsp {
   density: number;
   preDelay: number;
   character: number;
+  /** The gain-ranging converter's share (RV-6): 0 linear, 1 ranging, smoothed per block. */
+  ranging: number;
   mix: number;
   targetMix: number;
   /** Early (smoothed), and its level on the wet output: Early times the reverb mode's share. */
@@ -84,8 +95,6 @@ class RetroReverbDsp {
   inputLeft: number;
   inputRight: number;
   internalInput: number;
-  convertInput: number;
-  converted: number;
 
   constructor(rate: number, params: RetroParams) {
     // Rule 7: each double field is born a double (NaN), before its start value.
@@ -94,15 +103,18 @@ class RetroReverbDsp {
     this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
-    this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
+    this.level = this.targetLevel = this.levelStep = this.ranging = NaN;
     this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.ticks = 0;
-    this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
+    this.inputLeft = this.inputRight = this.internalInput = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
     this.earlyTaps = new RetroEarly(this.reflections.delay);
+    this.inputConverter = new RetroConverter();
+    this.leftConverter = new RetroConverter();
+    this.rightConverter = new RetroConverter();
     this.pre = new RetroDelay(C.rate * B.preDelay[1]);
     this.inputFilter = new RetroFilter(rate);
     this.leftFilter = new RetroFilter(rate);
@@ -117,6 +129,7 @@ class RetroReverbDsp {
     this.density = params.density[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
+    this.ranging = params.converter[0] > 0 ? 1 : 0;
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
@@ -133,6 +146,7 @@ class RetroReverbDsp {
     this.reflections.configure(this);
     this.earlyTaps.size = this.size;
     this.earlyTaps.configure();
+    this.configureConverters();
   }
 
   configure(params: RetroParams, frames: number): void {
@@ -151,6 +165,11 @@ class RetroReverbDsp {
       this.density = params.density[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
+    const ranging = params.converter[0] > 0 ? 1 : 0;
+    // From linear: the detectors start at unity gain, where ranging reads as linear.
+    if (this.ranging === 0 && ranging !== 0) this.resetConverters();
+    this.ranging += k * (ranging - this.ranging);
+    if (Math.abs(ranging - this.ranging) < C.silenceFloor) this.ranging = ranging;
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
@@ -171,6 +190,21 @@ class RetroReverbDsp {
       this.earlyTaps.size = this.size;
       this.earlyTaps.configure();
     }
+    this.configureConverters();
+  }
+
+  /** The block's Character and converter share, into each conversion point. */
+  configureConverters(): void {
+    this.inputConverter.character = this.leftConverter.character = this.character;
+    this.rightConverter.character = this.character;
+    this.inputConverter.ranging = this.leftConverter.ranging = this.ranging;
+    this.rightConverter.ranging = this.ranging;
+  }
+
+  resetConverters(): void {
+    this.inputConverter.reset();
+    this.leftConverter.reset();
+    this.rightConverter.reset();
   }
 
   /**
@@ -209,32 +243,24 @@ class RetroReverbDsp {
     this.rightFilter.z.fill(0);
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
+    this.resetConverters();
     this.dormant = true;
-  }
-
-  /** `convertInput` through the converter's clip and quantiser, into `converted`. */
-  convert(): void {
-    const bounded = Math.max(-1, Math.min(1, this.convertInput));
-    const quantized = Math.trunc(bounded * C.converterSteps) / C.converterSteps;
-    this.converted = bounded + this.character * (quantized - bounded);
   }
 
   /** One sample of the internal clock, of `internalInput`. */
   internal(): void {
-    const input = this.internalInput;
+    const converter = this.inputConverter;
+    // Once a tick, so the ranging detector sees each sample once.
+    converter.input = this.internalInput;
+    converter.tick();
     let delayed: number;
-    if (this.preDelay < 1 / C.rate) {
-      this.convertInput = input;
-      this.convert();
-      delayed = this.converted;
-    } else {
+    if (this.preDelay < 1 / C.rate) delayed = converter.output;
+    else {
       this.pre.delay = this.preDelay * C.rate;
       this.pre.read();
       delayed = this.pre.output;
     }
-    this.convertInput = input;
-    this.convert();
-    this.pre.input = this.converted;
+    this.pre.input = converter.output;
     this.pre.write();
     this.tank.input = delayed;
     this.tank.tick();
@@ -263,12 +289,12 @@ class RetroReverbDsp {
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < C.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < C.silenceFloor) this.wetToneRight = 0;
-    this.convertInput = this.wetToneLeft;
-    this.convert();
-    this.heldLeft = this.converted;
-    this.convertInput = this.wetToneRight;
-    this.convert();
-    this.heldRight = this.converted;
+    this.leftConverter.input = this.wetToneLeft;
+    this.leftConverter.tick();
+    this.heldLeft = this.leftConverter.output;
+    this.rightConverter.input = this.wetToneRight;
+    this.rightConverter.tick();
+    this.heldRight = this.rightConverter.output;
   }
 
   /** One host sample: `inputLeft`/`inputRight` in, `left`/`right` out. */
