@@ -205,3 +205,35 @@ export const ROLL_QUANTISE = {
     'Snap the onsets of the selected notes, or every note when none is selected, to the nearest Snap step. Lengths are kept.',
   offTitle: 'Set a Snap to quantise to',
 } as const;
+
+/**
+ * Rec (windsor#663; record `2026-10-09-roll-recording` decisions 1, 7, 8
+ * and 9, the mockup's words): the switch's two sides, the label for each
+ * look, the hint and the titles, the undo step a take makes, the summary of
+ * a full region, and how often the console's recorder reads the playhead.
+ */
+export const ROLL_REC = {
+  label: 'Rec',
+  on: 'Rec',
+  off: 'Off',
+  looks: {
+    'no-region': 'no region',
+    off: '',
+    armed: 'armed',
+    paused: 'paused',
+    recording: 'recording',
+    full: 'region full',
+  },
+  hint: 'No region under the playhead',
+  titles: {
+    'no-region':
+      "No region under the playhead: move the playhead into one of this part's regions to record",
+    paused: "Armed, paused: recording resumes when the playhead enters this part's next region",
+    live: 'Record what you play into the region under the playhead',
+  },
+  undo: 'Record',
+  held: 'held, written when it stops sounding',
+  full: (max: number): string =>
+    `Region full: ${max} notes, the most a region holds · no new notes are recorded here`,
+  pollMs: 25,
+} as const;

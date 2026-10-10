@@ -24,6 +24,7 @@ import { renderMixerTab } from './mixerTab';
 import { mountPartStrip } from './partStrip';
 import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
+import { mountRollRecorder } from './rollRecMount';
 import { newSong } from './songParts';
 import { songTab } from './songTab';
 import { GEAR_ICON, mountTabShell } from './tabShell';
@@ -46,6 +47,8 @@ const keyboard = new Keyboard(
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
+// The Roll's Rec records what the keyboard plays (windsor#663).
+mountRollRecorder(ctx, keyboard);
 // The bend and the mod wheel follow the selected part, whichever view picked it.
 ctx.parts.onSelect(() => keyboard.followPart());
 

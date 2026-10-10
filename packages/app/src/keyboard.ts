@@ -3,6 +3,13 @@
  * the real engine — `part.noteOn`/`noteOff`, nothing local. Its QWERTY keys
  * play only while the Parts tab is shown (windsor#349), so another tab's own
  * keys (the Song tab's E and D) never sound a note; MIDI input plays anywhere.
+ *
+ * Its `tap` (windsor#663, the Roll recorder) hears each note where it really
+ * starts and stops on the part: `play`, and a `lift` that sends the note-off,
+ * each with its input event's `timeStamp`. A release Hold keeps reaches the
+ * tap only when the voice stops (a forced lift, or Panic, which the tap
+ * hears as one); the sustain pedal's is `MidiPerformer`'s, which lifts on
+ * pedal up.
  */
 import type { AudioPart } from '@windsor/engine';
 import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
@@ -19,6 +26,7 @@ import {
 } from './keyboardConstants';
 import { pitchClass } from './consoleFormat';
 import type { PerformerSink } from './midiPerformer';
+import type { NoteTap } from './rollRecorder';
 
 /**
  * A dropdown picked with the mouse keeps focus, and the note keys above are
@@ -70,7 +78,17 @@ export const isShortcutPress = (
 interface Held {
   id: number;
   part: AudioPart;
+  /** The MIDI note it plays, for the tap's release. */
+  note: number;
   el: HTMLElement | null;
+}
+
+/** One note struck: its pitch, velocity, key and input event's `timeStamp`. */
+interface Strike {
+  readonly note: number;
+  readonly velocity: number;
+  readonly keyEl: HTMLElement | null;
+  readonly timeStamp: number | undefined;
 }
 
 export class Keyboard {
@@ -79,6 +97,9 @@ export class Keyboard {
 
   /** Called after Panic, so a MIDI performer can forget notes the part no longer sounds. */
   onPanic: (() => void) | null = null;
+
+  /** Hears every note this keyboard starts and stops on a part: the Roll recorder (windsor#663). */
+  tap: NoteTap | null = null;
 
   private readonly held = new Map<string, Held>();
   /**
@@ -115,9 +136,9 @@ export class Keyboard {
       if (BLACK_KEYS.has(pitchClass(i))) key.dataset.black = '1';
       key.addEventListener('pointerdown', (e) => {
         key.setPointerCapture(e.pointerId);
-        this.press('mouse', i, key);
+        this.press('mouse', i, key, e.timeStamp);
       });
-      const up = (): void => this.lift('mouse');
+      const up = (e: PointerEvent): void => this.lift('mouse', false, e.timeStamp);
       key.addEventListener('pointerup', up);
       key.addEventListener('pointercancel', up);
       box.appendChild(key);
@@ -149,12 +170,13 @@ export class Keyboard {
     if (e.key === 'x') return this.shiftOctave(1);
     const off = QWERTY[e.key];
     if (off === undefined || this.held.has(e.code)) return;
-    this.press(e.code, off, ($('keys').children[off] as HTMLElement | undefined) ?? null);
+    const keyEl = ($('keys').children[off] as HTMLElement | undefined) ?? null;
+    this.press(e.code, off, keyEl, e.timeStamp);
   }
 
   /** One QWERTY release, by physical key so a Shift change between the two still lifts. */
   onKeyUp(e: KeyboardEvent): void {
-    this.lift(e.code);
+    this.lift(e.code, false, e.timeStamp);
   }
 
   shiftOctave(by: number): void {
@@ -170,6 +192,7 @@ export class Keyboard {
    * part switch, which is what Hold is for; Panic is what lets them all go.
    */
   panic(): void {
+    this.tap?.panic();
     const selected = this.getPart();
     if (selected) this.sounded.add(selected);
     for (const part of this.sounded) part.panic();
@@ -205,18 +228,18 @@ export class Keyboard {
   /** One MIDI input's view of this keyboard: real note numbers, real velocity, its own held notes. */
   midiSink(inputId: string): PerformerSink {
     return {
-      press: (note, velocity) => {
+      press: (note, velocity, timeStamp) => {
         const offset = note - this.octave * SEMITONES_PER_OCTAVE;
         const keys = document.getElementById('keys');
         const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
-        this.play(
-          `midi:${inputId}:${note}`,
+        this.play(`midi:${inputId}:${note}`, {
           note,
           velocity,
-          (keyEl as HTMLElement | undefined) ?? null,
-        );
+          keyEl: (keyEl as HTMLElement | undefined) ?? null,
+          timeStamp,
+        });
       },
-      release: (note, force) => this.lift(`midi:${inputId}:${note}`, force),
+      release: (note, force, timeStamp) => this.lift(`midi:${inputId}:${note}`, force, timeStamp),
       bend: (semitones) => {
         this.bendSemitones = semitones;
         this.followPart();
@@ -228,23 +251,35 @@ export class Keyboard {
     };
   }
 
-  private press(source: string, offset: number, keyEl: HTMLElement | null): void {
-    this.play(source, this.octave * SEMITONES_PER_OCTAVE + offset, FIXED_VELOCITY, keyEl);
+  private press(
+    source: string,
+    offset: number,
+    keyEl: HTMLElement | null,
+    timeStamp: number | undefined,
+  ): void {
+    const note = this.octave * SEMITONES_PER_OCTAVE + offset;
+    this.play(source, { note, velocity: FIXED_VELOCITY, keyEl, timeStamp });
   }
 
-  private play(source: string, note: number, velocity: number, keyEl: HTMLElement | null): void {
+  private play(source: string, strike: Strike): void {
     const part = this.getPart();
     if (!part) return;
+    const { note, velocity, keyEl, timeStamp } = strike;
     const id = part.noteOn(note, velocity);
     this.sounded.add(part);
     keyEl?.classList.add('down');
-    this.held.set(source, { id, part, el: keyEl });
+    this.held.set(source, { id, part, note, el: keyEl });
+    this.tap?.press(part, source, note, velocity, timeStamp);
   }
 
-  private lift(source: string, force = false): void {
+  /** A key let go: its note stops unless Hold keeps it (`force` stops it anyway). */
+  private lift(source: string, force = false, timeStamp?: number): void {
     const held = this.held.get(source);
     if (!held) return;
-    if (!this.hold || force) held.part.noteOff(held.id);
+    if (!this.hold || force) {
+      held.part.noteOff(held.id);
+      this.tap?.release(held.part, source, held.note, timeStamp);
+    }
     held.el?.classList.remove('down');
     this.held.delete(source);
   }

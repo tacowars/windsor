@@ -3105,6 +3105,104 @@ body.chord-dragging {
   border-color: var(--line);
   cursor: default;
 }
+/* Rec (windsor#663, the mockup's rules): Audition's two-way switch in the
+   record colour (--hot). Armed or paused, On is tinted and its dot lit;
+   recording, On is filled and its dot blinks. Off with no region under the
+   playhead, the switch dims and the hint under it says why. */
+.rec-seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+/* Off and live: the pressed side neutral, not a colour of its own. */
+.rec-seg button[aria-pressed='true'] {
+  background: var(--panel-hi);
+  color: var(--ink);
+}
+.rec-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+.rec-item .rec-state {
+  font-family: var(--f-num);
+}
+.rec-hint {
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 9px;
+  line-height: 10px;
+}
+.rec-item:not(.disabled):not(.paused) .rec-hint {
+  display: none;
+}
+.rec-item.disabled .rec-seg {
+  opacity: 0.45;
+}
+.rec-item.disabled .rec-seg button {
+  cursor: not-allowed;
+}
+.rec-item.disabled .rec-seg button[aria-pressed='true'] {
+  background: var(--panel-hi);
+  color: var(--ink-dim);
+}
+.rec-item.armed .rec-on,
+.rec-item.paused .rec-on {
+  background: color-mix(in srgb, var(--hot) 22%, var(--inset));
+  color: var(--ink);
+}
+.rec-item.armed .rec-dot,
+.rec-item.paused .rec-dot {
+  background: var(--hot);
+}
+.rec-item.armed .rec-off,
+.rec-item.paused .rec-off,
+.rec-item.recording .rec-off {
+  background: var(--inset);
+  color: var(--ink-dim);
+}
+.rec-item.recording .rec-on {
+  background: var(--hot);
+  color: var(--inset);
+}
+.rec-item.recording .rec-dot {
+  background: var(--inset);
+  animation: rec-blink 1.2s steps(1) infinite;
+}
+.rec-item.armed .rec-state,
+.rec-item.paused .rec-state,
+.rec-item.recording .rec-state {
+  color: var(--hot);
+}
+@keyframes rec-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rec-item.recording .rec-dot {
+    animation: none;
+  }
+}
+/* The note Rec holds: drawn growing, with a record-coloured edge, until it
+   stops sounding and is written. No gesture takes it. */
+.roll-note.rec-held {
+  z-index: 2;
+  box-shadow:
+    inset 0 0 0 1px var(--hot),
+    inset -2px 0 0 var(--hot);
+  cursor: default;
+  pointer-events: none;
+}
+.roll-stem.rec-held {
+  background: var(--hot);
+}
+.roll-summary.full {
+  color: var(--hot);
+}
 .seg.roll-seg {
   flex-wrap: nowrap;
   height: var(--roll-ctl-h);
