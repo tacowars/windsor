@@ -1,5 +1,9 @@
 /** Runs the actual shipped retro processor with only browser globals shimmed. */
-import { RETRO_REVERB_DEFAULTS, RETRO_REVERB_MODES } from '../inserts/retroReverbConstants';
+import {
+  RETRO_REVERB_CONVERTERS,
+  RETRO_REVERB_DEFAULTS,
+  RETRO_REVERB_MODES,
+} from '../inserts/retroReverbConstants';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
 import { firstValues, generatedProcessor } from './generatedProcessor';
 
@@ -9,6 +13,7 @@ export function retroParams(spec: Partial<RetroReverbSpec> = {}): Record<string,
       ...RETRO_REVERB_DEFAULTS,
       ...spec,
       mode: RETRO_REVERB_MODES.indexOf(spec.mode ?? 'reverb'),
+      converter: RETRO_REVERB_CONVERTERS.indexOf(spec.converter ?? 'linear'),
     })
       .filter(([key]) => key !== 'kind')
       .map(([key, value]) => [key, new Float32Array([Number(value)])]),

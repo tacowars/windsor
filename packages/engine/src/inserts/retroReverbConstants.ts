@@ -1,6 +1,8 @@
 /** Original vintage-reverb tunables (#682); no factory microcode or delay tables. */
 export const RETRO_REVERB_NAME = 'retro-reverb';
 export const RETRO_REVERB_MODES = ['reverb', 'gated', 'reverse'] as const;
+/** The converter's model: today's fixed quantiser, or a gain-ranging one (RV-6). */
+export const RETRO_REVERB_CONVERTERS = ['linear', 'ranging'] as const;
 export const RETRO_REVERB_BOUNDS = {
   decay: [0.2, 20],
   size: [0.25, 3],
@@ -10,6 +12,13 @@ export const RETRO_REVERB_BOUNDS = {
   character: [0, 1],
   mix: [0, 1],
   duration: [0.1, 0.6],
+  // RV-0 adds these at neutral defaults (below); each is read by the item that ships it.
+  early: [0, 1],
+  driftRate: [0.05, 5],
+  driftDepth: [0, 1],
+  density: [0, 1],
+  lowDecay: [0.25, 4],
+  lowCross: [80, 2000],
 } as const;
 export const RETRO_REVERB_DEFAULTS = {
   decay: 1.4,
@@ -21,6 +30,13 @@ export const RETRO_REVERB_DEFAULTS = {
   mix: 0.3,
   enabled: true,
   duration: 0.3,
+  // Neutral: at these values the reverb sounds as it did before the fields existed.
+  early: 0,
+  driftRate: 0.5,
+  driftDepth: 0,
+  density: 0,
+  lowDecay: 1,
+  lowCross: 300,
 };
 export const RETRO_REVERB_DSP = {
   rate: 23437.5,

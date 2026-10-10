@@ -25,6 +25,8 @@ class RetroReverbProcessor extends AudioWorkletProcessor {
       })),
       { name: 'enabled', minValue: 0, maxValue: 1, defaultValue: 1, automationRate: 'k-rate' },
       { name: 'mode', minValue: 0, maxValue: 2, defaultValue: 0, automationRate: 'k-rate' },
+      // The index in RETRO_REVERB_CONVERTERS; nothing reads it until RV-6.
+      { name: 'converter', minValue: 0, maxValue: 1, defaultValue: 0, automationRate: 'k-rate' },
     ];
   }
 

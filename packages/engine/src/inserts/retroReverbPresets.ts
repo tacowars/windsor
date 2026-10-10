@@ -21,15 +21,18 @@ export interface RetroReverbPreset {
   readonly settings: Settings;
 }
 
+/**
+ * Every sound field at its default, so a preset is the whole state: applying one resets each
+ * field it does not name (Early, Drift, Density, the low band, the converter) to neutral, and
+ * matching compares them all.
+ */
+const USER_OWNED: readonly string[] = ['kind', 'mix', 'enabled'];
 const base: Settings = {
-  mode: 'reverb',
-  decay: DEFAULT_RETRO_REVERB.decay,
-  size: DEFAULT_RETRO_REVERB.size,
-  tone: DEFAULT_RETRO_REVERB.tone,
+  ...(Object.fromEntries(
+    Object.entries(DEFAULT_RETRO_REVERB).filter(([key]) => !USER_OWNED.includes(key)),
+  ) as Settings),
   diffusion: RETRO_PRESET_DIFFUSION,
-  preDelay: DEFAULT_RETRO_REVERB.preDelay,
   character: RETRO_PRESET_CHARACTER,
-  duration: DEFAULT_RETRO_REVERB.duration,
 };
 
 export const RETRO_REVERB_PRESETS: readonly RetroReverbPreset[] = [

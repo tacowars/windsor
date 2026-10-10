@@ -4,6 +4,7 @@
 // packages/engine/src/inserts/retroReverbConstants.ts
 var RETRO_REVERB_NAME = "retro-reverb";
 var RETRO_REVERB_MODES = ["reverb", "gated", "reverse"];
+var RETRO_REVERB_CONVERTERS = ["linear", "ranging"];
 var RETRO_REVERB_BOUNDS = {
   decay: [0.2, 20],
   size: [0.25, 3],
@@ -12,7 +13,14 @@ var RETRO_REVERB_BOUNDS = {
   preDelay: [0, 0.25],
   character: [0, 1],
   mix: [0, 1],
-  duration: [0.1, 0.6]
+  duration: [0.1, 0.6],
+  // RV-0 adds these at neutral defaults (below); each is read by the item that ships it.
+  early: [0, 1],
+  driftRate: [0.05, 5],
+  driftDepth: [0, 1],
+  density: [0, 1],
+  lowDecay: [0.25, 4],
+  lowCross: [80, 2e3]
 };
 var RETRO_REVERB_DEFAULTS = {
   decay: 1.4,
@@ -23,7 +31,14 @@ var RETRO_REVERB_DEFAULTS = {
   character: 0.65,
   mix: 0.3,
   enabled: true,
-  duration: 0.3
+  duration: 0.3,
+  // Neutral: at these values the reverb sounds as it did before the fields existed.
+  early: 0,
+  driftRate: 0.5,
+  driftDepth: 0,
+  density: 0,
+  lowDecay: 1,
+  lowCross: 300
 };
 var RETRO_REVERB_DSP = {
   rate: 23437.5,
@@ -497,7 +512,9 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
         automationRate: "k-rate"
       })),
       { name: "enabled", minValue: 0, maxValue: 1, defaultValue: 1, automationRate: "k-rate" },
-      { name: "mode", minValue: 0, maxValue: 2, defaultValue: 0, automationRate: "k-rate" }
+      { name: "mode", minValue: 0, maxValue: 2, defaultValue: 0, automationRate: "k-rate" },
+      // The index in RETRO_REVERB_CONVERTERS; nothing reads it until RV-6.
+      { name: "converter", minValue: 0, maxValue: 1, defaultValue: 0, automationRate: "k-rate" }
     ];
   }
   constructor(options) {

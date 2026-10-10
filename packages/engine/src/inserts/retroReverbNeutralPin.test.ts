@@ -6,7 +6,8 @@
  * tolerance of 1e-6 above an absolute floor of 1e-9 (about −180 dB) for windows near silence.
  * That passes the last-ulp drift of V8's `Math` between arm64 and x64 and fails any audible
  * change. Refresh only for an intended change to the neutral sound:
- * `WINDSOR_REFRESH_RETRO_NEUTRAL_PIN=1 npx vitest run packages/engine/src/inserts/retroReverbNeutralPin.test.ts`.
+ * `WINDSOR_REFRESH_RETRO_NEUTRAL_PIN=1 npx vitest run packages/engine/src/inserts/retroReverbNeutralPin.test.ts`,
+ * then `npx prettier --write` the fixture.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
@@ -56,7 +57,9 @@ function fingerprint(spec: Partial<RetroReverbSpec>, input: Float32Array): numbe
       for (let i = 0; i < BLOCK; i++)
         sums[channel]![Math.floor((frame + i) / WINDOW)]! += output[channel]![i]! ** 2;
   }
-  return sums.map((sum) => [...sum].map((total) => Number(Math.sqrt(total / WINDOW).toPrecision(9))));
+  return sums.map((sum) =>
+    [...sum].map((total) => Number(Math.sqrt(total / WINDOW).toPrecision(9))),
+  );
 }
 
 function renderAll(): Record<string, number[][]> {
