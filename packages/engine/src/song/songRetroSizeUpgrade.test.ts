@@ -1,8 +1,8 @@
 /**
- * Song version 7 → 8 (windsor#626): the Filter insert's Reso row moved from
- * linear to log. The upgrade is an identity step, so a version-7 song with
- * a Filter Reso lane opens at this build's version (through 8) with nothing
- * but `version` changed, and its lane plays along the log curve.
+ * Song version 8 → 9 (RV-4): Retro Reverb's Size row moved from linear to
+ * log. The upgrade is an identity step, so a version-8 song with a Retro
+ * Size lane opens at this build's version with nothing but `version`
+ * changed, and its lane plays along the log curve.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -11,41 +11,41 @@ import { FULL_DOCUMENT, FULL_STRIPS, withDocumentPart } from '../__fixtures__/fu
 import { valueAt } from '../automation/automationEvaluate';
 import { insertTargetRow } from '../automation/automationTargets';
 import { ARRANGEMENT_VERSION } from '../audioConstants';
-import { DEFAULT_FILTER } from '../inserts/filterSpec';
 import type { InsertSpec } from '../inserts/insertRegistry';
+import { DEFAULT_RETRO_REVERB } from '../inserts/retroReverbSpec';
 import { makeArrangement } from './arrangementDocument';
 import { upgradeSong } from './songMigrations';
 
-const FILTER = { ...DEFAULT_FILTER, id: 'filt1' } as InsertSpec;
+const RETRO = { ...DEFAULT_RETRO_REVERB, id: 'retro1' } as InsertSpec;
 const END = 384;
-const RESO = lane('insert.filt1.resonance', [point(0, 0.5), point(END, 12)]);
+const SIZE = lane('insert.retro1.size', [point(0, 0.25), point(END, 3)]);
 
-/** A version-7 song whose hat strip carries a Filter, its Reso drawn 0.5 → 12 unbent. */
-const versionSeven = (): Record<string, unknown> => ({
+/** A version-8 song whose hat strip carries a Retro Reverb, its Size drawn 0.25 → 3 unbent. */
+const versionEight = (): Record<string, unknown> => ({
   ...structuredClone(
     withDocumentPart(FULL_DOCUMENT, 'hat', {
-      strip: { ...FULL_STRIPS.hat, inserts: [FILTER] },
-      automation: [RESO],
+      strip: { ...FULL_STRIPS.hat, inserts: [RETRO] },
+      automation: [SIZE],
     }),
   ),
-  version: 7,
+  version: 8,
 });
 
-describe('a version-7 song with a Filter Reso lane (windsor#626)', () => {
+describe('a version-8 song with a Retro Reverb Size lane (RV-4)', () => {
   it("upgrades to this build's version with nothing but its version changed", () => {
-    const raw = versionSeven();
+    const raw = versionEight();
     const { document, refused } = upgradeSong(raw);
     expect(refused).toBeUndefined();
     expect(document).toEqual({ ...raw, version: ARRANGEMENT_VERSION });
   });
 
   it('plays its lane along the log curve: the midpoint is the geometric mean', () => {
-    const result = makeArrangement(versionSeven());
+    const result = makeArrangement(versionEight());
     expect(result.refused).toBeUndefined();
     const hat = result.document.parts.find((part) => part.automation?.length)!;
     const saved = hat.automation![0]!;
-    expect(saved).toEqual(RESO);
-    const row = insertTargetRow('filter', 'resonance')!;
-    expect(valueAt(row, saved.points, END / 2)).toBeCloseTo(Math.sqrt(0.5 * 12), 6);
+    expect(saved).toEqual(SIZE);
+    const row = insertTargetRow('retro-reverb', 'size')!;
+    expect(valueAt(row, saved.points, END / 2)).toBeCloseTo(Math.sqrt(0.25 * 3), 6);
   });
 });

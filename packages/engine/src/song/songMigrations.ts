@@ -64,7 +64,16 @@ const snapshotToPatchFormatFour = (doc: RawDocument): RawDocument =>
 const filterResoOnLogScale = (doc: RawDocument): RawDocument => doc;
 
 /**
- * Three upgrades ship, 5 → 6, 6 → 7 and 7 → 8. Version 2 was retired by
+ * Version 8 → 9 (RV-4): a Retro Reverb's Size row moved from a linear to a
+ * log scale, so a saved Size lane plays along the log curve between its
+ * points. No lane is rewritten: a Size lane saved at version 8 plays along
+ * the log curve from version 9. A version-8 snapshot already holds the
+ * current patch format, so `patches` is not touched.
+ */
+const retroSizeOnLogScale = (doc: RawDocument): RawDocument => doc;
+
+/**
+ * Four upgrades ship, 5 → 6, 6 → 7, 7 → 8 and 8 → 9. Version 2 was retired by
  * #705, version 3 by windsor#238 (record `2026-10-01-retire-song-version-3`)
  * and version 4 by windsor#224, each with no upgrade, so a song saved at any
  * of them is refused.
@@ -73,6 +82,7 @@ export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   5: snapshotToPatchFormatThree,
   6: snapshotToPatchFormatFour,
   7: filterResoOnLogScale,
+  8: retroSizeOnLogScale,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

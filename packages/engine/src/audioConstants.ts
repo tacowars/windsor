@@ -193,15 +193,16 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 8 since windsor#626 (a Filter
- * insert's Reso lane is drawn and played on a log scale). Version 7
- * (windsor#590: the embedded patches are patch format 4, the operators'
- * `opLp` and `opHp`), version 6 (windsor#300: patch format 3, the drive out
- * of the filter) and version 5 (windsor#224: Tape's Drive feeds the magnetic
- * core) upgrade to 8 through `SONG_MIGRATIONS`; versions 2 to 4 are refused
- * (record `2026-09-28-format-versions-refuse-never-destroy`).
+ * A document's document-format version: 9 since RV-4 (a Retro Reverb's
+ * Size lane is drawn and played on a log scale). Version 8 (windsor#626: a
+ * Filter insert's Reso lane on a log scale), version 7 (windsor#590: the
+ * embedded patches are patch format 4, the operators' `opLp` and `opHp`),
+ * version 6 (windsor#300: patch format 3, the drive out of the filter) and
+ * version 5 (windsor#224: Tape's Drive feeds the magnetic core) upgrade to 9
+ * through `SONG_MIGRATIONS`; versions 2 to 4 are refused (record
+ * `2026-09-28-format-versions-refuse-never-destroy`).
  */
-export const ARRANGEMENT_VERSION = 8;
+export const ARRANGEMENT_VERSION = 9;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
