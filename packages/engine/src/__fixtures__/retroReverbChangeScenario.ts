@@ -52,7 +52,7 @@ interface RetroState {
   dormant: boolean;
   wetToneLeft: number;
   wetToneRight: number;
-  tank: { density: number };
+  tank: { density: number; sizeTicks: number };
 }
 
 /**
@@ -82,9 +82,9 @@ const TOGGLES: [string, number][] = [
 /**
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
  * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
- * and off, the line taps.
+ * and off, the line taps, the line taps placed on every tick of a Size move.
  */
-const PATHS = 14;
+const PATHS = 15;
 
 /** No input. */
 const none: Float32Array[][] = [];
@@ -131,6 +131,9 @@ function notePaths(
   if (dsp.dormant) seen[10] = 1;
   if (dsp.earlyLevel > config.floor) seen[11] = 1;
   if (dsp.tank.density !== 0) seen[13] = 1;
+  // A Size move ran with Density on: a ramp counts its ticks down to 0, a held Size never starts,
+  // and the taps were placed on each of them.
+  if (dsp.tank.density !== 0 && dsp.tank.sizeTicks === 0 && !dsp.dormant) seen[14] = 1;
 }
 
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {

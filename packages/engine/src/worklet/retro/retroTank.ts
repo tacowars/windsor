@@ -78,8 +78,8 @@ class RetroTank {
   tapSignsLeft: Float64Array;
   tapSignsRight: Float64Array;
   /**
-   * Per tap, set each block: its delay in samples as whole samples (rounded up) less a fraction,
-   * read in place rather than through `RetroDelay.read` (the same interpolation, at half the cost
+   * Per tap: its delay in samples as whole samples (rounded up) less a fraction, set each block
+   * and each tick of a Size move, read in place rather than through `RetroDelay.read` (the same interpolation, at half the cost
    * measured in `docs/research/2026-10-10-retro-reverb-extensions/rv3.md`), and its gain in each
    * output.
    */
@@ -180,19 +180,33 @@ class RetroTank {
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(C.decayTarget, (C.tankSeconds[i] * size) / decay);
     this.density = share > C.silenceFloor ? density * share : 0;
-    if (this.density !== 0) this.configureTaps();
+    if (this.density === 0) return;
+    this.placeTaps();
+    this.weighTaps();
   }
 
-  /** The taps' delays at this Size, and their gains at this Density and the lines' gains. */
-  configureTaps(): void {
+  /**
+   * The taps' delays at the lines' Size now: once a block while Size holds, and on every tick of
+   * a Size move (RV-4's ramp), so the taps glide with the line ends rather than step each block.
+   * Taps and ends scale with the same Size, so every tap stays at least 0.18 of its line short of
+   * the end at any Size up to 10 (1.4 ms at Size 0.25), beyond Drift's 0.5 ms either way, and
+   * inside the buffer, which holds the longest end at Size 10.
+   */
+  placeTaps(): void {
+    for (let k = 0; k < this.tapWhole.length; k++) {
+      const delay = this.tapFractions[k] * C.tankSeconds[this.tapLines[k]] * this.size * C.rate;
+      this.tapWhole[k] = Math.ceil(delay);
+      this.tapFraction[k] = this.tapWhole[k] - delay;
+    }
+  }
+
+  /** The taps' gains at this Density and the lines' gains, once a block. */
+  weighTaps(): void {
     let left = 0,
       right = 0;
     for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.tapLines[k];
       const fraction = this.tapFractions[k];
-      const delay = fraction * C.tankSeconds[line] * this.size * C.rate;
-      this.tapWhole[k] = Math.ceil(delay);
-      this.tapFraction[k] = this.tapWhole[k] - delay;
       const weight = this.density * Math.pow(this.gains[line], fraction - 1);
       this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
       this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
@@ -229,6 +243,17 @@ class RetroTank {
     this.tapRight = right;
   }
 
+  /**
+   * One tick of a Size move: the lines' `size` a step on, and the taps placed at it. The block's
+   * last tick sets the target itself, so rounding in the steps never leaves it short.
+   */
+  stepSize(): void {
+    this.sizeTicks--;
+    this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+    if (this.sizeTicks === 0) this.sizeStep = 0;
+    if (this.density !== 0) this.placeTaps();
+  }
+
   tick(): void {
     let input = this.input;
     for (let i = 0; i < this.diffusers.length; i++) {
@@ -249,12 +274,7 @@ class RetroTank {
       this.driftPhase = phase;
       triangle = 2 * Math.abs(phase) - 1;
     }
-    // The block's last tick sets the target itself, so rounding in the steps never leaves it short.
-    if (this.sizeStep !== 0) {
-      this.sizeTicks--;
-      this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
-      if (this.sizeTicks === 0) this.sizeStep = 0;
-    }
+    if (this.sizeStep !== 0) this.stepSize();
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];

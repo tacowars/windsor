@@ -336,17 +336,30 @@ var RetroTank = class {
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(RETRO_REVERB_DSP.decayTarget, RETRO_REVERB_DSP.tankSeconds[i] * size / decay);
     this.density = share > RETRO_REVERB_DSP.silenceFloor ? density * share : 0;
-    if (this.density !== 0) this.configureTaps();
+    if (this.density === 0) return;
+    this.placeTaps();
+    this.weighTaps();
   }
-  /** The taps' delays at this Size, and their gains at this Density and the lines' gains. */
-  configureTaps() {
+  /**
+   * The taps' delays at the lines' Size now: once a block while Size holds, and on every tick of
+   * a Size move (RV-4's ramp), so the taps glide with the line ends rather than step each block.
+   * Taps and ends scale with the same Size, so every tap stays at least 0.18 of its line short of
+   * the end at any Size up to 10 (1.4 ms at Size 0.25), beyond Drift's 0.5 ms either way, and
+   * inside the buffer, which holds the longest end at Size 10.
+   */
+  placeTaps() {
+    for (let k = 0; k < this.tapWhole.length; k++) {
+      const delay = this.tapFractions[k] * RETRO_REVERB_DSP.tankSeconds[this.tapLines[k]] * this.size * RETRO_REVERB_DSP.rate;
+      this.tapWhole[k] = Math.ceil(delay);
+      this.tapFraction[k] = this.tapWhole[k] - delay;
+    }
+  }
+  /** The taps' gains at this Density and the lines' gains, once a block. */
+  weighTaps() {
     let left = 0, right = 0;
     for (let k = 0; k < this.tapWhole.length; k++) {
       const line = this.tapLines[k];
       const fraction = this.tapFractions[k];
-      const delay = fraction * RETRO_REVERB_DSP.tankSeconds[line] * this.size * RETRO_REVERB_DSP.rate;
-      this.tapWhole[k] = Math.ceil(delay);
-      this.tapFraction[k] = this.tapWhole[k] - delay;
       const weight = this.density * Math.pow(this.gains[line], fraction - 1);
       this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
       this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
@@ -379,6 +392,16 @@ var RetroTank = class {
     this.tapLeft = left;
     this.tapRight = right;
   }
+  /**
+   * One tick of a Size move: the lines' `size` a step on, and the taps placed at it. The block's
+   * last tick sets the target itself, so rounding in the steps never leaves it short.
+   */
+  stepSize() {
+    this.sizeTicks--;
+    this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+    if (this.sizeTicks === 0) this.sizeStep = 0;
+    if (this.density !== 0) this.placeTaps();
+  }
   tick() {
     let input = this.input;
     for (let i = 0; i < this.diffusers.length; i++) {
@@ -398,11 +421,7 @@ var RetroTank = class {
       this.driftPhase = phase;
       triangle = 2 * Math.abs(phase) - 1;
     }
-    if (this.sizeStep !== 0) {
-      this.sizeTicks--;
-      this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
-      if (this.sizeTicks === 0) this.sizeStep = 0;
-    }
+    if (this.sizeStep !== 0) this.stepSize();
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
