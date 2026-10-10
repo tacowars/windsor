@@ -113,10 +113,7 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
 
   it('updates the copy the part had when Save started, not a patch loaded during the write', async () => {
     const scope = await linkedScope();
-    let finish = (): void => undefined;
-    const written = new Promise<void>((resolve) => (finish = resolve));
-    const write = scope.files.write;
-    scope.files.write = (name, text) => written.then(() => write(name, text));
+    const finish = deferWrites(scope.files);
     const working = { ...patchOf(scope.ctx, 'kick-2')!, volume: 0.1 };
     const saving = savePatch({ ...scope, working, meta: META });
     // The user loads another patch into the slot while the write is slow.
@@ -133,10 +130,7 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
 
   it('leaves another song alone when it opens during the write', async () => {
     const scope = await linkedScope();
-    let finish = (): void => undefined;
-    const written = new Promise<void>((resolve) => (finish = resolve));
-    const write = scope.files.write;
-    scope.files.write = (name, text) => written.then(() => write(name, text));
+    const finish = deferWrites(scope.files);
     const working = { ...patchOf(scope.ctx, 'kick-2')!, volume: 0.1 };
     const saving = savePatch({ ...scope, working, meta: META });
     // The user opens song B, which has a kick-2 of its own, while the write is slow.
@@ -172,10 +166,74 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
   it('drops the link on Save as… and on Init', async () => {
     const scope = await linkedScope();
     const working = patchOf(scope.ctx, 'kick-2')!;
-    const id = await copyToNew({ ...scope, working, meta: { ...META, name: 'Kick Mine' } });
+    const { id } = await copyToNew({ ...scope, working, meta: { ...META, name: 'Kick Mine' } });
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe(id);
     expect(partAt(scope.ctx.model.doc, hat)?.patchSource).toBeUndefined();
     initPatch({ ...scope, slot: arp });
     expect(partAt(scope.ctx.model.doc, arp)?.patchSource).toBeUndefined();
+  });
+});
+
+/** Holds the folder's writes until the returned `finish` runs. */
+function deferWrites(files: PatchFolder): () => void {
+  let finish = (): void => undefined;
+  const written = new Promise<void>((resolve) => (finish = resolve));
+  const write = files.write;
+  files.write = (name, text) => written.then(() => write(name, text));
+  return () => finish();
+}
+
+describe('Save as… pinned to the song and slot it started in (windsor#677)', () => {
+  const MINE = { ...META, name: 'Kick Mine' };
+
+  it('leaves another song alone when it opens during the write', async () => {
+    const scope = await linkedScope();
+    const finish = deferWrites(scope.files);
+    const working = patchOf(scope.ctx, 'kick-2')!;
+    const saving = copyToNew({ ...scope, working, meta: MINE });
+    const theirs = makePatch({ name: 'Song B Kick', volume: 0.7 });
+    scope.ctx.model.open({ ...scope.ctx.model.doc, patches: { 'kick-2': theirs } });
+    const before = structuredClone({
+      parts: scope.ctx.model.doc.parts,
+      patches: scope.ctx.model.doc.patches,
+    });
+    finish();
+    const { id, switched } = await saving;
+    expect(switched).toBe(false);
+    expect(scope.library.entries[id]?.patch.name).toBe('Kick Mine');
+    expect({ parts: scope.ctx.model.doc.parts, patches: scope.ctx.model.doc.patches }).toEqual(
+      before,
+    );
+  });
+
+  it('keeps a patch loaded into the slot during the write', async () => {
+    const scope = await linkedScope();
+    const finish = deferWrites(scope.files);
+    const working = patchOf(scope.ctx, 'kick-2')!;
+    const saving = copyToNew({ ...scope, working, meta: MINE });
+    const chosen = makePatch({ name: 'Chosen', volume: 0.7 });
+    scope.ctx.change({
+      ...partChange(hat, { preset: 'chosen', patchSource: undefined }),
+      patches: { chosen },
+    });
+    finish();
+    const { id, switched } = await saving;
+    expect(switched).toBe(false);
+    expect(scope.library.entries[id]).toBeDefined();
+    expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe('chosen');
+    expect(patchOf(scope.ctx, 'chosen')).toEqual(chosen);
+    expect(patchOf(scope.ctx, id)).toBeUndefined();
+  });
+
+  it('switches the part when the write resolves with nothing changed meanwhile', async () => {
+    const scope = await linkedScope();
+    const finish = deferWrites(scope.files);
+    const working = patchOf(scope.ctx, 'kick-2')!;
+    const saving = copyToNew({ ...scope, working, meta: MINE });
+    finish();
+    const { id, switched } = await saving;
+    expect(switched).toBe(true);
+    expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe(id);
+    expect(patchOf(scope.ctx, id)?.name).toBe('Kick Mine');
   });
 });

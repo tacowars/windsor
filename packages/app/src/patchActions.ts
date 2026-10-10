@@ -173,6 +173,12 @@ export function discardEdits(scope: PatchScope): Patch | null {
   return restored;
 }
 
+/** Copy to new's file id, and whether the part switched to it (windsor#677). */
+export interface CopyResult {
+  id: string;
+  switched: boolean;
+}
+
 export interface WriteRequest extends PatchScope {
   working: Patch;
   meta: PatchMetadata;
@@ -187,7 +193,7 @@ export interface WriteRequest extends PatchScope {
 export async function savePatch(request: WriteRequest): Promise<string> {
   const origin = patchOrigin(request);
   if (origin.kind !== 'library') throw new Error('Save needs a library patch; use Copy to new.');
-  if (saveForks(request)) return copyToNew(request);
+  if (saveForks(request)) return (await copyToNew(request)).id;
   const { ctx, library, meta, working } = request;
   const file = buildPatchFile(meta, working);
   // Pinned before the write, with the song it belongs to: a patch loaded into
@@ -207,9 +213,10 @@ export async function savePatch(request: WriteRequest): Promise<string> {
  * folder), and switch the part to it. The new id is a library id, so the
  * part's `patchSource` goes (windsor#669 decision 4). The automatic copy it
  * leaves goes only when unedited (windsor#671): an edit made before Save as…
- * is in that copy too.
+ * is in that copy too. Only into the song and the slot it started in:
+ * `switched` says whether the part took the new patch.
  */
-export async function copyToNew(request: WriteRequest): Promise<string> {
+export async function copyToNew(request: WriteRequest): Promise<CopyResult> {
   const { ctx, library, slot, meta, working } = request;
   const wasInit = patchOrigin(request).kind === 'init';
   const id = uniqueId(slugify(meta.name), [
@@ -217,7 +224,15 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
     ...Object.keys(ctx.model.doc.patches ?? {}),
   ]);
   const file = buildPatchFile(meta, working);
+  // Pinned before the write, as Save pins them (windsor#677): another song
+  // opened, or another patch loaded into the slot, meanwhile gets no switch
+  // and no cleanup. The file is still written and the id still returned.
+  const own = partAt(ctx.model.doc, slot)?.preset;
+  const song = ctx.model.openings;
   await writeLibraryFile(library, id, patchFileText(file), request.download);
+  if (ctx.model.openings !== song || partAt(ctx.model.doc, slot)?.preset !== own) {
+    return { id, switched: false };
+  }
   // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
   withGesture('Copy to new', () => {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
@@ -228,7 +243,7 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
     });
     if (wasInit) dropInit(ctx);
   });
-  return id;
+  return { id, switched: true };
 }
 
 /** Remove one of the user's patches (or a folder file); refused for a built-in and the fallback. Songs keep their copies. */
