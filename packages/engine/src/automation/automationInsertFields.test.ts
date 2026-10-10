@@ -91,13 +91,14 @@ describe('automatableInsertFields', () => {
   it("offers Retro Reverb's tank in reverb mode and its gate time outside it", () => {
     const retro = defaults<RetroReverbSpec>('retro-reverb');
     const reverb = fields({ ...retro, mode: 'reverb' });
-    expect(reverb).toEqual(expect.arrayContaining(['decay', 'size']));
+    expect(reverb).toEqual(expect.arrayContaining(['decay', 'size', 'early']));
     expect(reverb).not.toContain('duration');
     for (const mode of ['gated', 'reverse'] as const) {
       const finite = fields({ ...retro, mode });
       expect(finite).toContain('duration');
       expect(finite).not.toContain('decay');
       expect(finite).not.toContain('size');
+      expect(finite).not.toContain('early');
       expect(finite).toEqual(expect.arrayContaining(['tone', 'diffusion', 'preDelay', 'mix']));
     }
   });

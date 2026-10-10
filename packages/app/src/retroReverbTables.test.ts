@@ -3,7 +3,7 @@ import { DEFAULT_RETRO_REVERB, RETRO_REVERB_BOUNDS } from '@windsor/engine';
 import { RETRO_REVERB_KNOBS } from './retroReverbTables';
 
 /** Engine fields that have no knob yet; each item that ships one takes its field off this list. */
-const NO_KNOB_YET = ['early', 'driftRate', 'driftDepth', 'density', 'lowDecay', 'lowCross'];
+const NO_KNOB_YET = ['driftRate', 'driftDepth', 'density', 'lowDecay', 'lowCross'];
 
 it('exposes every numerical engine field with the engine range and default', () => {
   expect(RETRO_REVERB_KNOBS.map((k) => k.f).sort()).toEqual(
