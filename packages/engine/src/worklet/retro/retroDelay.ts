@@ -27,6 +27,8 @@ class RetroDelay {
     const length = this.buffer.length;
     let position = this.head - Math.max(1, Math.min(length - 2, this.delay));
     if (position < 0) position += length;
+    // A delay a hair over 1 at head 1 (Drift's detune near zero) rounds `position` up to `length`.
+    if (position >= length) position -= length;
     const index = Math.floor(position);
     const next = index + 1 === length ? 0 : index + 1;
     this.output =

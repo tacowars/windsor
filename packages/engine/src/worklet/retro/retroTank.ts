@@ -88,10 +88,13 @@ class RetroTank {
     this.excursion = driftDepth * C.driftExcursion * C.rate;
     const detune = driftDepth * C.detuneExcursion * C.rate;
     // The output delays are written only while Drift is on. Coming back on, they hold the last
-    // output, so the first reads, a few samples back, never reach an old tail.
+    // output, so the first reads, a few samples back, never reach an old tail. Filled by index:
+    // `fill(this.left)` would pass a double to a call V8 may not inline, which boxes it.
     if (this.detune === 0 && detune !== 0) {
-      this.detuneLeft.buffer.fill(this.left);
-      this.detuneRight.buffer.fill(this.right);
+      const left = this.detuneLeft.buffer;
+      const right = this.detuneRight.buffer;
+      for (let i = 0; i < left.length; i++) left[i] = this.left;
+      for (let i = 0; i < right.length; i++) right[i] = this.right;
     }
     this.detune = detune;
     this.diffusion = diffusion * C.maxDiffusion;

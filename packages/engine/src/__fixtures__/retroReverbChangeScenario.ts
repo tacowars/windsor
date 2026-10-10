@@ -9,7 +9,9 @@
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
  * the pre-delay is off and the mix has settled; then mono noise and no input
- * for `inputs` quanta each. The probe imports it by path in its child Node,
+ * for `inputs` quanta each; then stereo noise for `flicker` quanta with Drift
+ * depth switching between 0 and `flickerDepth` every quantum, so the tank's
+ * detune delays are refilled on every other block. The probe imports it by path in its child Node,
  * which runs it directly (its types are stripped), so it imports nothing at
  * run time: the DSP's constants it compares against come in its config.
  *
@@ -26,6 +28,10 @@ export interface RetroReverbChangeConfig {
   loud: number;
   /** Quanta of mono noise, then of no input, in each cycle. */
   inputs: number;
+  /** Quanta of Drift depth switching on and off, in each cycle. */
+  flicker: number;
+  /** A depth within the snap floor of 0, so the smoothed depth lands on it, and back, in one block. */
+  flickerDepth: number;
   /** The decay the silence runs at, so the tail reaches zero in a second or two. */
   quietDecay: number;
   /** `RETRO_REVERB_DSP.silenceFloor`: the fade and snap threshold. */
@@ -73,11 +79,15 @@ const TOGGLES: [string, number][] = [
 
 /**
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
- * mono, no input, the switch fading, switched off and dormant, the early taps.
+ * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
+ * and off.
  */
-const PATHS = 12;
+const PATHS = 13;
 
-type Phase = 'loud' | 'quiet' | 'mono' | 'none';
+/** No input. */
+const none: Float32Array[][] = [];
+
+type Phase = 'loud' | 'quiet' | 'mono' | 'none' | 'flicker';
 
 /** The cycle, one quantum at a time, and the paths it has passed through. */
 interface Cycle {
@@ -99,6 +109,27 @@ function settled(dsp: RetroState, config: RetroReverbChangeConfig): boolean {
   );
 }
 
+/** The paths in `PATHS` that a phase alone marks. */
+const PHASE_PATHS: Partial<Record<Phase, number>> = { mono: 7, none: 8, flicker: 12 };
+
+/** After a quantum renders: record the paths the reverb is on. */
+function notePaths(
+  seen: Uint8Array,
+  dsp: RetroState,
+  phase: Phase,
+  config: RetroReverbChangeConfig,
+): void {
+  seen[dsp.finite > config.floor ? 0 : 1] = 1;
+  seen[dsp.preDelay < 1 / config.internalRate ? 3 : 2] = 1;
+  if (dsp.wetToneLeft === 0 && dsp.wetToneRight === 0) seen[4] = 1;
+  seen[dsp.mix === dsp.targetMix ? 6 : 5] = 1;
+  const path = PHASE_PATHS[phase];
+  if (path !== undefined) seen[path] = 1;
+  if (dsp.level !== dsp.targetLevel) seen[9] = 1;
+  if (dsp.dormant) seen[10] = 1;
+  if (dsp.earlyLevel > config.floor) seen[11] = 1;
+}
+
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
   const { params, sound, quiet } = probe;
   const dsp = (probe.processor as unknown as { dsp: RetroState }).dsp;
@@ -108,8 +139,8 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
   const defaults = Float32Array.from(arrays, (values) => values[0]!);
   const decay = params.decay!;
   const decayDefault = decay[0]!;
+  const depth = params.driftDepth!;
   const mono = [[sound[0]![0]!]];
-  const none: Float32Array[][] = [];
   const seen = new Uint8Array(PATHS);
   let phase: Phase = 'loud';
   let left = config.loud;
@@ -117,15 +148,26 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
 
   const toggle = (): void => {
     const k = change++ % TOGGLES.length;
-    const values = arrays[k]!;
-    values[0] = values[0] === others[k] ? defaults[k]! : others[k]!;
+    arrays[k]![0] = arrays[k]![0] === others[k] ? defaults[k]! : others[k]!;
   };
   // Every parameter at its default, the decay short: the tail runs down to zero.
   const hush = (): void => {
     for (let k = 0; k < arrays.length; k++) arrays[k]![0] = defaults[k]!;
     decay[0] = config.quietDecay;
   };
+  // Drift's depth from exactly 0 to on and back, a block each: the detune delays' refill.
+  const flicker = (): Float32Array[][] => {
+    if (--left > 0) {
+      depth[0] = depth[0] === 0 ? config.flickerDepth : 0;
+      return sound;
+    }
+    depth[0] = 0;
+    phase = 'loud';
+    left = config.loud;
+    return none;
+  };
   const step = (q: number): Float32Array[][] => {
+    if (phase === 'flicker') return flicker();
     if (phase === 'loud') {
       if (q % config.period === 0) toggle();
       if (--left > 0) return sound;
@@ -145,21 +187,11 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
       left = config.inputs;
       return mono;
     }
-    phase = 'loud';
-    left = config.loud;
+    phase = 'flicker';
+    left = config.flicker;
     return none;
   };
-  const note = (): void => {
-    seen[dsp.finite > config.floor ? 0 : 1] = 1;
-    seen[dsp.preDelay < 1 / config.internalRate ? 3 : 2] = 1;
-    if (dsp.wetToneLeft === 0 && dsp.wetToneRight === 0) seen[4] = 1;
-    seen[dsp.mix === dsp.targetMix ? 6 : 5] = 1;
-    if (phase === 'mono') seen[7] = 1;
-    if (phase === 'none') seen[8] = 1;
-    if (dsp.level !== dsp.targetLevel) seen[9] = 1;
-    if (dsp.dormant) seen[10] = 1;
-    if (dsp.earlyLevel > config.floor) seen[11] = 1;
-  };
+  const note = (): void => notePaths(seen, dsp, phase, config);
   return { step, note, seen };
 }
 
