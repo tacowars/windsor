@@ -79,8 +79,9 @@ class RetroTank {
   tapSignsRight: Float64Array;
   /**
    * Per tap, set each block: its delay in samples as whole samples (rounded up) less a fraction,
-   * read in place rather than through `RetroDelay.read` (the same interpolation, at a third of the
-   * cost), and its gain in each output.
+   * read in place rather than through `RetroDelay.read` (the same interpolation, at half the cost
+   * measured in `docs/research/2026-10-10-retro-reverb-extensions/rv3.md`), and its gain in each
+   * output.
    */
   tapWhole: Int32Array;
   tapFraction: Float64Array;
