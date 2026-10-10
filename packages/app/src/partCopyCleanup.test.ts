@@ -111,14 +111,29 @@ describe('dropping an unedited automatic copy (windsor#671)', () => {
     expect(ctx.model.doc.patches?.[COPY]).toBeUndefined();
   });
 
-  it('drops a copy of a song-only patch, whose base is still in the song', () => {
-    const ctx = twoParts();
-    ctx.change({ patches: { 'my-pad': makePatch({ name: 'My Pad', volume: 0.4 }) } });
-    choosePreset(ctx, 0, 'my-pad');
-    choosePreset(ctx, 1, 'my-pad');
-    expect(partAt(ctx.model.doc, 1)?.preset).toBe('my-pad-2');
-    choosePreset(ctx, 1, STEPS[0]!);
-    expect(ctx.model.doc.patches?.['my-pad-2']).toBeUndefined();
+  it('keeps a copy renamed to a copy-shaped id with another base, and drops `<source>-2`', () => {
+    const renamed = onCopy();
+    renamePatch(renamed, COPY, 'custom-2');
+    expect(partAt(renamed.model.doc, 1)).toMatchObject({ preset: 'custom-2', patchSource: ICE });
+    step(renamed, STEPS[0]!);
+    expect(renamed.model.doc.patches?.['custom-2']).toBeDefined();
+    const copy = onCopy();
+    step(copy, STEPS[0]!);
+    expect(copy.model.doc.patches?.[COPY]).toBeUndefined();
+  });
+
+  it('drops an unedited copy of a song-only patch, and keeps an edited one', () => {
+    for (const edit of [false, true]) {
+      const ctx = twoParts();
+      ctx.change({ patches: { pad: makePatch({ name: 'Pad', volume: 0.4 }) } });
+      choosePreset(ctx, 0, 'pad');
+      choosePreset(ctx, 1, 'pad');
+      expect(partAt(ctx.model.doc, 1)?.preset).toBe('pad-2');
+      expect(partAt(ctx.model.doc, 1)?.patchSource).toBeUndefined();
+      if (edit) ctx.change({ patches: { 'pad-2': { volume: 0.123 } } });
+      choosePreset(ctx, 1, STEPS[0]!);
+      expect(Object.hasOwn(ctx.model.doc.patches ?? {}, 'pad-2')).toBe(edit);
+    }
   });
 
   it('never drops a library id, a patch another part plays, or a part staying put', () => {

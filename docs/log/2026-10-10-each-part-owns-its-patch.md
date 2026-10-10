@@ -98,15 +98,18 @@ never edited is deleted when the part moves on. The pure function is
    - no other part plays `P`;
    - `P` is not a library id, and not an Init sentinel (`dropInit` owns
      those);
-   - `P` is an automatic copy: its id has the shape `uniqueId` gives a copy,
-     `<base>-<n>` with n from 2, and either the part has a `patchSource` or
-     `<base>` is still in the song (the open-time split and a load's copy
-     of a song-only patch, which carry no `patchSource`). A renamed copy
-     has lost the shape, so a rename keeps it even where the display name
-     did not change;
+   - `P` is an automatic copy: its id is exactly `<base>-<n>`, n from 2,
+     the id `uniqueId` gives a copy of `<base>`, where `<base>` is the
+     copy's own base. That is the part's `patchSource` when it has one;
+     with none (the open-time split and a load's copy of a song-only
+     patch), it is an id still in the song's `patches`. A renamed copy has
+     lost its base's shape, so a rename keeps it even where the display
+     name did not change, and even when the new id looks like a copy:
+     `custom-2` on a part linked to `bell` is no automatic copy;
    - `P` is leaf-identical (`patchLeafDifferences` empty, the name
-     included) to its `patchSource` library entry or to another patch
-     already in the song. The patch the move loads is no witness: Save as…
+     included) to its base: with a `patchSource`, that library entry or
+     another patch already in the song; with none, the song patch `<base>`
+     itself. The patch the move loads is no witness: Save as…
      writes the part's edits into its new patch, and the copy holding the
      same edits stays, as any edited copy does.
 

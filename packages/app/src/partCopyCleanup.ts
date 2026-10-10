@@ -9,7 +9,7 @@
  * (`choosePreset`, `initPatch`, `copyToNew`) spread what this returns into
  * the `patches` of the change they already make.
  */
-import type { ArrangementDocument } from '@windsor/engine';
+import type { ArrangementDocument, Patch } from '@windsor/engine';
 import { partAt, patchLeafDifferences } from '@windsor/engine';
 import { isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
@@ -19,38 +19,50 @@ import { libraryPatch } from './libraryModel';
 const COPY_ID = /^(.+)-(\d+)$/;
 const FIRST_COPY_NUMBER = 2;
 
-/** The id `id` was copied from, when `id` has the shape a copy's fresh id takes. */
-function copyBase(id: string): string | undefined {
+/** True when `id` is exactly `<base>-<n>`, the id `uniqueId` gives a copy of `base`. */
+function isCopyOf(id: string, base: string): boolean {
   const match = COPY_ID.exec(id);
-  if (!match || Number(match[2]) < FIRST_COPY_NUMBER) return undefined;
-  return match[1];
+  return match?.[1] === base && Number(match[2]) >= FIRST_COPY_NUMBER;
 }
 
 /**
- * True when `id` is an automatic copy (decision 2): its id has a copy's
- * shape, and the part kept the library link (`patchSource`), or the id it
- * was copied from is still in the song (the open-time split and a load's
- * copy of a song-only patch). A renamed copy has lost the shape.
+ * The patches an automatic copy `id` must be leaf-identical to, or null when
+ * `id` is no automatic copy (decision 2). The copy's base is the part's
+ * `patchSource` when it has one, and `id` must be exactly `<patchSource>-<n>`;
+ * its witnesses are that library entry and the song's other patches. With no
+ * `patchSource` (the open-time split and a load's copy of a song-only patch)
+ * the base is the id it was copied from, still in the song, and the copy must
+ * match that patch. A renamed copy has lost its base's shape, even when it
+ * kept the link: `custom-2` linked to `bell` is no automatic copy.
  */
-function isAutoCopy(
+function autoCopyWitnesses(
   doc: Pick<ArrangementDocument, 'patches'>,
   id: string,
   patchSource: string | undefined,
-): boolean {
-  const base = copyBase(id);
-  if (base === undefined) return false;
-  return patchSource !== undefined || Object.hasOwn(doc.patches ?? {}, base);
+  library: LibraryModel,
+): Patch[] | null {
+  const patches = doc.patches ?? {};
+  if (patchSource === undefined) {
+    const base = COPY_ID.exec(id)?.[1];
+    if (base === undefined || !isCopyOf(id, base) || !Object.hasOwn(patches, base)) return null;
+    return [patches[base]!];
+  }
+  if (!isCopyOf(id, patchSource)) return null;
+  const kept = Object.entries(patches)
+    .filter(([other]) => other !== id && !isInitPreset(other))
+    .map(([, other]) => other);
+  const source = libraryPatch(library, patchSource);
+  return source ? [source, ...kept] : kept;
 }
 
 /**
  * The `patches` removal that drops the copy part `slot` leaves as it moves
  * to `next`, or null (decisions 2 and 3); `doc` is the song before the move.
  * The copy goes only when no other part plays it, its id is no library id,
- * it is an automatic copy, and it is leaf-identical (name included) to its
- * `patchSource` library entry or to another patch already in the song, so
- * dropping it loses no sound. The patch the move loads is no witness: Save
- * as… writes the part's edits into it, and the copy holding the same edits
- * stays, as an edited copy always does.
+ * it is an automatic copy, and it is leaf-identical (name included) to one
+ * of that copy's witnesses, so dropping it loses no sound. The patch the
+ * move loads is no witness: Save as… writes the part's edits into it, and
+ * the copy holding the same edits stays, as an edited copy always does.
  */
 export function leftCopyDrop(
   doc: Pick<ArrangementDocument, 'parts' | 'patches'>,
@@ -64,13 +76,8 @@ export function leftCopyDrop(
   const patch = doc.patches && Object.hasOwn(doc.patches, left) ? doc.patches[left] : undefined;
   if (!patch || isInitPreset(left) || Object.hasOwn(library.entries, left)) return null;
   if (doc.parts.some((other) => other.slot !== slot && other.preset === left)) return null;
-  if (!isAutoCopy(doc, left, part.patchSource)) return null;
-  const kept = Object.entries(doc.patches ?? {})
-    .filter(([id]) => id !== left && !isInitPreset(id))
-    .map(([, other]) => other);
-  const source =
-    part.patchSource === undefined ? undefined : libraryPatch(library, part.patchSource);
-  const reachable = source ? [source, ...kept] : kept;
-  const unedited = reachable.some((other) => patchLeafDifferences(patch, other).length === 0);
+  const witnesses = autoCopyWitnesses(doc, left, part.patchSource, library);
+  if (!witnesses) return null;
+  const unedited = witnesses.some((other) => patchLeafDifferences(patch, other).length === 0);
   return unedited ? { [left]: null } : null;
 }
