@@ -80,6 +80,18 @@ var RETRO_REVERB_DSP = {
   filterPoleDivisor: 8,
   hostBandwidthRatio: 0.4,
   decayTarget: 1e-3,
+  // Drift (RV-2), Windsor's own values. A line's read moves up to `driftExcursion` seconds either
+  // way at depth 1, times its signed share in `driftLineDepths`. A mode at f Hz moves
+  // f × excursion of its line's mode spacing, whatever the line's length, so 0.5 ms moves the
+  // modes at 1 kHz half a spacing each way at any Size. The shares sum to zero, so the network's
+  // mean delay holds still while the lines move against one another, and no two are in a simple
+  // ratio, so no two move in step.
+  driftExcursion: 5e-4,
+  driftLineDepths: [1, -0.77, 0.61, -0.84],
+  // Each wet output reads a short line swept 0..2 × this (seconds) at depth 1, L and R in
+  // opposite directions: a triangle at r Hz detunes each side by ±4 r × this, about ±3.5 cents
+  // at 0.5 Hz and ±14 cents at 2 Hz.
+  detuneExcursion: 1e-3,
   millisecondsPerSecond: 1e3
 };
 
@@ -217,24 +229,42 @@ var RetroFilter = class {
 // packages/engine/src/worklet/retro/retroTank.ts
 var RetroTank = class {
   constructor() {
-    this.lines = RETRO_REVERB_DSP.tankSeconds.map((t) => new RetroDelay(t * RETRO_REVERB_BOUNDS.size[1] * RETRO_REVERB_DSP.rate));
+    this.lines = RETRO_REVERB_DSP.tankSeconds.map(
+      (t, i) => new RetroDelay(
+        (t * RETRO_REVERB_BOUNDS.size[1] + RETRO_REVERB_DSP.driftExcursion * Math.abs(RETRO_REVERB_DSP.driftLineDepths[i])) * RETRO_REVERB_DSP.rate
+      )
+    );
+    this.detuneLeft = new RetroDelay(1 + 2 * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate);
+    this.detuneRight = new RetroDelay(1 + 2 * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate);
     this.diffusers = RETRO_REVERB_DSP.diffuserSeconds.map((t) => new RetroDelay(t * RETRO_REVERB_DSP.rate));
     this.damping = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.gains = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.values = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
     this.input = this.lineInput = this.feedback = NaN;
+    this.driftPhase = this.driftStep = this.excursion = this.detune = NaN;
     this.size = 1;
     this.diffusion = this.pole = this.left = this.right = 0;
     this.input = this.lineInput = this.feedback = 0;
+    this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
   }
   configure({
     size,
     decay,
     tone,
-    diffusion
+    diffusion,
+    driftRate,
+    driftDepth
   }) {
     this.size = size;
+    this.driftStep = 2 * driftRate / RETRO_REVERB_DSP.rate;
+    this.excursion = driftDepth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
+    const detune = driftDepth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
+    if (this.detune === 0 && detune !== 0) {
+      this.detuneLeft.buffer.fill(this.left);
+      this.detuneRight.buffer.fill(this.right);
+    }
+    this.detune = detune;
     this.diffusion = diffusion * RETRO_REVERB_DSP.maxDiffusion;
     this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / RETRO_REVERB_DSP.rate);
     for (let i = 0; i < this.lines.length; i++)
@@ -252,10 +282,18 @@ var RetroTank = class {
       delay.write();
       input = old + this.diffusion * value;
     }
+    let triangle = 0;
+    if (this.detune !== 0) {
+      let phase = this.driftPhase + this.driftStep;
+      if (phase >= 1) phase -= 2;
+      this.driftPhase = phase;
+      triangle = 2 * Math.abs(phase) - 1;
+    }
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
       line.delay = RETRO_REVERB_DSP.tankSeconds[i] * this.size * RETRO_REVERB_DSP.rate;
+      if (triangle !== 0) line.delay += this.excursion * RETRO_REVERB_DSP.driftLineDepths[i] * triangle;
       line.read();
       const raw = line.output;
       const damped = this.damping[i] + this.pole * (raw - this.damping[i]);
@@ -273,6 +311,17 @@ var RetroTank = class {
     this.write(this.lines.length - 1);
     this.left = (y[0] + y[1] - y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
     this.right = (y[0] - y[1] + y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
+    if (this.detune === 0) return;
+    this.detuneLeft.input = this.left;
+    this.detuneLeft.write();
+    this.detuneRight.input = this.right;
+    this.detuneRight.write();
+    this.detuneLeft.delay = 1 + this.detune * (1 + triangle);
+    this.detuneLeft.read();
+    this.left = this.detuneLeft.output;
+    this.detuneRight.delay = 1 + this.detune * (1 - triangle);
+    this.detuneRight.read();
+    this.right = this.detuneRight.output;
   }
   /** Line `i` takes `lineInput` and `feedback`, mixed and clamped. */
   write(i) {
@@ -416,6 +465,7 @@ var RetroReverbDsp = class {
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.early = this.earlyLevel = NaN;
+    this.driftRate = this.driftDepth = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
@@ -430,6 +480,8 @@ var RetroReverbDsp = class {
     this.decay = params.decay[0];
     this.tone = params.tone[0];
     this.diffusion = params.diffusion[0];
+    this.driftRate = params.driftRate[0];
+    this.driftDepth = params.driftDepth[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
     this.duration = params.duration[0];
@@ -455,6 +507,10 @@ var RetroReverbDsp = class {
     this.decay += k * (params.decay[0] - this.decay);
     this.tone += k * (params.tone[0] - this.tone);
     this.diffusion += k * (params.diffusion[0] - this.diffusion);
+    this.driftRate += k * (params.driftRate[0] - this.driftRate);
+    this.driftDepth += k * (params.driftDepth[0] - this.driftDepth);
+    if (Math.abs(params.driftDepth[0] - this.driftDepth) < RETRO_REVERB_DSP.silenceFloor)
+      this.driftDepth = params.driftDepth[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
     this.duration += k * (params.duration[0] - this.duration);
@@ -481,6 +537,8 @@ var RetroReverbDsp = class {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
     for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
+    tank.detuneLeft.buffer.fill(0);
+    tank.detuneRight.buffer.fill(0);
     tank.damping.fill(0);
     tank.values.fill(0);
     tank.left = tank.right = 0;

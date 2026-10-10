@@ -49,6 +49,9 @@ class RetroReverbDsp {
   decay: number;
   tone: number;
   diffusion: number;
+  /** Drift (RV-2), smoothed like the others; a depth within the floor of its target lands on it. */
+  driftRate: number;
+  driftDepth: number;
   preDelay: number;
   character: number;
   mix: number;
@@ -84,6 +87,7 @@ class RetroReverbDsp {
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.early = this.earlyLevel = NaN;
+    this.driftRate = this.driftDepth = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
@@ -98,6 +102,8 @@ class RetroReverbDsp {
     this.decay = params.decay[0];
     this.tone = params.tone[0];
     this.diffusion = params.diffusion[0];
+    this.driftRate = params.driftRate[0];
+    this.driftDepth = params.driftDepth[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
     this.duration = params.duration[0];
@@ -124,6 +130,10 @@ class RetroReverbDsp {
     this.decay += k * (params.decay[0] - this.decay);
     this.tone += k * (params.tone[0] - this.tone);
     this.diffusion += k * (params.diffusion[0] - this.diffusion);
+    this.driftRate += k * (params.driftRate[0] - this.driftRate);
+    this.driftDepth += k * (params.driftDepth[0] - this.driftDepth);
+    if (Math.abs(params.driftDepth[0] - this.driftDepth) < C.silenceFloor)
+      this.driftDepth = params.driftDepth[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
     this.duration += k * (params.duration[0] - this.duration);
@@ -152,6 +162,8 @@ class RetroReverbDsp {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
     for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
+    tank.detuneLeft.buffer.fill(0);
+    tank.detuneRight.buffer.fill(0);
     tank.damping.fill(0);
     tank.values.fill(0);
     tank.left = tank.right = 0;

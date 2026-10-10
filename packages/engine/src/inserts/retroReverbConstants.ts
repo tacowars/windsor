@@ -78,5 +78,17 @@ export const RETRO_REVERB_DSP = {
   filterPoleDivisor: 8,
   hostBandwidthRatio: 0.4,
   decayTarget: 0.001,
+  // Drift (RV-2), Windsor's own values. A line's read moves up to `driftExcursion` seconds either
+  // way at depth 1, times its signed share in `driftLineDepths`. A mode at f Hz moves
+  // f × excursion of its line's mode spacing, whatever the line's length, so 0.5 ms moves the
+  // modes at 1 kHz half a spacing each way at any Size. The shares sum to zero, so the network's
+  // mean delay holds still while the lines move against one another, and no two are in a simple
+  // ratio, so no two move in step.
+  driftExcursion: 0.0005,
+  driftLineDepths: [1, -0.77, 0.61, -0.84],
+  // Each wet output reads a short line swept 0..2 × this (seconds) at depth 1, L and R in
+  // opposite directions: a triangle at r Hz detunes each side by ±4 r × this, about ±3.5 cents
+  // at 0.5 Hz and ±14 cents at 2 Hz.
+  detuneExcursion: 0.001,
   millisecondsPerSecond: 1000,
 } as const;

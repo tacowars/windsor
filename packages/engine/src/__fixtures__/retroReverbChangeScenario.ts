@@ -1,9 +1,10 @@
 /**
  * The Retro reverb's run for `workletAllocationProbe.ts` (windsor#230): every
  * path its render takes, over and over. A cycle is stereo noise with one
- * parameter changed every `period` quanta (size, decay, tone, diffusion,
- * pre-delay, character, mix, duration, early, the gated and reverse modes and
- * the enable, so the finite field, the early taps, the pre-delay line, the mix glide, the
+ * parameter changed every `period` quanta (size, decay, tone, diffusion, drift
+ * depth and rate, pre-delay, character, mix, duration, early, the gated and
+ * reverse modes and the enable, so the finite field, the early taps, the
+ * pre-delay line, the mix glide, the
  * switch's fade and its cleared, dormant off (windsor#630) all run),
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
@@ -60,11 +61,13 @@ const TOGGLES: [string, number][] = [
   ['tone', 1500],
   ['mode', 2],
   ['diffusion', 0.2],
+  ['driftDepth', 0.8],
   ['character', 0.1],
   ['enabled', 0],
   ['mix', 0.8],
   ['duration', 0.55],
   ['early', 0.8],
+  ['driftRate', 3],
   ['enabled', 0],
 ];
 

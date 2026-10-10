@@ -4,6 +4,12 @@
  * `write`, the lines' own `delay`/`output`/`input`), never as arguments or results, which V8
  * boxes across a call it does not inline (worklet rule 2); every double field is first written
  * as one (rule 7). Tested through retroReverbDsp.test.ts and retroReverbAllocation.test.ts.
+ *
+ * Drift (RV-2): one triangle LFO moves the four line reads, each by its signed share of the
+ * excursion (delay-line modulation as in Dattorro 1997, Part 2), and sweeps a short delay on each
+ * wet output, L and R in opposite directions, for a stereo detune. At depth 0 both excursions
+ * are exactly 0: the LFO holds, the line reads are today's and the output delays are skipped, so
+ * the output is today's to the bit (`retroReverbNeutralPin.test.ts`).
  */
 import {
   RETRO_REVERB_BOUNDS as B,
@@ -27,18 +33,39 @@ class RetroTank {
   /** The signed input share and the feedback `write` mixes into a line. */
   lineInput: number;
   feedback: number;
+  /** The wet outputs' detune delays. */
+  detuneLeft: RetroDelay;
+  detuneRight: RetroDelay;
+  /**
+   * The LFO's phase (-1..1, one cycle), its step a sample, and the two excursions in samples at
+   * the depth.
+   */
+  driftPhase: number;
+  driftStep: number;
+  excursion: number;
+  detune: number;
 
   constructor() {
-    this.lines = C.tankSeconds.map((t) => new RetroDelay(t * B.size[1] * C.rate));
+    // Room for the longest line at the largest Size plus its read's furthest drift.
+    this.lines = C.tankSeconds.map(
+      (t, i) =>
+        new RetroDelay(
+          (t * B.size[1] + C.driftExcursion * Math.abs(C.driftLineDepths[i])) * C.rate,
+        ),
+    );
+    this.detuneLeft = new RetroDelay(1 + 2 * C.detuneExcursion * C.rate);
+    this.detuneRight = new RetroDelay(1 + 2 * C.detuneExcursion * C.rate);
     this.diffusers = C.diffuserSeconds.map((t) => new RetroDelay(t * C.rate));
     this.damping = new Float64Array(C.tankSeconds.length);
     this.gains = new Float64Array(C.tankSeconds.length);
     this.values = new Float64Array(C.tankSeconds.length);
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
     this.input = this.lineInput = this.feedback = NaN;
+    this.driftPhase = this.driftStep = this.excursion = this.detune = NaN;
     this.size = 1;
     this.diffusion = this.pole = this.left = this.right = 0;
     this.input = this.lineInput = this.feedback = 0;
+    this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
   }
 
   configure({
@@ -46,13 +73,27 @@ class RetroTank {
     decay,
     tone,
     diffusion,
+    driftRate,
+    driftDepth,
   }: {
     size: number;
     decay: number;
     tone: number;
     diffusion: number;
+    driftRate: number;
+    driftDepth: number;
   }): void {
     this.size = size;
+    this.driftStep = (2 * driftRate) / C.rate;
+    this.excursion = driftDepth * C.driftExcursion * C.rate;
+    const detune = driftDepth * C.detuneExcursion * C.rate;
+    // The output delays are written only while Drift is on. Coming back on, they hold the last
+    // output, so the first reads, a few samples back, never reach an old tail.
+    if (this.detune === 0 && detune !== 0) {
+      this.detuneLeft.buffer.fill(this.left);
+      this.detuneRight.buffer.fill(this.right);
+    }
+    this.detune = detune;
     this.diffusion = diffusion * C.maxDiffusion;
     this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / C.rate);
     for (let i = 0; i < this.lines.length; i++)
@@ -71,10 +112,19 @@ class RetroTank {
       delay.write();
       input = old + this.diffusion * value;
     }
+    // The LFO runs only while Drift is on; at depth 0 it holds and the reads are today's.
+    let triangle = 0;
+    if (this.detune !== 0) {
+      let phase = this.driftPhase + this.driftStep;
+      if (phase >= 1) phase -= 2;
+      this.driftPhase = phase;
+      triangle = 2 * Math.abs(phase) - 1;
+    }
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
       line.delay = C.tankSeconds[i] * this.size * C.rate;
+      if (triangle !== 0) line.delay += this.excursion * C.driftLineDepths[i] * triangle;
       line.read();
       const raw = line.output;
       const damped = this.damping[i] + this.pole * (raw - this.damping[i]);
@@ -93,6 +143,18 @@ class RetroTank {
     this.write(this.lines.length - 1);
     this.left = (y[0] + y[1] - y[2] - y[3]) * C.outputTrim;
     this.right = (y[0] - y[1] + y[2] - y[3]) * C.outputTrim;
+    if (this.detune === 0) return;
+    this.detuneLeft.input = this.left;
+    this.detuneLeft.write();
+    this.detuneRight.input = this.right;
+    this.detuneRight.write();
+    // A delay of 1 reads the sample just written, so a small depth starts from no delay.
+    this.detuneLeft.delay = 1 + this.detune * (1 + triangle);
+    this.detuneLeft.read();
+    this.left = this.detuneLeft.output;
+    this.detuneRight.delay = 1 + this.detune * (1 - triangle);
+    this.detuneRight.read();
+    this.right = this.detuneRight.output;
   }
 
   /** Line `i` takes `lineInput` and `feedback`, mixed and clamped. */
