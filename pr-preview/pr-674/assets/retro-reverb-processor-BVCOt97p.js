@@ -60,6 +60,22 @@ var RETRO_REVERB_DSP = {
   reflectionJitterSpan: 0.6,
   reflectionSparseStride: 4,
   reflectionEdgeFraction: 0.02,
+  // Early reflections (RV-1), Windsor's own: per channel, seconds at Size 1 after the pre-delay
+  // point. The first tap sits within 5 ms of it (the slap); the last lands before the shortest
+  // tank line's first return (tankSeconds[0] × Size), so the reflections fill the gap ahead of
+  // the bloom. Each gain falls as the cube root of its time (gentler than spherical spreading, so
+  // the later taps still read); L and R differ in time and in the signs of the later taps.
+  earlySecondsLeft: [29e-4, 97e-4, 0.0173, 0.0269],
+  earlySecondsRight: [43e-4, 0.0121, 0.0211, 0.0293],
+  earlyGainsLeft: [1, -0.67, 0.55, -0.48],
+  earlyGainsRight: [0.88, 0.62, -0.52, -0.46],
+  // The times follow Size within these bounds: the first tap never closer than about 1.5 ms (a
+  // comb colour, not a reflection), the last never past about 120 ms (a separate echo pattern).
+  earlyScaleMin: 0.5,
+  earlyScaleMax: 4,
+  // Measured, not estimated: an impulse at Size 1, Decay 1.4 and Character 0 gives the taps at
+  // Early 0.5 the same energy as the whole tank response, so Early 1 sits 6 dB above it.
+  earlyTrim: 0.58,
   filterSections: 2,
   filterPoleDivisor: 8,
   hostBandwidthRatio: 0.4,
@@ -239,12 +255,15 @@ var RetroTank = class {
     tone,
     diffusion,
     driftRate,
-    driftDepth
+    driftDepth,
+    finite
   }) {
     this.size = size;
     this.driftStep = 2 * driftRate / RETRO_REVERB_DSP.rate;
-    this.excursion = driftDepth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
-    const detune = driftDepth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
+    const share = 1 - finite;
+    const depth = share > RETRO_REVERB_DSP.silenceFloor ? driftDepth * share : 0;
+    this.excursion = depth * RETRO_REVERB_DSP.driftExcursion * RETRO_REVERB_DSP.rate;
+    const detune = depth * RETRO_REVERB_DSP.detuneExcursion * RETRO_REVERB_DSP.rate;
     if (this.detune === 0 && detune !== 0) {
       const left = this.detuneLeft.buffer;
       const right = this.detuneRight.buffer;
@@ -394,6 +413,54 @@ var RetroReflections = class {
   }
 };
 
+// packages/engine/src/worklet/retro/retroEarly.ts
+var RetroEarly = class {
+  constructor(history) {
+    this.history = history;
+    this.offsetsLeft = new Int32Array(RETRO_REVERB_DSP.earlySecondsLeft.length);
+    this.offsetsRight = new Int32Array(RETRO_REVERB_DSP.earlySecondsRight.length);
+    this.fractionsLeft = new Float64Array(RETRO_REVERB_DSP.earlySecondsLeft.length);
+    this.fractionsRight = new Float64Array(RETRO_REVERB_DSP.earlySecondsRight.length);
+    this.left = this.right = this.size = NaN;
+    this.left = this.right = 0;
+    this.size = 1;
+  }
+  configure() {
+    const scale = Math.max(RETRO_REVERB_DSP.earlyScaleMin, Math.min(RETRO_REVERB_DSP.earlyScaleMax, this.size)) * RETRO_REVERB_DSP.rate;
+    const longest = this.history.buffer.length - 2;
+    for (let i = 0; i < RETRO_REVERB_DSP.earlySecondsLeft.length; i++) {
+      const delay = Math.max(1, Math.min(longest, RETRO_REVERB_DSP.earlySecondsLeft[i] * scale));
+      this.offsetsLeft[i] = Math.ceil(delay);
+      this.fractionsLeft[i] = Math.ceil(delay) - delay;
+    }
+    for (let i = 0; i < RETRO_REVERB_DSP.earlySecondsRight.length; i++) {
+      const delay = Math.max(1, Math.min(longest, RETRO_REVERB_DSP.earlySecondsRight[i] * scale));
+      this.offsetsRight[i] = Math.ceil(delay);
+      this.fractionsRight[i] = Math.ceil(delay) - delay;
+    }
+  }
+  tick() {
+    const buffer = this.history.buffer;
+    const head = this.history.head;
+    const length = buffer.length;
+    let left = 0, right = 0;
+    for (let i = 0; i < RETRO_REVERB_DSP.earlySecondsLeft.length; i++) {
+      let index = head - this.offsetsLeft[i];
+      if (index < 0) index += length;
+      const next = index + 1 === length ? 0 : index + 1;
+      left += RETRO_REVERB_DSP.earlyGainsLeft[i] * (buffer[index] + this.fractionsLeft[i] * (buffer[next] - buffer[index]));
+    }
+    for (let i = 0; i < RETRO_REVERB_DSP.earlySecondsRight.length; i++) {
+      let index = head - this.offsetsRight[i];
+      if (index < 0) index += length;
+      const next = index + 1 === length ? 0 : index + 1;
+      right += RETRO_REVERB_DSP.earlyGainsRight[i] * (buffer[index] + this.fractionsRight[i] * (buffer[next] - buffer[index]));
+    }
+    this.left = left * RETRO_REVERB_DSP.earlyTrim;
+    this.right = right * RETRO_REVERB_DSP.earlyTrim;
+  }
+};
+
 // packages/engine/src/worklet/retro/retroReverbDsp.ts
 var RetroReverbDsp = class {
   constructor(rate, params) {
@@ -403,11 +470,13 @@ var RetroReverbDsp = class {
     this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
+    this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = NaN;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
+    this.earlyTaps = new RetroEarly(this.reflections.delay);
     this.pre = new RetroDelay(RETRO_REVERB_DSP.rate * RETRO_REVERB_BOUNDS.preDelay[1]);
     this.inputFilter = new RetroFilter(rate);
     this.leftFilter = new RetroFilter(rate);
@@ -424,6 +493,8 @@ var RetroReverbDsp = class {
     this.duration = params.duration[0];
     this.finite = params.mode[0] > 0 ? 1 : 0;
     this.reverse = params.mode[0] > 1 ? 1 : 0;
+    this.early = params.early[0];
+    this.earlyLevel = this.early * (1 - this.finite);
     this.mix = this.targetMix = params.mix[0];
     this.level = this.targetLevel = params.enabled[0] ? 1 : 0;
     this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
@@ -433,6 +504,8 @@ var RetroReverbDsp = class {
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
     this.tank.configure(this);
     this.reflections.configure(this);
+    this.earlyTaps.size = this.size;
+    this.earlyTaps.configure();
   }
   configure(params, frames) {
     const k = 1 - Math.exp(-frames / (RETRO_REVERB_DSP.smoothSeconds * this.rate));
@@ -449,6 +522,9 @@ var RetroReverbDsp = class {
     this.duration += k * (params.duration[0] - this.duration);
     this.finite += k * ((params.mode[0] > 0 ? 1 : 0) - this.finite);
     this.reverse += k * ((params.mode[0] > 1 ? 1 : 0) - this.reverse);
+    this.early += k * (params.early[0] - this.early);
+    if (Math.abs(params.early[0] - this.early) < RETRO_REVERB_DSP.silenceFloor) this.early = params.early[0];
+    this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
     if (this.level !== 0) this.dormant = false;
@@ -457,6 +533,10 @@ var RetroReverbDsp = class {
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
     this.tank.configure(this);
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) this.reflections.configure(this);
+    if (this.earlyLevel > RETRO_REVERB_DSP.silenceFloor) {
+      this.earlyTaps.size = this.size;
+      this.earlyTaps.configure();
+    }
   }
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear() {
@@ -504,6 +584,8 @@ var RetroReverbDsp = class {
     this.tank.input = delayed;
     this.tank.tick();
     let left = this.tank.left, right = this.tank.right;
+    const early = this.earlyLevel > RETRO_REVERB_DSP.silenceFloor;
+    if (early) this.earlyTaps.tick();
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) {
       this.reflections.input = delayed;
       this.reflections.tick();
@@ -512,6 +594,10 @@ var RetroReverbDsp = class {
     } else {
       this.reflections.delay.input = delayed;
       this.reflections.delay.write();
+    }
+    if (early) {
+      left += this.earlyLevel * this.earlyTaps.left;
+      right += this.earlyLevel * this.earlyTaps.right;
     }
     this.wetToneLeft += this.wetPole * (left - this.wetToneLeft);
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
