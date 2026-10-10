@@ -55,6 +55,29 @@ export function stepPatch(
   return next === undefined || next === current ? null : next;
 }
 
+/** What ◀ ▶ step from for one part: its preset, and the library patch its copy came from. */
+export interface PartStep {
+  readonly order: readonly string[];
+  readonly all: readonly string[];
+  /** The patch the part plays. */
+  readonly preset: string;
+  /** The library patch the part's own copy was made from (windsor#669), if any. */
+  readonly patchSource?: string | undefined;
+  readonly by: StepDirection;
+}
+
+/**
+ * The patch ◀ or ▶ loads for a part (windsor#669): from the part's own row
+ * when the filter shows it, else from its copy's library place, and never
+ * the patch the part already plays, so a step always moves.
+ */
+export function stepPartPatch(step: PartStep): string | null {
+  const { order, all, preset, patchSource, by } = step;
+  const anchor = order.includes(preset) ? preset : (patchSource ?? preset);
+  const next = stepPatch(order, anchor, by, all);
+  return next === preset ? null : next;
+}
+
 /** The first entry of `order` met walking `all` from `current` in `by`'s direction. */
 function enterOrder(
   order: readonly string[],

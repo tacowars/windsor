@@ -185,10 +185,13 @@ export async function savePatch(request: WriteRequest): Promise<string> {
   if (saveForks(request)) return copyToNew(request);
   const { ctx, library, meta, working } = request;
   const file = buildPatchFile(meta, working);
-  // Pinned before the write: a patch loaded into the slot meanwhile is not this save's to change.
+  // Pinned before the write, with the song it belongs to: a patch loaded into
+  // the slot, or another song opened, meanwhile is not this save's to change.
   const own = partAt(ctx.model.doc, request.slot)?.preset;
+  const song = ctx.model.openings;
   await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
-  if (own !== undefined && ctx.model.doc.patches && Object.hasOwn(ctx.model.doc.patches, own)) {
+  const patches = ctx.model.doc.patches;
+  if (own !== undefined && ctx.model.openings === song && patches && Object.hasOwn(patches, own)) {
     ctx.change({ patches: { [own]: file.patch } });
   }
   return origin.id;

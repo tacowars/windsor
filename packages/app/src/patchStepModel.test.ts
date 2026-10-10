@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Patch } from '@windsor/engine';
 import { filterPresets, makePatch } from '@windsor/engine';
 import { library, loadPageLibrary } from './libraryModel';
-import { moveHighlight, stepListing, stepPatch } from './patchStepModel';
+import { moveHighlight, stepListing, stepPartPatch, stepPatch } from './patchStepModel';
 
 beforeAll(() => loadPageLibrary(library));
 
@@ -77,6 +77,36 @@ describe('a song’s copy of a library patch', () => {
     const filter = { query: '', category: '', tag: '', source: 'document' };
     const ids = filterPresets(stepListing(library.entries, song()), filter).map((e) => e.id);
     expect(ids).toEqual(['kick']);
+  });
+});
+
+describe('a part on its own copy of a library patch (windsor#669)', () => {
+  const THIS_SONG = { query: '', category: '', tag: '', source: 'document' };
+  const song = (): Record<string, Patch> => ({
+    kick: library.entries.kick!.patch,
+    'efm-bell-perc-2': { ...library.entries['efm-bell-perc']!.patch, name: 'Bell 2' },
+  });
+  const step = (by: 1 | -1): string | null => {
+    const listing = stepListing(library.entries, song());
+    return stepPartPatch({
+      order: filterPresets(listing, THIS_SONG).map((entry) => entry.id),
+      all: listing.map((entry) => entry.id),
+      preset: 'efm-bell-perc-2',
+      patchSource: 'efm-bell-perc',
+      by,
+    });
+  };
+
+  it('steps away from the copy it plays under “this song”, both ways', () => {
+    expect(step(1)).toBe('kick');
+    expect(step(-1)).toBe('kick');
+  });
+
+  it('steps from the library place when the filter hides the copy', () => {
+    const all = ['a', 'bell', 'c', 'bell-2'];
+    const at = { order: ['a', 'c'], all, preset: 'bell-2', patchSource: 'bell' };
+    expect(stepPartPatch({ ...at, by: 1 })).toBe('c');
+    expect(stepPartPatch({ ...at, by: -1 })).toBe('a');
   });
 });
 

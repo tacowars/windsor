@@ -140,7 +140,14 @@ async function connectFolder(ctx: AppCtx): Promise<void> {
   ctx.render();
 }
 
-async function forgetFolder(ctx: AppCtx): Promise<void> {
+/** Pended at once (windsor#669): a song opening while the handle is forgotten waits for the page library. */
+function forgetFolder(ctx: AppCtx): Promise<void> {
+  const load = forgetAndDisconnect(ctx);
+  awaitUserLibrary(load);
+  return load;
+}
+
+async function forgetAndDisconnect(ctx: AppCtx): Promise<void> {
   await forgetHandle();
   await disconnectLibrary(library);
   remembered = null;

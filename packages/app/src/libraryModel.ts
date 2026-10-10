@@ -63,62 +63,84 @@ export const libraryPatch = (model: LibraryModel, id: string): Patch | undefined
 export const isWritable = (model: LibraryModel, id: string): boolean =>
   model.folder ? Object.hasOwn(model.entries, id) : model.userIds.has(id);
 
-/** The boot's load of the user's library (IndexedDB, or a reconnected folder), failure swallowed. */
+/** Every load of the active library recorded so far, chained; a failure is swallowed. */
 let userLibraryLoad: Promise<unknown> = Promise.resolve();
 
 /** Hands the pending user-library readiness its load; a failed load still settles it. */
 export type SettleUserLibrary = (load: Promise<unknown>) => void;
 
 /**
- * Mark the user's library as still to come, at once: a song opening from
+ * Mark the active library as still to come, at once: a song opening from
  * now on waits until the returned settle is handed a load and that load
- * ends (windsor#669). The boot calls this before its first await, so an
- * import during a slow IndexedDB open never splits against the built-ins alone.
+ * ends, and for every load pended before it (windsor#669). The boot calls
+ * this before its first await, so an import during a slow IndexedDB open
+ * never splits against the built-ins alone.
  */
 export function pendUserLibrary(): SettleUserLibrary {
   let settle: SettleUserLibrary = () => undefined;
-  userLibraryLoad = new Promise<unknown>((resolve) => {
+  const pending = new Promise<unknown>((resolve) => {
     settle = (load) => resolve(load.catch(() => undefined));
   });
+  userLibraryLoad = Promise.all([userLibraryLoad, pending]);
   return settle;
 }
 
-/** Record a user-library load, so a song opening meanwhile waits for it (windsor#669). */
+/** Record a library load, so a song opening meanwhile waits for it (windsor#669). */
 export function awaitUserLibrary(load: Promise<unknown>): void {
   pendUserLibrary()(load);
 }
 
 /**
- * The complete active library has arrived: the built-ins, then whatever
- * user-library load the boot recorded. A song's open split
- * (`isolatePartPatches`) reads `entries`, so it waits for this. A failed
- * user load still lets the song open; a failed built-in load stops it.
+ * Every reload of the active library goes through this: the load is
+ * recorded before the caller gets control back, so `libraryLoaded` never
+ * resolves for a library that is no longer the one being read.
  */
-export const libraryLoaded = (): Promise<unknown> => Promise.all([loadBuiltIns(), userLibraryLoad]);
+const tracked =
+  <A extends unknown[]>(load: (...args: A) => Promise<void>) =>
+  (...args: A): Promise<void> => {
+    const run = load(...args);
+    awaitUserLibrary(run);
+    return run;
+  };
+
+/**
+ * The complete active library has arrived: the built-ins, then every
+ * library load recorded, including one recorded while this waits. A song's
+ * open split (`isolatePartPatches`) reads `entries`, so it waits for this.
+ * A failed library load still lets the song open; a failed built-in load
+ * stops it.
+ */
+export async function libraryLoaded(): Promise<void> {
+  await loadBuiltIns();
+  for (let load = userLibraryLoad; ; load = userLibraryLoad) {
+    await load;
+    if (load === userLibraryLoad) return;
+  }
+}
 
 /** Load the built-ins, and show them (with the user's patches) if the model is on the page library. */
-export async function loadPageLibrary(model: LibraryModel): Promise<void> {
+export const loadPageLibrary = tracked(async (model: LibraryModel): Promise<void> => {
   await loadBuiltIns();
   if (model.mode === 'page') await refreshLibrary(model);
-}
+});
 
 /** Attach the user's library store and read it in beside the built-ins. */
-export async function connectUserLibrary(model: LibraryModel, user: PatchFolder): Promise<void> {
+export function connectUserLibrary(model: LibraryModel, user: PatchFolder): Promise<void> {
   model.user = user;
-  await refreshLibrary(model);
+  return refreshLibrary(model);
 }
 
-/** Point the model at a folder and read it. */
-export async function connectLibrary(model: LibraryModel, folder: PatchFolder): Promise<void> {
+/** Point the model at a folder and read it; a song opening meanwhile waits for the folder's ids. */
+export function connectLibrary(model: LibraryModel, folder: PatchFolder): Promise<void> {
   model.folder = folder;
   model.mode = 'folder';
-  await refreshLibrary(model);
+  return refreshLibrary(model);
 }
 
 /** Back to the built-ins and the user's library. */
-export async function disconnectLibrary(model: LibraryModel): Promise<void> {
+export function disconnectLibrary(model: LibraryModel): Promise<void> {
   Object.assign(model, pageLibrary(model.user));
-  await refreshLibrary(model);
+  return refreshLibrary(model);
 }
 
 /**
@@ -127,7 +149,7 @@ export async function disconnectLibrary(model: LibraryModel): Promise<void> {
  * hidden behind the built-in — built-ins are never shadowed — and is named
  * under `problems`.
  */
-export async function refreshLibrary(model: LibraryModel): Promise<void> {
+export const refreshLibrary = tracked(async (model: LibraryModel): Promise<void> => {
   if (model.folder) {
     const { entries, problems, oldFormat } = await readFolderLibrary(model.folder);
     model.entries = entries;
@@ -153,7 +175,7 @@ export async function refreshLibrary(model: LibraryModel): Promise<void> {
     ...problems,
     ...clashes.map((id) => `your patch "${id}" is hidden by the built-in of the same id`),
   ];
-}
+});
 
 /**
  * Write one file: into the folder or the user's library and re-read it, or —
@@ -161,7 +183,7 @@ export async function refreshLibrary(model: LibraryModel): Promise<void> {
  * in memory so the browser reflects it for the rest of the session. A
  * built-in id is refused in page mode: built-ins are never shadowed.
  */
-export async function writeLibraryFile(
+export const writeLibraryFile = tracked(async function writeLibraryFile(
   model: LibraryModel,
   id: string,
   text: string,
@@ -188,16 +210,16 @@ export async function writeLibraryFile(
   } catch (error) {
     model.problems = [error instanceof Error ? error.message : String(error)];
   }
-}
+});
 
 /** Remove one of the user's patches, or a folder file, and re-read; a built-in is refused. */
-export async function removeLibraryFile(model: LibraryModel, id: string): Promise<void> {
+export const removeLibraryFile = tracked(async (model: LibraryModel, id: string): Promise<void> => {
   const store = model.folder ?? model.user;
   if (!store) throw new Error('This browser cannot store patches, so there is none to delete.');
   if (!isWritable(model, id)) throw new Error(`"${id}" is a built-in patch and stays read-only.`);
   await store.remove(patchFileName(id));
   await refreshLibrary(model);
-}
+});
 
 /** An old-format patch by id, or undefined. */
 export const oldFormatPatch = (model: LibraryModel, id: string): OldFormatPatch | undefined =>
@@ -215,13 +237,13 @@ export function exportOldFormat(
 }
 
 /** Delete an old-format patch from the store it was read from, on the user's word, and re-read. */
-export async function removeOldFormat(model: LibraryModel, id: string): Promise<void> {
+export const removeOldFormat = tracked(async (model: LibraryModel, id: string): Promise<void> => {
   const store = model.folder ?? model.user;
   if (!store || !oldFormatPatch(model, id))
     throw new Error(`"${id}" is not an old-format patch in this library.`);
   await store.remove(patchFileName(id));
   await refreshLibrary(model);
-}
+});
 
 /** The warning toast for the patch files the last library read refused, or null when it refused none. */
 export function libraryProblemsText(model: LibraryModel): string | null {

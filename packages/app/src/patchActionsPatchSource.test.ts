@@ -129,6 +129,23 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
     expect(patchOf(scope.ctx, 'kick-2')?.volume).toBe(0.1);
   });
 
+  it('leaves another song alone when it opens during the write', async () => {
+    const scope = await linkedScope();
+    let finish = (): void => undefined;
+    const written = new Promise<void>((resolve) => (finish = resolve));
+    const write = scope.files.write;
+    scope.files.write = (name, text) => written.then(() => write(name, text));
+    const working = { ...patchOf(scope.ctx, 'kick-2')!, volume: 0.1 };
+    const saving = savePatch({ ...scope, working, meta: META });
+    // The user opens song B, which has a kick-2 of its own, while the write is slow.
+    const theirs = makePatch({ name: 'Song B Kick', volume: 0.7 });
+    scope.ctx.model.open({ ...scope.ctx.model.doc, patches: { 'kick-2': theirs } });
+    finish();
+    await saving;
+    expect(scope.library.entries['kick']?.patch.volume).toBe(0.1);
+    expect(patchOf(scope.ctx, 'kick-2')).toEqual(theirs);
+  });
+
   it("discards and reverts into this part's copy only", async () => {
     const scope = await linkedScope();
     const kept = patchOf(scope.ctx, 'kick');

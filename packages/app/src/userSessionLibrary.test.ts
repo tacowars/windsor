@@ -11,7 +11,13 @@ import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { openGestureConsole } from './__fixtures__/gestureConsole';
 import { memorySessionStore, memorySongRecords } from './__fixtures__/memorySongStores';
 import type { PatchFolder } from './libraryFolder';
-import { awaitUserLibrary, library, loadPageLibrary, pageLibrary } from './libraryModel';
+import {
+  awaitUserLibrary,
+  connectLibrary,
+  library,
+  loadPageLibrary,
+  pageLibrary,
+} from './libraryModel';
 import type { UserStores } from './userLibraryStore';
 import { bootUserState } from './userSession';
 
@@ -69,6 +75,31 @@ describe('bootUserState', () => {
     opened({ patches: userPatches(), songs, library: memorySongRecords(songs) });
     expect(await imported).toBe(true);
     await booting;
+    expect(partAt(ctx.model.doc, 1)).toMatchObject({
+      preset: 'user-bell-3',
+      patchSource: 'user-bell',
+    });
+  });
+});
+
+describe('a library folder connected after boot', () => {
+  it('holds an import made during its read until the folder’s ids have loaded', async () => {
+    const ctx = openGestureConsole();
+    await ctx.importDoc({ version: ARRANGEMENT_VERSION, parts: [] });
+    let listed = (): void => undefined;
+    const slow = new Promise<void>((resolve) => (listed = resolve));
+    const folder = userPatches();
+    const list = folder.list;
+    folder.list = () => slow.then(list);
+    const connecting = connectLibrary(library, folder);
+    const imported = ctx.importDoc({
+      version: ARRANGEMENT_VERSION,
+      parts: [part(0), part(1)],
+      patches: { 'user-bell': makePatch({ name: 'Ice Needle' }) },
+    });
+    listed();
+    await connecting;
+    expect(await imported).toBe(true);
     expect(partAt(ctx.model.doc, 1)).toMatchObject({
       preset: 'user-bell-3',
       patchSource: 'user-bell',
