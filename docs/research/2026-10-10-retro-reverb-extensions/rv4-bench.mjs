@@ -6,7 +6,7 @@
 //
 //   node rv4-bench.mjs [bundle.js] [size]
 import { readFileSync } from 'node:fs';
-import { cpus, release } from 'node:os';
+import { cpus, platform, release } from 'node:os';
 
 const root = new URL('../../../', import.meta.url);
 const bundle =
@@ -56,7 +56,7 @@ for (const count of [1, 8, 16]) {
 }
 console.log(
   JSON.stringify({
-    machine: `${cpus()[0].model}, Darwin ${release()}, ${process.arch}`,
+    machine: `${cpus()[0].model}, ${platform()} ${release()}, ${process.arch}`,
     backend: `Node ${process.version} / V8 ${process.versions.v8}`,
     size,
     bytesPerInstance,
