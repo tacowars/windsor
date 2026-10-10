@@ -211,9 +211,16 @@ and 4.
 
 ## CPU
 
-`rv5-bench.mjs` (beside this file) is `rv4-bench.mjs` with Low decay,
-Density and Low cross arguments. It runs reverb mode, Mix 1 and a 0.25 sine
-input, and times user CPU (`process.cpuUsage`).
+RV-5's copy of the bench, since folded into `bench.mjs` beside this file, was
+RV-4's with Low decay, Density and Low cross arguments. It runs reverb mode,
+Mix 1 and a 0.25 sine input, and times user CPU (`process.cpuUsage`), which
+`bench.mjs` reports as `cpuUser`. The figures below were read with that copy.
+To re-run the cases (Low cross stays at its default, 300 Hz; add `--bundle
+<copy of main's bundle>` for the main rows):
+
+```bash
+node docs/research/2026-10-10-retro-reverb-extensions/bench.mjs --preset rv5 --rounds 5
+```
 
 **Method.** Each value is the median of five interleaved rounds. Each round
 is the median of six timed passes of 1,500 quanta. The unit is CPU

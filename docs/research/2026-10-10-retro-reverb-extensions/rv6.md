@@ -150,13 +150,23 @@ tank, and the all-Linear reference never had that tail to truncate.
 
 ## CPU
 
-`rv6-bench.mjs` (beside this file) is `rv4-bench.mjs` with a converter
-argument in place of Size, at Character 1 and Mix 1, fed a sine falling 60 dB
-a second from 0.25 and restarting every 2 s, so the ranging detector walks
-every range. Seven interleaved rounds of the three cases; each value is the
-median round (range in brackets), each round the median of six timed passes
-of 1,500 quanta. CPU microseconds per 128-frame quantum per instance at
-48 kHz. Other sessions kept the machine busy (load average 4.4 to 7.5).
+RV-6's copy of the bench, since folded into `bench.mjs` beside this file, was
+RV-4's with a converter argument in place of Size, at Character 1 and Mix 1,
+fed a sine falling 60 dB a second from 0.25 and restarting every 2 s, so the
+ranging detector walks every range. Seven interleaved rounds of the three
+cases; each value is the median round (range in brackets), each round the
+median of six timed passes of 1,500 quanta. CPU microseconds per 128-frame
+quantum per instance at 48 kHz. Other sessions kept the machine busy (load
+average 4.4 to 7.5).
+
+The figures below were read with that copy, whose user CPU time `bench.mjs`
+reports as `cpuUser` (`cpuRange` is the rounds' range in its user + system
+`cpu`). To re-run the cases (add `--bundle <copy of main's bundle>` for the
+main row):
+
+```bash
+node docs/research/2026-10-10-retro-reverb-extensions/bench.mjs --preset rv6 --rounds 7
+```
 
 | Case | 1 instance | 8 | 16 |
 |---|---|---|---|

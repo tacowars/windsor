@@ -212,12 +212,20 @@ is unchanged and green.
 
 ## CPU
 
-`rv3-bench.mjs` (beside this file) is `rv2-bench.mjs` with a Density
-argument, timed in the process's CPU time (user + system) as well as wall
-time. It runs reverb mode, Mix 1 and a 0.25 sine input. Each value is the
-median of five runs, interleaved with the other cases, and each run is the
-median of six timed passes of 1,500 quanta. The unit is microseconds per
-128-frame quantum per instance at 48 kHz. "main" is `131dec4`'s bundle.
+RV-3's copy of the bench, since folded into `bench.mjs` beside this file, was
+RV-2's with a Density argument, timed in the process's CPU time (user +
+system) as well as wall time (`bench.mjs`'s `cpu` and `wall`). It runs reverb
+mode, Mix 1 and a 0.25 sine input. Each value is the median of five runs,
+interleaved with the other cases, and each run is the median of six timed
+passes of 1,500 quanta. The unit is microseconds per 128-frame quantum per
+instance at 48 kHz. "main" is `131dec4`'s bundle.
+
+The figures below were read with that copy. To re-run the cases (add
+`--bundle <copy of main's bundle>` for the main rows):
+
+```bash
+node docs/research/2026-10-10-retro-reverb-extensions/bench.mjs --preset rv3 --rounds 5
+```
 
 The machine was shared with other sessions' builds and tests throughout: the
 load average read 173 at the start and 252 at the end. That inflates every
