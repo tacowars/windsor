@@ -98,5 +98,38 @@ export const RETRO_REVERB_DSP = {
   // opposite directions: a triangle at r Hz detunes each side by ±4 r × this, about ±3.5 cents
   // at 0.5 Hz and ±14 cents at 2 Hz.
   detuneExcursion: 0.001,
+  // Density (RV-3), Windsor's own values: four taps inside each tank line, as fractions of its
+  // current length (so they follow Size), read beside the line ends (the output-tap idea of
+  // Dattorro 1997, Part 1, applied to the four lines). Chosen by a search for the widest smallest
+  // gap between the arrival times of the taps, the line ends and their sums with one more line,
+  // up to 110 ms (0.13 ms at Size 1); no fraction is within 0.012 of a ratio with a denominator
+  // up to 8, so a tap's echoes never fall in step with its line's. All sit between 0.2 and 0.82,
+  // clear of the read Drift moves (at most 0.07 of the shortest line at the smallest Size).
+  densityFractions: [
+    [0.229, 0.359, 0.551, 0.812],
+    [0.235, 0.482, 0.638, 0.774],
+    [0.219, 0.479, 0.612, 0.815],
+    [0.223, 0.416, 0.585, 0.818],
+  ],
+  // Each tap's sign in the left and the right sum, 0 where it plays in the other: each channel
+  // takes two taps of every line, one early and one late, so L and R share none.
+  densityLeft: [
+    [1, 0, 1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0],
+    [0, -1, 0, 1],
+  ],
+  densityRight: [
+    [0, 1, 0, -1],
+    [-1, 0, -1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0],
+  ],
+  // Each output's line-end sum's energy, in lines, for the loudness match (left, right). Four
+  // unrelated ends at ±1 would make 4; the feedback matrix makes the left signs add up and the
+  // right ones partly cancel. Measured, not estimated: with these, an impulse at Size 0.25 to 3 and
+  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.2 dB where a short
+  // decay at a large Size leaves the first pass most of the energy.
+  densityEndEnergy: [5.2, 3.3],
   millisecondsPerSecond: 1000,
 } as const;

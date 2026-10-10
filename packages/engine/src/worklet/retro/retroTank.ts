@@ -19,6 +19,16 @@
  * the last of them sets it to the target, so it lands exactly at any host rate and block size, so a Size move
  * sweeps the reads rather than jumping them once a block (a zipper). A Size that holds has a step
  * of 0 and reads exactly as before. The lines are sized for the largest Size plus Drift's reach.
+ *
+ * Density (RV-3): besides the line ends, each output sums taps inside the lines
+ * (`densityFractions`), Dattorro's plate output taps (1997, Part 1) applied to the four lines. A
+ * line's whole loss is applied on write, so a tap a fraction f along it reads a sample that will
+ * lose nothing more before the end: weighted by the line's gain to the power f - 1, it sits on the
+ * same decay envelope as the end, and the RT60 is unchanged (the taps only read; nothing feeds
+ * back). Each channel is scaled by 1 / sqrt(1 + Σ (d × weight)² / E), E its ends' sum's energy in
+ * lines (`densityEndEnergy`), so ends and taps together keep the level of the ends alone. Like
+ * Drift, Density is scaled by the tank's share; at 0 no tap is read and the outputs are today's
+ * expressions, to the bit.
  */
 import {
   RETRO_REVERB_BOUNDS as B,
@@ -60,6 +70,22 @@ class RetroTank {
   driftStep: number;
   excursion: number;
   detune: number;
+  /** Density times the tank's share; 0 skips the taps. */
+  density: number;
+  /** Per tap, line-major: its line, its fraction, its signs (`densityLeft`/`densityRight`). */
+  tapLines: Uint8Array;
+  tapFractions: Float64Array;
+  tapSignsLeft: Float64Array;
+  tapSignsRight: Float64Array;
+  /** Per tap, set each block: its delay in samples and its gain in each output. */
+  tapDelays: Float64Array;
+  tapGainsLeft: Float64Array;
+  tapGainsRight: Float64Array;
+  /** The line ends' gain in each output while the taps play, and the taps' sums a sample. */
+  endLeft: number;
+  endRight: number;
+  tapLeft: number;
+  tapRight: number;
 
   constructor() {
     // Room for the longest line at the largest Size plus its read's furthest drift.
@@ -75,6 +101,16 @@ class RetroTank {
     this.damping = new Float64Array(C.tankSeconds.length);
     this.gains = new Float64Array(C.tankSeconds.length);
     this.values = new Float64Array(C.tankSeconds.length);
+    const taps = C.densityFractions.flat().length;
+    this.tapLines = Uint8Array.from(C.densityFractions.flatMap((row, i) => row.map(() => i)));
+    this.tapFractions = Float64Array.from(C.densityFractions.flat());
+    this.tapSignsLeft = Float64Array.from(C.densityLeft.flat());
+    this.tapSignsRight = Float64Array.from(C.densityRight.flat());
+    this.tapDelays = new Float64Array(taps);
+    this.tapGainsLeft = new Float64Array(taps);
+    this.tapGainsRight = new Float64Array(taps);
+    this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
+    this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = 0;
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
     this.sizeTarget = this.sizeStep = this.sizeTicks = NaN;
     this.input = this.lineInput = this.feedback = NaN;
@@ -94,6 +130,7 @@ class RetroTank {
     diffusion,
     driftRate,
     driftDepth,
+    density,
     finite,
   }: {
     size: number;
@@ -107,6 +144,7 @@ class RetroTank {
     diffusion: number;
     driftRate: number;
     driftDepth: number;
+    density: number;
     /** The finite field's share of the wet output (`RetroReverbDsp.finite`). */
     finite: number;
   }): void {
@@ -134,6 +172,46 @@ class RetroTank {
     this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / C.rate);
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(C.decayTarget, (C.tankSeconds[i] * size) / decay);
+    this.density = share > C.silenceFloor ? density * share : 0;
+    if (this.density !== 0) this.configureTaps();
+  }
+
+  /** The taps' delays at this Size, and their gains at this Density and the lines' gains. */
+  configureTaps(): void {
+    let left = 0,
+      right = 0;
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      const line = this.tapLines[k];
+      const fraction = this.tapFractions[k];
+      this.tapDelays[k] = fraction * C.tankSeconds[line] * this.size * C.rate;
+      const weight = this.density * Math.pow(this.gains[line], fraction - 1);
+      this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
+      this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
+      left += this.tapGainsLeft[k] * this.tapGainsLeft[k];
+      right += this.tapGainsRight[k] * this.tapGainsRight[k];
+    }
+    // The taps' energy against the ends' sum's, in lines (`densityEndEnergy`).
+    this.endLeft = C.outputTrim / Math.sqrt(1 + left / C.densityEndEnergy[0]);
+    this.endRight = C.outputTrim / Math.sqrt(1 + right / C.densityEndEnergy[1]);
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      this.tapGainsLeft[k] *= this.endLeft;
+      this.tapGainsRight[k] *= this.endRight;
+    }
+  }
+
+  /** Every tap, read before this sample's writes, into `tapLeft`/`tapRight`. */
+  readTaps(): void {
+    let left = 0,
+      right = 0;
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      const line = this.lines[this.tapLines[k]];
+      line.delay = this.tapDelays[k];
+      line.read();
+      left += this.tapGainsLeft[k] * line.output;
+      right += this.tapGainsRight[k] * line.output;
+    }
+    this.tapLeft = left;
+    this.tapRight = right;
   }
 
   tick(): void {
@@ -172,6 +250,7 @@ class RetroTank {
       const damped = this.damping[i] + this.pole * (raw - this.damping[i]);
       y[i] = this.damping[i] = Math.abs(damped) < C.silenceFloor ? 0 : damped;
     }
+    if (this.density !== 0) this.readTaps();
     // Normalized Hadamard transform: preserves feedback energy before loss.
     this.lineInput = input;
     this.feedback = (y[0] + y[1] + y[2] + y[3]) / 2;
@@ -183,8 +262,13 @@ class RetroTank {
     this.write(2);
     this.feedback = (y[0] - y[1] - y[2] + y[3]) / 2;
     this.write(this.lines.length - 1);
-    this.left = (y[0] + y[1] - y[2] - y[3]) * C.outputTrim;
-    this.right = (y[0] - y[1] + y[2] - y[3]) * C.outputTrim;
+    if (this.density === 0) {
+      this.left = (y[0] + y[1] - y[2] - y[3]) * C.outputTrim;
+      this.right = (y[0] - y[1] + y[2] - y[3]) * C.outputTrim;
+    } else {
+      this.left = (y[0] + y[1] - y[2] - y[3]) * this.endLeft + this.tapLeft;
+      this.right = (y[0] - y[1] + y[2] - y[3]) * this.endRight + this.tapRight;
+    }
     if (this.detune === 0) return;
     this.detuneLeft.input = this.left;
     this.detuneLeft.write();

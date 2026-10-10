@@ -80,6 +80,26 @@ describe('retro reverb shipped DSP', () => {
       expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
     },
   );
+  it('density adds echoes in the first 50 ms and keeps the decay below 3 kHz', () => {
+    const decay = 2;
+    const [sparse] = render({ decay, tone: 9000 }, 48000, 3);
+    const [dense] = render({ decay, tone: 9000, density: 1 }, 48000, 3);
+    expect(Math.abs(rt60Below3k(dense!) / rt60Below3k(sparse!) - 1)).toBeLessThan(0.05);
+    // Diffusion 0 keeps each path one click: a rise past 10 % of the peak after a fall below 2.5 %.
+    const echoes = (data: Float32Array): number => {
+      const peak = data.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+      let count = 0,
+        armed = true;
+      for (const v of data) {
+        if (armed && Math.abs(v) > peak / 10) count++;
+        armed = armed ? Math.abs(v) <= peak / 10 : Math.abs(v) < peak / 40;
+      }
+      return count;
+    };
+    const [few] = render({ diffusion: 0 }, 48000, 0.05);
+    const [many] = render({ diffusion: 0, density: 1 }, 48000, 0.05);
+    expect(echoes(many!)).toBeGreaterThanOrEqual(echoes(few!) + 6);
+  });
   it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
     expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
       render({ mode }, 48000, 0.5),

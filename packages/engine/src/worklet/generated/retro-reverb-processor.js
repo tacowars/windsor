@@ -100,6 +100,39 @@ var RETRO_REVERB_DSP = {
   // opposite directions: a triangle at r Hz detunes each side by ±4 r × this, about ±3.5 cents
   // at 0.5 Hz and ±14 cents at 2 Hz.
   detuneExcursion: 1e-3,
+  // Density (RV-3), Windsor's own values: four taps inside each tank line, as fractions of its
+  // current length (so they follow Size), read beside the line ends (the output-tap idea of
+  // Dattorro 1997, Part 1, applied to the four lines). Chosen by a search for the widest smallest
+  // gap between the arrival times of the taps, the line ends and their sums with one more line,
+  // up to 110 ms (0.13 ms at Size 1); no fraction is within 0.012 of a ratio with a denominator
+  // up to 8, so a tap's echoes never fall in step with its line's. All sit between 0.2 and 0.82,
+  // clear of the read Drift moves (at most 0.07 of the shortest line at the smallest Size).
+  densityFractions: [
+    [0.229, 0.359, 0.551, 0.812],
+    [0.235, 0.482, 0.638, 0.774],
+    [0.219, 0.479, 0.612, 0.815],
+    [0.223, 0.416, 0.585, 0.818]
+  ],
+  // Each tap's sign in the left and the right sum, 0 where it plays in the other: each channel
+  // takes two taps of every line, one early and one late, so L and R share none.
+  densityLeft: [
+    [1, 0, 1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0],
+    [0, -1, 0, 1]
+  ],
+  densityRight: [
+    [0, 1, 0, -1],
+    [-1, 0, -1, 0],
+    [0, 1, 0, -1],
+    [-1, 0, 1, 0]
+  ],
+  // Each output's line-end sum's energy, in lines, for the loudness match (left, right). Four
+  // unrelated ends at ±1 would make 4; the feedback matrix makes the left signs add up and the
+  // right ones partly cancel. Measured, not estimated: with these, an impulse at Size 0.25 to 3 and
+  // Decay 0.3 to 8 s plays at Density 1 within 0.4 dB of Density 0, and within 1.2 dB where a short
+  // decay at a large Size leaves the first pass most of the energy.
+  densityEndEnergy: [5.2, 3.3],
   millisecondsPerSecond: 1e3
 };
 
@@ -249,6 +282,16 @@ var RetroTank = class {
     this.damping = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.gains = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.values = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
+    const taps = RETRO_REVERB_DSP.densityFractions.flat().length;
+    this.tapLines = Uint8Array.from(RETRO_REVERB_DSP.densityFractions.flatMap((row, i) => row.map(() => i)));
+    this.tapFractions = Float64Array.from(RETRO_REVERB_DSP.densityFractions.flat());
+    this.tapSignsLeft = Float64Array.from(RETRO_REVERB_DSP.densityLeft.flat());
+    this.tapSignsRight = Float64Array.from(RETRO_REVERB_DSP.densityRight.flat());
+    this.tapDelays = new Float64Array(taps);
+    this.tapGainsLeft = new Float64Array(taps);
+    this.tapGainsRight = new Float64Array(taps);
+    this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = NaN;
+    this.density = this.endLeft = this.endRight = this.tapLeft = this.tapRight = 0;
     this.size = this.diffusion = this.pole = this.left = this.right = NaN;
     this.sizeTarget = this.sizeStep = this.sizeTicks = NaN;
     this.input = this.lineInput = this.feedback = NaN;
@@ -267,6 +310,7 @@ var RetroTank = class {
     diffusion,
     driftRate,
     driftDepth,
+    density,
     finite
   }) {
     this.sizeTarget = size;
@@ -290,6 +334,41 @@ var RetroTank = class {
     this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / RETRO_REVERB_DSP.rate);
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(RETRO_REVERB_DSP.decayTarget, RETRO_REVERB_DSP.tankSeconds[i] * size / decay);
+    this.density = share > RETRO_REVERB_DSP.silenceFloor ? density * share : 0;
+    if (this.density !== 0) this.configureTaps();
+  }
+  /** The taps' delays at this Size, and their gains at this Density and the lines' gains. */
+  configureTaps() {
+    let left = 0, right = 0;
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      const line = this.tapLines[k];
+      const fraction = this.tapFractions[k];
+      this.tapDelays[k] = fraction * RETRO_REVERB_DSP.tankSeconds[line] * this.size * RETRO_REVERB_DSP.rate;
+      const weight = this.density * Math.pow(this.gains[line], fraction - 1);
+      this.tapGainsLeft[k] = this.tapSignsLeft[k] * weight;
+      this.tapGainsRight[k] = this.tapSignsRight[k] * weight;
+      left += this.tapGainsLeft[k] * this.tapGainsLeft[k];
+      right += this.tapGainsRight[k] * this.tapGainsRight[k];
+    }
+    this.endLeft = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + left / RETRO_REVERB_DSP.densityEndEnergy[0]);
+    this.endRight = RETRO_REVERB_DSP.outputTrim / Math.sqrt(1 + right / RETRO_REVERB_DSP.densityEndEnergy[1]);
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      this.tapGainsLeft[k] *= this.endLeft;
+      this.tapGainsRight[k] *= this.endRight;
+    }
+  }
+  /** Every tap, read before this sample's writes, into `tapLeft`/`tapRight`. */
+  readTaps() {
+    let left = 0, right = 0;
+    for (let k = 0; k < this.tapDelays.length; k++) {
+      const line = this.lines[this.tapLines[k]];
+      line.delay = this.tapDelays[k];
+      line.read();
+      left += this.tapGainsLeft[k] * line.output;
+      right += this.tapGainsRight[k] * line.output;
+    }
+    this.tapLeft = left;
+    this.tapRight = right;
   }
   tick() {
     let input = this.input;
@@ -325,6 +404,7 @@ var RetroTank = class {
       const damped = this.damping[i] + this.pole * (raw - this.damping[i]);
       y[i] = this.damping[i] = Math.abs(damped) < RETRO_REVERB_DSP.silenceFloor ? 0 : damped;
     }
+    if (this.density !== 0) this.readTaps();
     this.lineInput = input;
     this.feedback = (y[0] + y[1] + y[2] + y[3]) / 2;
     this.write(0);
@@ -335,8 +415,13 @@ var RetroTank = class {
     this.write(2);
     this.feedback = (y[0] - y[1] - y[2] + y[3]) / 2;
     this.write(this.lines.length - 1);
-    this.left = (y[0] + y[1] - y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
-    this.right = (y[0] - y[1] + y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
+    if (this.density === 0) {
+      this.left = (y[0] + y[1] - y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
+      this.right = (y[0] - y[1] + y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
+    } else {
+      this.left = (y[0] + y[1] - y[2] - y[3]) * this.endLeft + this.tapLeft;
+      this.right = (y[0] - y[1] + y[2] - y[3]) * this.endRight + this.tapRight;
+    }
     if (this.detune === 0) return;
     this.detuneLeft.input = this.left;
     this.detuneLeft.write();
@@ -491,7 +576,7 @@ var RetroReverbDsp = class {
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.early = this.earlyLevel = NaN;
-    this.driftRate = this.driftDepth = this.ticks = NaN;
+    this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
@@ -509,6 +594,7 @@ var RetroReverbDsp = class {
     this.diffusion = params.diffusion[0];
     this.driftRate = params.driftRate[0];
     this.driftDepth = params.driftDepth[0];
+    this.density = params.density[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
     this.duration = params.duration[0];
@@ -539,6 +625,9 @@ var RetroReverbDsp = class {
     this.driftDepth += k * (params.driftDepth[0] - this.driftDepth);
     if (Math.abs(params.driftDepth[0] - this.driftDepth) < RETRO_REVERB_DSP.silenceFloor)
       this.driftDepth = params.driftDepth[0];
+    this.density += k * (params.density[0] - this.density);
+    if (Math.abs(params.density[0] - this.density) < RETRO_REVERB_DSP.silenceFloor)
+      this.density = params.density[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
     this.duration += k * (params.duration[0] - this.duration);

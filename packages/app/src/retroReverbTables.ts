@@ -26,6 +26,7 @@ const fields: readonly { f: RetroField; label: string; page?: 'space' }[] = [
   { f: 'early', label: 'Early', page: 'space' },
   { f: 'driftRate', label: 'Drift rate', page: 'space' },
   { f: 'driftDepth', label: 'Drift depth', page: 'space' },
+  { f: 'density', label: 'Density', page: 'space' },
 ];
 export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
   ({ f, label, page }) => ({

@@ -59,6 +59,8 @@ class RetroReverbDsp {
   /** Drift (RV-2), smoothed like the others; a depth within the floor of its target lands on it. */
   driftRate: number;
   driftDepth: number;
+  /** Density (RV-3), smoothed like Drift's depth: within the floor of its target it lands on it. */
+  density: number;
   preDelay: number;
   character: number;
   mix: number;
@@ -94,7 +96,7 @@ class RetroReverbDsp {
     this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
     this.convertInput = this.converted = this.level = this.targetLevel = this.levelStep = NaN;
     this.early = this.earlyLevel = NaN;
-    this.driftRate = this.driftDepth = this.ticks = NaN;
+    this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
@@ -112,6 +114,7 @@ class RetroReverbDsp {
     this.diffusion = params.diffusion[0];
     this.driftRate = params.driftRate[0];
     this.driftDepth = params.driftDepth[0];
+    this.density = params.density[0];
     this.preDelay = params.preDelay[0];
     this.character = params.character[0];
     this.duration = params.duration[0];
@@ -143,6 +146,9 @@ class RetroReverbDsp {
     this.driftDepth += k * (params.driftDepth[0] - this.driftDepth);
     if (Math.abs(params.driftDepth[0] - this.driftDepth) < C.silenceFloor)
       this.driftDepth = params.driftDepth[0];
+    this.density += k * (params.density[0] - this.density);
+    if (Math.abs(params.density[0] - this.density) < C.silenceFloor)
+      this.density = params.density[0];
     this.preDelay += k * (params.preDelay[0] - this.preDelay);
     this.character += k * (params.character[0] - this.character);
     this.duration += k * (params.duration[0] - this.duration);

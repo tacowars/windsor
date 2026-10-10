@@ -11,8 +11,8 @@
  * driven by `retroReverbChangeScenario.ts`) with `--expose-gc`, a 64 MB young
  * generation and `--trace-generalization`. A cycle is 512 quanta of stereo
  * noise with a parameter change every 8 (size, decay, tone, diffusion, drift
- * depth and rate, pre-delay, character, mix, duration, early, gated and
- * reverse, the enable), then
+ * depth and rate, pre-delay, character, mix, duration, early, density, gated
+ * and reverse, the enable), then
  * silence at a short decay until the tail is exact zeros, the finite field has
  * faded, the pre-delay is off and the mix has settled (about 520 quanta), then
  * 64 quanta of mono noise and 64 of no input, then 512 quanta of stereo
