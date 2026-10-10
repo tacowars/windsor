@@ -24,6 +24,8 @@ const fields: readonly { f: RetroField; label: string; page?: 'space' }[] = [
   { f: 'duration', label: 'Time' },
   { f: 'mix', label: 'Mix' },
   { f: 'early', label: 'Early', page: 'space' },
+  { f: 'driftRate', label: 'Drift rate', page: 'space' },
+  { f: 'driftDepth', label: 'Drift depth', page: 'space' },
 ];
 export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
   ({ f, label, page }) => ({
@@ -36,7 +38,7 @@ export const RETRO_REVERB_KNOBS: readonly RetroReverbKnobEntry[] = fields.map(
       def: DEFAULT_RETRO_REVERB[f],
       fmt:
         f === 'tone' ? fmtHz : f === 'decay' || f === 'preDelay' || f === 'duration' ? fmtMs : fmt2,
-      ...(f === 'tone' || f === 'decay' ? { curve: 'log' as const } : {}),
+      ...(f === 'tone' || f === 'decay' || f === 'driftRate' ? { curve: 'log' as const } : {}),
     },
   }),
 );

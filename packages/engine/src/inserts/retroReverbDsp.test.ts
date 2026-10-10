@@ -31,6 +31,24 @@ function energy(data: Float32Array, from = 0, to = data.length): number {
   return total;
 }
 
+/**
+ * Seconds to fall 60 dB below 3 kHz: four one-pole lowpasses at 3 kHz, the backward-integrated
+ * energy, and its fall from -5 to -25 dB scaled to 60.
+ */
+function rt60Below3k(data: Float32Array, rate = 48000): number {
+  const pole = 1 - Math.exp((-2 * Math.PI * 3000) / rate);
+  const state = [0, 0, 0, 0];
+  const tail = new Float64Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    let v = data[i]!;
+    for (let k = 0; k < state.length; k++) v = state[k]! += pole * (v - state[k]!);
+    tail[i] = v * v;
+  }
+  for (let i = data.length - 2; i >= 0; i--) tail[i]! += tail[i + 1]!;
+  const crossing = (db: number): number => tail.findIndex((e) => e < tail[0]! * 10 ** (db / 10));
+  return ((crossing(-25) - crossing(-5)) / rate) * 3;
+}
+
 describe('retro reverb shipped DSP', () => {
   it.each(RETRO_REVERB_MODES)('%s has a finite stereo tail', (mode) => {
     const [left, right] = render({ mode });
@@ -44,6 +62,19 @@ describe('retro reverb shipped DSP', () => {
     const [long] = render({ decay: RETRO_REVERB_BOUNDS.decay[1] });
     expect(energy(long!, 48000)).toBeGreaterThan(energy(short!, 48000) * 100);
     expect(energy(short!, 48000)).toBeLessThan(1e-12);
+  });
+  it('drift moves the tail and keeps its decay below 3 kHz', () => {
+    const decay = 2;
+    const still = render({ decay, tone: 9000 }, 48000, 4);
+    const [left, right] = render({ decay, tone: 9000, driftDepth: 1, driftRate: 2 }, 48000, 4);
+    expect(left).not.toEqual(still[0]);
+    expect(right).not.toEqual(still[1]);
+    expect(Math.abs(rt60Below3k(left!) / decay - 1)).toBeLessThan(0.1);
+  });
+  it.each(['gated', 'reverse'] as const)('%s skips Drift, which only the tank plays', (mode) => {
+    expect(render({ mode, driftDepth: 1, driftRate: 2 }, 48000, 0.5)).toEqual(
+      render({ mode }, 48000, 0.5),
+    );
   });
   it.each(['gated', 'reverse'] as const)('%s ends after its selected duration', (mode) => {
     const duration = 0.3;

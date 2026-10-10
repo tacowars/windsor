@@ -192,8 +192,8 @@ const COMPRESSOR_ROWS = [
 
 const R = RETRO_REVERB_BOUNDS;
 /**
- * The tank and its early reflections play only in reverb mode; gated and reverse play the finite
- * field (`retroReverbDsp.ts`).
+ * The tank, its drift and its early reflections play only in reverb mode; gated and reverse play
+ * the finite field (`retroReverbDsp.ts`).
  */
 const tank = (spec: RetroReverbSpec): boolean => spec.mode === 'reverb';
 const RETRO_REVERB_ROWS: InsertFieldRow<RetroReverbSpec>[] = [
@@ -205,6 +205,8 @@ const RETRO_REVERB_ROWS: InsertFieldRow<RetroReverbSpec>[] = [
   row('character', 'Character', R.character),
   row('mix', 'Mix', R.mix),
   when(row('early', 'Early', R.early), tank),
+  when(row('driftRate', 'Drift rate', R.driftRate, 'log', 'Hz'), tank),
+  when(row('driftDepth', 'Drift depth', R.driftDepth), tank),
   when(row('duration', 'Gate time', R.duration, 'linear', 's'), (spec) => !tank(spec)),
 ];
 

@@ -10,11 +10,15 @@
  * its own that runs the shipped bundle (`__fixtures__/workletAllocationProbe.ts`,
  * driven by `retroReverbChangeScenario.ts`) with `--expose-gc`, a 64 MB young
  * generation and `--trace-generalization`. A cycle is 512 quanta of stereo
- * noise with a parameter change every 8 (size, decay, tone, diffusion,
- * pre-delay, character, mix, duration, early, gated and reverse, the enable), then
+ * noise with a parameter change every 8 (size, decay, tone, diffusion, drift
+ * depth and rate, pre-delay, character, mix, duration, early, gated and
+ * reverse, the enable), then
  * silence at a short decay until the tail is exact zeros, the finite field has
  * faded, the pre-delay is off and the mix has settled (about 520 quanta), then
- * 64 quanta of mono noise and 64 of no input: about 1 160 quanta. The child
+ * 64 quanta of mono noise and 64 of no input, then 512 quanta of stereo
+ * noise with Drift depth switching between exactly 0 and on every quantum
+ * (each switch on refills the tank's two detune delays): about 1 670 quanta.
+ * The child
  * warms for 48 000 quanta (the load meter reporting for the first half),
  * forces two collections, then reads `used_heap_size` in ten windows across
  * 8 000 quanta with the meter off (it calls Date.now() twice a quantum, and V8
@@ -49,6 +53,8 @@ function probe(): ProbeRun {
     period: 8,
     loud: 512,
     inputs: 64,
+    flicker: 512,
+    flickerDepth: RETRO_REVERB_DSP.silenceFloor / 2,
     quietDecay: 0.2,
     floor: RETRO_REVERB_DSP.silenceFloor,
     internalRate: RETRO_REVERB_DSP.rate,
