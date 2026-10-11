@@ -43,6 +43,12 @@
  *   (`groupInsertsRebuilt`); a length edit refits them. Routing a part in or
  *   out of a group touches none of them. A group has no sequencer, so its
  *   lanes never reach the gates.
+ * - **Clip envelopes** (windsor#702, epic windsor#699). Each part's regions
+ *   and the rolls they play go to the player as its `ClipEnvelopeSource`:
+ *   every part at `load`, and after a partial each part whose regions or
+ *   sequencer it carries (a part added among them), or every part when the
+ *   song's length changed. A part none of whose regions plays an envelope
+ *   hands the player null, and nothing of its playback changes.
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
@@ -57,6 +63,7 @@ import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDo
 import { fitLanes, normaliseAutomation } from '../song/automationNormalise';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { GroupBus } from '../mixer/groupBus';
+import { clipEnvelopeSource } from '../automation/clipEnvelopeSource';
 import { automationResolver } from './automationResolver';
 
 /** Where a part's lanes go for its region gate to read: the `ArrangementPlayer`. */
@@ -104,7 +111,10 @@ export class SongAutomation {
     const player = this.playerValue;
     if (!player) return;
     player.seek(this.scheduler.transport.currentTick);
-    for (const part of document.parts) player.setLanes(partOwner(part.slot), part.automation ?? []);
+    for (const part of document.parts) {
+      player.setLanes(partOwner(part.slot), part.automation ?? []);
+      player.setEnvelopes(partOwner(part.slot), clipEnvelopeSource(part, this.songTicks));
+    }
     for (const group of document.groups ?? []) {
       player.setLanes(groupOwner(group.id), group.automation ?? []);
     }
@@ -128,7 +138,9 @@ export class SongAutomation {
     for (const [slot, part] of parts) if (part === null) player.remove(partOwner(slot));
     for (const [id, group] of groups) if (group === null) player.remove(groupOwner(id));
     const { transport } = partial;
-    if (isRecord(transport) && (transport.bars !== undefined || transport.meter !== undefined)) {
+    const resized =
+      isRecord(transport) && (transport.bars !== undefined || transport.meter !== undefined);
+    if (resized) {
       const { bars, meter } = read().transport;
       this.songTicks = songTicks(bars, meter);
       player.setSongTicks(this.songTicks);
@@ -149,9 +161,20 @@ export class SongAutomation {
       }
     }
     for (const [id, group] of groups) if (isRecord(group)) this.applyGroup(player, id, group);
+    const moved = parts.filter(
+      ([, part]) => isRecord(part) && ('regions' in part || 'sequencer' in part),
+    );
+    const slots = resized ? read().parts.map((p) => p.slot) : moved.map(([slot]) => slot);
+    for (const slot of slots) this.reenvelope(player, slot, read);
     for (const owner of player.owners()) {
       if (!isGroupOwner(owner)) gates?.setLanes(owner.part, player.lanesOf(owner));
     }
+  }
+
+  /** The part on `slot` hands the player what its regions play now. */
+  private reenvelope(player: AutomationPlayer, slot: number, read: () => MergedSong): void {
+    const part = read().parts.find((p) => p.slot === slot);
+    player.setEnvelopes(partOwner(slot), part ? clipEnvelopeSource(part, this.songTicks) : null);
   }
 
   /** Restart one owner's lanes from now: their targets' params changed. */

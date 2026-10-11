@@ -33,6 +33,24 @@ export interface AutomationHandle {
   release(time: number): void;
 }
 
+/**
+ * A handle whose param carries an offset another source adds to: a voice
+ * slot's (`synth/voiceAutomation.ts`), where a roll's clip envelope sums
+ * with the song lane on the same target (windsor#702).
+ */
+export interface OffsetHandle extends AutomationHandle {
+  /** The offset `schedule` writes for a lane value. */
+  offsetOf(value: number): number;
+  /** Reach `offset` itself at `time`: a lane's offset plus an envelope's. */
+  scheduleOffset(offset: number, time: number, how: AutomationHow): void;
+  /** Cancel from `time`, then hold `offset` from there. */
+  holdOffset(offset: number, time: number): void;
+}
+
+/** Whether `handle` writes offsets a clip envelope can add to. */
+export const isOffsetHandle = (handle: AutomationHandle): handle is OffsetHandle =>
+  'scheduleOffset' in handle;
+
 /** A handle on params a knob also writes. */
 export interface KnobHandle extends AutomationHandle {
   /** True from a hold or schedule until the release: the knob records and does not write. */
