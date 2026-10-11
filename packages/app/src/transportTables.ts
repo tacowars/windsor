@@ -14,7 +14,6 @@ import {
   DIVISORS,
   METERS,
   PITCH_CLASS_MAX,
-  SCALE_NAMES,
   STRAIGHT_SWING,
   SWING_AMOUNT_MAX,
   SWING_AMOUNT_MIN,
@@ -22,6 +21,8 @@ import {
 } from '@windsor/engine';
 import { fmt0, fmt2 } from './consoleFormat';
 import type { KnobSpec } from './knob';
+import type { SelectGroup, SelectOption } from './dom';
+import { SCALE_DISPLAY_NAMES, SCALE_GROUPS } from './scaleNameTables';
 import { DRAG_RANGE_FINE_PX, DRAG_RANGE_PX } from './knobConstants';
 import { NEW_SONG_BARS, NEW_SONG_BPM } from './songConstants';
 
@@ -120,11 +121,15 @@ export const KEY_OPTIONS: readonly { value: string; label: string }[] = CHORD_NO
   PITCH_CLASS_MAX + 1,
 ).map((name, pc) => ({ value: String(pc), label: name }));
 
-/** The named scales, in the engine's order; a custom offset list shows as this. */
+/** A custom offset list shows as this, after the groups. */
 export const CUSTOM_SCALE = 'custom';
-export const SCALE_OPTIONS: readonly { value: string; label: string }[] = SCALE_NAMES.map(
-  (name) => ({ value: name, label: name }),
-);
+/** The named scales under their groups (windsor#721 decision 3), by display name. */
+export const SCALE_OPTION_GROUPS: readonly SelectGroup[] = SCALE_GROUPS.map((group) => ({
+  group: group.label,
+  options: group.scales.map((name) => ({ value: name, label: SCALE_DISPLAY_NAMES[name] })),
+}));
+/** Every named scale's option, in the picker's order. */
+export const SCALE_OPTIONS: readonly SelectOption[] = SCALE_OPTION_GROUPS.flatMap((g) => g.options);
 
 /**
  * The position readout's third field (windsor#431 decision 3): 16ths inside

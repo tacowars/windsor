@@ -11,6 +11,41 @@ describe('SCALES', () => {
       expect(s.at(-1)!).toBeLessThan(12);
     }
   });
+
+  it('carry the windsor#721 scales with their spelt offsets, after the original seven', () => {
+    expect(SCALE_NAMES.slice(0, 7)).toEqual([
+      'major',
+      'naturalMinor',
+      'dorian',
+      'mixolydian',
+      'lydian',
+      'pentatonicMajor',
+      'pentatonicMinor',
+    ]);
+    expect(Object.fromEntries(SCALE_NAMES.slice(7).map((name) => [name, SCALES[name]]))).toEqual({
+      phrygian: [0, 1, 3, 5, 7, 8, 10],
+      locrian: [0, 1, 3, 5, 6, 8, 10],
+      harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+      melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+      phrygianDominant: [0, 1, 4, 5, 7, 8, 10],
+      hirajoshi: [0, 2, 3, 7, 8],
+      japaneseIn: [0, 1, 5, 7, 8],
+      majorBlues: [0, 2, 3, 4, 7, 9],
+      minorBlues: [0, 3, 5, 6, 7, 10],
+      wholeTone: [0, 2, 4, 6, 8, 10],
+    });
+  });
+
+  it('fold a degree past a 5- or 6-note scale to its root an octave up', () => {
+    expect(foldDegree(SCALES.hirajoshi.length, SCALES.hirajoshi.length)).toEqual({
+      degree: 0,
+      carry: 1,
+    });
+    expect(foldDegree(SCALES.minorBlues.length, SCALES.minorBlues.length)).toEqual({
+      degree: 0,
+      carry: 1,
+    });
+  });
 });
 
 describe('ScaleSampler', () => {

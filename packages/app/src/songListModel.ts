@@ -7,6 +7,7 @@
  * section builds DOM from them and holds no rule of its own.
  */
 import { CHORD_NOTE_NAMES, TEMPLATE_TAG } from '@windsor/engine';
+import { SCALE_DISPLAY_NAMES } from './scaleNameTables';
 import type { SongFacts, SongKey } from './songFacts';
 import type { SongListEntry } from './songLibrary';
 import type { RelativeTimeSteps, SongSort } from './songListTables';
@@ -143,10 +144,15 @@ export function sortSongs(entries: readonly SongListEntry[], sort: SongSort): So
 const numberCell = (value: number | null): string =>
   value === null ? SONG_CELL_NONE : String(value);
 
-/** A key as the transport strip spells it: `A naturalMinor`. */
+/**
+ * A key as the transport strip spells it: `A minor`. A scale this build
+ * does not know shows as written.
+ */
 export function keyLabel(key: SongKey | null): string {
   if (key === null) return SONG_CELL_NONE;
-  return `${CHORD_NOTE_NAMES[key.root] ?? String(key.root)} ${key.scale}`;
+  const names: Readonly<Record<string, string>> = SCALE_DISPLAY_NAMES;
+  const scale = Object.hasOwn(names, key.scale) ? names[key.scale] : key.scale;
+  return `${CHORD_NOTE_NAMES[key.root] ?? String(key.root)} ${scale}`;
 }
 
 const sameDay = (a: Date, b: Date): boolean =>

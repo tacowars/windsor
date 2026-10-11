@@ -189,7 +189,7 @@ describe('the rows', () => {
       bpm: '132',
       meter: '4/4',
       bars: '16',
-      key: 'A naturalMinor',
+      key: 'A minor',
       edited: '12 s ago',
     });
     expect(byId('kick').meter).toBe('7/8');
@@ -255,6 +255,9 @@ describe('relative times', () => {
 
   it('spells a key with the console names', () => {
     expect(keyLabel({ root: 3, scale: 'dorian' })).toBe('D# dorian');
+    expect(keyLabel({ root: 9, scale: 'harmonicMinor' })).toBe('A harmonic minor');
+    expect(keyLabel({ root: 0, scale: 'japaneseIn' })).toBe('C in (miyako-bushi)');
+    expect(keyLabel({ root: 0, scale: 'futureScale' })).toBe('C futureScale');
     expect(keyLabel(null)).toBe('—');
   });
 });

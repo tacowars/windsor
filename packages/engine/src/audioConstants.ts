@@ -56,6 +56,18 @@ export const SCALES = {
   lydian: [0, 2, 4, 6, 7, 9, 11],
   pentatonicMajor: [0, 2, 4, 7, 9],
   pentatonicMinor: [0, 3, 5, 7, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+  /** The ascending (jazz) form at every step. */
+  melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+  phrygianDominant: [0, 1, 4, 5, 7, 8, 10],
+  /** Burrows/Sachs spelling; `japaneseIn` is the same pitch set from its ♭2. */
+  hirajoshi: [0, 2, 3, 7, 8],
+  japaneseIn: [0, 1, 5, 7, 8],
+  majorBlues: [0, 2, 3, 4, 7, 9],
+  minorBlues: [0, 3, 5, 6, 7, 10],
+  wholeTone: [0, 2, 4, 6, 8, 10],
 } as const satisfies Record<string, readonly number[]>;
 
 /* --------------------- arrangement document bounds ---------------------- */

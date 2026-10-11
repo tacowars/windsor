@@ -15,6 +15,7 @@ import { DEFAULT_STRIP } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
 import { DEFAULT_GRID_CONFIG } from '../sequencing/gridSequencer';
 import { ARRANGEMENT_VERSION, DEFAULT_BARS } from '../audioConstants';
+import { SCALE_NAMES } from '../sequencing/scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { ALL, KICK, PATCHES, play, silentPart, song } from '../__fixtures__/documentCases';
@@ -147,6 +148,15 @@ describe('corrections are reported', () => {
     );
     expect(result.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
     expect(result.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
+  });
+
+  it('keeps each windsor#721 scale through a round trip, uncorrected', () => {
+    for (const scale of SCALE_NAMES.slice(7)) {
+      const first = makeArrangement(song([KICK], { harmony: { root: 9, scale } }));
+      expect(first.corrections.join('\n')).not.toMatch(/harmony\.scale/);
+      expect(first.document.harmony.scale).toBe(scale);
+      expect(makeArrangement(first.document).document).toEqual(first.document);
+    }
   });
 
   it('reports harmony.weights as an unknown key and changes nothing else (#704, #705)', () => {
