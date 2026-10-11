@@ -49,6 +49,8 @@ interface Call {
 function rig(record = true) {
   let handler: TickHandler | null = null;
   const clock = { now: 0 };
+  /** Where the fake transport rests while stopped. */
+  const transport = { rest: 0 };
   const calls: Call[] = [];
   let handed = 0;
   const follower = new BloomChordFollower({
@@ -62,7 +64,7 @@ function rig(record = true) {
     sink: record ? (mask, time, hold) => calls.push({ mask, time, hold }) : () => handed++,
     harmony: SONG_HARMONY,
     songTicks: SONG,
-    restTick: 0,
+    restTick: () => transport.rest,
   });
   const event: TickEvent = {
     tick: 0,
@@ -88,6 +90,7 @@ function rig(record = true) {
     follower,
     calls,
     clock,
+    transport,
     run,
     since,
     handed: () => handed,
@@ -170,6 +173,15 @@ describe('stopped', () => {
     // The next start is a jump, held at its tick.
     run(30, 30, at(400));
     expect(calls.at(-1)).toEqual(hold(I, at(400) - FADE));
+  });
+
+  it('holds where the transport now rests after a loop start rewound it', () => {
+    const { follower, calls, clock, transport } = rig();
+    expect(calls).toEqual([hold(V, 0)]);
+    // A loop from tick 120 (vi) rewinds the stopped transport there; the next edit re-plans.
+    transport.rest = 120;
+    follower.setSong(SONG_HARMONY, SONG);
+    expect(calls.at(-1)).toEqual(hold(VI, clock.now));
   });
 
   it('stops hearing the transport once disposed', () => {

@@ -118,6 +118,31 @@ export interface MusicReadout extends PlaybackReadout {
 const songLength = ({ transport }: Pick<Arrangement, 'transport'>): number =>
   songTicks(transport.bars, transport.meter);
 
+/**
+ * Re-plan Song chord after a live edit, by what it touched (windsor#729): a
+ * harmony or transport edit rebuilds the timeline from one read of the
+ * arrangement (a clone, so never on other edits); a part, group, master or
+ * return edit may have switched a bloom to Song chord, which needs the
+ * changes already issued, and clones nothing.
+ */
+function replanChords(
+  chords: BloomChordFollower,
+  partial: DocumentPartial,
+  arrangement: () => Arrangement,
+): void {
+  if (partial.harmony !== undefined || partial.transport !== undefined) {
+    const song = arrangement();
+    chords.setSong(song.harmony, songLength(song));
+  } else if (
+    partial.parts !== undefined ||
+    partial.groups !== undefined ||
+    partial.master !== undefined ||
+    partial.returns !== undefined
+  ) {
+    chords.replan();
+  }
+}
+
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -324,7 +349,7 @@ export class AudioSystem {
       sink: (mask, time, hold) => this.insertHarmony.setChord(mask, time, hold),
       harmony: arrangement.harmony,
       songTicks: songLength(arrangement),
-      restTick: this.scheduler.transport.currentTick,
+      restTick: () => this.scheduler.transport.currentTick,
     });
     this.playback.load(player, [lanes, this.chords]);
   }
@@ -428,7 +453,7 @@ export class AudioSystem {
     this.sidechains.commit(routing.graph);
     this.automation.apply(partial, () => player.arrangement, player);
     // Whatever moved a chord or its time, from now (windsor#729).
-    this.chords?.setSong(player.arrangement.harmony, songLength(player.arrangement));
+    if (this.chords) replanChords(this.chords, partial, () => player.arrangement);
     return { ok: true, ignored };
   }
 

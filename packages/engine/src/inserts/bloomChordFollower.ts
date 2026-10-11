@@ -19,7 +19,9 @@
  *   bloom created since.
  * - **Stopped.** A stop holds the set where the playhead stood; a seek, or ■'s
  *   rewind, the set at the new tick; a re-plan while stopped, the set where
- *   the playhead rests.
+ *   the playhead rests, folded by the song's length now. The transport's rest
+ *   is read again at each re-plan, so a stopped transport moved without a
+ *   seek (a loop's start rewinding it) is held where it now rests.
  * - **No allocation per tick.** The ticks issued and not yet sounded are kept
  *   in typed arrays, which grow only when full.
  *
@@ -43,8 +45,8 @@ export interface ChordFollowerOptions {
   readonly harmony: Harmony;
   /** The song's length: a transport tick plays the chord at `tick mod songTicks`. */
   readonly songTicks: number;
-  /** Where the stopped transport rests: where the chord is first held. */
-  readonly restTick: number;
+  /** Where the stopped transport rests now, read at each re-plan while stopped. */
+  readonly restTick: () => number;
   /** How early a change is scheduled; the worklet's fade when absent. */
   readonly fadeSeconds?: number;
 }
@@ -55,8 +57,10 @@ const fold = (tick: number, songTicks: number): number =>
 export class BloomChordFollower {
   private timeline: ChordTimeline;
   private songTicks: number;
-  /** The song position the stopped playhead rests on. */
-  private restPos: number;
+  /** The transport tick the stopped playhead rests on, unfolded. */
+  private restAt: number;
+  /** The transport's rest when `restAt` was taken: a different one since means it moved. */
+  private restSeen: number;
   /** The transport ticks issued since the start, from the one sounding now on, and their times. */
   private ticks = new Float64Array(2);
   private times = new Float64Array(2);
@@ -72,7 +76,7 @@ export class BloomChordFollower {
   constructor(private readonly options: ChordFollowerOptions) {
     this.timeline = chordTimeline(options.harmony, options.songTicks);
     this.songTicks = options.songTicks;
-    this.restPos = fold(options.restTick, options.songTicks);
+    this.restAt = this.restSeen = options.restTick();
     this.fade = options.fadeSeconds ?? BLOOM_GENERATOR.switchSeconds;
     this.unfollow = options.transport.subscribe(1, (event) => this.follow(event));
     this.replan();
@@ -94,7 +98,7 @@ export class BloomChordFollower {
    */
   replan(): void {
     const now = this.options.now();
-    const pos = this.lastPos < 0 ? this.restPos : this.positionAt(now + this.fade);
+    const pos = this.lastPos < 0 ? this.restPos() : this.positionAt(now + this.fade);
     this.hand(chordMaskAt(this.timeline, pos), now, true);
     for (let i = 0; i < this.count; i++) {
       if (this.times[i]! > now) this.schedule(fold(this.ticks[i]!, this.songTicks), this.times[i]!);
@@ -104,16 +108,16 @@ export class BloomChordFollower {
   /** The transport halted: hold the set where the playhead stood. */
   stop(): void {
     const now = this.options.now();
-    if (this.lastPos >= 0) this.restPos = this.positionAt(now);
+    if (this.lastPos >= 0) this.rest(this.tickAt(now));
     this.forget();
-    this.hand(chordMaskAt(this.timeline, this.restPos), now, true);
+    this.hand(chordMaskAt(this.timeline, this.restPos()), now, true);
   }
 
   /** The halted transport moved to `tick`: hold the set there. */
   seek(tick: number): void {
-    this.restPos = fold(tick, this.songTicks);
+    this.rest(tick);
     this.forget();
-    this.hand(chordMaskAt(this.timeline, this.restPos), this.options.now(), true);
+    this.hand(chordMaskAt(this.timeline, this.restPos()), this.options.now(), true);
   }
 
   /** ■ rewound the halted transport to `tick`: as a seek. */
@@ -153,11 +157,33 @@ export class BloomChordFollower {
     this.last = time;
   }
 
-  /** The song position sounding at `time`: the last issued tick at or before it, else the first. */
+  /** The song position sounding at `time`. */
   private positionAt(time: number): number {
+    return fold(this.tickAt(time), this.songTicks);
+  }
+
+  /** The transport tick sounding at `time`: the last issued at or before it, else the first. */
+  private tickAt(time: number): number {
     let at = 0;
     while (at + 1 < this.count && this.times[at + 1]! <= time) at++;
-    return this.count > 0 ? fold(this.ticks[at]!, this.songTicks) : this.restPos;
+    return this.count > 0 ? this.ticks[at]! : this.restAt;
+  }
+
+  /** The playhead rests on `tick`, against the transport's rest now. */
+  private rest(tick: number): void {
+    this.restAt = tick;
+    this.restSeen = this.options.restTick();
+  }
+
+  /**
+   * The song position the stopped playhead rests on. A stop keeps the tick
+   * that was sounding, behind the transport's queue; where the transport has
+   * moved since, its rest is taken instead.
+   */
+  private restPos(): number {
+    const now = this.options.restTick();
+    if (now !== this.restSeen) this.restAt = this.restSeen = now;
+    return fold(this.restAt, this.songTicks);
   }
 
   private record(tick: number, time: number): void {
