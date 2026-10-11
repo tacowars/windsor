@@ -16,6 +16,7 @@ import { scale, TEST_KINDS } from '../__fixtures__/stripRig';
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { InsertRegistry } from '../inserts/insertRegistry';
 import { createInsertChain } from './insertChain';
+import { slotChild } from './insertSlot';
 
 const NOW = 1;
 const fake = (node: AudioNode): FakeNode => node as unknown as FakeNode;
@@ -299,5 +300,22 @@ describe('a dispose', () => {
     expect(leftovers([tint], fades)).toEqual({ edges: [], disposed: [1] });
     expect(() => r.settle()).not.toThrow();
     expect(tint.disposed).toBe(1);
+  });
+});
+
+describe('the live child', () => {
+  it('is read through the host: the newest child through a swap, none when empty', () => {
+    const r = rig();
+    expect(slotChild(r.stage())).toBeUndefined();
+    r.stage().set(host({ kind: 'tint' }));
+    const tint = children.at(-1)!;
+    expect(slotChild(r.stage())).toBe(tint);
+    // A stage that is not a host's has none.
+    expect(slotChild(tint)).toBeUndefined();
+    r.stage().set(host({ kind: 'tone' }));
+    const tone = children.at(-1)!;
+    expect(slotChild(r.stage())).toBe(tone);
+    r.stage().set(host(null));
+    expect(slotChild(r.stage())).toBeUndefined();
   });
 });

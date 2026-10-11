@@ -326,10 +326,14 @@ export type { GroupBus } from './mixer/groupBus';
 export { routePart } from './mixer/channelStrip';
 export type { PartStrip, StripStage } from './mixer/channelStrip';
 export { createLowCutStage } from './mixer/lowCutStage';
+// A host's live slot child, read-only (windsor#692).
+export { slotChild } from './mixer/insertSlot';
+export type { HostStage } from './mixer/insertSlot';
 export type { LowCutStage } from './mixer/lowCutStage';
 export {
   INSERT_KINDS,
   INSERT_KIND_NAMES,
+  SLOT_FIELD,
   insertKind,
   insertSlot,
   isHostKind,

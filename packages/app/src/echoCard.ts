@@ -12,7 +12,7 @@ import type { InsertCard } from './insertCards';
 import { ECHO_KNOBS } from './insertKnobTables';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
 import { insertPage, insertSelect, wideColumn } from './insertLayout';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import { TEMPO_DIVISIONS } from './mixerTables';
 import { tempoMatches, tempoSeconds } from './returnControls';
 
@@ -54,7 +54,7 @@ export const echoCard: InsertCard = (ctx, slot, index) => {
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== 'echo') return;
     inserts[index] = spec;
-    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const build = (): HTMLElement => {
     const tempo = tempoPicker(

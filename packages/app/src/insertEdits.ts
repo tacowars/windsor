@@ -5,12 +5,17 @@
  * chain: the same kinds in the same order are param writes, anything else
  * rebuilds that one strip's inserts. Every insert carries its id through
  * (windsor#186), which is what the rack's view state follows.
+ *
+ * A host's slot child (windsor#692) is edited through its host's chain: each
+ * child edit finds the host by its id and returns the host's whole next
+ * chain.
  */
 import type { InsertIdSource, InsertKindName, InsertSpec } from '@windsor/engine';
 import {
   INSERT_KINDS,
   MAX_INSERTS,
   freshInsertId,
+  insertSlot,
   onSendBus,
   withInsertIds,
 } from '@windsor/engine';
@@ -93,3 +98,36 @@ export function setInsertField(
 ): InsertSpec[] {
   return list.map((spec, i) => (i === index ? ({ ...spec, [field]: value } as InsertSpec) : spec));
 }
+
+/** `list` with the slot of the host `hostId` holding `child` (null for none); any other entry as it was. */
+export function withChild(
+  list: readonly InsertSpec[],
+  hostId: string,
+  child: InsertSpec | null,
+): InsertSpec[] {
+  return withInsertIds(list).map((spec) =>
+    spec.id === hostId ? ({ ...spec, slot: child } as InsertSpec) : spec,
+  );
+}
+
+/**
+ * `list` with a fresh child of `kind` in the slot of the host `hostId`: the
+ * kind's defaults with a fresh id, other than the id of the child it
+ * replaces. A send bus's child too starts at the defaults (no `onSendBus`),
+ * since the child is already on its host's wet path.
+ */
+export function setChild(
+  list: readonly InsertSpec[],
+  hostId: string,
+  kind: InsertKindName,
+  ids: IdSource = SHARED_IDS,
+): InsertSpec[] {
+  const host = withInsertIds(list).find((spec) => spec.id === hostId);
+  const leaving = host ? insertSlot(host)?.id : undefined;
+  const defaults = structuredClone(INSERT_KINDS[kind].defaults);
+  return withChild(list, hostId, { ...defaults, id: ids.next(leaving ? [leaving] : []) });
+}
+
+/** `list` with the slot of the host `hostId` empty. */
+export const removeChild = (list: readonly InsertSpec[], hostId: string): InsertSpec[] =>
+  withChild(list, hostId, null);

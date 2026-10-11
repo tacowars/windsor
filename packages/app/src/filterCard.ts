@@ -19,7 +19,7 @@ import type { InsertCard } from './insertCards';
 import { FILTER_INSERT_KNOBS } from './insertKnobTables';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
 import { fitColumn, insertPage } from './insertLayout';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import type { InsertTarget } from './insertTarget';
 import { filterModeShows } from './patchPanels';
 
@@ -54,7 +54,7 @@ function page(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== 'filter') return;
     inserts[index] = next;
-    ctx.change(insertChange(slot, inserts));
+    ctx.change(targetChange(ctx, slot, inserts));
   };
   const slope = labelled(
     'Slope',

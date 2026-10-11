@@ -15,7 +15,7 @@ import {
 } from '@windsor/engine';
 import type { DelaySpec } from '@windsor/engine';
 import { DELAY_KNOBS, DELAY_MODE_LABELS } from './delayTables';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import type { InsertCard } from './insertCards';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { insertKnob, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
@@ -108,7 +108,7 @@ export const delayCard: InsertCard = (ctx, slot, index) => {
       const inserts = [...insertsOf(ctx, slot)];
       if (inserts[index]?.kind !== 'delay') return;
       inserts[index] = spec;
-      if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+      if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
     },
   };
   const tone = pickKnobs(DELAY_KNOBS, ['highpass', 'lowpass', 'drive', 'outputDb']);

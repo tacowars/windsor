@@ -9,7 +9,7 @@
  * other strip edit: the engine rebuilds that one strip's chain, and the
  * transport and every other part keep playing.
  */
-import type { InsertTarget } from './insertTarget';
+import type { ChainTarget } from './insertTarget';
 import { isGroupTarget } from './insertTarget';
 import type { InsertKindName } from '@windsor/engine';
 import { MAX_INSERTS } from '@windsor/engine';
@@ -21,7 +21,8 @@ import { addInsert, addInsertAtFront, canAddInsert } from './insertEdits';
 import { insertsOf } from './insertKnobs';
 import type { RackAccent } from './insertRackTables';
 import { INSERT_RACK_PX, RACK_ACCENTS } from './insertRackTables';
-import { commitChain, insertBox } from './insertShell';
+import { commitChain } from './insertRailControls';
+import { insertBox } from './insertShell';
 
 /** Which end of the chain an Add slot adds at. */
 type AddSide = 'front' | 'back';
@@ -31,13 +32,13 @@ const SIDE_WORDS: Readonly<Record<AddSide, string>> = {
   back: 'at the back',
 };
 
-function add(ctx: AppCtx, slot: InsertTarget, side: AddSide, kind: InsertKindName): void {
+function add(ctx: AppCtx, slot: ChainTarget, side: AddSide, kind: InsertKindName): void {
   const list = insertsOf(ctx, slot);
   const front = side === 'front';
   commitChain(ctx, slot, front ? addInsertAtFront(list, kind, slot) : addInsert(list, kind, slot));
 }
 
-function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement {
+function addPicker(ctx: AppCtx, slot: ChainTarget, side: AddSide): HTMLElement {
   const full = !canAddInsert(insertsOf(ctx, slot));
   const picker = addSlot({
     disabled: full,
@@ -50,7 +51,7 @@ function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement 
 }
 
 /** What the Add picker's label calls the chain: Master, Send A, a group by name, or a slot. */
-function chainName(ctx: AppCtx, slot: InsertTarget): string {
+function chainName(ctx: AppCtx, slot: ChainTarget): string {
   if (slot === 'master') return 'Master';
   if (isGroupTarget(slot)) {
     return groupAt(ctx.model.doc, groupIdOfKey(slot) ?? -1)?.name ?? 'a group';
@@ -65,7 +66,7 @@ function chainName(ctx: AppCtx, slot: InsertTarget): string {
  */
 export function stripInserts(
   ctx: AppCtx,
-  slot: InsertTarget,
+  slot: ChainTarget,
   accent: RackAccent = 'strip',
 ): HTMLElement {
   const row = el('div', 'insert-row');

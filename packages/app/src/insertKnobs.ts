@@ -8,23 +8,31 @@
  * On a part's strip, and on a group's (windsor#616), a knob is locked while
  * a lane on its field is on (windsor#351, `knobAutomation.ts`). A lane on a
  * field the insert's settings leave unread is inert and locks nothing; the
- * send buses and the master carry no lanes.
+ * send buses and the master carry no lanes. A host's slot child
+ * (windsor#692) locks under its host's lane on `slot.<field>`.
  */
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { insertChange, insertsOf, isGroupTarget } from './insertTarget';
+import {
+  childAddress,
+  insertLaneScope,
+  insertsOf,
+  isGroupTarget,
+  targetChange,
+} from './insertTarget';
 export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { makeKnob, type KnobSpec } from './knob';
-import { insertKnobAutomation, insertLaneHolder, knobSongTick } from './knobAutomation';
+import { insertKnobAutomation, knobSongTick } from './knobAutomation';
 
 /**
  * The lock on the knob over `field` of the insert at `index` in `target`'s
- * chain, for a part's strip or a group's (windsor#616); nothing for a send
- * bus or the master.
+ * chain, for a part's strip or a group's (windsor#616), a slot child's
+ * included (its host's lane on `slot.<field>`, `insertLaneScope`); nothing
+ * for a send bus or the master.
  */
 export function insertFieldLock(
   ctx: AppCtx,
@@ -32,13 +40,13 @@ export function insertFieldLock(
   index: number,
   field: string,
 ): Pick<KnobSpec, 'automation'> {
-  if (typeof target !== 'number' && !isGroupTarget(target)) return {};
+  const chain = childAddress(target)?.chain ?? target;
+  if (typeof chain !== 'number' && !isGroupTarget(chain)) return {};
   return {
     automation: () => {
-      const holder = insertLaneHolder(ctx.model.doc, target);
-      const spec = insertsOf(ctx, target)[index];
+      const at = insertLaneScope(ctx, target, index);
       const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
-      return insertKnobAutomation(holder, spec, field, tick);
+      return insertKnobAutomation(at.holder, at.spec, `${at.fieldPrefix}${field}`, tick);
     },
   };
 }
@@ -63,7 +71,7 @@ function rackKnob<S>(
     },
     set: (v) => {
       const inserts = setInsertField(insertsOf(ctx, slot), index, f, v);
-      if (ctx.change(insertChange(slot, inserts)).ok) knob.onChange?.();
+      if (ctx.change(targetChange(ctx, slot, inserts)).ok) knob.onChange?.();
     },
   });
 }

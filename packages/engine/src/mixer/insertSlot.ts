@@ -19,6 +19,10 @@
  * window has passed. Any number may be leaving at once; a change always
  * lands on the newest child. The same kind, or an id-only change, is the
  * child's own `set`, with no re-wire and no fade.
+ *
+ * The wrapped host shows its live child read-only (`slotChild`, windsor#692),
+ * so a card in the slot reads the child's own meter: the newest child, never
+ * a leaving one.
  */
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import { fadeRamp } from '../inserts/fadeRamp';
@@ -62,6 +66,8 @@ interface Child {
 }
 
 interface Slot {
+  /** The live child's stage: the newest, never a leaving one. */
+  readonly child: InsertStage<InsertSpec> | undefined;
   /** Land `spec` (a child, or null for none) on the slot. */
   assign(spec: InsertSpec | null): void;
   /** The live child's handle on its own field `field`. */
@@ -102,6 +108,9 @@ function createSlot(path: WetPath, deps: SlotDeps): Slot {
     later(() => drop(child), INSERT_FADE_SECONDS);
   };
   return {
+    get child() {
+      return live?.stage;
+    },
     assign(spec): void {
       if (live && spec && live.stage.kind === spec.kind) {
         live.stage.set(spec);
@@ -126,6 +135,16 @@ function createSlot(path: WetPath, deps: SlotDeps): Slot {
   };
 }
 
+/** A host's stage as `withSlot` wraps it: its live child, read-only. */
+export interface HostStage extends InsertStage<InsertSpec> {
+  readonly child: InsertStage<InsertSpec> | undefined;
+}
+
+/** The live child in `stage`'s slot: undefined for an empty slot, or a stage that is not a host's. */
+export const slotChild = (
+  stage: InsertStage<InsertSpec> | undefined,
+): InsertStage<InsertSpec> | undefined => (stage as Partial<HostStage> | undefined)?.child;
+
 /**
  * `stage` with its slot, when it is a host's (it has a `wetPath`); any other
  * stage unchanged. The wrapper's `set` hands the host its own fields and the
@@ -141,8 +160,11 @@ export function withSlot(
   if (!stage.wetPath) return stage;
   const slot = createSlot(stage.wetPath, deps);
   slot.assign(insertSlot(spec));
-  return {
+  const host: HostStage = {
     ...stage,
+    get child() {
+      return slot.child;
+    },
     set(next: InsertSpec): void {
       checkInsert(deps.registry, next, deps.owner);
       stage.set(next);
@@ -157,4 +179,5 @@ export function withSlot(
       stage.dispose();
     },
   };
+  return host;
 }

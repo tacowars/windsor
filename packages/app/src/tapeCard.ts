@@ -21,7 +21,7 @@ import type { InsertTarget } from './insertTarget';
 import { el } from './dom';
 import { insertsOf } from './insertKnobs';
 import { insertPage, insertSelect, knobColumns, wideColumn } from './insertLayout';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import { tapeKnobs } from './tapeKnobs';
 import type { TapeControl } from './tapeTables';
 import { TAPE_OVERSAMPLING_HINT, TAPE_OVERSAMPLING_OPTIONS, TAPE_PAGES } from './tapeTables';
@@ -87,7 +87,7 @@ export const tapeCard: InsertCard = (ctx: AppCtx, target: InsertTarget, index) =
       const inserts = [...insertsOf(ctx, target)];
       if (inserts[index]?.kind !== 'tape') return;
       inserts[index] = spec;
-      if (ctx.change(insertChange(target, inserts)).ok) ctx.render();
+      if (ctx.change(targetChange(ctx, target, inserts)).ok) ctx.render();
     },
   };
   return TAPE_PAGES.map((page) => ({

@@ -13,6 +13,12 @@
  * its fold and page back too. A render keeps the state, so a knob edit
  * elsewhere leaves a folded insert folded and a page on screen.
  *
+ * A host's slot (windsor#692) adds one more view to its host: whether its
+ * empty slot is expanded to the picker. The slot child's own fold and page
+ * are kept like any insert's, under its child target (`insertTarget.ts`'s
+ * `childTarget`), which names the host, so they follow the host through a
+ * reorder and start afresh with a new child.
+ *
  * Pure: every function returns a new state and leaves its argument alone.
  */
 import type { InsertSpec } from '@windsor/engine';
@@ -28,12 +34,15 @@ import { withInsertIds } from '@windsor/engine';
 export interface InsertView {
   readonly page: string;
   readonly folded: boolean;
+  /** A host's empty slot, expanded to its picker; collapsed to its tab by default. */
+  readonly slotOpen: boolean;
 }
 
 /** One insert's view as the shell draws it: the index of the page shown, and the fold. */
 export interface ShownView {
   readonly page: number;
   readonly folded: boolean;
+  readonly slotOpen: boolean;
 }
 
 /** A chain: a part's slot, `'master'`, or any other name a chain takes. */
@@ -43,10 +52,10 @@ export type RackChain = number | string;
 export type RackView = ReadonlyMap<string, InsertView>;
 
 /** The first page, open, as the state keeps it: where every insert starts. */
-const STORED_OPEN: InsertView = { page: '', folded: false };
+const STORED_OPEN: InsertView = { page: '', folded: false, slotOpen: false };
 
 /** The first page, open, as the shell draws it. */
-export const OPEN_VIEW: ShownView = { page: 0, folded: false };
+export const OPEN_VIEW: ShownView = { page: 0, folded: false, slotOpen: false };
 
 export const emptyRack = (): RackView => new Map();
 
@@ -72,12 +81,20 @@ export function viewAt(
   pages: readonly string[],
 ): ShownView {
   const view = state.get(rackKey(chain, id)) ?? STORED_OPEN;
-  return { page: Math.max(0, pages.indexOf(view.page)), folded: view.folded };
+  return {
+    page: Math.max(0, pages.indexOf(view.page)),
+    folded: view.folded,
+    slotOpen: view.slotOpen,
+  };
 }
 
 function withView(state: RackView, key: string, view: InsertView): RackView {
   const next = new Map(state);
-  if (view.page === STORED_OPEN.page && view.folded === STORED_OPEN.folded) next.delete(key);
+  const stored =
+    view.page === STORED_OPEN.page &&
+    view.folded === STORED_OPEN.folded &&
+    view.slotOpen === STORED_OPEN.slotOpen;
+  if (stored) next.delete(key);
   else next.set(key, view);
   return next;
 }
@@ -100,4 +117,11 @@ export function toggleFold(state: RackView, chain: RackChain, id: string): RackV
   const key = rackKey(chain, id);
   const view = state.get(key) ?? STORED_OPEN;
   return withView(state, key, { ...view, folded: !view.folded });
+}
+
+/** `state` with the host `id`'s empty slot expanded to its picker (`open`) or collapsed to its tab. */
+export function openSlot(state: RackView, chain: RackChain, id: string, open: boolean): RackView {
+  const key = rackKey(chain, id);
+  const view = state.get(key) ?? STORED_OPEN;
+  return withView(state, key, { ...view, slotOpen: open });
 }

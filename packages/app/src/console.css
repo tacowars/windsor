@@ -19,6 +19,9 @@
   /* The sequencer targets' automation lanes and the knobs they lock (windsor#491). */
   --seq: #cc7a9c;
   --hot: #d2643c;
+  /* A host insert's slot child (windsor#692): its ground and its rail. */
+  --sub-ground: #1a1f23;
+  --sub-rail: #20272b;
 
   --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
   --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -915,6 +918,95 @@ input {
   margin: 6px;
   background: var(--line);
 }
+/* A host's slot (windsor#692; docs/design/echo-slot-mockup.html): the
+   empty slot's tab (› collapsed, ‹ expanded with the picker after it), or
+   the child after the host's page, a nested box with its own rail. The rail
+   and the tab take their widths from insertRackTables.ts; the child's switch
+   and name take the chain's accent. Switching the host off dims its child,
+   since the host bypasses its whole wet path. */
+.insert-box.off .sub {
+  opacity: 0.4;
+}
+.sub {
+  flex: none;
+  display: flex;
+  border-left: 1px solid var(--line-bright);
+  background: var(--sub-ground);
+}
+.sub-rail {
+  width: var(--sub-rail-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+  background: var(--sub-rail);
+  border-right: 1px solid var(--line);
+}
+.sub.folded {
+  cursor: pointer;
+}
+.sub.folded .sub-rail {
+  border-right: 0;
+}
+.sub-rail .insert-name {
+  font-size: 9.5px;
+  color: var(--kc);
+}
+.sub-rail .insert-icon.insert-power {
+  color: var(--kc);
+}
+.sub.off .sub-rail .insert-power {
+  color: var(--ink-faint);
+}
+.sub.off .sub-stack {
+  opacity: 0.4;
+}
+.sub-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.slot-tab {
+  width: var(--slot-tab-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 0;
+  background: var(--panel-hi);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.slot-tab.open {
+  border-right: 1px solid var(--line);
+}
+.slot-tab:hover {
+  color: var(--ink);
+  background: var(--panel);
+}
+.slot-tab-glyph {
+  font-size: 13px;
+  line-height: 1;
+}
+.slot-tab-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--f-panel);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.slot-open {
+  flex: none;
+  display: flex;
+}
 /* The rack's dials (knob.ts's `dial`): the mockup's 30 px .knob and 42 px .knob.big. */
 .insert-row .knob.rack {
   width: auto;
@@ -1221,6 +1313,10 @@ input {
 .insert-page.eq-page {
   gap: 0;
   padding: 0;
+}
+/* A slot child's EQ has no Listen (windsor#692): its switch is not drawn. */
+.insert-page.eq-page.in-slot .eq-controls .insert-switch {
+  display: none;
 }
 .eq-graph {
   flex: none;

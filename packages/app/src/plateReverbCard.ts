@@ -13,7 +13,7 @@ import type { InsertCard } from './insertCards';
 import { PLATE_REVERB_KNOBS } from './insertKnobTables';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
 import { insertPage, wideColumn } from './insertLayout';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import { spacePicker } from './returnControls';
 
 export const plateReverbCard: InsertCard = (ctx, slot, index) => {
@@ -25,7 +25,7 @@ export const plateReverbCard: InsertCard = (ctx, slot, index) => {
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== 'plate') return;
     inserts[index] = spec;
-    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const knobs = (fields: Parameters<typeof pickKnobs<PlateReverbSpec>>[1]): HTMLElement[] =>
     insertKnobs(ctx, slot, index, pickKnobs(PLATE_REVERB_KNOBS, fields));

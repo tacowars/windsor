@@ -30,7 +30,7 @@ import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import type { InsertCard, InsertPage } from './insertCards';
 import type { InsertTarget } from './insertTarget';
-import { insertChange, insertsOf } from './insertTarget';
+import { insertsOf, targetChange } from './insertTarget';
 import { insertFieldLock } from './insertKnobs';
 import type { KnobSpec } from './knob';
 import { driveSelect, driveToggle, driveKnob } from './advancedDriveControls';
@@ -238,7 +238,7 @@ export const advancedDriveCard: InsertCard = (ctx: AppCtx, target: InsertTarget,
       const inserts = [...insertsOf(ctx, target)];
       if (inserts[index]?.kind !== 'advanced-drive') return;
       inserts[index] = spec;
-      if (!ctx.change(insertChange(target, inserts)).ok) return;
+      if (!ctx.change(targetChange(ctx, target, inserts)).ok) return;
       view.afterCommit?.();
       if (render) ctx.render();
     },

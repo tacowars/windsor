@@ -24,6 +24,10 @@ export const INSERT_RACK_PX: Readonly<Record<string, number>> = {
   '--rack-picker-w': 230,
   /** A plot's column (Advanced Drive's shaper and filter). */
   '--rack-plot-w': 124,
+  /** A host's slot child's rail (windsor#692): switch, `SLOT · <KIND>`, ✕. */
+  '--sub-rail-w': 20,
+  /** A host's empty slot, collapsed to its tab (› and a vertical "Slot"). */
+  '--slot-tab-w': 22,
 };
 
 /** Knobs to a column at the rack's small dial. */
@@ -32,7 +36,8 @@ export const KNOBS_PER_COLUMN = 2;
 /**
  * Which chain a rack draws, and so its accent (the mockup's `--kc`): a
  * part's chain and the master's in `--modulator`, a send bus's in
- * `--carrier`. Its knob arcs, filled switches and page tabs read it.
+ * `--carrier`. Its knob arcs, filled switches and page tabs read it, and so
+ * do a slot child's switch and name.
  */
 export type RackAccent = 'strip' | 'bus';
 

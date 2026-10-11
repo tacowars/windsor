@@ -16,7 +16,15 @@ import { FieldNormaliser } from '@windsor/engine/song/arrangementFields';
 import { normaliseInserts } from '@windsor/engine/inserts/insertRegistry';
 import { addInsert, addInsertAtFront, moveInsert, removeInsert } from './insertEdits';
 import type { RackView } from './insertRackModel';
-import { OPEN_VIEW, emptyRack, insertIdAt, showPage, toggleFold, viewAt } from './insertRackModel';
+import {
+  OPEN_VIEW,
+  emptyRack,
+  insertIdAt,
+  openSlot,
+  showPage,
+  toggleFold,
+  viewAt,
+} from './insertRackModel';
 
 /** A card's three pages, by name. */
 const P = ['One', 'Two', 'Three'] as const;
@@ -50,8 +58,8 @@ describe('showPage and toggleFold', () => {
     const start = emptyRack();
     const paged = showPage(start, 1, 'c', P, 1);
     const folded = toggleFold(paged, 1, 'a');
-    expect(viewAt(folded, 1, 'c', P)).toEqual({ page: 1, folded: false });
-    expect(viewAt(folded, 1, 'a', P)).toEqual({ page: 0, folded: true });
+    expect(viewAt(folded, 1, 'c', P)).toEqual({ ...OPEN_VIEW, page: 1 });
+    expect(viewAt(folded, 1, 'a', P)).toEqual({ ...OPEN_VIEW, folded: true });
     expect(viewAt(folded, 1, 'b', P)).toEqual(OPEN_VIEW);
     expect(start.size).toBe(0);
     expect(viewAt(paged, 1, 'a', P)).toEqual(OPEN_VIEW);
@@ -66,12 +74,21 @@ describe('showPage and toggleFold', () => {
 
   it('opens a folded insert again, keeping its page', () => {
     const state = toggleFold(toggleFold(showPage(emptyRack(), 2, 'b', P, 2), 2, 'b'), 2, 'b');
-    expect(viewAt(state, 2, 'b', P)).toEqual({ page: 2, folded: false });
+    expect(viewAt(state, 2, 'b', P)).toEqual({ ...OPEN_VIEW, page: 2 });
   });
 
   it('forgets an insert that is back on page 1 and open', () => {
     expect(toggleFold(toggleFold(emptyRack(), 1, 'a'), 1, 'a').size).toBe(0);
     expect(showPage(showPage(emptyRack(), 1, 'a', P, 2), 1, 'a', P, 0).size).toBe(0);
+  });
+});
+
+describe('openSlot (windsor#692)', () => {
+  it('expands a host’s empty slot beside its fold and page, and forgets it once collapsed', () => {
+    const open = openSlot(toggleFold(emptyRack(), 1, 'h'), 1, 'h', true);
+    expect(viewAt(open, 1, 'h', P)).toEqual({ ...OPEN_VIEW, folded: true, slotOpen: true });
+    expect(viewAt(open, 1, 'x', P).slotOpen).toBe(false);
+    expect(openSlot(openSlot(emptyRack(), 1, 'h', true), 1, 'h', false).size).toBe(0);
   });
 });
 
@@ -124,8 +141,8 @@ describe('the view follows each insert through edits, undo and redo', () => {
       spec.kind === 'advanced-drive' ? spec.drive : spec.kind,
       viewAt(view, chain, insertIdAt(list, i), STAGES),
     ]);
-  const FIRST = [3, { page: 0, folded: true }];
-  const SECOND = [9, { page: 1, folded: false }];
+  const FIRST = [3, { ...OPEN_VIEW, folded: true }];
+  const SECOND = [9, { ...OPEN_VIEW, page: 1 }];
   const FRESH = ['drive', OPEN_VIEW];
 
   const edits: Record<string, (list: readonly InsertSpec[]) => InsertSpec[]> = {
