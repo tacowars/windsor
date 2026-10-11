@@ -36,6 +36,8 @@ export interface ShapeShown {
   readonly readout: string;
   /** The Rate stops in the song's meter (`shapeRates`, windsor#430); 4/4's when absent. */
   readonly rates?: readonly ShapeRate[];
+  /** How a value of the row reads on Top and Bottom; `readout` when absent. */
+  readonly valueText?: (value: number) => string;
 }
 
 export interface ShapePopover {
@@ -168,8 +170,12 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
       const on = shapeControls(next.kind);
       const rate = rateIndex(next.rateTicks, rates);
       set('rate', rate, rates[rate]!.label, on.rate);
-      set('top', next.top, readout(shown.row, fromDisplay(shown.row, next.top)));
-      set('bottom', next.bottom, readout(shown.row, fromDisplay(shown.row, next.bottom)));
+      const text = (display: number): string => {
+        const value = fromDisplay(shown.row, display);
+        return shown.valueText ? shown.valueText(value) : readout(shown.row, value);
+      };
+      set('top', next.top, text(next.top));
+      set('bottom', next.bottom, text(next.bottom));
       set('phase', next.phase, phaseLabel(next.phase), on.phase);
       set('duty', next.duty, dutyLabel(next.duty), on.duty);
     },

@@ -65,6 +65,8 @@ export interface ShapeLane {
   points(): readonly AutomationPoint[];
   /** Commit `points` as the lane's whole list, one undo step named `label`. */
   commit(label: string, points: readonly AutomationPoint[]): void;
+  /** How Top and Bottom read in the popover; the row's own readout when absent (a roll's offsets, windsor#708). */
+  readonly valueText?: (value: number) => string;
 }
 
 export interface ShapeTool {
@@ -185,7 +187,8 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     decorate(lane, range, shapedPoints(lane.points(), range, stamp));
     const meter = lane.host.meter();
     const readout = shapeReadout(range, draft, stamp.length, meter);
-    popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane) });
+    const text = lane.valueText ? { valueText: lane.valueText } : {};
+    popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane), ...text });
     place();
   };
 

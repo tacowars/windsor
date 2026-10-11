@@ -4,9 +4,11 @@
  * Snap, which the device moves in from the Notes column, and the picker
  * beside it; under them the shown envelope's section, then its switch and
  * ✕ with the counts; then Edit, Draw and Shape across both columns, and the
- * tool's hint. Here the tools only select (windsor#708 makes them act).
- * They look like the Song tab's (`.seg.auto-tools`, `.auto-hint`) under
- * their own classes, which the Song tab's tool sync never reaches.
+ * tool's hint. The tools act through `rollEnvelopeEditing.ts`
+ * (windsor#708). They look like the Song tab's (`.seg.auto-tools`,
+ * `.auto-hint`) under their own classes, which the Song tab's tool sync
+ * never reaches. Under the section, the envelope's value under the
+ * pointer, as the mockup's state 3 shows it.
  */
 import type { RollEnvelope } from '@windsor/engine';
 import { el } from './dom';
@@ -112,15 +114,24 @@ function tools(state: EnvelopeColumnState, actions: EnvelopeColumnActions): HTML
 export function envelopeColumn(): {
   readonly root: HTMLElement;
   render(state: EnvelopeColumnState, actions: EnvelopeColumnActions): void;
+  /** The shown envelope's value under the pointer, or null to clear it. */
+  value(text: string | null): void;
 } {
   const root = el('div', 'renv-ctl');
   root.hidden = true;
+  const value = el('span', 'renv-val');
   return {
     root,
+    value: (text) => {
+      value.textContent = text ?? '';
+    },
     render: (state, actions) => {
       const snap = root.querySelector(':scope > .roll-item.roll-snap');
       const at = el('div', 'renv-at');
-      if (state.shown) at.appendChild(el('span', 'renv-kind', state.section));
+      if (state.shown) {
+        value.classList.toggle('off', !state.shown.on);
+        at.append(el('span', 'renv-kind', state.section), value);
+      }
       root.replaceChildren(
         ...(snap ? [snap] : []),
         pickButton(state, actions),

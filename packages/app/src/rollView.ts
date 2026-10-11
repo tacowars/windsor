@@ -16,6 +16,7 @@ import { PPQ } from '@windsor/engine';
 import { type RollPage, ROLL_ENVELOPE_TOOL_DEFAULT } from './rollEnvelopeTables';
 import type { RollKeys } from './rollRows';
 import type { AutomationTool } from './songAutomationTables';
+import { DEFAULT_SHAPE_SETTINGS, type ShapeSettings } from './songShapeTables';
 import {
   ROLL_ROW_DEFAULT,
   ROLL_ROW_PX,
@@ -34,10 +35,14 @@ export interface RollZoom {
 /** Which of the two views: the device in the pane, or Expanded. */
 export type RollViewKind = 'device' | 'wide';
 
-/** The Envelopes tab's own settings: the tool picked, and the target whose envelope is shown. */
+/**
+ * The Envelopes tab's own settings: the tool picked, the target whose
+ * envelope is shown, and the Shape tool's last settings (windsor#708).
+ */
 export interface RollEnvelopeView {
   tool: AutomationTool;
   shown: string | null;
+  shape: ShapeSettings;
 }
 
 /** A part's view settings. */
@@ -60,7 +65,7 @@ export interface RollViewState {
  */
 export const defaultRollView = (): RollViewState => ({
   page: 'notes',
-  envelope: { tool: ROLL_ENVELOPE_TOOL_DEFAULT, shown: null },
+  envelope: { tool: ROLL_ENVELOPE_TOOL_DEFAULT, shown: null, shape: DEFAULT_SHAPE_SETTINGS },
   snap: ROLL_SNAP_DEFAULT,
   keys: '12',
   fold: false,
