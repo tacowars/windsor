@@ -15,6 +15,7 @@ import {
   ROLL_ENVELOPE_ROW,
   ROLL_LOOP_TICKS_MAX,
   TICKS_PER_BAR,
+  assertRollEnvelopes,
   envelopeValueAt,
 } from '@windsor/engine';
 import { hostBarTicks, hostFrame } from './automationEditHost';
@@ -196,9 +197,66 @@ describe('a gesture past the point cap on the longest loop', () => {
 
   it('keeps a result under the cap whole, and the first and last of one over it', () => {
     const next = [P(0, 0), P(1, 1)];
-    expect(withinPointCap(next, [], 2)).toEqual(next);
+    expect(withinPointCap(next, [], { loopTicks: LONGEST, cap: 2 })).toEqual(next);
     const over = [...next, P(2, 0), P(3, 1), P(4, 0)];
-    expect(withinPointCap(over, [], 3).map((p) => p.tick)).toEqual([0, 2, 4]);
+    const thinned = withinPointCap(over, [], { loopTicks: LONGEST, cap: 3 });
+    expect(thinned.map((p) => p.tick)).toEqual([0, 2, 4]);
+  });
+});
+
+describe('a gesture on a full envelope whose points a shrunk loop left silent', () => {
+  /** The cap's worth of points, every one past the loop's end. */
+  const silent = Array.from({ length: ROLL_ENVELOPE_POINTS_MAX }, (_, i) => P(LOOP + i, 1));
+  const start = editablePoints(silent, LOOP);
+
+  /** Within the cap, every written point kept and heard, the silent ones dropped furthest first. */
+  function landed(next: readonly RollEnvelopePoint[], written: readonly RollEnvelopePoint[]) {
+    expect(next.length).toBeLessThanOrEqual(ROLL_ENVELOPE_POINTS_MAX);
+    const envelope = { target: 'filter.cutoff' as const, on: true, points: next };
+    assertRollEnvelopes([envelope]);
+    for (const point of written) {
+      expect(next).toContainEqual(point);
+      expect(envelopeValueAt(envelope, point.tick, LOOP)).toBeCloseTo(point.value, 9);
+    }
+    const kept = next.filter((p) => p.tick >= LOOP);
+    expect(kept).toEqual(silent.slice(0, kept.length));
+  }
+
+  it('lands a Draw stroke across a heard bar', () => {
+    const grain = { ticks: drawGrain(PPQ / 4), axisTicks: LOOP };
+    const samples = new Map<number, number>();
+    const a = { tick: 0, display: 0 };
+    edits.stroke(samples, null, a, grain);
+    edits.stroke(samples, a, { tick: BAR, display: 1 }, grain);
+    const next = settlePoints(edits.drawn(start, samples, grain), {
+      start,
+      loopTicks: LOOP,
+      stroke: true,
+    });
+    const written = next.filter((p) => p.tick < LOOP);
+    expect(written.length).toBeGreaterThan(2);
+    expect(written.at(-1)?.tick).toBe(BAR);
+    landed(next, written);
+  });
+
+  it('lands a Shape across a heard bar', () => {
+    const range = { startTick: 0, endTick: BAR };
+    const draft = {
+      kind: 'sine',
+      rateTicks: BAR / 4,
+      top: 1,
+      bottom: 0,
+      phase: 0,
+      duty: 0.5,
+    } as const;
+    const stamp = stampedPoints(ROLL_ENVELOPE_ROW, range, draft);
+    const next = settlePoints(shapedPoints(start, range, stamp), {
+      start,
+      loopTicks: LOOP,
+      stroke: false,
+    });
+    expect(stamp.length).toBeGreaterThan(2);
+    landed(next, stamp);
   });
 });
 

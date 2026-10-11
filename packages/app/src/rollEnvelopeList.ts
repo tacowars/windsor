@@ -9,16 +9,11 @@
  * The list sits on the page, fixed under the picker's button, so the
  * device's frame never clips it. A press outside it, Escape, or a pick
  * closes it, and so does a redraw of its Roll card: its life is the card's
- * (`rollEnvelopeListLife.ts`), and a pick writes only while the card is
+ * (`rollPopoverLife.ts`), and a pick writes only while the card is
  * still the page's.
  */
 import { el } from './dom';
-import {
-  type ListOwner,
-  holdEnvelopeList,
-  ownedPick,
-  releaseEnvelopeList,
-} from './rollEnvelopeListLife';
+import { type ListOwner, holdRollPopover, ownedPick, releaseRollPopover } from './rollPopoverLife';
 import type { EnvelopePicker, MarkedTarget, OpenTarget } from './rollEnvelopePicker';
 import {
   ROLL_ENVELOPE_LIST_PX as PX,
@@ -98,13 +93,14 @@ function place(list: HTMLElement, anchor: HTMLElement): void {
 }
 
 /**
- * Open the list under `anchor`, closing any other; `pick` hears a target
- * while `owner`'s card is live, `closed` the list closing for any reason.
+ * Open the list under `anchor`, closing any other, held as `card`'s; `pick`
+ * hears a target while the card is live, `closed` the list closing for any
+ * reason.
  */
 export function openEnvelopeList(
   anchor: HTMLElement,
   picker: EnvelopePicker,
-  hooks: ListOwner & { pick(path: string): void; closed(): void },
+  hooks: ListOwner & { readonly card: object; pick(path: string): void; closed(): void },
 ): EnvelopeList {
   const list = el('div', 'renv-list');
   list.setAttribute('role', 'listbox');
@@ -126,12 +122,12 @@ export function openEnvelopeList(
     list.remove();
     document.removeEventListener('pointerdown', outside, true);
     window.removeEventListener('keydown', escape, true);
-    releaseEnvelopeList(close);
+    releaseRollPopover('list', close);
     hooks.closed();
   }
   const pick = ownedPick(hooks, close, (path) => hooks.pick(path));
   list.append(...listBody(picker, (path) => void pick(path)));
-  holdEnvelopeList(close);
+  holdRollPopover('list', close, hooks.card);
   document.body.appendChild(list);
   place(list, anchor);
   document.addEventListener('pointerdown', outside, true);

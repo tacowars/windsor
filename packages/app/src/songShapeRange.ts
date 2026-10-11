@@ -48,6 +48,7 @@ import {
   stampedPoints,
   type ShapeRange,
 } from './songShapeModel';
+import { type ShapeLifeHooks, shapeLife } from './songShapeLife';
 import { shapePlacer } from './songShapePlacer';
 import { shapePopover } from './songShapePopover';
 import { type ShapeRate, shapeRates } from './songShapeTables';
@@ -89,6 +90,8 @@ export interface ShapeTool {
   /** The toolbar's tool changed: anything but Shape closes the popover. */
   toolChanged(): void;
   close(): void;
+  /** Whether a selection is open, its popover and window listeners with it. */
+  isOpen(): boolean;
 }
 
 interface Selection {
@@ -146,6 +149,8 @@ export interface ShapeToolMount {
   /** The lanes' scrolling viewport, whose visible edges keep the popover in. */
   viewport(): Element | null;
   readonly tools: AutomationToolState;
+  /** The tool's owner, told when a selection opens and closes, so it can close the tool with its card. */
+  readonly life?: ShapeLifeHooks;
 }
 
 /** The Shape tool for one render of the lanes. */
@@ -213,22 +218,12 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     if (drag) endDrag();
     else close();
   };
-  const listen = (on: boolean): void => {
-    if (on) {
-      window.addEventListener('keydown', onKey, true);
-      window.addEventListener('scroll', place, { capture: true, passive: true });
-      window.addEventListener('resize', place);
-      return;
-    }
-    window.removeEventListener('keydown', onKey, true);
-    window.removeEventListener('scroll', place, true);
-    window.removeEventListener('resize', place);
-  };
+  const life = shapeLife(window, { onKey, place }, mount.life);
 
   function close(): void {
     const lane = selectedLane();
     if (lane) undecorate(lane);
-    if (selection) listen(false);
+    life.close();
     placer.stop();
     selection = null;
     popover.element.remove();
@@ -259,7 +254,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       draft: shapeDraft(lane.row, lane.points(), range, state.shape, ratesOf(lane)),
     };
     container.appendChild(popover.element);
-    listen(true);
+    life.open(api.close);
     show();
     popover.focus();
   };
@@ -268,7 +263,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     const ended = drag;
     drag = null;
     if (!ended) return null;
-    if (!selection) window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('keydown', onKey, true);
     if (ended.lane.timeline.hasPointerCapture(ended.pointerId)) {
       ended.lane.timeline.releasePointerCapture(ended.pointerId);
     }
@@ -337,7 +332,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     }
   };
 
-  return {
+  const api: ShapeTool = {
     attach(lane) {
       lanes.set(lane.key, lane);
       wire(lane);
@@ -358,5 +353,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       endDrag();
       close();
     },
+    isOpen: () => life.isOpen(),
   };
+  return api;
 }

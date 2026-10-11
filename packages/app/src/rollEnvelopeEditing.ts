@@ -27,6 +27,7 @@ import { dragReading, envelopeOffsetText } from './rollEnvelopeReadout';
 import { editablePoints, envelopeUndoLabel, settlePoints } from './rollEnvelopeSettle';
 import { ROLL_ENVELOPE_READOUT_PX, ROLL_ENVELOPE_TOOL_UNDO } from './rollEnvelopeTables';
 import { wireLaneEditing } from './songAutomationGesture';
+import type { ShapeLifeHooks } from './songShapeLife';
 import { type ShapeTool, shapeTool } from './songShapeRange';
 
 /** The envelope the tools edit, as the document holds it, and its target's name. */
@@ -49,6 +50,8 @@ export interface EnvelopeEditingHost {
   write(points: readonly RollEnvelopePoint[], label: string): void;
   /** The value under the pointer over the layer, read for the column; null once it leaves. */
   hover(text: string | null): void;
+  /** The card's hold on the Shape tool, so the tool closes with it (`rollPopoverLife.ts`). */
+  readonly life: ShapeLifeHooks;
 }
 
 /** Mount the tools on the layer's lane; the Shape tool is handed back for the device's repaints. */
@@ -130,6 +133,7 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
     container: input.container,
     viewport: () => input.viewport,
     tools: host.tools,
+    life: input.life,
   });
   shape.attach({
     host,

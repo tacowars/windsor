@@ -36,6 +36,12 @@ import { envelopeKeys } from './rollEnvelopeKeys';
 import { type EnvelopeList, openEnvelopeList } from './rollEnvelopeList';
 import { envelopeLayer } from './rollEnvelopeOverlay';
 import {
+  closeRollPopovers,
+  holdRollPopover,
+  keepRollPopovers,
+  releaseRollPopover,
+} from './rollPopoverLife';
+import {
   type EnvelopeTargetGroup,
   envelopePicker,
   shownEnvelope,
@@ -124,6 +130,10 @@ export class RollEnvelopeMode {
       shown: () => this.shownEnvelope(),
       write: (points, label) => this.write(points, label),
       hover: (text) => this.column.value(text),
+      life: {
+        hold: (close) => holdRollPopover('shape', close, this),
+        release: (close) => releaseRollPopover('shape', close),
+      },
     });
     envelopeKeys({
       showing: () => this.on && host.attached() && host.body.closest('[hidden]') === null,
@@ -196,10 +206,14 @@ export class RollEnvelopeMode {
     editor.commitEnvelopes(withEnvelopePoints(envelopes, shown.envelope.target, points), label);
   }
 
-  /** Keep the list open only while `on`: the card on the page and shown. Returns `on`. */
-  keepList(on: boolean): boolean {
-    if (!on) this.list?.close();
-    return on;
+  /** Keep the list and the Shape tool open only while `on`: the card on the page and shown. Returns `on`. */
+  keepPopovers(on: boolean): boolean {
+    return keepRollPopovers(this, on);
+  }
+
+  /** Close the list and the Shape tool: the card moved (Expand opened or closed). */
+  closePopovers(): void {
+    closeRollPopovers(this);
   }
 
   /** Keep the curve on the notes' sideways scroll. */
@@ -255,6 +269,7 @@ export class RollEnvelopeMode {
   private openList(anchor: HTMLElement): void {
     const { state } = this.read();
     this.list = openEnvelopeList(anchor, state.picker, {
+      card: this,
       live: () => this.host.attached(),
       pick: (path) => this.pick(path),
       closed: () => {

@@ -126,6 +126,7 @@ class RollDevice {
       body: this.body,
       title: () => `${partAt(ctx.model.doc, slot)?.name ?? ''} — ${KIND_LABELS.roll}`,
       changed: () => {
+        this.envelopes.closePopovers();
         this.spot.forget();
         this.paint();
       },
@@ -334,8 +335,8 @@ class RollDevice {
   private watch(): void {
     let restored = false;
     watchPlayhead({
-      attached: () => this.envelopes.keepList(this.expander.attached()),
-      shown: () => this.envelopes.keepList(this.body.closest('[hidden]') === null),
+      attached: () => this.envelopes.keepPopovers(this.expander.attached()),
+      shown: () => this.envelopes.keepPopovers(this.body.closest('[hidden]') === null),
       repaintIf: () => {
         if (!restored) {
           restored = true;

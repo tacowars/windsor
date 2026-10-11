@@ -15,14 +15,17 @@
  *   gesture puts on the loop's end (the axis clamps there) is pulled one
  *   tick in, so a Shape or a dragged point that ends there is heard; a Draw
  *   stroke's sample there is dropped, so the stroke stays on the Snap grid.
- *   The silent points a shrunk loop left are kept as they were.
+ *   The silent points a shrunk loop left are kept as they were, unless the
+ *   cap needs their room (below).
  *
  * - **At most `ROLL_ENVELOPE_POINTS_MAX` points.** A fine Draw or a fast
  *   cyclic Shape on a long loop can write more than an envelope holds,
- *   and the normaliser would cut the overflow off the end. The gesture's
- *   own points are thinned evenly across its range instead, its first and
- *   last kept, until the whole envelope fits (`withinPointCap`); the points
- *   it found outside its range are kept as they are.
+ *   and the normaliser would cut the overflow off the end. A gesture inside
+ *   the loop always lands (`withinPointCap`): the silent points a shrunk
+ *   loop left make room first, furthest past the loop's end first; a heard
+ *   point is never dropped for it. Past that, the gesture's own points are
+ *   thinned evenly across its range, its first and last kept, until the
+ *   whole envelope fits.
  *
  * An envelope with no point heard is drawn as its flat 0 line, and the
  * gestures edit that line: `editablePoints` hands them a point at tick 0
@@ -96,28 +99,57 @@ function oneToATick(
   return out;
 }
 
+/** The cap and the loop a gesture's points are kept within. */
+export interface PointCap {
+  readonly loopTicks: number;
+  readonly cap?: number;
+}
+
 /**
- * `next` within `cap` points: when it holds more, the points the gesture
- * wrote (those not in `start`) are thinned evenly by index, their first and
- * last kept, so the gesture still spans its whole range; the points it found
- * are all kept. A gesture with room for fewer than two keeps what fits from
- * its first.
+ * `found` without its `excess` silent points, those furthest past the loop's
+ * end first: the points a shrunk loop left, which make room for a gesture.
+ */
+function droppedSilent(
+  found: ReadonlySet<RollEnvelopePoint>,
+  excess: number,
+  loopTicks: number,
+): Set<RollEnvelopePoint> {
+  const silent = [...found].filter((point) => point.tick >= loopTicks);
+  silent.sort((a, b) => b.tick - a.tick);
+  return new Set(silent.slice(0, excess));
+}
+
+/**
+ * `next` within the cap: when it holds more, the silent points the gesture
+ * found past the loop's end go first, furthest first, so a gesture inside
+ * the loop always lands. A heard point it found is never dropped. When the
+ * heard points alone pass the cap, the points the gesture wrote (those not
+ * in `start`) are thinned evenly by index, their first and last kept, so the
+ * gesture still spans its whole range. A gesture with room for fewer than
+ * two keeps what fits from its first.
  */
 export function withinPointCap(
   next: readonly RollEnvelopePoint[],
   start: readonly RollEnvelopePoint[],
-  cap = ROLL_ENVELOPE_POINTS_MAX,
+  { loopTicks, cap = ROLL_ENVELOPE_POINTS_MAX }: PointCap,
 ): RollEnvelopePoint[] {
   if (next.length <= cap) return [...next];
   const found = new Set(start);
-  const written = next.filter((point) => !found.has(point));
-  const room = Math.max(0, cap - (next.length - written.length));
-  const kept = new Set<RollEnvelopePoint>();
-  if (room === 1) kept.add(written[0]!);
+  const dropped = droppedSilent(
+    new Set(next.filter((point) => found.has(point))),
+    next.length - cap,
+    loopTicks,
+  );
+  const kept = next.filter((point) => !dropped.has(point));
+  if (kept.length <= cap) return kept;
+  const written = kept.filter((point) => !found.has(point));
+  const room = Math.max(0, cap - (kept.length - written.length));
+  const thinned = new Set<RollEnvelopePoint>();
+  if (room === 1) thinned.add(written[0]!);
   for (let i = 0; room > 1 && i < room; i++) {
-    kept.add(written[Math.round((i * (written.length - 1)) / (room - 1))]!);
+    thinned.add(written[Math.round((i * (written.length - 1)) / (room - 1))]!);
   }
-  return next.filter((point) => found.has(point) || kept.has(point));
+  return kept.filter((point) => found.has(point) || thinned.has(point));
 }
 
 /** A gesture's `next` points as the envelope can hold them: heard inside the loop, one to a tick, within the cap. */
@@ -126,7 +158,7 @@ export function settlePoints(
   frame: SettleFrame,
 ): RollEnvelopePoint[] {
   const settled = oneToATick(shortOfNeighbours(inLoop(next, frame), frame.start), frame.start);
-  return withinPointCap(settled, frame.start);
+  return withinPointCap(settled, frame.start, { loopTicks: frame.loopTicks });
 }
 
 /** `envelopes` with the one on `target` holding `points`. */
