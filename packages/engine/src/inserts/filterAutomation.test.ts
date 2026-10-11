@@ -40,7 +40,7 @@ const time = (tick: number): number => GROUP_FIRST + tick * GROUP_TICK;
 function expectTraced(param: (field: string) => FakeParam): void {
   for (const l of LANES) {
     const field = l.target.split('.').at(-1)!;
-    const row = insertTargetRow('filter', field)!;
+    const row = insertTargetRow(DEFAULT_FILTER, field)!;
     const p = param(field);
     expect(p.automation.length, field).toBeGreaterThan(30);
     for (let tick = 1; tick < 30; tick++)
@@ -50,17 +50,24 @@ function expectTraced(param: (field: string) => FakeParam): void {
 
 describe('Filter lanes', () => {
   it('has rows for the sweep and the switch: Cutoff in Hz, Reso on a log scale, Mix, On', () => {
-    expect(insertTargetRow('filter', 'cutoff')).toMatchObject({
+    expect(insertTargetRow(DEFAULT_FILTER, 'cutoff')).toMatchObject({
       min: 30,
       max: 18000,
       scale: 'log',
       unit: 'Hz',
     });
-    expect(insertTargetRow('filter', 'resonance')).toMatchObject({ scale: 'log' });
-    expect(insertTargetRow('filter', 'mix')).toMatchObject({ min: 0, max: 1, scale: 'linear' });
-    expect(insertTargetRow('filter', 'enabled')).toMatchObject({ scale: 'switch', label: 'On' });
+    expect(insertTargetRow(DEFAULT_FILTER, 'resonance')).toMatchObject({ scale: 'log' });
+    expect(insertTargetRow(DEFAULT_FILTER, 'mix')).toMatchObject({
+      min: 0,
+      max: 1,
+      scale: 'linear',
+    });
+    expect(insertTargetRow(DEFAULT_FILTER, 'enabled')).toMatchObject({
+      scale: 'switch',
+      label: 'On',
+    });
     for (const field of ['mode', 'slope24'])
-      expect(insertTargetRow('filter', field), field).toBeUndefined();
+      expect(insertTargetRow(DEFAULT_FILTER, field), field).toBeUndefined();
   });
 
   it("sweep a part strip's Filter", async () => {

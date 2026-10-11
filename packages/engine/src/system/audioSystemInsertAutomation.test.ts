@@ -95,7 +95,14 @@ const setInserts = (sys: AudioSystem, inserts: InsertSpec[]) =>
 
 /** The lane's value at `time` on a transport started at 0. */
 const laneAt = (l: AutomationLane, kind: 'tape' | 'phaser', time: number): number =>
-  valueAt(insertTargetRow(kind, l.target.split('.').at(-1)!)!, l.points, (time - FIRST) / TICK);
+  valueAt(
+    insertTargetRow(
+      { tape: DEFAULT_TAPE, phaser: DEFAULT_PHASER }[kind],
+      l.target.split('.').at(-1)!,
+    )!,
+    l.points,
+    (time - FIRST) / TICK,
+  );
 
 const ramps = (p: FakeParam) => p.automation.filter((e) => e.call === 'linearRampToValueAtTime');
 

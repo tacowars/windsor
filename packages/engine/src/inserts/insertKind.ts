@@ -7,9 +7,29 @@ import type { AutomationHandle } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { StripStage } from '../mixer/channelStrip';
 
+/**
+ * A host's wet path (record `2026-10-11-wet-path-slot`): where its slot's
+ * child insert is wired in, on the wet layer before the host's Mix. A host
+ * kind is one whose `fields` include `slot`; only a host's stage has one.
+ */
+export interface WetPath {
+  /** Where the wet layer leaves, before the host's Mix: a node and its output index. */
+  readonly send: { readonly node: AudioNode; readonly output: number };
+  /** Where the child's output re-enters: from here on it takes the host's Mix and switch. */
+  readonly ret: AudioNode;
+  /**
+   * Cross the host's own internal wet edge out (true) or back in (false) over
+   * INSERT_FADE_SECONDS from now. The slot module fades the child's gain itself;
+   * route never touches it. route(false) on a fresh stage is today's graph.
+   */
+  route(on: boolean): void;
+}
+
 /** A live insert: a strip stage that can take its kind's settings without re-wiring. */
 export interface InsertStage<S extends { readonly kind: string }> extends StripStage {
   readonly kind: S['kind'];
+  /** A host kind's wet path (`WetPath`); absent on every other kind. */
+  readonly wetPath?: WetPath;
   /** Present only for a worklet effect; owned and stopped by the stage. */
   readonly processor?: AudioWorkletNode;
   readonly reduction?: { read(): number; setActive(enabled: boolean): void };

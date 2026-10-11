@@ -33,7 +33,7 @@ import { EQ_INSERT } from './eqInsert';
 import type { EqSpec } from './eqSpec';
 import { FILTER_INSERT } from './filterInsert';
 import type { FilterSpec } from './filterSpec';
-import type { InsertKind, InsertStage } from './insertKind';
+import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { IdClaim } from './insertIds';
 import { chainIds } from './insertIds';
 
@@ -94,12 +94,25 @@ export function insertKind(
   return typeof kind === 'string' && Object.hasOwn(registry, kind) ? registry[kind] : undefined;
 }
 
+/** The field a host kind keeps its child in (record `2026-10-11-wet-path-slot`). */
+export const SLOT_FIELD = 'slot';
+
+/** Whether `kind` is a host: its `fields` include `slot`, one child insert on its wet path. */
+export const isHostKind = (kind: InsertKind<InsertSpec>): boolean =>
+  kind.fields.includes(SLOT_FIELD);
+
+/** The child in `spec`'s slot, or null when it holds none or is not a host's. */
+export function insertSlot(spec: InsertSpec): InsertSpec | null {
+  return (SLOT_FIELD in spec ? spec.slot : null) ?? null;
+}
+
 /**
  * A strip's `inserts` list: absent is `[]`; a junk entry is dropped with a
  * correction; a kind the registry lacks is dangling and dropped; entries past
  * `MAX_INSERTS` are dropped with a correction; each kept entry is its kind's
  * normalised spec with its `id`. The id is read here, beside the kind's own
  * fields rather than among them, and filled or replaced as `chainIds` says.
+ * A host's child is part of its host's entry and counts toward nothing.
  */
 export function normaliseInserts(
   raw: unknown,
@@ -116,27 +129,98 @@ export function normaliseInserts(
   const claims: IdClaim[] = [];
   raw.forEach((entry: unknown, i) => {
     const at = `${path}[${i}]`;
-    if (!isRecord(entry)) {
-      n.correction(`${at}: ${show(entry)} is not an insert — dropped`);
-      return;
-    }
-    const kind = insertKind(registry, entry.kind);
-    if (!kind) {
-      n.dangling.push(`${at}.kind: no insert kind ${show(entry.kind)} is defined`);
-      n.correction(`${at}: dropped`);
-      return;
-    }
-    if (out.length >= MAX_INSERTS) {
+    // Past the limit, only an entry that would be kept is reported as over it.
+    if (out.length >= MAX_INSERTS && isRecord(entry) && insertKind(registry, entry.kind)) {
       n.correction(`${at}: past the ${MAX_INSERTS}-insert limit — dropped`);
       return;
     }
-    const { id, ...fields } = entry;
-    const spec = kind.normalise(fields, at, n);
+    const spec = normaliseInsertEntry(entry, at, n, registry);
+    if (!spec || !isRecord(entry)) return;
     out.push(spec);
-    claims.push({ raw: id, at, kind: spec.kind });
+    claims.push({ raw: entry.id, at, kind: spec.kind });
   });
   const ids = chainIds(claims, n);
   return out.map((spec, i) => ({ ...spec, id: ids[i]! }));
 }
 
-export type { InsertKind, InsertStage };
+/**
+ * One insert entry at `at`, its `id` apart: its kind's normalised spec, or
+ * undefined (reported) for a junk entry or a dangling kind. A host's `slot`
+ * is read here, never by its kind (`normaliseSlot`).
+ */
+export function normaliseInsertEntry(
+  entry: unknown,
+  at: string,
+  n: FieldNormaliser,
+  registry: InsertRegistry = INSERT_KINDS,
+): InsertSpec | undefined {
+  if (!isRecord(entry)) {
+    n.correction(`${at}: ${show(entry)} is not an insert — dropped`);
+    return undefined;
+  }
+  const kind = insertKind(registry, entry.kind);
+  if (!kind) {
+    n.dangling.push(`${at}.kind: no insert kind ${show(entry.kind)} is defined`);
+    n.correction(`${at}: dropped`);
+    return undefined;
+  }
+  const fields: Record<string, unknown> = { ...entry };
+  delete fields.id;
+  if (!isHostKind(kind)) return kind.normalise(fields, at, n);
+  const child = fields[SLOT_FIELD];
+  delete fields[SLOT_FIELD];
+  const spec = kind.normalise(fields, at, n);
+  const slot = normaliseSlot(child, spec.kind, `${at}.${SLOT_FIELD}`, n, registry);
+  // A host's spec is one whose type carries `slot`.
+  return { ...spec, [SLOT_FIELD]: slot } as InsertSpec;
+}
+
+/**
+ * A host's child at `path`: absent or null is none, silently; junk, the
+ * host's own kind and a dangling kind are none, reported. A kept child is
+ * its kind's spec with an id of its own, from a one-entry chain, which may
+ * equal any strip id: every target spells it under its host's. One level
+ * deep, so a host child's own slot is none, and within the v1 limits
+ * (`slotLimits`).
+ */
+function normaliseSlot(
+  raw: unknown,
+  host: string,
+  path: string,
+  n: FieldNormaliser,
+  registry: InsertRegistry,
+): InsertSpec | null {
+  if (raw === undefined || raw === null) return null;
+  if (isRecord(raw) && raw.kind === host) {
+    n.correction(`${path}: a ${host} cannot hold another ${host} — using none`);
+    return null;
+  }
+  const entry = isRecord(raw) ? withoutNestedSlot(raw, path, n, registry) : raw;
+  const spec = normaliseInsertEntry(entry, path, n, registry);
+  if (!spec || !isRecord(raw)) return null;
+  const [id] = chainIds([{ raw: raw.id, at: path, kind: spec.kind }], n);
+  return { ...slotLimits(spec, path, n), id: id! };
+}
+
+/** `raw` with its own slot emptied, reported, when it is a host holding one. */
+function withoutNestedSlot(
+  raw: Record<string, unknown>,
+  path: string,
+  n: FieldNormaliser,
+  registry: InsertRegistry,
+): Record<string, unknown> {
+  const kind = insertKind(registry, raw.kind);
+  const nested = raw[SLOT_FIELD];
+  if (!kind || !isHostKind(kind) || nested === undefined || nested === null) return raw;
+  n.correction(`${path}.${SLOT_FIELD}: an insert in a slot holds no slot of its own — using none`);
+  return { ...raw, [SLOT_FIELD]: null };
+}
+
+/** The v1 slot limits (epic decision 8): a child compressor listens to its own input. */
+function slotLimits(spec: InsertSpec, path: string, n: FieldNormaliser): InsertSpec {
+  if (spec.kind !== 'compressor' || (spec.sidechain ?? 'internal') === 'internal') return spec;
+  n.correction(`${path}.sidechain: ${show(spec.sidechain)} in a slot — set to "internal"`);
+  return { ...spec, sidechain: 'internal' };
+}
+
+export type { InsertKind, InsertStage, WetPath };

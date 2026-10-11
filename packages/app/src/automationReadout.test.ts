@@ -1,11 +1,11 @@
 /** An automation target's value as it reads, in its catalog row's units (windsor#348, windsor#424). */
 import { describe, expect, it } from 'vitest';
-import { requireCatalogRow, targetRow } from '@windsor/engine';
+import { DEFAULT_FILTER, requireCatalogRow, targetRow } from '@windsor/engine';
 import { readout } from './automationReadout';
 
 describe('the readout', () => {
   it("reads an insert's on/off as On or Off (windsor#631)", () => {
-    const row = targetRow('insert.f.enabled', () => 'filter')!;
+    const row = targetRow('insert.f.enabled', () => DEFAULT_FILTER)!;
     expect([readout(row, 1), readout(row, 0)]).toEqual(['On', 'Off']);
   });
 

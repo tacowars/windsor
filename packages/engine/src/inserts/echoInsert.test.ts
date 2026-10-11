@@ -120,6 +120,7 @@ describe('ECHO_INSERT', () => {
       resonance,
       mix: 0.3,
       enabled: true,
+      slot: null,
     });
   });
 

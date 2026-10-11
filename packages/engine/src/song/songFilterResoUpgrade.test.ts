@@ -45,7 +45,7 @@ describe('a version-7 song with a Filter Reso lane (windsor#626)', () => {
     const hat = result.document.parts.find((part) => part.automation?.length)!;
     const saved = hat.automation![0]!;
     expect(saved).toEqual(RESO);
-    const row = insertTargetRow('filter', 'resonance')!;
+    const row = insertTargetRow(DEFAULT_FILTER, 'resonance')!;
     expect(valueAt(row, saved.points, END / 2)).toBeCloseTo(Math.sqrt(0.5 * 12), 6);
   });
 });

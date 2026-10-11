@@ -25,6 +25,12 @@
  * rate and each stage only where its route, sync and switches play them, an
  * EQ band only while it is on. `automatableInsertFields`
  * (`automationInsertFields.ts`) applies them.
+ *
+ * A host kind (record `2026-10-11-wet-path-slot`) also lists its slot's
+ * rows, `slot.<field>`: every other kind's, each available only while the
+ * slot holds that kind (`slotRows`). So `slot.rate` is a row several times
+ * over, once per child kind, and a lookup needs the insert's spec, not only
+ * its kind (`insertTargetRow`).
  */
 import { REVERB_SPACE_RANGES } from '../audioConstants';
 import {
@@ -52,6 +58,7 @@ import type { AdvancedDriveSpec } from '../inserts/advancedDriveSpec';
 import type { DelaySpec } from '../inserts/delaySpec';
 import type { EqSpec } from '../inserts/eqSpec';
 import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
+import { INSERT_KIND_NAMES, INSERT_KINDS, insertSlot, SLOT_FIELD } from '../inserts/insertRegistry';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
 import type { TapeSpec } from '../inserts/tapeSpec';
 import { PHASER_BOUNDS } from '../inserts/phaserConstants';
@@ -70,6 +77,8 @@ export type InsertSpecOf<K extends InsertKindName> = Extract<InsertSpec, { reado
  */
 export interface InsertFieldRow<S extends InsertSpec = InsertSpec> extends AutomationTargetRow {
   readonly available?: (spec: S) => boolean;
+  /** On a host's slot row (`slotRows`), the child kind whose field it moves. */
+  readonly childKind?: InsertKindName;
 }
 
 /** `r`, read by the DSP only where `available` holds. */
@@ -337,10 +346,25 @@ const FILTER_ROWS = [
 /** An insert's on/off switch (windsor#628): `enabled`, 0 off and 1 on, held between points. */
 export const INSERT_SWITCH_ROW: InsertFieldRow = row('enabled', 'On', UNIT, 'switch');
 
-/** Each insert kind's continuous fields, the targets a lane may move on it. */
-export const INSERT_AUTOMATION_FIELDS: {
+/**
+ * `rows`, then `toggle` where `kind`'s spec has `enabled` (windsor#628): the
+ * one rule for a kind's switch, read by `insertKindFields` and `slotRows`.
+ */
+export function withSwitch(
+  kind: InsertKindName,
+  rows: readonly InsertFieldRow[],
+  toggle = INSERT_SWITCH_ROW,
+): readonly InsertFieldRow[] {
+  return Object.hasOwn(INSERT_KINDS[kind].defaults, toggle.target) ? [...rows, toggle] : rows;
+}
+
+/** A table of rows by kind, each over its kind's spec. */
+type KindRows = {
   readonly [K in InsertKindName]: readonly InsertFieldRow<InsertSpecOf<K>>[];
-} = {
+};
+
+/** Each kind's own continuous fields, before a host's slot rows join them. */
+const KIND_ROWS: KindRows = {
   drive: DRIVE_ROWS,
   'advanced-drive': ADVANCED_DRIVE_ROWS,
   chorus: CHORUS_ROWS,
@@ -354,4 +378,40 @@ export const INSERT_AUTOMATION_FIELDS: {
   echo: ECHO_ROWS,
   eq: EQ_ROWS,
   filter: FILTER_ROWS,
+};
+
+/** The prefix a host's slot rows carry (record `2026-10-11-wet-path-slot`). */
+export const SLOT_TARGET_PREFIX = `${SLOT_FIELD}.`;
+
+/**
+ * A host's slot rows (record `2026-10-11-wet-path-slot`): every other kind's
+ * rows, its switch included, under `slot.` and labelled `Slot …`, each
+ * carrying the child kind it reads. A row is available only while the slot
+ * holds that kind and the child's own row is read under the child's spec.
+ */
+export function slotRows(host: InsertKindName, table: KindRows = KIND_ROWS): InsertFieldRow[] {
+  return INSERT_KIND_NAMES.filter((kind) => kind !== host).flatMap((kind) => {
+    // The table pairs each kind with rows over that kind's spec.
+    return withSwitch(kind, table[kind] as readonly InsertFieldRow[]).map(
+      (child): InsertFieldRow => ({
+        ...child,
+        target: `${SLOT_TARGET_PREFIX}${child.target}`,
+        label: `Slot ${child.label}`,
+        childKind: kind,
+        available: (spec) => {
+          const slot = insertSlot(spec);
+          return slot?.kind === kind && (child.available?.(slot) ?? true);
+        },
+      }),
+    );
+  });
+}
+
+/**
+ * Each insert kind's continuous fields, the targets a lane may move on it,
+ * and on a host its slot rows: Echo's are every other kind's, under `slot.`.
+ */
+export const INSERT_AUTOMATION_FIELDS: KindRows = {
+  ...KIND_ROWS,
+  echo: [...ECHO_ROWS, ...slotRows('echo')],
 };

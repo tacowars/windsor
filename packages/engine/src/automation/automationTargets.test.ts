@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { INSERT_KIND_NAMES } from '../inserts/insertRegistry';
+import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
+import { DEFAULT_ECHO } from '../inserts/echoInsert';
+import { DEFAULT_EQ } from '../inserts/eqSpec';
+import { CHORUS_RATE_MAX_HZ, CHORUS_RATE_MIN_HZ } from '../inserts/insertConstants';
+import { PHASER_BOUNDS } from '../inserts/phaserConstants';
+import { DEFAULT_PHASER } from '../inserts/phaserSpec';
+import { INSERT_KIND_NAMES, type InsertSpec } from '../inserts/insertRegistry';
 import { insertKindFields } from './automationInsertFields';
 import { SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import type { ParsedTarget } from './automationLane';
@@ -173,17 +179,65 @@ describe('the row lookups', () => {
     expect(() => requireCatalogRow('voice.nothing')).toThrow('"voice.nothing"');
   });
 
-  it("find an insert row through its insert's kind", () => {
-    expect(insertTargetRow('eq', 'bands.0.gain')?.unit).toBe('dB');
-    expect(insertTargetRow('chorus', 'bands.0.gain')).toBeUndefined();
-    const kinds: Record<string, 'phaser'> = { ph000001: 'phaser' };
-    const kindOf = (id: string) => kinds[id];
-    expect(targetRow('insert.ph000001.center', kindOf)?.scale).toBe('log');
-    expect(targetRow('insert.zz000009.center', kindOf)).toBeUndefined();
-    expect(targetRow('insert.ph000001.bands.0.q', kindOf)).toBeUndefined();
+  it("find an insert row through its insert's spec", () => {
+    expect(insertTargetRow(DEFAULT_EQ, 'bands.0.gain')?.unit).toBe('dB');
+    expect(insertTargetRow(DEFAULT_CHORUS, 'bands.0.gain')).toBeUndefined();
+    const specs: Record<string, InsertSpec> = { ph000001: DEFAULT_PHASER };
+    const specOf = (id: string) => specs[id];
+    expect(targetRow('insert.ph000001.center', specOf)?.scale).toBe('log');
+    expect(targetRow('insert.zz000009.center', specOf)).toBeUndefined();
+    expect(targetRow('insert.ph000001.bands.0.q', specOf)).toBeUndefined();
     expect(targetRow('insert.ph000001.center')).toBeUndefined();
     expect(targetRow('voice.pitchEnvAmount')?.unit).toBe('st');
     expect(targetRow('voice.nothing')).toBeUndefined();
+  });
+});
+
+describe("a host's slot targets (record 2026-10-11-wet-path-slot)", () => {
+  const echoWith = (slot: InsertSpec | null): InsertSpec => ({ ...DEFAULT_ECHO, slot });
+
+  it('parse, format and round-trip insert.<hostId>.slot.<field>, an escaped id included', () => {
+    expect(parseTargetId('insert.e1.slot.rate')).toEqual({
+      kind: 'insert',
+      insertId: 'e1',
+      field: 'slot.rate',
+    });
+    for (const insertId of ['e1', 'echo.main', 'x.slot', '100%']) {
+      const target = { kind: 'insert', insertId, field: 'slot.rate' } as const;
+      const id = formatTargetId(target);
+      expect(parseTargetId(id), id).toEqual(target);
+    }
+    expect(formatTargetId({ kind: 'insert', insertId: '100%', field: 'slot.rate' })).toBe(
+      'insert.100%25.slot.rate',
+    );
+    // `x.slot`'s `rate` is not `x`'s `slot.rate`: the dot is escaped.
+    expect(formatTargetId({ kind: 'insert', insertId: 'x.slot', field: 'rate' })).toBe(
+      'insert.x%2Eslot.rate',
+    );
+  });
+
+  it("give the live child kind's row, and none with the slot empty or the field missing", () => {
+    const phaser = echoWith({ ...DEFAULT_PHASER, id: 'p' });
+    const chorus = echoWith({ ...DEFAULT_CHORUS, id: 'c' });
+    const rate = targetRow('insert.e1.slot.rate', () => phaser);
+    expect(rate).toMatchObject({
+      label: 'Slot Rate',
+      min: PHASER_BOUNDS.rate[0],
+      max: PHASER_BOUNDS.rate[1],
+      scale: 'log',
+    });
+    expect(targetRow('insert.e1.slot.rate', () => chorus)).toMatchObject({
+      label: 'Slot Rate',
+      min: CHORUS_RATE_MIN_HZ,
+      max: CHORUS_RATE_MAX_HZ,
+    });
+    expect(insertTargetRow(phaser, 'slot.enabled')).toMatchObject({ scale: 'switch' });
+    expect(insertTargetRow(phaser, 'slot.mix')).toMatchObject({ label: 'Slot Mix' });
+    expect(insertTargetRow(echoWith(null), 'slot.rate')).toBeUndefined();
+    expect(insertTargetRow(DEFAULT_ECHO, 'slot.rate')).toBeUndefined();
+    expect(insertTargetRow(chorus, 'slot.center')).toBeUndefined();
+    expect(insertTargetRow(DEFAULT_PHASER, 'slot.rate')).toBeUndefined();
+    expect(insertTargetRow(phaser, 'mix')).toMatchObject({ label: 'Mix', max: 1 });
   });
 });
 

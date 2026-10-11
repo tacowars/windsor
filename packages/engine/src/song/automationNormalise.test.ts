@@ -25,6 +25,7 @@ import {
   parseTargetId,
 } from '../automation/automationTargets';
 import { ARRANGEMENT_VERSION } from '../audioConstants';
+import { DEFAULT_EQ } from '../inserts/eqSpec';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import { mergeArrangement, type Arrangement } from './arrangement';
@@ -176,7 +177,7 @@ describe('the target', () => {
     const eqLanes = Array.from({ length: FM_LANES_MAX + 1 }, (_, band) => {
       const field = `bands.${band % FM_LANES_MAX}.${band < FM_LANES_MAX ? 'freq' : 'q'}`;
       return lane(insertTarget(AUTOMATION_EQ_ID, field), [
-        point(0, insertTargetRow('eq', field)!.min),
+        point(0, insertTargetRow(DEFAULT_EQ, field)!.min),
       ]);
     });
     const strip = STRIP_TARGET_IDS.map((target) => lane(target, [point(0, 0)]));

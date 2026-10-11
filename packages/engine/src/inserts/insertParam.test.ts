@@ -33,23 +33,33 @@ import { insertKindFields } from '../automation/automationInsertFields';
 import { INSERT_AUTOMATION_FIELDS } from '../automation/automationInsertTables';
 import type { AutomationTargetRow } from '../automation/automationLane';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
-import type { InsertSpec } from './insertRegistry';
+import type { InsertKindName, InsertSpec } from './insertRegistry';
 import { INSERT_KIND_NAMES } from './insertRegistry';
 
 const undo = installParamWorklet();
 afterAll(undo);
 
+/**
+ * A kind's own catalog rows. A host's slot rows (`childKind`, `slot.<field>`)
+ * move the child in its slot, and nothing plays a child until windsor#688,
+ * whose tests cover their handles.
+ */
+const ownRows = (kind: InsertKindName): readonly AutomationTargetRow[] =>
+  INSERT_AUTOMATION_FIELDS[kind].filter((row) => !row.childKind);
+
 /** `spec` with every catalog field of its kind moved to another value. */
 function everyKnobMoved(spec: InsertSpec): InsertSpec {
   let next = spec;
-  for (const row of INSERT_AUTOMATION_FIELDS[spec.kind]) {
+  for (const row of ownRows(spec.kind)) {
     next = withField(next, row.target, otherValue(row, fieldValue(spec, row.target), 0.71));
   }
   return next;
 }
 
 const cases = INSERT_KIND_NAMES.flatMap((kind) =>
-  insertKindFields(kind).map((row) => ({ kind, row, field: row.target })),
+  insertKindFields(kind)
+    .filter((row) => !row.childKind)
+    .map((row) => ({ kind, row, field: row.target })),
 );
 
 /** The lane's value away from `spec`'s, and `spec` at it: the open spec's switch goes off. */
