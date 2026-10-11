@@ -9,28 +9,35 @@
  * processor takes (`BLOOM_PITCHES_ALL` is every pitch class); the processor
  * works out each pitch class's correction from it. Scale's `song` (windsor#717)
  * takes the song's root and scale instead of Key's, whichever scale the song
- * is in, a custom one included. Main thread only: the worklet imports none of
+ * is in, a custom one included. Scale's `chord` (windsor#729) takes the
+ * pitch classes of the chord the harmony track is on (`chordPitches`), which
+ * `bloomChordFollower.ts` schedules on the transport; until a chord is handed
+ * over it plays the song's key. Main thread only: the worklet imports none of
  * this. Pinned by `bloomPitches.test.ts`.
  */
 import { CHORD_NOTE_NAMES } from '../harmony/chordTables';
-import type { Harmony } from '../harmony/harmonyTimeline';
+import { eventStack } from '../harmony/chordTheory';
+import type { Harmony, HarmonyEvent } from '../harmony/harmonyTimeline';
 import { SCALE_NAMES, scaleOffsets } from '../sequencing/scaleSampler';
 import type { ScaleName } from '../sequencing/scaleSampler';
 import {
   BLOOM_PITCH_CLASSES,
   BLOOM_PITCHES_ALL,
+  BLOOM_SCALE_CHORD,
   BLOOM_SCALE_DEFAULT,
   BLOOM_SCALE_SONG,
 } from './bloomConstants';
 
 /**
  * Scale's choices: `chromatic` (every pitch class, Bloom's off), `song` (the
- * song's key), then Windsor's scales in order.
+ * song's key), `chord` (the song's chord), then Windsor's scales in order.
  */
-export type BloomScale = typeof BLOOM_SCALE_DEFAULT | typeof BLOOM_SCALE_SONG | ScaleName;
+export type BloomScale =
+  typeof BLOOM_SCALE_DEFAULT | typeof BLOOM_SCALE_SONG | typeof BLOOM_SCALE_CHORD | ScaleName;
 export const BLOOM_SCALE_CHOICES: readonly BloomScale[] = [
   BLOOM_SCALE_DEFAULT,
   BLOOM_SCALE_SONG,
+  BLOOM_SCALE_CHORD,
   ...SCALE_NAMES,
 ];
 
@@ -57,16 +64,27 @@ export function pitchMask(root: number, offsets: readonly number[]): number {
 }
 
 /**
+ * The pitch set of a chord on the harmony track (windsor#729): the classes of
+ * `(root + t) mod 12` for every tone `t` of the stack `chordAt` builds
+ * (`eventStack`), so its size, quality and accidental are in it and a
+ * degree's octave carry folds away.
+ */
+export function chordPitches(songKey: SongKey, event: HarmonyEvent): number {
+  return pitchMask(songKey.root, eventStack(scaleOffsets(songKey.scale), event));
+}
+
+/**
  * The processor's pitch set for a Key and Scale: `chromatic` is every pitch
  * class, and `song` is `songKey`'s set, Key aside; with no song key yet (no
- * song loaded), `song` plays every pitch class.
+ * song loaded), `song` plays every pitch class. `chord` is the same as
+ * `song` here, its fallback: the stage plays the chord it is handed instead.
  */
 export function bloomPitches(
   spec: { readonly key: BloomKey; readonly scale: BloomScale },
   songKey?: SongKey,
 ): number {
   if (spec.scale === BLOOM_SCALE_DEFAULT) return BLOOM_PITCHES_ALL;
-  if (spec.scale === BLOOM_SCALE_SONG) {
+  if (spec.scale === BLOOM_SCALE_SONG || spec.scale === BLOOM_SCALE_CHORD) {
     return songKey ? pitchMask(songKey.root, scaleOffsets(songKey.scale)) : BLOOM_PITCHES_ALL;
   }
   return pitchMask(Math.max(0, BLOOM_KEY_CHOICES.indexOf(spec.key)), scaleOffsets(spec.scale));

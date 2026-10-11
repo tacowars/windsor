@@ -1,7 +1,8 @@
 /**
  * The song's key reaching the inserts (windsor#717): the registry hands a new
  * stage the current key and forwards a change of root or scale to the live
- * ones, and nothing else. On the live system, every bloom on Song key follows
+ * ones, and nothing else; the song's chord (windsor#729) is forwarded to every
+ * live stage that takes one, and each new one is announced. On the live system, every bloom on Song key follows
  * the song's key on a part strip, a group, a return and the master, a bloom
  * on a fixed scale doesn't, and one added after the song loaded starts on it.
  */
@@ -44,7 +45,7 @@ function source() {
       set: vi.fn(),
       dispose: vi.fn(),
     };
-    const keyed = { ...base, setHarmony: vi.fn(), setTempo: vi.fn() };
+    const keyed = { ...base, setHarmony: vi.fn(), setTempo: vi.fn(), setChord: vi.fn() };
     return (kind === 'keyed' ? keyed : base) as unknown as Stage;
   };
   const kind = (name: 'keyed' | 'plain') =>
@@ -105,6 +106,20 @@ describe('harmonyInsertRegistry', () => {
     harmony.setHarmony(5, 'major');
     expect(made.keyed[0]!.setHarmony).not.toHaveBeenCalled();
     expect(create(harmony.registry, 'plain')).toBe(made.plain[0]);
+  });
+
+  it('forwards a chord to every live stage that takes one, and announces each new one', () => {
+    const { registry: src, made } = source();
+    const added = vi.fn();
+    const harmony = harmonyInsertRegistry(src, added);
+    create(harmony.registry, 'keyed');
+    create(harmony.registry, 'plain');
+    const gone = create(harmony.registry, 'keyed');
+    expect(added).toHaveBeenCalledTimes(2);
+    gone.dispose();
+    harmony.setChord(0b10010001, 1.5, true);
+    expect(made.keyed[0]!.setChord).toHaveBeenCalledExactlyOnceWith(0b10010001, 1.5, true);
+    expect(made.keyed[1]!.setChord).not.toHaveBeenCalled();
   });
 
   it('composes with the tempo registry, so a stage takes both', () => {

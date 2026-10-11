@@ -2,8 +2,9 @@
  * `MusicPlayback` on its own: a real `Scheduler` on the fake context and a
  * recording stand-in for the player. Start is a no-op before a player or while
  * muted; mute keeps the tick and stop rewinds it (#708); seek moves a halted
- * transport and refuses a running one (windsor#102); the queries forward
- * to the player and answer "nothing" without one.
+ * transport and refuses a running one (windsor#102); every follower hears
+ * a stop and a seek, and one that asks hears ■'s rewind (windsor#729); the
+ * queries forward to the player and answer "nothing" without one.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -101,6 +102,30 @@ describe('MusicPlayback transport', () => {
     expect(player.releaseAll).toHaveBeenCalledTimes(2);
     expect(player.reset).toHaveBeenCalledTimes(1);
     expect(playback.isMuted).toBe(true);
+  });
+});
+
+describe('MusicPlayback followers (windsor#729)', () => {
+  it('tells every follower of a mute, a stop and a seek, and of the rewind those that ask', () => {
+    const { scheduler, playback, player, advance } = rig();
+    // The automation player's shape (no rewind) and the song chord's.
+    const lanes = { stop: vi.fn(), seek: vi.fn() };
+    const chords = { stop: vi.fn(), seek: vi.fn(), rewound: vi.fn() };
+    playback.load(player as unknown as ArrangementPlayer, [lanes, chords]);
+    playback.start();
+    advance(2);
+    playback.setMuted(true);
+    expect(playback.seek(96)).toBe(true);
+    playback.stop();
+    for (const follower of [lanes, chords]) {
+      expect(follower.stop).toHaveBeenCalledTimes(2);
+      expect(follower.seek).toHaveBeenCalledExactlyOnceWith(96);
+    }
+    expect(chords.rewound).toHaveBeenCalledExactlyOnceWith(scheduler.transport.currentTick);
+    // The rewind follows the stop, once the transport rests where ▶ starts.
+    expect(chords.rewound.mock.invocationCallOrder[0]).toBeGreaterThan(
+      chords.stop.mock.invocationCallOrder[1]!,
+    );
   });
 });
 

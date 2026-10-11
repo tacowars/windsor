@@ -44,8 +44,8 @@ const OLD_TABLE: [BloomScale, number[]][] = [
 ];
 
 describe("bloom's lists are Windsor's", () => {
-  it('Scale is chromatic, song, then SCALE_NAMES in order; Key is CHORD_NOTE_NAMES itself', () => {
-    expect(BLOOM_SCALE_CHOICES).toEqual(['chromatic', 'song', ...SCALE_NAMES]);
+  it('Scale is chromatic, song, chord, then SCALE_NAMES in order; Key is CHORD_NOTE_NAMES itself', () => {
+    expect(BLOOM_SCALE_CHOICES).toEqual(['chromatic', 'song', 'chord', ...SCALE_NAMES]);
     expect(BLOOM_KEY_CHOICES).toBe(CHORD_NOTE_NAMES);
   });
 });
