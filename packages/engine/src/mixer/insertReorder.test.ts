@@ -90,7 +90,7 @@ describe('routePart insert reordering', () => {
     strip.setInserts([boost(1), scale(1)]);
     // The ramp is out, and nothing has moved yet.
     expect(gain.automation.map((a) => a.call)).toEqual([
-      'cancelScheduledValues',
+      'cancelAndHoldAtTime',
       'setValueAtTime',
       'linearRampToValueAtTime',
     ]);

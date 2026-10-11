@@ -25,6 +25,7 @@
 import { MS_PER_SECOND } from '../audioConstants';
 import { INSERT_KINDS } from '../inserts/insertRegistry';
 import type { InsertSpec, InsertStage } from '../inserts/insertRegistry';
+import { holdAt } from './audibleGate';
 import type { RouteOptions } from './channelStrip';
 import { createInsertChain, createInsertUpdater } from './insertChain';
 import type { ReturnSpec } from './mix';
@@ -91,8 +92,7 @@ export function createReturn(
     },
     fadeTo(level: number, seconds: number): void {
       const now = context.currentTime;
-      fade.gain.cancelScheduledValues(now);
-      fade.gain.setValueAtTime(fade.gain.value, now);
+      holdAt(fade.gain, now);
       fade.gain.linearRampToValueAtTime(level, now + seconds);
     },
   };

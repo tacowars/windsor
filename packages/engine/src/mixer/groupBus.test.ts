@@ -129,10 +129,10 @@ describe('a group bus', () => {
     expect(targets(bus.input)).toEqual([fake(stage!.input)]);
     const fade = targets(stage!.output)[0]!;
     expect(gain(fade).automation.map((a) => [a.call, a.value])).toEqual([
-      ['cancelScheduledValues', 1],
+      ['cancelAndHoldAtTime', 1],
       ['setValueAtTime', 1],
       ['linearRampToValueAtTime', 0],
-      ['cancelScheduledValues', 0],
+      ['cancelAndHoldAtTime', 0],
       ['setValueAtTime', 0],
       ['linearRampToValueAtTime', 1],
     ]);

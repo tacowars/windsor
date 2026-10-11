@@ -8,10 +8,13 @@
  * `param.value`, which a browser reports as of the last render quantum and
  * which a cancel may already have moved. Once a ramp has run its course the
  * computed value is its end, so a later ramp schedules exactly what a plain
- * "hold the current value, then ramp" would.
+ * "hold the current value, then ramp" would. The value is pinned through
+ * `holdAt`, whose cancel-and-hold keeps Chrome from rendering one frame of
+ * the cancelled timeline at `now` (windsor#694).
  *
  * Main thread only. Nothing else may schedule on `param`.
  */
+import { holdAt } from '../mixer/audibleGate';
 import { INSERT_FADE_SECONDS } from './insertConstants';
 
 export interface FadeRamp {
@@ -34,8 +37,7 @@ export function fadeRamp(
     to(next): void {
       const now = context.currentTime;
       const value = valueAt(now);
-      param.cancelScheduledValues(now);
-      param.setValueAtTime(value, now);
+      holdAt(param, now, value);
       param.linearRampToValueAtTime(next, now + seconds);
       from = value;
       target = next;

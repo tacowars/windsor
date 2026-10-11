@@ -18,7 +18,7 @@
  */
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { AudibleGate } from './audibleGate';
-import { createAudibleGate } from './audibleGate';
+import { createAudibleGate, holdAt } from './audibleGate';
 import type { ChannelStrip } from './mix';
 import type { ReturnBus } from './returnBus';
 import { createSend } from './returnBus';
@@ -92,8 +92,7 @@ export function createTap(
     },
     fadeTo(level: number, seconds: number): void {
       const now = context.currentTime;
-      head.gain.cancelScheduledValues(now);
-      head.gain.setValueAtTime(head.gain.value, now);
+      holdAt(head.gain, now);
       head.gain.linearRampToValueAtTime(level, now + seconds);
     },
     dispose(): void {
