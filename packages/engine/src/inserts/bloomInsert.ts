@@ -18,8 +18,9 @@
 import { fadeRamp } from './fadeRamp';
 import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
-import { BLOOM_BOUNDS, BLOOM_NAME, BLOOM_SLOT } from './bloomConstants';
+import { BLOOM_BOUNDS, BLOOM_NAME, BLOOM_SCALE_SONG, BLOOM_SLOT } from './bloomConstants';
 import { bloomPitches } from './bloomPitches';
+import type { SongKey } from './bloomPitches';
 import {
   BLOOM_FIELDS,
   BLOOM_NUMBERS,
@@ -32,14 +33,14 @@ import type { BloomSpec } from './bloomSpec';
 /**
  * Every param `set` writes, by name, for `spec`: the numbers as they are,
  * the switches as 0/1, Key and Scale as one pitch set, `pitches`
- * (`bloomPitches.ts`). The processor's `split`
- * param is no field's, so it is not here.
+ * (`bloomPitches.ts`), with Scale's `song` read from `songKey`. The
+ * processor's `split` param is no field's, so it is not here.
  */
-export function bloomValues(spec: BloomSpec): Record<string, number> {
+export function bloomValues(spec: BloomSpec, songKey?: SongKey): Record<string, number> {
   const values: Record<string, number> = {};
   for (const name of BLOOM_NUMBERS) values[name] = spec[name];
   for (const name of BLOOM_SWITCHES) values[name] = Number(spec[name]);
-  values.pitches = bloomPitches(spec);
+  values.pitches = bloomPitches(spec, songKey);
   return values;
 }
 
@@ -95,10 +96,12 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
   normalise: normaliseBloom,
   create(context, spec): InsertStage<BloomSpec> {
     let current = spec;
+    // The last song key the registry handed over (windsor#717): Scale's `song` reads it.
+    let songKey: SongKey | undefined;
     const { processor, input, output, ret } = bloomGraph(context, spec);
     const params = workletFieldParams(
       processor,
-      (name) => bloomValues(current)[name]!,
+      (name) => bloomValues(current, songKey)[name]!,
       bloomParamOf,
     );
     return {
@@ -109,7 +112,13 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
       wetPath: bloomWetPath(context, processor, ret),
       set(next): void {
         current = next;
-        params.write(bloomValues(next));
+        params.write(bloomValues(next, songKey));
+      },
+      setHarmony(root, scale): void {
+        songKey = { root, scale };
+        if (current.scale === BLOOM_SCALE_SONG) {
+          params.write({ pitches: bloomPitches(current, songKey) });
+        }
       },
       param: (field) => params.param(field),
       dispose(): void {

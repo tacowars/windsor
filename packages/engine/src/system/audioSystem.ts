@@ -34,6 +34,8 @@ import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { AutomationLane } from '../automation/automationLane';
 import { groupOwner, partOwner } from '../automation/automationOwner';
 import type { AudioLoadReadout } from '../cost/audioLoad';
+import type { Harmony } from '../harmony/harmonyTimeline';
+import { harmonyInsertRegistry } from '../inserts/harmonyInsertRegistry';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
@@ -117,6 +119,7 @@ export class AudioSystem {
 
   private readonly meter: SystemLoadMeter;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
+  private readonly insertHarmony: ReturnType<typeof harmonyInsertRegistry>;
   private readonly graph: StandingGraph;
   private readonly groups: GroupBuses;
   private readonly parts: PartStrips;
@@ -130,7 +133,9 @@ export class AudioSystem {
     this.engine = engine ?? new FmEngine();
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
     this.meter = new SystemLoadMeter(this.engine.context, options.meterLoad ?? true);
-    this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
+    // Every stage passes through both: the song's key under the tempo (windsor#717).
+    this.insertHarmony = harmonyInsertRegistry();
+    this.insertTempo = tempoInsertRegistry(this.scheduler.bpm, this.insertHarmony.registry);
     // Passed to every strip and the song master: how it builds an insert, whom
     // it tells when its chain changes, and how it waits out a fade (#652).
     const routeOptions: RouteOptions = {
@@ -275,6 +280,7 @@ export class AudioSystem {
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
     this.insertTempo.setTempo(arrangement.transport.bpm);
+    this.insertHarmony.setHarmony(arrangement.harmony.root, arrangement.harmony.scale);
     // Before the parts, so a part that starts on a group connects to it directly (windsor#285).
     this.groups.build(groups ?? []);
     for (const part of arrangement.parts) {
@@ -379,6 +385,9 @@ export class AudioSystem {
       return result;
     }
     this.insertTempo.setTempo(this.scheduler.bpm);
+    // The song's key, forwarded only when its root or scale changed (`harmonyInsertRegistry`).
+    const { root, scale } = player.readout();
+    this.insertHarmony.setHarmony(root, scale as Harmony['scale']);
     const ignored = [...result.ignored, ...groupPlan.ignored];
     ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
     // `GroupBuses` draws the order: groups built and edited, strips, members released, solo, removals.

@@ -88,6 +88,11 @@ export const BLOOM_DEFAULTS = {
 /** Key's and Scale's defaults: C, and `chromatic`, Scale's off (every pitch class). */
 export const BLOOM_KEY_DEFAULT = 'C';
 export const BLOOM_SCALE_DEFAULT = 'chromatic';
+/**
+ * Scale's Song key (windsor#717): the song's harmony root and scale, resolved
+ * in the stage from the harmony the registry hands it, never in the spec.
+ */
+export const BLOOM_SCALE_SONG = 'song';
 
 /** The route's tunables (`worklet/bloom/bloomDsp.ts`). */
 export const BLOOM_DSP = {

@@ -9,8 +9,10 @@
  *   on/off switch is the rail's ⏻).
  * - Generator: Shape and Bright, Octave (six steps), then the Key and Scale
  *   pickers in one wide column. They read as the transport's do (windsor#728):
- *   Key its note names, Scale `chromatic` first, then Windsor's scales under
- *   the transport's groups and names.
+ *   Key its note names, Scale `chromatic` first, `song key` in its own group
+ *   (windsor#717), then Windsor's scales under the transport's groups and
+ *   names. On `song key` Key is disabled and shows the song's key, as the
+ *   transport's Key does; the bloom's own key stays underneath.
  * - Bands: Low and High (note names; they never cross), then Focus.
  * - Dynamics: Density, read as the compressor's ratio.
  * - Output: Amount and Spread, then Mix at the big dial, last.
@@ -20,9 +22,10 @@
  * Freeze, locks while a lane on its field is on.
  */
 import { DEFAULT_BLOOM } from '@windsor/engine';
-import type { BloomSpec } from '@windsor/engine';
+import type { BloomScale, BloomSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import type { SelectGroup } from './dom';
 import type { InsertCard } from './insertCards';
 import {
   BLOOM_KEY_ITEMS,
@@ -34,7 +37,7 @@ import type { InsertKnobEntry } from './insertKnobTables';
 import { bigInsertKnobs, insertFieldLock, insertKnob, insertsOf, pickKnobs } from './insertKnobs';
 import { insertColumn, insertPage, insertRule, insertSelect, wideColumn } from './insertLayout';
 import { targetChange } from './insertTarget';
-import { SCALE_OPTION_GROUPS } from './transportTables';
+import { KEY_OPTIONS, SCALE_OPTION_GROUPS } from './transportTables';
 import type { InsertTarget } from './insertTarget';
 import { lockNotice, type KnobAutomation } from './knobAutomation';
 import { followAutomation, paintLock, switchShowsOn } from './knobLock';
@@ -87,22 +90,55 @@ function freezeButton(view: BloomView): HTMLElement {
   return button;
 }
 
+/** Scale's Song key (windsor#717): the song's root and scale, resolved by the engine. */
+const SONG_KEY: BloomScale = 'song';
+
+/** Scale's groups: `song key` alone, then the transport's. */
+export const BLOOM_SCALE_GROUPS: readonly SelectGroup[] = [
+  { group: 'Song', options: [{ value: SONG_KEY, label: 'song key' }] },
+  ...SCALE_OPTION_GROUPS,
+];
+
+/**
+ * What Key shows: the bloom's own key, or on Song key the song's (`root`, a
+ * pitch class), named as the transport's Key names it, and disabled.
+ */
+export function bloomKeyShown(
+  spec: Pick<BloomSpec, 'key' | 'scale'>,
+  root: number,
+): { readonly value: string; readonly disabled: boolean } {
+  if (spec.scale !== SONG_KEY) return { value: spec.key, disabled: false };
+  const song = KEY_OPTIONS.find((option) => option.value === String(root));
+  return { value: song?.label ?? spec.key, disabled: true };
+}
+
 /** Key and Scale: the generator's pickers, neither a lane's, in one wide column. */
 function keyAndScale(view: BloomView): HTMLElement {
   const spec = view.current();
+  const key = insertSelect({
+    label: 'Key',
+    options: BLOOM_KEY_ITEMS,
+    value: spec.key,
+    change: (next) => view.commit({ ...view.current(), key: next as BloomSpec['key'] }),
+  });
+  const keySelect = key.querySelector('select')!;
+  const paintKey = (): void => {
+    const shown = bloomKeyShown(view.current(), view.ctx.model.doc.harmony.root);
+    keySelect.value = shown.value;
+    keySelect.disabled = shown.disabled;
+  };
+  paintKey();
   return wideColumn(
-    insertSelect({
-      label: 'Key',
-      options: BLOOM_KEY_ITEMS,
-      value: spec.key,
-      change: (key) => view.commit({ ...view.current(), key: key as BloomSpec['key'] }),
-    }),
+    key,
     insertSelect({
       label: 'Scale',
       options: BLOOM_SCALE_OFF_ITEMS,
-      groups: SCALE_OPTION_GROUPS,
+      groups: BLOOM_SCALE_GROUPS,
       value: spec.scale,
-      change: (scale) => view.commit({ ...view.current(), scale: scale as BloomSpec['scale'] }),
+      change: (scale) => {
+        view.commit({ ...view.current(), scale: scale as BloomSpec['scale'] });
+        paintKey();
+      },
     }),
   );
 }

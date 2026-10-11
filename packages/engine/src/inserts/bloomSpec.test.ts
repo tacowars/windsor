@@ -4,7 +4,9 @@
  * round-trip the kind through `makeArrangement`.
  */
 import { describe, expect, it } from 'vitest';
+import { FULL_DOCUMENT } from '../__fixtures__/fullArrangement';
 import { FieldNormaliser } from '../song/arrangementFields';
+import { makeArrangement } from '../song/arrangementDocument';
 import { BLOOM_BOUNDS } from './bloomConstants';
 import { BLOOM_INSERT } from './bloomInsert';
 import { DEFAULT_BLOOM } from './bloomSpec';
@@ -36,6 +38,19 @@ describe('the bloom spec', () => {
     expect(BLOOM_INSERT.normalise({ ...edited }, 'fx', n)).toEqual(edited);
     expect(BLOOM_INSERT.normalise({}, 'fx', n)).toEqual(DEFAULT_BLOOM);
     expect(n.corrections).toEqual([]);
+  });
+
+  it('keeps Scale on song through a song round trip, Key untouched', () => {
+    const onSong: BloomSpec = { ...DEFAULT_BLOOM, key: 'A#', scale: 'song' };
+    const raw = {
+      ...FULL_DOCUMENT,
+      master: { inserts: [{ ...onSong, id: 'bloom1' }] },
+    };
+    const first = makeArrangement(raw);
+    expect(first.corrections).toEqual([]);
+    expect(first.document.master!.inserts).toEqual([{ ...onSong, id: 'bloom1' }]);
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document).toEqual(first.document);
   });
 
   it('clamps, rounds, replaces and drops junk, and reports each fix', () => {

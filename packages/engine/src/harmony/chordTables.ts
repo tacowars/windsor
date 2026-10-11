@@ -117,8 +117,11 @@ export const ACCIDENTAL_GLYPHS: Readonly<Record<ChordAccidental, string>> = {
   1: '♯',
 };
 
-/** The console's note spelling: sharps only (epic #605 decision 11). */
-export const CHORD_NOTE_NAMES: readonly string[] = [
+/**
+ * The console's note spelling: sharps only (epic #605 decision 11). `as const`,
+ * so a reader that stores a name (Bloom's Key) types it as one of the twelve.
+ */
+export const CHORD_NOTE_NAMES = [
   'C',
   'C#',
   'D',
@@ -131,7 +134,7 @@ export const CHORD_NOTE_NAMES: readonly string[] = [
   'A',
   'A#',
   'B',
-];
+] as const;
 
 /**
  * A voicing is a transform of the inverted close stack (ascending semitones).
