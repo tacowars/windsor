@@ -145,8 +145,8 @@ conversion and mode blending; `retroTank.ts`, `retroReflections.ts`,
 primitives; `retroConverter.ts` owns a conversion point, linear or gain-ranging. Its separate `tsconfig.json` uses the same erased-field settings.
 Tests under `inserts/retroReverb*.test.ts` run the generated processor through
 `__fixtures__/retroReverbHarness.ts`. Settings and original tunables are in
-`inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the editable
-approximation bank is `retroReverbPresets.ts` / `retroReverbPresetTables.ts`.
+`inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the preset bank
+is `retroReverbPresetBank.ts`, applied and matched by `retroReverbPresets.ts`.
 The render allocates nothing (windsor#230): samples cross every call in
 fields (`inputLeft`/`inputRight`, `internalInput`, each converter's
 `input`/`output` (`retroConverter.ts`, RV-6), each network's `input`, each line's `delay`/`output`/`input`, each filter's

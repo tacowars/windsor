@@ -1,57 +1,22 @@
-/** Approximation bank: selecting a preset writes all sound parameters; Mix and bypass stay user-owned. */
-import { DEFAULT_RETRO_REVERB } from './retroReverbSpec';
+/**
+ * The Retro reverb's preset bank (RV-8, `retroReverbPresetBank.ts`). Selecting a preset writes
+ * every sound field, so a preset is the whole state; Mix and the on/off switch stay the user's.
+ * A song stores the values, never a preset number.
+ */
 import type { RetroReverbSpec } from './retroReverbSpec';
-import {
-  RETRO_ROOM_TABLE,
-  RETRO_PRESET_SIZES,
-  RETRO_PRESET_TONES,
-  RETRO_GATE_DURATIONS,
-  RETRO_REVERSE_DURATIONS,
-  RETRO_PRESET_DIFFUSION,
-  RETRO_PRESET_CHARACTER,
-  RETRO_GATE_FIRST,
-  RETRO_REVERSE_FIRST,
-  RETRO_MILLISECONDS,
-} from './retroReverbPresetTables';
+import { RETRO_REVERB_PRESETS } from './retroReverbPresetBank';
 
-type Settings = Omit<RetroReverbSpec, 'kind' | 'mix' | 'enabled'>;
+export type RetroPresetSettings = Omit<RetroReverbSpec, 'kind' | 'mix' | 'enabled'>;
+/** The menu's groups, in its order. */
+export type RetroPresetGroup = 'Drums' | 'Pads & leads' | 'Ambient';
 export interface RetroReverbPreset {
   readonly number: number;
   readonly label: string;
-  readonly settings: Settings;
+  readonly group: RetroPresetGroup;
+  readonly settings: RetroPresetSettings;
 }
 
-/**
- * Every sound field at its default, so a preset is the whole state: applying one resets each
- * field it does not name (Early, Drift, Density, the low band, the converter) to neutral, and
- * matching compares them all.
- */
-const USER_OWNED: readonly string[] = ['kind', 'mix', 'enabled'];
-const base: Settings = {
-  ...(Object.fromEntries(
-    Object.entries(DEFAULT_RETRO_REVERB).filter(([key]) => !USER_OWNED.includes(key)),
-  ) as Settings),
-  diffusion: RETRO_PRESET_DIFFUSION,
-  character: RETRO_PRESET_CHARACTER,
-};
-
-export const RETRO_REVERB_PRESETS: readonly RetroReverbPreset[] = [
-  ...RETRO_ROOM_TABLE.map(([decay, size, tone], i) => ({
-    number: i + 1,
-    label: `${String(i + 1).padStart(2, '0')} · ${decay}s ${size} ${tone}`,
-    settings: { ...base, decay, size: RETRO_PRESET_SIZES[size], tone: RETRO_PRESET_TONES[tone] },
-  })),
-  ...RETRO_GATE_DURATIONS.map((duration, i) => ({
-    number: RETRO_GATE_FIRST + i,
-    label: `${RETRO_GATE_FIRST + i} · Gated ${Math.round(duration * RETRO_MILLISECONDS)}ms`,
-    settings: { ...base, mode: 'gated' as const, duration },
-  })),
-  ...RETRO_REVERSE_DURATIONS.map((duration, i) => ({
-    number: RETRO_REVERSE_FIRST + i,
-    label: `${RETRO_REVERSE_FIRST + i} · Reverse ${Math.round(duration * RETRO_MILLISECONDS)}ms`,
-    settings: { ...base, mode: 'reverse' as const, duration },
-  })),
-];
+export { RETRO_REVERB_PRESETS };
 
 export function applyRetroPreset(spec: RetroReverbSpec, number: number): RetroReverbSpec {
   const preset = RETRO_REVERB_PRESETS.find((entry) => entry.number === number);
@@ -60,7 +25,7 @@ export function applyRetroPreset(spec: RetroReverbSpec, number: number): RetroRe
 
 export function matchingRetroPreset(spec: RetroReverbSpec): number | undefined {
   return RETRO_REVERB_PRESETS.find((preset) =>
-    (Object.keys(preset.settings) as Array<keyof Settings>).every(
+    (Object.keys(preset.settings) as Array<keyof RetroPresetSettings>).every(
       (key) => preset.settings[key] === spec[key],
     ),
   )?.number;

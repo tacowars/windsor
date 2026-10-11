@@ -56,7 +56,10 @@ function choice<T extends string>(
   return select;
 }
 
-/** The preset picker: Custom, then the bank; a pick writes the preset's whole state. */
+/**
+ * The preset picker: Custom, then the bank under its groups, in the bank's order; a pick writes
+ * the preset's whole state.
+ */
 function presetChoice(
   current: () => RetroSpec,
   commit: (spec: RetroSpec) => void,
@@ -65,8 +68,15 @@ function presetChoice(
   preset.className = 'field';
   preset.setAttribute('aria-label', 'Retro reverb preset');
   preset.add(new Option('Custom', ''));
-  for (const entry of RETRO_REVERB_PRESETS)
-    preset.add(new Option(entry.label, String(entry.number)));
+  let group: HTMLOptGroupElement | undefined;
+  for (const entry of RETRO_REVERB_PRESETS) {
+    if (group?.label !== entry.group) {
+      group = document.createElement('optgroup');
+      group.label = entry.group;
+      preset.appendChild(group);
+    }
+    group.appendChild(new Option(entry.label, String(entry.number)));
+  }
   preset.value = String(matchingRetroPreset(current()) ?? '');
   preset.onchange = (): void => commit(applyRetroPreset(current(), Number(preset.value)));
   return preset;
@@ -105,7 +115,7 @@ export const retroReverbCard: InsertCard = (ctx, slot, index) => {
     );
     const page = insertPage(
       wideColumn(
-        labelled('Preset approximation', preset),
+        labelled('Preset', preset),
         labelled('Mode', mode),
         labelled('Converter', converter),
       ),

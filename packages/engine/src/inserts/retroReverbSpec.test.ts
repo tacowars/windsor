@@ -38,30 +38,26 @@ describe('retro insert and preset song contract', () => {
     });
     expect(n.corrections).toHaveLength(7);
   });
-  it('has all 63 approximation starting points, preserving user mix/bypass on selection', () => {
-    expect(RETRO_REVERB_PRESETS.map((p) => p.number)).toEqual(
-      Array.from({ length: 63 }, (_, i) => i + 1),
-    );
+  it('applies each preset as a whole state that normalises to itself and matches back', () => {
+    const labels = RETRO_REVERB_PRESETS.map((p) => p.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    const moved = {
+      ...DEFAULT_RETRO_REVERB,
+      early: 0.37,
+      lowDecay: 3.3,
+      converter: 'ranging' as const,
+      mix: 0.17,
+      enabled: false,
+    };
     for (const preset of RETRO_REVERB_PRESETS) {
-      const spec = applyRetroPreset(
-        { ...DEFAULT_RETRO_REVERB, mix: 0.17, enabled: false },
-        preset.number,
-      );
+      const spec = applyRetroPreset(moved, preset.number);
       const n = new FieldNormaliser();
       expect(RETRO_REVERB_INSERT.normalise({ ...spec }, 'fx', n)).toEqual(spec);
       expect(n.corrections).toEqual([]);
-      expect(spec).toMatchObject({ mix: 0.17, enabled: false });
+      expect(spec).toEqual({ ...preset.settings, kind: 'retro-reverb', mix: 0.17, enabled: false });
       expect(matchingRetroPreset(spec)).toBe(preset.number);
       expect(matchingRetroPreset({ ...spec, preDelay: 0.123 })).toBeUndefined();
-      expect(matchingRetroPreset({ ...spec, early: 0.5 })).toBeUndefined();
-      expect(matchingRetroPreset({ ...spec, converter: 'ranging' })).toBeUndefined();
     }
-    const moved = { ...DEFAULT_RETRO_REVERB, early: 1, lowDecay: 2, converter: 'ranging' as const };
-    expect(applyRetroPreset(moved, 1)).toMatchObject({
-      early: DEFAULT_RETRO_REVERB.early,
-      lowDecay: DEFAULT_RETRO_REVERB.lowDecay,
-      converter: DEFAULT_RETRO_REVERB.converter,
-    });
   });
   it('round trips every preset as settings on both track and master, without preset-bank references', () => {
     for (const preset of RETRO_REVERB_PRESETS) {
