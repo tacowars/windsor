@@ -35,7 +35,7 @@ export const DRIVE_CURVE_POINTS = 4097;
 /* --------------------------------- chorus -------------------------------- */
 
 /** The LFO rate of the first voice, in Hz; the others run at `CHORUS_VOICE_RATIOS` of it. */
-export const CHORUS_RATE_MIN_HZ = 0.05;
+export const CHORUS_RATE_MIN_HZ = 0.02;
 /** 10 Hz covers the Juno-60's Chorus I + II at 9.75 Hz (#695 decision 2). */
 export const CHORUS_RATE_MAX_HZ = 10;
 export const CHORUS_RATE_DEFAULT_HZ = 0.6;

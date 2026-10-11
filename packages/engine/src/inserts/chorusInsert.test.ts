@@ -156,15 +156,15 @@ describe('the chorus sound', () => {
 });
 
 describe('CHORUS_INSERT.normalise', () => {
-  it('clamps a rate past the ceiling to it and keeps the Juno I + II rate (#695)', () => {
+  it('clamps a rate past the ceiling to it and keeps the Both preset’s rate (#695)', () => {
     const n = new FieldNormaliser();
     const rate = (raw: number): number =>
       CHORUS_INSERT.normalise({ kind: 'chorus', rate: raw }, 'x', n).rate;
     const past = CHORUS_RATE_MAX_HZ + 2;
-    const junoFast = CHORUS_PRESETS.find((p) => p.id === 'juno-1-2')?.settings.rate ?? NaN;
+    const both = CHORUS_PRESETS.find((p) => p.id === 'both')?.settings.rate ?? NaN;
     expect(rate(past)).toBe(CHORUS_RATE_MAX_HZ);
     expect(rate(CHORUS_RATE_MAX_HZ)).toBe(CHORUS_RATE_MAX_HZ);
-    expect(rate(junoFast)).toBe(junoFast);
+    expect(rate(both)).toBe(both);
     expect(n.corrections).toEqual([`x.rate: clamped ${past} to ${CHORUS_RATE_MAX_HZ}`]);
   });
 
