@@ -41,6 +41,7 @@ var BLOOM_DEFAULTS = {
 };
 var BLOOM_KEY_DEFAULT = "C";
 var BLOOM_SCALE_DEFAULT = "chromatic";
+var BLOOM_SCALE_SONG = "song";
 var BLOOM_DSP = {
   /** One-pole smoothing of the continuous controls, per block. */
   smoothSeconds: 0.02,
