@@ -122,7 +122,12 @@ export function createGroupBus(
   level.connect(gate);
   gate.connect(destination);
   const registry = options.registry ?? INSERT_KINDS;
-  const chain = createInsertChain(context, input, spec.inserts, registry, `group ${spec.id}`);
+  const later = options.defer ?? laterByTimeout;
+  const chain = createInsertChain(context, input, spec.inserts, {
+    registry,
+    owner: `group ${spec.id}`,
+    later,
+  });
   let tail = chain.tail;
   tail.connect(fade);
   const tap = {
@@ -138,7 +143,6 @@ export function createGroupBus(
       fade.gain.linearRampToValueAtTime(to, now + seconds);
     },
   };
-  const later = options.defer ?? laterByTimeout;
   const updates = createInsertUpdater(chain, tap, later, options.changed, () =>
     options.insertsRebuilt?.(bus),
   );

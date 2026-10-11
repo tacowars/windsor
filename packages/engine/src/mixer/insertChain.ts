@@ -14,6 +14,8 @@ import type { StripStage } from './channelStrip';
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { InsertRegistry, InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { insertKind } from '../inserts/insertRegistry';
+import type { Later } from './insertSlot';
+import { checkInsert, withSlot } from './insertSlot';
 import type { Tap } from './stripTap';
 
 /** Connect `stages` in order after `head`; returns the chain's tail. */
@@ -52,7 +54,7 @@ export interface InsertChain {
   readonly tail: AudioNode;
   /** Whether `specs` is the live kinds in the live order: a settings-only change. */
   matches(specs: readonly InsertSpec[]): boolean;
-  /** Throws for a kind the registry lacks — before a caller fades or re-wires anything. */
+  /** Throws for a kind the registry lacks, a host's child's too — before a caller fades or re-wires anything. */
   check(specs: readonly InsertSpec[]): void;
   /** Settings onto the live stages, in order. Only valid when `matches` holds. */
   apply(specs: readonly InsertSpec[]): void;
@@ -89,30 +91,38 @@ function reorderOf(
   return out;
 }
 
+/** What a chain builds from, and the strip's own wait. */
+export interface InsertChainOptions {
+  readonly registry: InsertRegistry;
+  /** Who the chain belongs to, for a refusal's message. */
+  readonly owner: string;
+  /** The strip's `defer`: a host's leaving slot child is disposed after its fade (`insertSlot.ts`). */
+  readonly later: Later;
+}
+
 // eslint-disable-next-line max-lines-per-function -- one closure over the chain's stages and tail: the four operations share that state
 export function createInsertChain(
   context: BaseAudioContext,
   head: AudioNode,
   specs: readonly InsertSpec[],
-  registry: InsertRegistry,
-  owner: string,
+  options: InsertChainOptions,
 ): InsertChain {
-  const build = (list: readonly InsertSpec[]): InsertStage<InsertSpec>[] =>
-    list.map((spec) => {
-      const kind = insertKind(registry, spec.kind);
-      if (!kind) throw new Error(`part "${owner}": no insert kind "${spec.kind}"`);
-      return kind.create(context, spec);
-    });
+  const { registry, owner } = options;
+  // A kind the registry lacks, a host's child's included, is refused before anything is built.
+  const check = (next: readonly InsertSpec[]): void => {
+    for (const spec of next) checkInsert(registry, spec, owner);
+  };
+  const slotDeps = { context, ...options };
+  // Every host's stage carries its slot (windsor#688), so the paths below move a child with its host.
+  const build = (list: readonly InsertSpec[]): InsertStage<InsertSpec>[] => {
+    check(list);
+    return list.map((spec) =>
+      withSlot(insertKind(registry, spec.kind)!.create(context, spec), spec, slotDeps),
+    );
+  };
   let stages = build(specs);
   let applied = specs;
   let tail = chain(head, stages);
-  const check = (next: readonly InsertSpec[]): void => {
-    for (const spec of next) {
-      if (!insertKind(registry, spec.kind)) {
-        throw new Error(`part "${owner}": no insert kind "${spec.kind}"`);
-      }
-    }
-  };
   const applyTo = (next: readonly InsertSpec[]): void => {
     stages.forEach((stage, i) => stage.set(next[i]!));
     applied = next;

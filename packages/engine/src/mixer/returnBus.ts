@@ -76,7 +76,11 @@ export function createReturn(
   fade.connect(output);
   output.connect(destination);
   const registry = options.registry ?? INSERT_KINDS;
-  const chain = createInsertChain(context, input, spec.inserts, registry, `bus ${name}`);
+  const chain = createInsertChain(context, input, spec.inserts, {
+    registry,
+    owner: `bus ${name}`,
+    later: options.defer ?? laterByTimeout,
+  });
   let tail = chain.tail;
   tail.connect(fade);
   const tap = {
