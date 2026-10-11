@@ -74,6 +74,10 @@ const PURE_FILES = [
   '../harmony/figureTones.ts',
   // The Roll's config and check (windsor#599): its notes, loop and bounds.
   'rollSequencer.ts',
+  // Its clip envelopes' type, caps and check (windsor#701); the evaluator,
+  // `rollEnvelopeValue.ts`, reads the automation curve and is not here.
+  'rollEnvelope.ts',
+  'rollEnvelopeTables.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',
