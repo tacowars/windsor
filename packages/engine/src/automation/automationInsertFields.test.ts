@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AdvancedDriveSpec, DriveStageSpec } from '../inserts/advancedDriveSpec';
+import type { ChorusSpec } from '../inserts/chorusInsert';
 import type { DelaySpec } from '../inserts/delaySpec';
+import type { EchoSpec } from '../inserts/echoInsert';
 import type { EqBand, EqSpec } from '../inserts/eqSpec';
 import { INSERT_KINDS, INSERT_KIND_NAMES, type InsertSpec } from '../inserts/insertRegistry';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
@@ -24,9 +26,12 @@ describe('insertKindFields', () => {
     }
   });
 
-  it('lists no switch in the continuous table', () => {
+  it("lists no switch in the continuous table but a host's child's, slot.enabled", () => {
     for (const rows of Object.values(INSERT_AUTOMATION_FIELDS)) {
-      expect(rows.some((r) => r.target === 'enabled' || r.scale === 'switch')).toBe(false);
+      const own = rows.filter((r) => !r.childKind);
+      expect(own.some((r) => r.target === 'enabled' || r.scale === 'switch')).toBe(false);
+      const switches = rows.filter((r) => r.scale === 'switch');
+      expect(switches.every((r) => r.target === 'slot.enabled' && r.childKind)).toBe(true);
     }
   });
 });
@@ -58,8 +63,46 @@ describe('automatableInsertFields', () => {
       'plate',
       'echo',
     ] as const) {
-      expect(fields(defaults(kind)), kind).toHaveLength(insertKindFields(kind).length);
+      // An empty slot reads none of a host's slot rows.
+      const own = insertKindFields(kind).filter((r) => !r.childKind);
+      expect(fields(defaults(kind)), kind).toEqual(own.map((r) => r.target));
     }
+  });
+
+  describe("a host's slot (record 2026-10-11-wet-path-slot)", () => {
+    const echo = defaults<EchoSpec>('echo');
+    const ECHO_OWN = ['delayTime', 'feedback', 'damp', 'resonance', 'mix'];
+
+    it("lists Echo's rows and exactly the live child's, slot.enabled and slot.mix among them", () => {
+      const chorus = { ...defaults<ChorusSpec>('chorus'), id: 'c' };
+      expect(fields({ ...echo, slot: chorus })).toEqual([
+        ...ECHO_OWN,
+        ...fields(chorus).map((f) => `slot.${f}`),
+        'enabled',
+      ]);
+      expect(fields({ ...echo, slot: chorus })).toEqual(
+        expect.arrayContaining(['slot.rate', 'slot.mix', 'slot.enabled']),
+      );
+    });
+
+    it("lists Echo's rows alone with the slot empty, null or absent", () => {
+      const bare = Object.fromEntries(
+        Object.entries(echo).filter(([key]) => key !== 'slot'),
+      ) as unknown as EchoSpec;
+      for (const spec of [echo, { ...echo, slot: null }, bare]) {
+        expect(fields(spec)).toEqual([...ECHO_OWN, 'enabled']);
+      }
+    });
+
+    it("reads a child row only where the child's own settings read it", () => {
+      const tape = defaults<TapeSpec>('tape');
+      const split = fields({ ...echo, slot: { ...tape, split: true } });
+      expect(split).toContain('slot.wow');
+      expect(split).not.toContain('slot.wear');
+      const unsplit = fields({ ...echo, slot: { ...tape, split: false } });
+      expect(unsplit).toContain('slot.wear');
+      expect(unsplit).not.toContain('slot.wow');
+    });
   });
 
   it("offers Tape's wear unsplit and its three motions split", () => {

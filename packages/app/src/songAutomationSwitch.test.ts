@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { AUTOMATION_PART } from '@windsor/engine/__fixtures__/automationSong';
 import { LANE_GROUP } from '@windsor/engine/__fixtures__/groupAutomationSong';
 import {
+  DEFAULT_FILTER,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   TICKS_PER_BAR,
@@ -36,7 +37,7 @@ import {
 const BAR = TICKS_PER_BAR;
 const SONG = 8 * BAR;
 const GRAIN = { ticks: BAR, songTicks: SONG };
-const ROW: AutomationTargetRow = targetRow('insert.f.enabled', () => 'filter')!;
+const ROW: AutomationTargetRow = targetRow('insert.f.enabled', () => DEFAULT_FILTER)!;
 const p = (tick: number, value: number): AutomationPoint => ({ tick, value, bend: 0 });
 
 /** Off over the whole song, as a new lane on an insert that is off starts. */

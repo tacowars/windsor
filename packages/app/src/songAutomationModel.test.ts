@@ -16,7 +16,9 @@ import {
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_DELAY,
+  DEFAULT_ECHO,
   DEFAULT_GRID_CONFIG,
+  DEFAULT_PHASER,
   DEFAULT_TAPE,
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
@@ -290,6 +292,15 @@ describe("a parameter's current value", () => {
     expect(patch).toBeDefined();
     expect(currentValue(AUTOMATION_PART, patch, 'voice.filter.cutoff')).toBe(patch!.filter.cutoff);
     expect(currentValue(AUTOMATION_PART, patch, 'voice.ops.2.width')).toBe(patch!.ops[2]!.width);
+  });
+
+  it("reads a host's slot field on its live child, under the child's row", () => {
+    const child = { ...DEFAULT_PHASER, rate: 2, id: 'ph' };
+    const part = partWith([{ ...DEFAULT_ECHO, id: 'e1', slot: child }]);
+    const rate = formatTargetId({ kind: 'insert', insertId: 'e1', field: 'slot.rate' });
+    expect(currentValue(part, patch, rate)).toBe(2);
+    expect(laneTitle(part, rate).name).toBe('Slot Rate');
+    expect(currentValue(partWith([{ ...DEFAULT_ECHO, id: 'e1' }]), patch, rate)).toBe(0);
   });
 });
 

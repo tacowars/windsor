@@ -41,7 +41,7 @@ function insertTarget(
   parsed: Extract<ParsedTarget, { kind: 'insert' }>,
 ): ResolvedTarget | undefined {
   const spec = host.insertSpecs.find((insert) => insert.id === parsed.insertId);
-  const row = spec && insertTargetRow(spec.kind, parsed.field);
+  const row = spec && insertTargetRow(spec, parsed.field);
   return row && found(insertAutomationHandle(host, parsed, row), row);
 }
 

@@ -23,18 +23,24 @@
  * say, or where the id holds a `%`, the id is written escaped, `%` as `%25` and
  * `.` as `%2E`, so every id round-trips; a generated id never needs it.
  *
- * Whether an insert id names an insert of a kind that has the field is the
- * part's to say: `insertTargetRow` takes the kind. `automationTargets.test.ts`
- * round-trips every id.
+ * A host's slot field (record `2026-10-11-wet-path-slot`) is one of these
+ * fields, `slot.rate` say, so `insert.<hostId>.slot.rate` names the host's
+ * child by its host's id, and the longest-first reading takes `slot.rate`
+ * over `rate`.
+ *
+ * Whether an insert id names an insert that has the field is the part's to
+ * say: `insertTargetRow` takes the insert's spec, since a host's slot rows
+ * are its live child's. `automationTargets.test.ts` round-trips every id.
  *
  * A group bus owns lanes too (windsor#614): the same ids, a subset of them
  * (`isGroupTarget`), relative to the group.
  */
-import type { InsertKindName } from '../inserts/insertRegistry';
+import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
+import { insertSlot } from '../inserts/insertRegistry';
 import type { SequencerKind } from '../song/arrangement';
 import type { SeqField } from '../sequencing/regionGate';
 import { insertKindFields } from './automationInsertFields';
-import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { INSERT_AUTOMATION_FIELDS, SLOT_TARGET_PREFIX } from './automationInsertTables';
 import { SEQ_AUTOMATION_FIELDS, SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import type {
@@ -92,7 +98,20 @@ const SEQ_FIELDS: ReadonlyMap<string, SeqField> = new Map(
 const INSERT_KIND_ROWS = (Object.keys(INSERT_AUTOMATION_FIELDS) as InsertKindName[]).map(
   (kind) => [kind, insertKindFields(kind)] as const,
 );
-const INSERT_ROWS = new Map(INSERT_KIND_ROWS.map(([kind, rows]) => [kind, byTarget(rows)]));
+/** Each kind's own rows by target: a host's slot rows apart, since one target has several. */
+const INSERT_ROWS = new Map(
+  INSERT_KIND_ROWS.map(([kind, rows]) => [kind, byTarget(rows.filter((r) => !r.childKind))]),
+);
+/** A host's slot rows (record `2026-10-11-wet-path-slot`), by host, then child kind, then target. */
+const SLOT_ROWS = new Map(
+  INSERT_KIND_ROWS.map(([host, rows]) => {
+    const byChild = new Map<InsertKindName, AutomationTargetRow[]>();
+    for (const row of rows) {
+      if (row.childKind) byChild.set(row.childKind, [...(byChild.get(row.childKind) ?? []), row]);
+    }
+    return [host, new Map([...byChild].map(([child, own]) => [child, byTarget(own)]))];
+  }),
+);
 /** Every field some insert kind automates, longest first, so `bands.3.freq` wins over a `freq`. */
 const INSERT_FIELDS_LONGEST_FIRST: readonly string[] = [
   ...new Set(INSERT_KIND_ROWS.flatMap(([, rows]) => rows.map((row) => row.target))),
@@ -231,25 +250,29 @@ export function requireCatalogRow(id: string): AutomationTargetRow {
   return row;
 }
 
-/** An insert kind's row for `field`, or undefined when the kind does not automate it. */
-export function insertTargetRow(
-  kind: InsertKindName,
-  field: string,
-): AutomationTargetRow | undefined {
-  return INSERT_ROWS.get(kind)?.get(field);
+/**
+ * `spec`'s row for `field`, or undefined when its kind does not automate it.
+ * A host's `slot.<field>` is its live child kind's row, so it has none while
+ * the slot is empty or the child lacks the field.
+ */
+export function insertTargetRow(spec: InsertSpec, field: string): AutomationTargetRow | undefined {
+  const own = INSERT_ROWS.get(spec.kind)?.get(field);
+  if (own || !field.startsWith(SLOT_TARGET_PREFIX)) return own;
+  const child = insertSlot(spec);
+  return child ? SLOT_ROWS.get(spec.kind)?.get(child.kind)?.get(field) : undefined;
 }
 
 /**
- * Any target's row. An insert target needs its insert's kind, which the part
- * knows: `insertKindOf` answers it from the insert's id.
+ * Any target's row. An insert target needs its insert's spec, which the part
+ * knows: `insertSpecOf` answers it from the insert's id.
  */
 export function targetRow(
   id: string,
-  insertKindOf?: (insertId: string) => InsertKindName | undefined,
+  insertSpecOf?: (insertId: string) => InsertSpec | undefined,
 ): AutomationTargetRow | undefined {
   const parsed = parseTargetId(id);
   if (!parsed) return undefined;
   if (parsed.kind !== 'insert') return catalogRow(id);
-  const kind = insertKindOf?.(parsed.insertId);
-  return kind === undefined ? undefined : insertTargetRow(kind, parsed.field);
+  const spec = insertSpecOf?.(parsed.insertId);
+  return spec === undefined ? undefined : insertTargetRow(spec, parsed.field);
 }

@@ -331,6 +331,8 @@ export {
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   insertKind,
+  insertSlot,
+  isHostKind,
   normaliseInserts,
 } from './inserts/insertRegistry';
 export type {
@@ -339,6 +341,7 @@ export type {
   InsertRegistry,
   InsertSpec,
   InsertStage,
+  WetPath,
 } from './inserts/insertRegistry';
 export { DEFAULT_DRIVE, DRIVE_INSERT, driveCompensation } from './inserts/driveInsert';
 export type { DriveSpec } from './inserts/driveInsert';

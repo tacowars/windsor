@@ -111,7 +111,7 @@ export function laneRow(
   target: string,
   patch?: Patch,
 ): AutomationTargetRow | undefined {
-  const row = targetRow(target, (insertId) => insertOf(owner, insertId)?.kind);
+  const row = targetRow(target, (insertId) => insertOf(owner, insertId));
   const parsed = parseTargetId(target);
   const name = parsed?.kind === 'voice' ? macroName(patch, parsed.path) : undefined;
   return row && name !== undefined ? { ...row, label: name } : row;

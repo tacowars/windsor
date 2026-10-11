@@ -8,16 +8,18 @@
  *
  * Every kind whose spec has `enabled` also offers it, as
  * `INSERT_SWITCH_ROW`, after its continuous rows (windsor#628, record
- * `2026-10-06-insert-switch-lanes`): the one place it is added, so the
- * catalog's lookups (`automationTargets.ts`) and the picker see the same
- * rows. The switch is always read. Pure.
+ * `2026-10-06-insert-switch-lanes`): added here, so the catalog's lookups
+ * (`automationTargets.ts`) and the picker see the same rows. The switch is
+ * always read. A host's slot rows (record `2026-10-11-wet-path-slot`) sit
+ * among its continuous rows, each child kind's with that kind's switch,
+ * `slot.enabled`, and only the live child's are read. Pure.
  */
 import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
-import { INSERT_KINDS } from '../inserts/insertRegistry';
 import {
   INSERT_AUTOMATION_FIELDS,
   INSERT_SWITCH_ROW,
   type InsertFieldRow,
+  withSwitch,
 } from './automationInsertTables';
 
 /** `kind`'s rows: its continuous fields, then `toggle` where its spec has `enabled`. */
@@ -27,8 +29,7 @@ export function insertKindFields(
   toggle = INSERT_SWITCH_ROW,
 ): readonly InsertFieldRow[] {
   // The table pairs each kind with rows over that kind's spec.
-  const rows = fields[kind] as readonly InsertFieldRow[];
-  return Object.hasOwn(INSERT_KINDS[kind].defaults, toggle.target) ? [...rows, toggle] : rows;
+  return withSwitch(kind, fields[kind] as readonly InsertFieldRow[], toggle);
 }
 
 /** `spec`'s kind's rows the DSP reads under `spec`'s settings, in the catalog's order. */

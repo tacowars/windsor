@@ -33,6 +33,7 @@ import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstan
 import { loopSettlesIn } from './echoSwitchSettle';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
+import type { InsertSpec } from './insertRegistry';
 import type { FieldReader } from './switchTimeline';
 
 export interface EchoSpec extends DelayLineSettings {
@@ -40,6 +41,12 @@ export interface EchoSpec extends DelayLineSettings {
   /** 0 dry .. 1 the repeats alone. */
   readonly mix: number;
   readonly enabled: boolean;
+  /**
+   * The child insert on the repeats, before Mix (record
+   * `2026-10-11-wet-path-slot`): Echo is a host. Absent or null is none, so a
+   * spec built in code without it is valid. The registry normalises it.
+   */
+  readonly slot?: InsertSpec | null;
 }
 
 export const DEFAULT_ECHO: EchoSpec = {
@@ -47,11 +54,13 @@ export const DEFAULT_ECHO: EchoSpec = {
   ...ECHO_LINE_DEFAULTS,
   mix: ECHO_MIX_DEFAULT,
   enabled: true,
+  slot: null,
 };
 
 export const ECHO_NUMBERS = Object.keys(ECHO_BOUNDS) as (keyof typeof ECHO_BOUNDS)[];
-const FIELDS = ['kind', ...ECHO_NUMBERS, 'enabled'];
+const FIELDS = ['kind', ...ECHO_NUMBERS, 'enabled', 'slot'];
 
+/** Echo's own fields; `slot` is the registry's (`normaliseInsertEntry`), so this leaves it empty. */
 function normalise(raw: Record<string, unknown>, path: string, n: FieldNormaliser): EchoSpec {
   n.dropUnknown(raw, FIELDS, path);
   const num = (field: (typeof ECHO_NUMBERS)[number]): number => {
@@ -66,6 +75,7 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
     resonance: num('resonance'),
     mix: num('mix'),
     enabled: n.bool(raw.enabled, DEFAULT_ECHO.enabled, `${path}.enabled`),
+    slot: null,
   };
 }
 

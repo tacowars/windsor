@@ -177,7 +177,9 @@ describe('PLATE_REVERB_KNOBS (windsor#171)', () => {
 
 describe('ECHO_KNOBS (windsor#171)', () => {
   it('covers every echo number from DEFAULT_ECHO, inside the engine bounds', () => {
-    const fields = INSERT_KINDS.echo.fields.filter((f) => f !== 'kind' && f !== 'enabled');
+    // The slot (record 2026-10-11-wet-path-slot) holds a child insert, not a number.
+    const notKnobs = ['kind', 'enabled', 'slot'];
+    const fields = INSERT_KINDS.echo.fields.filter((f) => !notKnobs.includes(f));
     expect(ECHO_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of ECHO_KNOBS) {
       expect(o.def, f).toBe(DEFAULT_ECHO[f]);

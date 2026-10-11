@@ -45,7 +45,7 @@ describe('a version-8 song with a Retro Reverb Size lane (RV-4)', () => {
     const hat = result.document.parts.find((part) => part.automation?.length)!;
     const saved = hat.automation![0]!;
     expect(saved).toEqual(SIZE);
-    const row = insertTargetRow('retro-reverb', 'size')!;
+    const row = insertTargetRow(DEFAULT_RETRO_REVERB, 'size')!;
     expect(valueAt(row, saved.points, END / 2)).toBeCloseTo(Math.sqrt(0.25 * 3), 6);
   });
 });

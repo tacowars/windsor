@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INSERT_KINDS, INSERT_KIND_NAMES } from '../inserts/insertRegistry';
-import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { insertKindFields } from './automationInsertFields';
+import { INSERT_AUTOMATION_FIELDS, slotRows } from './automationInsertTables';
 
 /** The value at a dotted path, with list indices as segments. */
 function at(spec: unknown, path: string): unknown {
@@ -14,11 +15,15 @@ describe('INSERT_AUTOMATION_FIELDS', () => {
 
   it("names numbers the kind's defaults hold, each inside its row", () => {
     for (const kind of INSERT_KIND_NAMES) {
-      const defaults = INSERT_KINDS[kind].defaults;
       const rows = INSERT_AUTOMATION_FIELDS[kind];
-      expect(new Set(rows.map((r) => r.target)).size, kind).toBe(rows.length);
+      // A host's slot rows repeat a target once per child kind.
+      const keys = rows.map((r) => `${r.childKind ?? kind}:${r.target}`);
+      expect(new Set(keys).size, kind).toBe(rows.length);
       for (const row of rows) {
-        const value = at(defaults, row.target);
+        // A slot row is its child kind's field, read on that kind's defaults.
+        if (row.scale === 'switch') continue;
+        const defaults = INSERT_KINDS[row.childKind ?? kind].defaults;
+        const value = at(defaults, row.target.replace(/^slot\./, ''));
         expect(typeof value, `${kind}.${row.target}`).toBe('number');
         expect(row.min, `${kind}.${row.target}`).toBeLessThan(row.max);
         expect(value as number).toBeGreaterThanOrEqual(row.min);
@@ -38,6 +43,31 @@ describe('INSERT_AUTOMATION_FIELDS', () => {
     expect(fields('tape')).not.toContain('seed');
     expect(fields('advanced-drive')).not.toContain('division');
     for (const kind of INSERT_KIND_NAMES) expect(fields(kind)).not.toContain('enabled');
+  });
+
+  it("gives Echo, the host, every other kind's rows and switch under slot., labelled Slot", () => {
+    const own = INSERT_AUTOMATION_FIELDS.echo.filter((r) => !r.childKind);
+    expect(own.map((r) => r.target)).toEqual(['delayTime', 'feedback', 'damp', 'resonance', 'mix']);
+    expect(INSERT_AUTOMATION_FIELDS.echo.slice(0, own.length)).toEqual(own);
+    expect(slotRows('echo')).toHaveLength(INSERT_AUTOMATION_FIELDS.echo.length - own.length);
+    for (const kind of INSERT_KIND_NAMES) {
+      const slot = slotRows('echo').filter((r) => r.childKind === kind);
+      if (kind === 'echo') {
+        expect(slot).toEqual([]);
+        continue;
+      }
+      const child = insertKindFields(kind);
+      expect(slot.map((r) => r.target)).toEqual(child.map((r) => `slot.${r.target}`));
+      expect(slot.map((r) => r.label)).toEqual(child.map((r) => `Slot ${r.label}`));
+      slot.forEach((r, i) => {
+        expect(r).toMatchObject({ min: child[i]!.min, max: child[i]!.max });
+        expect(r.scale).toBe(child[i]!.scale);
+      });
+    }
+    // Only the host's own rows sit in the plain tables of the other kinds.
+    for (const kind of INSERT_KIND_NAMES.filter((k) => k !== 'echo')) {
+      expect(INSERT_AUTOMATION_FIELDS[kind].some((r) => r.childKind)).toBe(false);
+    }
   });
 
   it('spells a nested field with its index', () => {

@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_FILTER,
   TICKS_PER_BAR,
   requireCatalogRow,
   targetRow,
@@ -64,7 +65,7 @@ describe('curveShape', () => {
   });
 
   it('draws a switch lane at two levels, holding each to the next point (windsor#631)', () => {
-    const row = targetRow('insert.f.enabled', () => 'filter')!;
+    const row = targetRow('insert.f.enabled', () => DEFAULT_FILTER)!;
     const points: AutomationPoint[] = [
       { tick: 0, value: 0, bend: 0 },
       { tick: BAR, value: 1, bend: 0 },

@@ -37,7 +37,7 @@ afterAll(() => restore());
 const { kick, hat } = FULL_SLOT;
 const ID = LANE_GROUP_ID;
 const LEVEL = requireCatalogRow('strip.level');
-const RATE_ROW = insertTargetRow('phaser', 'rate')!;
+const RATE_ROW = insertTargetRow(GROUP_PHASER, 'rate')!;
 const time = (tick: number): number => GROUP_FIRST + tick * GROUP_TICK;
 
 /** The group fades from 0.4 up to unity over two bars; the hat's own fader dips. */

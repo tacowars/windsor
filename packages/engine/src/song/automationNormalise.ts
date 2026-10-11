@@ -10,7 +10,10 @@
  *   on a field the part's sequencer kind does not offer
  *   (`SEQ_AUTOMATION_FIELDS`). A field the kind automates but the insert's
  *   current settings leave unread (Tape's `wear` while split) is kept, so
- *   switching the setting back brings the lane back to life.
+ *   switching the setting back brings the lane back to life. A host's
+ *   `slot.<field>` (record `2026-10-11-wet-path-slot`) is read against its
+ *   live child's kind, so it is dropped while the slot is empty or holds a
+ *   kind without the field.
  * - **Duplicates.** Of two surviving lanes on one target, the first wins.
  * - **Voice lanes.** At most `FM_LANES_MAX`; the extras are dropped in list
  *   order. Strip and insert lanes have no cap.
@@ -60,7 +63,7 @@ import {
 } from '../automation/automationTargets';
 import { switchValue } from '../automation/automationDisplay';
 import { valueAt } from '../automation/automationEvaluate';
-import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
+import type { InsertSpec } from '../inserts/insertRegistry';
 import type { MusicPart, SequencerKind } from './arrangement';
 import type { DocumentPart } from './arrangementDocument';
 import { type FieldNormaliser, isRecord, show } from './arrangementFields';
@@ -90,13 +93,13 @@ const POINTS_PER_TICK_MAX = 2;
 const BEND_MIN = -1;
 const BEND_MAX = 1;
 
-type InsertKindOf = (insertId: string) => InsertKindName | undefined;
+type InsertSpecOf = (insertId: string) => InsertSpec | undefined;
 
-/** The kind of each insert in `inserts`, by its id. */
-function insertKindOf(inserts: readonly InsertSpec[]): InsertKindOf {
-  const kinds = new Map<string, InsertKindName>();
-  for (const spec of inserts) if (spec.id !== undefined) kinds.set(spec.id, spec.kind);
-  return (insertId) => kinds.get(insertId);
+/** Each insert in `inserts`, by its id: a host's slot rows need its spec, not only its kind. */
+function insertSpecOf(inserts: readonly InsertSpec[]): InsertSpecOf {
+  const specs = new Map<string, InsertSpec>();
+  for (const spec of inserts) if (spec.id !== undefined) specs.set(spec.id, spec);
+  return (insertId) => specs.get(insertId);
 }
 
 /** A part's lanes: absent when it has none, corrected as the file's header says. */
@@ -110,13 +113,13 @@ export function normaliseAutomation(
     n.correction(`${path}: ${show(raw)} is not a list of lanes — dropped`);
     return undefined;
   }
-  const kindOf = insertKindOf(context.inserts);
+  const specOf = insertSpecOf(context.inserts);
   const taken = new Set<string>();
   let voiceLanes = 0;
   const out: AutomationLane[] = [];
   raw.forEach((entry, i) => {
     const lanePath = `${path}[${i}]`;
-    const lane = normaliseLane(entry, lanePath, context, kindOf);
+    const lane = normaliseLane(entry, lanePath, context, specOf);
     if (!lane) return;
     if (taken.has(lane.target)) {
       n.correction(`${lanePath}: an earlier lane moves ${lane.target} — lane dropped`);
@@ -139,12 +142,12 @@ function normaliseLane(
   raw: unknown,
   path: string,
   context: AutomationContext,
-  kindOf: InsertKindOf,
+  specOf: InsertSpecOf,
 ): AutomationLane | undefined {
   const { n } = context;
   const o = n.section(raw, path);
   n.dropUnknown(o, LANE_KEYS, path);
-  const owner = { kindOf, kind: context.kind, group: context.owner === 'group' };
+  const owner = { specOf, kind: context.kind, group: context.owner === 'group' };
   const target = laneTarget(o.target, `${path}.target`, owner, n);
   if (!target) return undefined;
   const points = normalisePoints(o.points, target.row, { ...context, path: `${path}.points` });
@@ -157,7 +160,7 @@ function normaliseLane(
 
 /** What a lane's target is checked against: the owner's inserts, a part's sequencer kind, and whether it is a group. */
 interface OwnerTargets {
-  readonly kindOf: InsertKindOf;
+  readonly specOf: InsertSpecOf;
   readonly kind: SequencerKind | undefined;
   readonly group: boolean;
 }
@@ -185,16 +188,16 @@ function laneTarget(
     return undefined;
   }
   if (parsed.kind !== 'insert') return { id, row: requireCatalogRow(raw) };
-  const { kindOf } = part;
-  const kind = kindOf(parsed.insertId);
-  if (kind === undefined) {
+  const { specOf } = part;
+  const spec = specOf(parsed.insertId);
+  if (spec === undefined) {
     const holder = part.group ? 'group' : 'strip';
     n.correction(`${path}: the ${holder} has no insert "${parsed.insertId}" — lane dropped`);
     return undefined;
   }
-  const row = insertTargetRow(kind, parsed.field);
+  const row = insertTargetRow(spec, parsed.field);
   if (!row) {
-    n.correction(`${path}: ${kind} has no automatable "${parsed.field}" — lane dropped`);
+    n.correction(`${path}: ${spec.kind} has no automatable "${parsed.field}" — lane dropped`);
     return undefined;
   }
   return { id, row };
@@ -311,13 +314,13 @@ export function fitLanes<L>(
   inserts: readonly InsertSpec[],
   songTicks: number,
 ): readonly L[] {
-  const kindOf = insertKindOf(inserts);
+  const specOf = insertSpecOf(inserts);
   let changed = false;
   const fitted = lanes.map((lane: unknown) => {
     if (!isRecord(lane) || typeof lane.target !== 'string' || !Array.isArray(lane.points)) {
       return lane;
     }
-    const row = targetRow(lane.target, kindOf);
+    const row = targetRow(lane.target, specOf);
     const points = row ? fitPoints(row, lane.points as AutomationPoint[], songTicks) : lane.points;
     if (points === lane.points) return lane;
     changed = true;
