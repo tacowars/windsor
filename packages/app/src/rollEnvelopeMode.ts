@@ -59,6 +59,8 @@ export interface EnvelopeModeHost {
   readonly tabs: RollTabs;
   readonly controls: RollControls;
   readonly editor: RollEditor;
+  /** Whether the card is still the page's: false once it is torn down or replaced. */
+  attached(): boolean;
   /** The last paint's scene. */
   scene(): RollScene | null;
 }
@@ -131,6 +133,12 @@ export class RollEnvelopeMode {
     else this.list?.close();
   }
 
+  /** Keep the list open only while `on`: the card on the page and shown. Returns `on`. */
+  keepList(on: boolean): boolean {
+    if (!on) this.list?.close();
+    return on;
+  }
+
   /** Keep the curve on the notes' sideways scroll. */
   scrolled(): void {
     if (this.on) this.layer.scroll(this.host.panes.body.scrollLeft);
@@ -181,10 +189,11 @@ export class RollEnvelopeMode {
   private openList(anchor: HTMLElement): void {
     const { state } = this.read();
     this.list = openEnvelopeList(anchor, state.picker, {
+      live: () => this.host.attached(),
       pick: (path) => this.pick(path),
       closed: () => {
         this.list = null;
-        if (this.on) this.render();
+        if (this.on && this.host.attached()) this.render();
       },
     });
     anchor.setAttribute('aria-expanded', 'true');

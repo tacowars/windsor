@@ -21,6 +21,7 @@ import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
+import { closeEnvelopeList } from './rollEnvelopeListLife';
 import { insertPanel } from './songInsertPanel';
 import { foldButton } from './songPaneFold';
 import { SEQUENCER_CARDS } from './sequencerCards';
@@ -177,6 +178,8 @@ function paintSelection(pane: HTMLElement, view: SongView): Painted {
  * edit never redraws the pane, so the knob under the pointer survives.
  */
 export function paintDetailPane(pane: HTMLElement, view: SongView): DetailPane {
+  // A Roll card's envelope list sits on the page's body; it goes with the card.
+  closeEnvelopeList();
   pane.innerHTML = '';
   pane.classList.toggle('empty', view.state.selection === null);
   const { stale, write } = paintSelection(pane, view);

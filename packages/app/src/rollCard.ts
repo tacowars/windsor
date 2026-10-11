@@ -116,9 +116,8 @@ class RollDevice {
     this.view = rollViewOf(slot);
     this.source = readRollSource(ctx.model.doc, slot, region);
     this.sourceSeen = sourceKey(this.source);
-    for (const [prop, colour] of Object.entries(ROLL_COLORS)) {
+    for (const [prop, colour] of Object.entries(ROLL_COLORS))
       this.body.style.setProperty(prop, colour);
-    }
     this.panes = rollPanes(() => this.scrolled());
     this.editing = rollEditing({
       ctx,
@@ -194,6 +193,7 @@ class RollDevice {
       tabs: this.tabs,
       controls: this.controls,
       editor: this.editing.editor,
+      attached: () => this.expander.attached(),
       scene: () => this.scene,
     });
   }
@@ -376,8 +376,8 @@ class RollDevice {
   private watch(): void {
     let restored = false;
     watchPlayhead({
-      attached: () => this.expander.attached(),
-      shown: () => this.body.closest('[hidden]') === null,
+      attached: () => this.envelopes.keepList(this.expander.attached()),
+      shown: () => this.envelopes.keepList(this.body.closest('[hidden]') === null),
       repaintIf: () => {
         if (!restored) {
           restored = true;
