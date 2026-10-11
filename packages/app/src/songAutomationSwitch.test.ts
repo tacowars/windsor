@@ -36,7 +36,7 @@ import {
 
 const BAR = TICKS_PER_BAR;
 const SONG = 8 * BAR;
-const GRAIN = { ticks: BAR, songTicks: SONG };
+const GRAIN = { ticks: BAR, axisTicks: SONG };
 const ROW: AutomationTargetRow = targetRow('insert.f.enabled', () => DEFAULT_FILTER)!;
 const p = (tick: number, value: number): AutomationPoint => ({ tick, value, bend: 0 });
 

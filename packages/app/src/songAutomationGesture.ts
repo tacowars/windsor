@@ -17,9 +17,12 @@
  * once on release, the lane's whole point list as one undo step. Escape, a
  * cancel, a lost capture or a blur put the lane back as the document has it.
  * The rules are `songAutomationEdit.ts` and `songAutomationSwitch.ts`, through
- * `songAutomationRules.ts`; this file only reads the pointer.
+ * `songAutomationRules.ts`; this file only reads the pointer. The axis, the
+ * frame and the tool come from the lane's host (`automationEditHost.ts`,
+ * windsor#706), so the same gestures run over the Song view or a roll's loop.
  */
 import type { AutomationPoint, AutomationTargetRow } from '@windsor/engine';
+import { hostFrame, type AutomationEditHost } from './automationEditHost';
 import {
   displayAtPx,
   draggedBend,
@@ -36,12 +39,10 @@ import {
 import { laneEdits } from './songAutomationRules';
 import { AUTOMATION_GESTURES } from './songAutomationTables';
 import { isFieldFocused } from './songAutomationToolbar';
-import type { SongView } from './songTab';
-import { SONG_VIEW } from './songViewTables';
 
 /** One lane's timeline, what it moves, and how it reads, redraws and commits. */
 export interface LaneEditing {
-  readonly view: SongView;
+  readonly host: AutomationEditHost;
   readonly timeline: HTMLElement;
   readonly row: AutomationTargetRow;
   /** The lane's name, for the undo label ("Move Cutoff point"). */
@@ -78,21 +79,17 @@ interface Live {
 /** Wire the Edit and Draw tools onto `lane.timeline`. */
 // eslint-disable-next-line max-lines-per-function -- one gesture's press, moves, release and cancel share its state and read as one sequence
 export function wireLaneEditing(lane: LaneEditing): void {
-  const { view, timeline, row } = lane;
+  const { host, timeline, row } = lane;
+  const { tools } = host;
   const edits = laneEdits(row);
   let live: Live | null = null;
-  const frame = (): LaneFrame => ({
-    pxPerBar: view.state.pxPerBar,
-    ticksPerBar: view.ticksPerBar(),
-    heightPx: SONG_VIEW.automationLanePx,
-    songTicks: view.songTicks(),
-  });
+  const frame = (): LaneFrame => hostFrame(host);
   const at = (e: PointerEvent | MouseEvent): { x: number; y: number } => {
     const box = timeline.getBoundingClientRect();
     return { x: e.clientX - box.left, y: e.clientY - box.top };
   };
   const snapped = (x: number, e: PointerEvent): number =>
-    snapTick(tickAtPx(x, frame()), view.state.automationSnap, view.songTicks(), e.shiftKey);
+    snapTick(tickAtPx(x, frame()), tools.automationSnap, host.axisTicks(), e.shiftKey);
   const preview = (points: readonly AutomationPoint[]): void => {
     if (!live) return;
     live.draft = points;
@@ -126,7 +123,7 @@ export function wireLaneEditing(lane: LaneEditing): void {
     if (!live || live.drag.mode !== 'draw') return;
     const { x, y } = at(e);
     const position = { tick: tickAtPx(x, frame()), display: displayAtPx(y, frame()) };
-    const grain = { ticks: drawGrain(view.state.automationSnap), songTicks: view.songTicks() };
+    const grain = { ticks: drawGrain(tools.automationSnap), axisTicks: host.axisTicks() };
     edits.stroke(live.drag.samples, live.drag.last, position, grain);
     live.drag.last = position;
     preview(edits.drawn(live.start, live.drag.samples, grain));
@@ -134,8 +131,7 @@ export function wireLaneEditing(lane: LaneEditing): void {
 
   /** The press's gesture, or null when the press did its whole edit (Alt-click). */
   const pressDrag = (e: PointerEvent, start: readonly AutomationPoint[]): Drag | null => {
-    if (view.state.automationTool === 'draw')
-      return { mode: 'draw', samples: new Map(), last: null };
+    if (tools.automationTool === 'draw') return { mode: 'draw', samples: new Map(), last: null };
     const press = pressAt(row, start, frame(), at(e));
     if (press.kind === 'point') return { mode: 'point', index: press.index };
     if (e.altKey && press.near && press.segment !== null) {
@@ -149,7 +145,7 @@ export function wireLaneEditing(lane: LaneEditing): void {
 
   timeline.addEventListener('pointerdown', (e) => {
     // The Shape tool's range gesture is its own (`songShapeRange.ts`, windsor#350).
-    if (e.button !== 0 || view.state.automationTool === 'shape') return;
+    if (e.button !== 0 || tools.automationTool === 'shape') return;
     e.preventDefault();
     e.stopPropagation();
     cancel();
@@ -210,7 +206,7 @@ export function wireLaneEditing(lane: LaneEditing): void {
   }
 
   timeline.addEventListener('dblclick', (e) => {
-    if (view.state.automationTool !== 'edit') return;
+    if (tools.automationTool !== 'edit') return;
     const start = lane.points();
     const press = pressAt(row, start, frame(), at(e));
     if (press.kind !== 'point' || start.length <= 1) return;

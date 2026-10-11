@@ -238,7 +238,11 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
   // The Shape tool's range and popover (windsor#350): the popover sits in the tab's body.
-  const shape = shapeTool(body, state);
+  const shape = shapeTool({
+    container: body,
+    viewport: () => body.querySelector('.lanes-scroll'),
+    tools: state,
+  });
   // The lane toolbar (windsor#349): shown while any part is folded open.
   const toolbar = automationToolbar(
     state,
