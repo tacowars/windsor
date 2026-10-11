@@ -100,9 +100,13 @@ is a measured claim.
 ### 3. Stereo input
 
 - **How:** keep L and R apart through their own input diffusers, and inject
-  L into the left half of the tank (line 4's input) and R into the right
-  half (line 8's), where the shared `split` goes today. The two diffuser
-  chains get different lengths so the sides decorrelate.
+  each where the shared `split` goes today, on the side its own output
+  reads most. Table 2's left output takes four of its seven taps from the
+  right half's lines (9, 10, 11) and the right output four from the left
+  half's (5, 6, 7). So L goes into the right half (line 8's input) and R
+  into the left half (line 4's). If item 5's tap table later changes that
+  weighting, it swaps the injections with it. The two diffuser chains get
+  different lengths so the sides decorrelate.
 - **Why, and where it helps:** a part's own inserts and its sends sit before
   its pan (`mixer/channelStrip.ts`), so a part's strip and send A hear it
   centred, and stereo input changes nothing there. It helps wherever the
