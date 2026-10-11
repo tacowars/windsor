@@ -10,6 +10,9 @@ import {
   TICKS_PER_BAR,
   envelopeValueAt,
   makeMacro,
+  makePatch,
+  regionState,
+  stepModValue,
   voiceTargetRow,
   type AutomationLane,
   type DocumentPart,
@@ -53,7 +56,7 @@ const query = (
   at: Partial<KnobEnvelopeQuery> = {},
 ): KnobEnvelopeQuery => ({
   part,
-  macros: [],
+  patch: makePatch(),
   path,
   base: 1000,
   tick: 2 * BAR + LOOP / 4,
@@ -84,11 +87,13 @@ describe('a knob no envelope moves', () => {
   });
 
   it('shows none on a target a macro mapping holds: the engine ignores the envelope', () => {
-    const macros = [
-      makeMacro({ name: 'Accent', mappings: [{ target: 'filter.cutoff', min: 400, max: 3200 }] }),
-    ];
+    const patch = makePatch({
+      macros: [
+        makeMacro({ name: 'Accent', mappings: [{ target: 'filter.cutoff', min: 400, max: 3200 }] }),
+      ],
+    });
     const part = rollPart([sweep('filter.cutoff')]);
-    expect(knobEnvelopeAt(query(part, 'filter.cutoff', { macros }))).toBeNull();
+    expect(knobEnvelopeAt(query(part, 'filter.cutoff', { patch }))).toBeNull();
   });
 });
 
@@ -184,5 +189,74 @@ describe('a knob an envelope moves', () => {
     expect(build).toHaveBeenCalledTimes(1);
     knobEnvelopeAt(query({ ...fresh }, 'filter.cutoff'), out, build);
     expect(build).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the voice slots the engine admits envelopes to', () => {
+  const lanePaths = [
+    'ops.0.level',
+    'ops.1.level',
+    'ops.2.level',
+    'ops.3.level',
+    'lfo.amount',
+    'lfo2.amount',
+    'filter.resonance',
+  ];
+  const lanes = (paths: readonly string[]): AutomationLane[] =>
+    paths.map((path) => ({
+      target: `voice.${path}`,
+      on: true,
+      points: [{ tick: 0, value: 0.5, bend: 0 }],
+    }));
+  const envelopes = [sweep('filter.cutoff'), sweep('filter.envAmount')];
+
+  it('rings only the first envelope when the song lanes leave one slot', () => {
+    const part = rollPart(envelopes, lanes(lanePaths));
+    expect(knobEnvelopeAt(query(part, 'filter.cutoff'))).not.toBeNull();
+    expect(knobEnvelopeAt(query(part, 'filter.envAmount'))).toBeNull();
+    const roomy = rollPart(envelopes, lanes(lanePaths.slice(1)));
+    expect(knobEnvelopeAt(query(roomy, 'filter.envAmount'))).not.toBeNull();
+  });
+});
+
+describe('the region the ring reads, as `regionState` places the tick', () => {
+  const loop = 3 * BAR;
+  const envelope: RollEnvelope = {
+    target: 'filter.cutoff',
+    on: true,
+    points: [
+      { tick: 0, value: -1, bend: 0 },
+      { tick: loop / 2, value: 1, bend: 0.3 },
+      { tick: loop - 1, value: -0.5, bend: 0 },
+    ],
+  };
+  const row = voiceTargetRow('filter.cutoff')!;
+  const partOver = (regions: DocumentPart['regions']): DocumentPart => ({
+    ...rollPart([]),
+    sequencer: { kind: 'roll', ...DEFAULT_ROLL_CONFIG, loopTicks: loop, envelopes: [envelope] },
+    regions,
+  });
+  const ticks = [0, 1.5 * BAR, 3 * BAR, 5 * BAR, 7.25 * BAR, SONG + 0.5 * BAR, SONG + 6.75 * BAR];
+
+  it.each([
+    ['the ∞ region, free-running past the song', [{ start: 0, duration: SONG }]],
+    [
+      'a gap between two regions',
+      [
+        { start: 0, duration: 2 * BAR },
+        { start: 4 * BAR, duration: 2 * BAR },
+      ],
+    ],
+    ['a finite region read again on the song’s wrap', [{ start: 6 * BAR, duration: 2 * BAR }]],
+  ])('%s', (_, regions) => {
+    const part = partOver(regions);
+    for (const tick of ticks) {
+      const state = regionState(regions, SONG, tick);
+      const value = state.live ? envelopeValueAt(envelope, state.localTick % loop, loop) : 0;
+      expect(knobEnvelopeAt(query(part, 'filter.cutoff', { tick }))?.playing).toBeCloseTo(
+        stepModValue(row, 1000, value),
+        9,
+      );
+    }
   });
 });

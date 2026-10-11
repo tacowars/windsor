@@ -570,7 +570,11 @@ export type { RollNote, RollSequencerConfig } from './sequencing/rollSequencer';
 // The Roll's clip envelopes (windsor#701): their type, cap, check, row and evaluator.
 export { ROLL_ENVELOPES_MAX, assertRollEnvelopes } from './sequencing/rollEnvelope';
 export type { RollEnvelope, RollEnvelopePoint } from './sequencing/rollEnvelope';
-export { envelopeValueAt } from './sequencing/rollEnvelopeValue';
+export { envelopeHeard, envelopeValueAt } from './sequencing/rollEnvelopeValue';
+// Which clip envelopes take a voice slot (windsor#725): the tracks' admission order, and the patch's side of it.
+export { admittedEnvelopes } from './automation/clipEnvelopeAdmission';
+export type { EnvelopeAdmissionQuery } from './automation/clipEnvelopeAdmission';
+export { voiceTargetSounds } from './synth/voiceAutomation';
 export { ROLL_ENVELOPE_POINTS_MAX, ROLL_ENVELOPE_ROW } from './sequencing/rollEnvelopeTables';
 export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';

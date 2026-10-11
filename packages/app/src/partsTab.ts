@@ -149,7 +149,7 @@ function patchEditor(ctx: AppCtx): PatchEditor {
 function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
   const query: KnobEnvelopeQuery = {
     part: undefined,
-    macros: [],
+    patch: ctx.parts.patch,
     path: '',
     base: 0,
     tick: 0,
@@ -159,7 +159,7 @@ function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
   return (path, out) => {
     const { doc } = ctx.model;
     query.part = partAt(doc, ctx.parts.selected);
-    query.macros = ctx.parts.patch.macros;
+    query.patch = ctx.parts.patch;
     query.path = path;
     query.base = Number(getPath(ctx.parts.patch, path) ?? 0);
     query.tick = ctx.transport.position();
