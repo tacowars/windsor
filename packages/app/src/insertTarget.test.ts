@@ -10,7 +10,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { AutomationLane, InsertSpec } from '@windsor/engine';
-import { DEFAULT_CHORUS, DEFAULT_ECHO, partAt } from '@windsor/engine';
+import { DEFAULT_CHORUS, DEFAULT_ECHO, DEFAULT_EQ, partAt } from '@windsor/engine';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -19,8 +19,17 @@ import type { EngineHost } from './host';
 import { childKindChange } from './insertChildLanes';
 import { setChild, setInsertField } from './insertEdits';
 import { insertFieldLock } from './insertKnobs';
-import type { ChainTarget } from './insertTarget';
-import { childAddress, childTarget, insertChange, insertsOf, targetChange } from './insertTarget';
+import type { EqLanes } from './eqAutomation';
+import { eqFieldLock } from './eqAutomation';
+import type { ChainTarget, ChildTarget } from './insertTarget';
+import {
+  childAddress,
+  childTarget,
+  insertChange,
+  insertLaneScope,
+  insertsOf,
+  targetChange,
+} from './insertTarget';
 import { insertLaneHolder } from './knobAutomation';
 import { library, loadPageLibrary } from './libraryModel';
 import { newSong } from './songParts';
@@ -97,6 +106,39 @@ describe('the child target', () => {
     expect(insertFieldLock(ctx, child, 0, 'rate').automation?.()?.value).toBe(1.5);
     expect(insertFieldLock(ctx, child, 0, 'depth').automation?.()).toBeNull();
     expect(insertFieldLock(ctx, childTarget('master', 'h'), 0, 'rate').automation).toBeUndefined();
+  });
+});
+
+describe('an EQ child’s curve lanes', () => {
+  const EQ: InsertSpec = {
+    ...DEFAULT_EQ,
+    id: 'e',
+    bands: DEFAULT_EQ.bands.map((band, i) => (i === 0 ? { ...band, on: true } : band)),
+  };
+  const eqLanes = (ctx: AppContext<TabPanel>, target: ChildTarget | ChainTarget): EqLanes => ({
+    ...insertLaneScope(ctx, target, 0),
+    tick: 0,
+  });
+
+  it('reads band 0’s freq from the host’s lane on slot.bands.0.freq', () => {
+    const ctx = openConsole();
+    expect(ctx.change(insertChange(0, [{ ...DEFAULT_ECHO, id: 'h', slot: EQ }])).ok).toBe(true);
+    const freq = lane('slot.bands.0.freq', 400);
+    expect(ctx.change(partChange(0, { automation: [freq] })).ok).toBe(true);
+    const at = eqLanes(ctx, childTarget(0, 'h'));
+    expect(at.fieldPrefix).toBe('slot.');
+    expect(eqFieldLock(at, 0, 'freq')?.value).toBe(400);
+    expect(eqFieldLock(at, 0, 'gain')).toBeNull();
+  });
+
+  it('reads the same EQ on a plain chain from its own lanes', () => {
+    const ctx = openConsole();
+    expect(ctx.change(insertChange(0, [EQ])).ok).toBe(true);
+    const own = { ...lane('bands.0.freq', 300), target: 'insert.e.bands.0.freq' } as AutomationLane;
+    expect(ctx.change(partChange(0, { automation: [own] })).ok).toBe(true);
+    const at = eqLanes(ctx, 0);
+    expect(at.fieldPrefix).toBe('');
+    expect(eqFieldLock(at, 0, 'freq')?.value).toBe(300);
   });
 });
 

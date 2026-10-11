@@ -10,11 +10,14 @@
  * field at its lane's value, so a handle follows its lane), whether a press
  * on a handle may drag it (not while its frequency or gain is held), and
  * whether any other edit of the curve touches a held field. Pure over the
- * part and its insert, so a test needs no DOM.
+ * part and its insert, so a test needs no DOM. In a host's slot
+ * (windsor#692) the lanes are the host's on `slot.bands.<i>.<field>`, as the
+ * child's knobs read them (`insertLaneScope`).
  */
-import type { EqBand, EqSpec, InsertSpec } from '@windsor/engine';
+import type { EqBand, EqSpec } from '@windsor/engine';
 import { automatableInsertFields, parseTargetId } from '@windsor/engine';
-import type { KnobAutomation, LaneHolder } from './knobAutomation';
+import type { InsertLaneScope } from './insertTarget';
+import type { KnobAutomation } from './knobAutomation';
 import { insertKnobAutomation } from './knobAutomation';
 
 /** The band fields a lane can hold, in the band panel's order. */
@@ -24,11 +27,13 @@ export type EqLaneField = (typeof EQ_LANE_FIELDS)[number];
 /** What a drag on a handle moves: the band's frequency and gain. */
 export const EQ_DRAG_FIELDS: readonly EqLaneField[] = ['freq', 'gain'];
 
-/** Where an EQ's lanes are read: its part or group (windsor#616), the insert in its chain, and the song tick. */
-export interface EqLanes {
-  readonly part: LaneHolder | undefined;
-  readonly insert: InsertSpec | undefined;
-  /** The song tick (`knobSongTick`). */
+/**
+ * Where an EQ's lanes are read (`insertLaneScope`): its part or group
+ * (windsor#616), the insert that holds the lanes and their field prefix (the
+ * EQ itself and none, or for a slot child its host and `slot.`), and the
+ * song tick (`knobSongTick`).
+ */
+export interface EqLanes extends InsertLaneScope {
   readonly tick: number;
 }
 
@@ -39,23 +44,24 @@ const BAND_FIELD_PREFIX = 'bands.';
 export const eqBandField = (band: number, field: EqLaneField): string =>
   `${BAND_FIELD_PREFIX}${band}.${field}`;
 
+/** Band `band`'s `field` as the lane holder's insert reads it: `slot.bands.3.freq` for a slot child. */
+const laneField = (at: EqLanes, band: number, field: EqLaneField): string =>
+  `${at.fieldPrefix}${eqBandField(band, field)}`;
+
 /** The lock a lane puts on band `band`'s `field`, or null while none holds it. */
 export const eqFieldLock = (at: EqLanes, band: number, field: EqLaneField): KnobAutomation | null =>
-  insertKnobAutomation(at.part, at.insert, eqBandField(band, field), at.tick);
+  insertKnobAutomation(at.holder, at.spec, laneField(at, band, field), at.tick);
 
 /** Whether any lane that is on targets this EQ's bands: the cheap test before the field-by-field one. */
 export function bandLanesOn(at: EqLanes): boolean {
-  const id = at.insert?.id;
+  const id = at.spec?.id;
   if (!id) return false;
+  const prefix = `${at.fieldPrefix}${BAND_FIELD_PREFIX}`;
   return (
-    at.part?.automation?.some((lane) => {
+    at.holder?.automation?.some((lane) => {
       if (!lane.on) return false;
       const target = parseTargetId(lane.target);
-      return (
-        target?.kind === 'insert' &&
-        target.insertId === id &&
-        target.field.startsWith(BAND_FIELD_PREFIX)
-      );
+      return target?.kind === 'insert' && target.insertId === id && target.field.startsWith(prefix);
     }) ?? false
   );
 }
@@ -87,11 +93,11 @@ export function eqHeldName(
   band: number,
   fields: readonly EqLaneField[] = EQ_LANE_FIELDS,
 ): string | null {
-  if (!at.insert || !bandLanesOn(at)) return null;
+  if (!at.spec || !bandLanesOn(at)) return null;
   const field = fields.find((f) => eqFieldLock(at, band, f) !== null);
   if (!field) return null;
-  const target = eqBandField(band, field);
-  return automatableInsertFields(at.insert).find((row) => row.target === target)?.label ?? target;
+  const target = laneField(at, band, field);
+  return automatableInsertFields(at.spec).find((row) => row.target === target)?.label ?? target;
 }
 
 /** The fields a lane can hold that differ between two states of one band. */

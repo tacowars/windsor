@@ -19,12 +19,15 @@ import {
   isReturnName,
   partAt,
   musicPartName,
+  SLOT_FIELD,
   slotChild,
   withInsertIds,
 } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { groupAt, groupIdOfKey } from './groupModel';
+import type { LaneHolder } from './knobAutomation';
+import { insertLaneHolder } from './knobAutomation';
 /** A group bus's chain, by the group's key (`groupModel.ts`'s `groupKey`). */
 export type GroupTarget = `group:${number}`;
 /** A chain the song holds: a part's strip, the master, a send bus or a group bus. */
@@ -160,4 +163,32 @@ export function liveInsert(
   if (!child) return chainStage(ctx, target as ChainTarget, index);
   const host = hostIn(ctx, child).index;
   return index === 0 && host >= 0 ? slotChild(chainStage(ctx, child.chain, host)) : undefined;
+}
+
+/**
+ * Where the lanes on the insert at `index` in `target`'s chain live: the
+ * chain's lane holder (a part's strip or a group, `insertLaneHolder`), the
+ * insert, and the prefix its fields carry in a lane's target. For a slot
+ * child that is the host's holder, the host and `slot.` (windsor#692
+ * decision 8), so its rows are found through `automatableInsertFields(host)`.
+ * A knob's lock and the EQ's curve both resolve a target through this.
+ */
+export interface InsertLaneScope {
+  readonly holder: LaneHolder | undefined;
+  readonly spec: InsertSpec | undefined;
+  readonly fieldPrefix: string;
+}
+
+export function insertLaneScope(ctx: AppCtx, target: InsertTarget, index: number): InsertLaneScope {
+  const child = childAddress(target);
+  if (!child) {
+    const holder = insertLaneHolder(ctx.model.doc, target);
+    return { holder, spec: insertsOf(ctx, target)[index], fieldPrefix: '' };
+  }
+  const host = hostIn(ctx, child);
+  return {
+    holder: insertLaneHolder(ctx.model.doc, child.chain),
+    spec: host.list[host.index],
+    fieldPrefix: `${SLOT_FIELD}.`,
+  };
 }

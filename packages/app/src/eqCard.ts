@@ -57,8 +57,14 @@ import type { InsertCard } from './insertCards';
 import { insertNote, insertPage, wideColumn } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
-import { insertsOf, isChildTarget, liveInsert, targetChange } from './insertTarget';
-import { insertLaneHolder, knobSongTick, lockedKnobNotice } from './knobAutomation';
+import {
+  insertLaneScope,
+  insertsOf,
+  isChildTarget,
+  liveInsert,
+  targetChange,
+} from './insertTarget';
+import { knobSongTick, lockedKnobNotice } from './knobAutomation';
 import { watchPlayhead } from './stepStrip';
 
 /** Every EQ's view for this session, by `rackKey`: never in the song. */
@@ -82,8 +88,7 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
     sampleRate: () => ctx.host.system?.engine.context.sampleRate ?? EQ_FALLBACK_SAMPLE_RATE,
     plot: () => eqPlot(model.view().range, model.sampleRate()),
     lanes: () => ({
-      part: insertLaneHolder(ctx.model.doc, slot),
-      insert: insertsOf(ctx, slot)[index],
+      ...insertLaneScope(ctx, slot, index),
       tick: knobSongTick(ctx.model.doc, ctx.transport.position()),
     }),
     shown: () => eqShownSpec(model.lanes(), model.spec()),

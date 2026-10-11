@@ -11,41 +11,28 @@
  * send buses and the master carry no lanes. A host's slot child
  * (windsor#692) locks under its host's lane on `slot.<field>`.
  */
-import type { InsertSpec } from '@windsor/engine';
-import { SLOT_FIELD } from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { childAddress, hostIn, insertsOf, isGroupTarget, targetChange } from './insertTarget';
+import {
+  childAddress,
+  insertLaneScope,
+  insertsOf,
+  isGroupTarget,
+  targetChange,
+} from './insertTarget';
 export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { makeKnob, type KnobSpec } from './knob';
-import { insertKnobAutomation, insertLaneHolder, knobSongTick } from './knobAutomation';
-
-/**
- * Where the lane on `field` of the insert at `index` in `target`'s chain
- * lives: that chain, the insert and the field, or for a slot child its
- * host's chain, the host and `slot.<field>` (windsor#692 decision 8), so the
- * row is found through `automatableInsertFields(host)`.
- */
-function laneAddress(
-  ctx: AppCtx,
-  target: InsertTarget,
-  index: number,
-  field: string,
-): { readonly chain: InsertTarget; readonly spec: InsertSpec | undefined; readonly field: string } {
-  const child = childAddress(target);
-  if (!child) return { chain: target, spec: insertsOf(ctx, target)[index], field };
-  const host = hostIn(ctx, child);
-  return { chain: child.chain, spec: host.list[host.index], field: `${SLOT_FIELD}.${field}` };
-}
+import { insertKnobAutomation, knobSongTick } from './knobAutomation';
 
 /**
  * The lock on the knob over `field` of the insert at `index` in `target`'s
  * chain, for a part's strip or a group's (windsor#616), a slot child's
- * included; nothing for a send bus or the master.
+ * included (its host's lane on `slot.<field>`, `insertLaneScope`); nothing
+ * for a send bus or the master.
  */
 export function insertFieldLock(
   ctx: AppCtx,
@@ -57,10 +44,9 @@ export function insertFieldLock(
   if (typeof chain !== 'number' && !isGroupTarget(chain)) return {};
   return {
     automation: () => {
-      const at = laneAddress(ctx, target, index, field);
-      const holder = insertLaneHolder(ctx.model.doc, at.chain);
+      const at = insertLaneScope(ctx, target, index);
       const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
-      return insertKnobAutomation(holder, at.spec, at.field, tick);
+      return insertKnobAutomation(at.holder, at.spec, `${at.fieldPrefix}${field}`, tick);
     },
   };
 }

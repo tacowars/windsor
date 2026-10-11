@@ -67,8 +67,9 @@ const eqOf = (part: DocumentPart): EqSpec & { id?: string } => {
 };
 
 const lanesAt = (part: DocumentPart, tick = 0): EqLanes => ({
-  part,
-  insert: eqOf(part),
+  holder: part,
+  spec: eqOf(part),
+  fieldPrefix: '',
   tick,
 });
 
@@ -78,7 +79,7 @@ const OFF_CUT = 7;
 
 describe('bandLanesOn', () => {
   const on = (lanes: readonly AutomationLane[]): boolean =>
-    bandLanesOn({ part: withLanes(lanes), insert: eqOf(AUTOMATION_PART), tick: 0 });
+    bandLanesOn({ ...lanesAt(withLanes(lanes)), spec: eqOf(AUTOMATION_PART) });
 
   it('is false with no lanes', () => {
     const bare: DocumentPart = { ...AUTOMATION_PART, automation: [] };
