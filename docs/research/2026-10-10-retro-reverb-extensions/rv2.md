@@ -13,13 +13,20 @@ complete worklet callbacks on a warm JIT, not real-time load in Chrome.
 
 ## CPU
 
-`rv2-bench.mjs` (beside this file) is the 2026-09-24 bench
-(`../2026-09-24-682-retro-reverb/bench.mjs`) with three changes: today's
-bundle path, a bundle argument so a copy of the main bundle can run too, and
-Drift settings. It runs reverb mode, Mix 1 and a 0.25 sine input. Each value
-is the median of three runs, interleaved with the other cases, and each run is
-the median of six timed passes of 1,500 quanta. The unit is microseconds per
-128-frame quantum per instance at 48 kHz.
+RV-2's copy of the bench, since folded into `bench.mjs` beside this file, was
+the 2026-09-24 bench (`../2026-09-24-682-retro-reverb/bench.mjs`) with three
+changes: today's bundle path, a bundle argument so a copy of the main bundle
+can run too, and Drift settings. It runs reverb mode, Mix 1 and a 0.25 sine
+input. Each value is the median of three runs, interleaved with the other
+cases, and each run is the median of six timed passes of 1,500 quanta. The
+unit is microseconds per 128-frame quantum per instance at 48 kHz. The figures
+below are that copy's wall time; `bench.mjs` reports the same reading as
+`wall`. To re-run the cases (add `--bundle <copy of main's bundle>` for the
+before row):
+
+```bash
+node docs/research/2026-10-10-retro-reverb-extensions/bench.mjs --preset rv2 --rounds 3
+```
 
 | Case | 1 instance | 8 | 16 |
 |---|---|---|---|

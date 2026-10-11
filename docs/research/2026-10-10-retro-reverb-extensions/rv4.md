@@ -13,8 +13,8 @@ v24.21.0 / V8 13.6.233.17-node.53, offline, running the shipped
 ## Memory
 
 The lines are allocated once, sized for the largest Size plus Drift's reach.
-`rv4-bench.mjs` (beside this file) sums the bytes of the typed arrays one
-instance holds:
+`bench.mjs` (beside this file) sums the bytes of the typed arrays one
+instance holds (`bytesPerInstance`):
 
 | Bundle | Bytes per instance |
 |---|---|
@@ -27,13 +27,21 @@ clock). The Size a song uses does not change it.
 
 ## CPU
 
-`rv4-bench.mjs` is `rv2-bench.mjs` with a Size argument in place of the Drift
-settings, the bytes count above, and user CPU time (`process.cpuUsage`) in
-place of the wall clock. Other sessions kept the machine busy throughout
-(load average 16–34 during the pass below), and the wall clock was useless:
-the same case read anywhere from 18 to 71 µs. CPU time held steadier, but it
-is still higher than RV-2's quiet-machine 9.3 µs. Compare the rows with each
-other, not with RV-2.
+RV-4's copy of the bench, since folded into `bench.mjs`, was RV-2's with a
+Size argument in place of the Drift settings, the bytes count above, and user
+CPU time (`process.cpuUsage`) in place of the wall clock. Other sessions kept
+the machine busy throughout (load average 16–34 during the pass below), and
+the wall clock was useless: the same case read anywhere from 18 to 71 µs. CPU
+time held steadier, but it is still higher than RV-2's quiet-machine 9.3 µs.
+Compare the rows with each other, not with RV-2.
+
+The figures below were read with that copy, whose user CPU time `bench.mjs`
+reports as `cpuUser`. To re-run the cases (add `--bundle <copy of main's
+bundle>` for the main rows):
+
+```bash
+node docs/research/2026-10-10-retro-reverb-extensions/bench.mjs --preset rv4 --rounds 3
+```
 
 The pass below is the quietest of three interleaved passes. Each value is
 the median of three rounds, and each round is the median of six timed passes
