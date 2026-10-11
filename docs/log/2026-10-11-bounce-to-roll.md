@@ -57,9 +57,24 @@ build tickets, written then.
 4. **How events map to Roll notes.**
    - **Pitch** is the note-on's pitch. **Length** runs from the note-on to
      its note-off, at least 1 tick. A note the generator never releases
-     ends at the region's end, where the gate's leave releases it. A
-     Euclid hit's hold, in seconds, converts at the song's tempo and is
-     rounded to whole ticks.
+     ends at the region's end, where the gate's leave releases it.
+   - **A Euclid hit's hold** is in seconds, and the clock's ticks are
+     swung (`swingTicks` in `sequencing/swing.ts`: tick `n` sounds at
+     `swingTicks(n)` straight ticks). The note's release tick is the
+     straight tick whose swung time is nearest the hit's onset time plus
+     its hold: `unswingTicks(swingTicks(onset) + hold ÷ secondsPerTick)`,
+     the inverse of the clock's warp, then whichever of the two whole ticks
+     around it sounds nearer that time. Straight, that is the hold at the
+     tempo. A release that is not already a whole tick is rounded, and
+     counted with the ratchet roundings ("ticks rounded", decision 8).
+     Worked below.
+   - **A Euclid tail past the region's end.** A Euclid hit is triggered
+     for its whole hold (`part.trigger` in `song/arrangementPlayer.ts`),
+     and the region's leave releases only pitched generators
+     (`song/partBinding.ts`), so a hold that crosses the region's end rang
+     past it. A Roll note is released at its region's end. The bounce cuts
+     such a note at the region's end and counts it ("3 Euclid tails cut at
+     a region's end"). Worked below.
    - **Velocity** is what the part played divided by the part's Vel. What
      the part played is `partNoteOn`'s velocity: the part's Vel × the
      event's velocity (a Figure cell's, else 1), plus the accent's bump, at
@@ -94,7 +109,7 @@ build tickets, written then.
      there, as above. An open last hit runs to its release, as a plain note
      does: a Grid's always, and an Arp's, Basslead's or Figure's when a tie
      or slide follows or its gate covers the step (`NoteRoll.open`). A hit whose onset is not a whole tick at 24 PPQ
-     is rounded and counted (decision 9). Worked below.
+     is rounded and counted (decision 8). Worked below.
    - **Step-mod lanes** become clip envelopes on the same voice targets
      (`2026-10-11-roll-envelope-format`). A part has at most
      `STEP_MOD_LANES_MAX` (4) lanes and a roll at most `ROLL_ENVELOPES_MAX`
@@ -172,11 +187,15 @@ build tickets, written then.
    sliding there; that is accepted.
 8. **The summary.** A successful bounce shows an `info` toast:
    "Bounced to Roll: 214 notes in 3 regions", followed by only the
-   approximations that are not zero, for example "12 ratchet hits rounded
-   · 6 accents lost their mod · 4 repeats trimmed · Skip and Gate lanes
-   baked". The counts are over the notes written (each region's loop), as
-   the note count is. "Repeats trimmed" counts the same-pitch overlaps of
-   decision 4. A Figure part that another part's canon follows is a
+   approximations that are not zero, for example "12 ticks rounded · 6
+   accents lost their mod · 4 repeats trimmed · 3 Euclid tails cut at a
+   region's end · Skip and Gate lanes baked". The counts are over the notes
+   written (each region's loop), as the note count is. "Ticks rounded"
+   counts the ratchet hits and the swung Euclid releases that fell between
+   ticks. "Repeats trimmed" counts the same-pitch overlaps of decision 4.
+   "Euclid tails cut" counts the written notes whose hold the render cut at
+   their region's end (decision 4); a region cuts at most one pass's worth,
+   its last. A Figure part that another part's canon follows is a
    leader no longer, and the normaliser drops that canon's source, as it
    does at any kind change of the leader. The toast then names the
    follower: "Pad's canon lost its leader". Undo brings both back.
@@ -292,6 +311,35 @@ swung ticks. Within one half of a swing pair the warp is linear, so the
 two agree up to the rounding; a step that spans a pair's midpoint does
 not.
 
+### A Euclid hold under swing (decision 4)
+
+A Euclid part at 75% sixteenth swing: a pair is 12 ticks and its off-beat
+lands at 75% of it, so a tick in the pair's first half lasts 1.5 straight
+ticks and one in its second half 0.5. A hit on the downbeat (tick 0) whose
+hold lasts six straight ticks (`hold` = 6 × `secondsPerTick`) is released
+at straight time 6 by `trigger`. `unswingTicks(6)` = 6 ÷ 1.5 = 4, a whole
+tick, so the note is written 0–4 and nothing is rounded. Played back, the
+clock reaches tick 4 at `swingTicks(4)` = 6 straight ticks, the hold's
+end. Converting at the tempo alone would write 0–6, and tick 6 is the
+delayed off-beat at `swingTicks(6)` = 9: three straight ticks too long.
+
+A hold of four straight ticks from the same downbeat inverts to tick
+2.667. Its neighbours sound at `swingTicks(2)` = 3 and `swingTicks(3)` =
+4.5, and 4.5 is nearer 4, so the note is written 0–3 and counted as one
+tick rounded. Straight, both holds convert at the tempo and round nothing.
+
+### A Euclid tail cut at the region's end (decision 4)
+
+A Euclid part at 1/16 (6 ticks), 16 steps, with a hit on step 16, in a
+one-bar region (ticks 0–96 of 4/4) at 120 BPM, straight: a tick is
+20.83 ms. Its hold is 0.25 s, 12 ticks. The step-16 hit starts on tick 90
+and `trigger` holds it to tick 102, six ticks past the region's end, and
+the leave does not release it. The bounce writes 90–96, the region's end,
+and the toast counts "1 Euclid tail cut at a region's end". In a longer
+region the same hit on each earlier bar's step 16 runs into the next
+bar's step-1 hit, if there is one, and is trimmed there by decision 4's
+overlap rules; only the last bar's is cut by the region's end.
+
 ## Boundary cases
 
 - **A part Vel of 0.** Every plain note plays at 0. With no accent, no
@@ -326,8 +374,9 @@ not.
   falls back to a longer loop, or to its own length. A Grid tie on step 1
   does the same: on the first pass it ties to nothing and is silent, while
   on every later pass it carries the last note across the bar line. A
-  note crossing the region's end can't happen, because the gate releases
-  everything there.
+  note crossing the region's end can't happen: the gate releases a
+  generator's notes there, and the bounce cuts a Euclid hold there
+  (decision 4).
 - **Several notes on one tick** (a Chord part's chord) are written as
   they are. Decision 7 never slides notes
   that start together.
@@ -382,7 +431,10 @@ build's markup and styles. It proposes:
 
 - The build tickets, written once the mockup is approved, cover:
   - the render and the loop search: the engine function and its tests,
-    with these examples as fixtures;
+    with these examples as fixtures, and two parity tests against the
+    played part: a last-step Euclid hit whose hold crosses the region's
+    end (written cut at the end, and counted), and a swung Euclid hit
+    (its written release sounds at the hold's end, to the nearest tick);
   - the overlap slide in `RollSequencer`;
   - the command, its toasts and its undo label.
 - `2026-10-04-roll-sequencer` listed per-note slide as not in v1, and its
