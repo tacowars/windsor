@@ -284,9 +284,6 @@ select.field { width: 100%; max-width: 260px; background: var(--inset); border: 
 .renv-opt[aria-current="true"] { background: rgba(224, 164, 78, 0.08); }
 .renv-opt[aria-current="true"] .tag { color: var(--carrier); }
 .shape-pop.in-page { position: absolute; z-index: 20; }
-/* A control drawn as a stand-in: no counterpart in the app yet. */
-.stand-in-tag { font-family: var(--f-num); font-size: 9px; fill: var(--hot); }
-.stand-in-mark { fill: var(--inset); stroke: var(--hot); stroke-width: 1.4; stroke-dasharray: 2 1.5; }
 
 /* ---------- the page ---------- */
 .page { padding: 20px 16px 56px; max-width: 1440px; margin: 0 auto; display: grid; gap: 26px; }
@@ -324,7 +321,7 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
     <p class="lede">A roll carries up to four <b>clip envelopes</b>: voice automation that loops with the roll's loop and travels with its region, as in Ableton Live's clip view. The card's tab row reads <b>Notes · Envelopes</b>. The <b>Envelopes</b> tab swaps the note controls for the envelope controls, in the same column and the same width: the roll's <b>Snap</b> first, as on Notes, then a <b>picker</b> of the voice targets with the envelope's switch and ✕, then the Song tab's <b>Edit, Draw and Shape</b> tools (<kbd>E</kbd> <kbd>D</kbd> <kbd>S</kbd>) with their hint. The chosen target's envelope is drawn over the note pane, whose notes dim and stop responding; the keys column keeps its 44 px and its keys. The Shape popover is the Song tab's. Values run −1..1: the middle line is 0, the patch's own setting, and the readout shows the offset.</p>
     <p class="lede">Each Roll below is live: <b>try the tabs, the picker, the tools, and the Shape tool</b> (drag a range across the pane). The curves are drawings. Everything but the Envelopes tab, its controls and the curve is today's Roll, copied from the app; the Notes tab is today's controls, unchanged.</p>
     <nav class="states" aria-label="States">
-      <a href="#s1">1 · today</a><a href="#s2">2 · empty</a><a href="#s3">3 · Draw</a><a href="#s4">4 · Edit</a><a href="#s5">5 · Shape</a><a href="#s6">6 · three envelopes</a><a href="#s7">7 · slots full</a><a href="#s8">8 · Expand</a><a href="#questions">questions</a>
+      <a href="#s1">1 · today</a><a href="#s2">2 · empty</a><a href="#s3">3 · Draw</a><a href="#s4">4 · Edit</a><a href="#s5">5 · Shape</a><a href="#s6">6 · three envelopes</a><a href="#s7">7 · slots full</a><a href="#s8">8 · Expand</a><a href="#decided">decided</a>
     </nav>
   </header>
 
@@ -341,11 +338,11 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
     <div class="rack seq-rack" data-state="draw"></div></section>
 
   <section class="state" id="s4"><h2><span class="n">4</span>Edit: a point dragged</h2>
-    <p>A point mid-drag, enlarged as the Song tab draws it, with the drag readout above it giving the offset. The first segment is bent. The Song tab draws no bend handle (you drag the line), so the diamond on it is a <b>stand-in</b>.</p>
+    <p>A point mid-drag, enlarged as the Song tab draws it, with the drag readout above it giving the offset. The first segment is bent. As on the Song tab, there is no bend handle: you bend a segment by dragging its line, and Alt-click straightens it.</p>
     <div class="rack seq-rack" data-state="edit"></div></section>
 
   <section class="state pad-pop" id="s5"><h2><span class="n">5</span>Shape: a range selected, the popover open</h2>
-    <p>Bar 2 selected with Shape. The popover is the Song tab's, unchanged; Top and Bottom read as offsets. The dashed line previews the stamp.</p>
+    <p>Bar 2 selected with Shape. The popover is the Song tab's, unchanged; Top and Bottom read as offsets: a new range opens with Top at the envelope's value where it starts and Bottom at the minimum. The dashed line previews the stamp.</p>
     <div class="rack seq-rack" data-state="shape"></div></section>
 
   <section class="state pad-list" id="s6"><h2><span class="n">6</span>Three envelopes</h2>
@@ -362,11 +359,13 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
       <div class="roll-overlay-head"><span class="roll-overlay-title">Pad — Roll</span><span class="roll-overlay-note">Expanded · Esc closes</span></div>
     </div></div></section>
 
-  <section class="choices" id="questions" aria-label="Questions">
-    <h2>Questions for tacowars</h2>
+  <section class="choices" id="decided" aria-label="Decided">
+    <h2>Decided</h2>
     <ol>
-      <li><b>The notes on the Envelopes tab.</b> Drawn at 30 % and inert, so the envelope reads against the music. The alternative is hiding them.</li>
-      <li><b>A bend handle.</b> The Song tab has none: you drag the line. State 4 draws a stand-in diamond. Draw one here and on the Song tab, or keep the Song tab's way?</li>
+      <li><b>The Notes · Envelopes tab</b> swaps the controls column. Snap comes first and is shared by both tabs.</li>
+      <li><b>The keys column</b> stays 44 px.</li>
+      <li><b>The notes in envelope mode</b> are dimmed to 30 % and inert.</li>
+      <li><b>Bending</b> is the Song tab's: drag the line, and Alt-click straightens it. There is no bend handle.</li>
     </ol>
   </section>
 </div>
@@ -394,17 +393,23 @@ const ROLL_COLORS = '--roll-k-root: rgba(224, 164, 78, 0.88); --roll-k-chord: rg
 /* ---------- the voice targets: the Song tab's picker for this part ---------- */
 // The groups and names `pickerGroups` gives the Init-based Pad on 2026-10-11,
 // plus two macros as a patch with macros would add them. `span` and `oct`
-// are the row's offset span and curve (voiceTargetTables.ts).
-const opRows = o => [['Level', .5], ['Decay', 0, 1], ['Dcy Crv', 1], ['Fdbk', 1], ['Width', .5], ['Ratio', 0, 1]].map(([n, s, oct]) => [`Op ${o} ${n}`, s, oct]);
+// are the row's offset span and curve, as voiceTargetTables.ts works them
+// out: a ratio row's span is in octaves, half its knob's log travel
+// (`halfTravel`), over the bounds patchDefaults.ts gives: a decay time
+// 0.001..20 s (about 7.14 oct), an operator ratio RATIO_RANGE 0.0625..24
+// (about 4.29 oct), an LFO rate 0.02..40 Hz (about 5.48 oct); Cutoff's is 4.5.
+const halfTravel = (min, max) => 0.5 * Math.log2(max / min);
+const DECAY_SPAN = halfTravel(0.001, 20), RATIO_SPAN = halfTravel(0.0625, 24), LFO_RATE_SPAN = halfTravel(0.02, 40);
+const opRows = o => [['Level', .5], ['Decay', DECAY_SPAN, 1], ['Dcy Crv', 1], ['Fdbk', 1], ['Width', .5], ['Ratio', RATIO_SPAN, 1]].map(([n, s, oct]) => [`Op ${o} ${n}`, s, oct]);
 const GROUPS = [
-  ['Voice · Filter', [['Cutoff', 4.5, 1], ['Filt Env Amt', 6], ['Resonance', 6], ['Filter Decay', 0, 1], ['Vowel', 1]]],
+  ['Voice · Filter', [['Cutoff', 4.5, 1], ['Filt Env Amt', 6], ['Resonance', 6], ['Filter Decay', DECAY_SPAN, 1], ['Vowel', 2]]],
   ...['A', 'B', 'C', 'D'].map(o => ['Voice · Op ' + o, opRows(o)]),
-  ['Voice · LFO', [['LFO 1 Amt', .5], ['LFO 1 Rate', 0, 1], ['LFO 2 Amt', .5], ['LFO 2 Rate', 0, 1]]],
+  ['Voice · LFO', [['LFO 1 Amt', .5], ['LFO 1 Rate', LFO_RATE_SPAN, 1], ['LFO 2 Amt', .5], ['LFO 2 Rate', LFO_RATE_SPAN, 1]]],
   ['Voice · Pitch', [['Pitch Env', 48]]],
   ['Macros', [['Bloom', 1], ['Air', 1]]],
 ];
 const TARGETS = new Map();
-for (const [group, rows] of GROUPS) for (const [name, span, oct] of rows) TARGETS.set(name, { name, group, span: span || 1, oct: !!oct });
+for (const [group, rows] of GROUPS) for (const [name, span, oct] of rows) TARGETS.set(name, { name, group, span, oct: !!oct });
 const offsetText = (target, v) => {
   const t = TARGETS.get(target), x = v * t.span;
   return t.oct ? `${x >= 0 ? '+' : ''}${x.toFixed(1)} oct` : `${x >= 0 ? '+' : ''}${x.toFixed(2)}`;
@@ -429,8 +434,8 @@ const STATES = {
   today: { today: true },
   empty: { env: true, tool: 'edit', list: true, envs: [] },
   draw: { env: true, tool: 'draw', envs: [{ target: 'Cutoff', on: true, points: drawnCutoff() }], cur: 'Cutoff', hover: 60 },
-  edit: { env: true, tool: 'edit', envs: [{ target: 'Cutoff', on: true, points: editCutoff() }], cur: 'Cutoff', drag: 2, bendMark: 0, hover: 96 },
-  shape: { env: true, tool: 'shape', envs: [{ target: 'Cutoff', on: true, points: editCutoff() }], cur: 'Cutoff', range: [96, 192], shape: { kind: 'triangle', rate: 24, top: 0.85, bottom: 0.35, phase: 0, duty: 0.5 } },
+  edit: { env: true, tool: 'edit', envs: [{ target: 'Cutoff', on: true, points: editCutoff() }], cur: 'Cutoff', drag: 2, hover: 96 },
+  shape: { env: true, tool: 'shape', envs: [{ target: 'Cutoff', on: true, points: editCutoff() }], cur: 'Cutoff', range: [96, 192], shape: { kind: 'triangle', rate: 24, phase: 0, duty: 0.5 } },
   three: { env: true, tool: 'edit', list: true, envs: [{ target: 'Cutoff', on: true, points: editCutoff() }, { target: 'Resonance', on: true, points: resonance() }, { target: 'Op B Level', on: false, points: opBLevel() }], cur: 'Cutoff' },
   full: { env: true, tool: 'edit', list: true, lanes: ['Filt Env Amt', 'Op A Level', 'Op A Fdbk', 'LFO 1 Amt', 'LFO 1 Rate', 'Pitch Env'], envs: [{ target: 'Cutoff', on: true, points: editCutoff() }, { target: 'Resonance', on: true, points: resonance() }], cur: 'Cutoff' },
   wide: { env: true, wide: true, tool: 'edit', envs: [{ target: 'Cutoff', on: true, points: editCutoff() }, { target: 'Resonance', on: true, points: resonance() }], cur: 'Cutoff', hover: 120 },
@@ -466,6 +471,8 @@ const RATES = [[3, '1/32'], [6, '1/16'], [12, '1/8'], [24, '1/4'], [48, '1/2'], 
 /* ---------- curve: display space 0..1, the envelope's −1..1 mapped onto it ---------- */
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const toD = v => (v + 1) / 2, fromD = d => d * 2 - 1;
+/* The bar under `tick`, inside the loop (songShapeModel.ts `barAt`). */
+const barAt = tick => { const bar = Math.min(BAR, LOOP), a = clamp(Math.floor(tick / BAR) * BAR, 0, LOOP - bar); return { a, b: a + bar }; };
 const bendCurve = (u, b, dir) => (!b || !dir ? u : Math.pow(u, Math.pow(5, -b * Math.sign(dir))));
 function valueAt(pts, t) {
   if (!pts.length) return 0;
@@ -505,10 +512,11 @@ class Roll {
     this.env = !!spec.env; this.tool = spec.tool || 'edit';
     this.envs = (spec.envs || []).map(e => ({ ...e, points: e.points.map(p => ({ ...p })) }));
     this.cur = spec.cur || null; this.lanes = new Set(spec.lanes || []);
-    this.listOpen = !!spec.list; this.drag = spec.drag; this.bendMark = spec.bendMark;
+    this.listOpen = !!spec.list; this.drag = spec.drag;
     this.hover = spec.hover ?? null;
     this.sel = spec.range ? { a: spec.range[0], b: spec.range[1] } : null;
-    this.shape = { kind: 'square', rate: 6, top: 0.8, bottom: 0.3, phase: 0, duty: 0.5, ...(spec.shape || {}) };
+    this.shape = { kind: 'square', rate: 6, top: 1, bottom: 0, phase: 0, duty: 0.5, ...(spec.shape || {}) };
+    if (this.sel) this.newDraft();
     this.build();
   }
   build() {
@@ -656,7 +664,7 @@ class Roll {
       on.onclick = () => { e.on = !e.on; this.render(); };
       const del = el('button', 'auto-btn', '×');
       del.type = 'button'; del.setAttribute('aria-label', `Delete the ${e.target} envelope`); del.title = 'Delete this envelope';
-      del.onclick = () => { this.envs = this.envs.filter(x => x !== e); this.cur = this.envs[0]?.target ?? null; this.drag = undefined; this.bendMark = undefined; this.closePop(); this.sel = null; this.render(); };
+      del.onclick = () => { this.envs = this.envs.filter(x => x !== e); this.cur = this.envs[0]?.target ?? null; this.drag = undefined; this.closePop(); this.sel = null; this.render(); };
       const hx = this.hover ?? 0;
       const val = el('span', 'renv-val' + (e.on ? '' : ' off'), e.on ? offsetText(e.target, valueAt(e.points, hx % LOOP)) : 'off');
       val.title = 'The offset at the pointer';
@@ -702,7 +710,7 @@ class Roll {
       }
       b.onclick = () => {
         if (!marked) this.envs.push({ target: name, on: true, points: [] });
-        this.cur = name; this.listOpen = false; this.drag = undefined; this.bendMark = undefined; this.sel = null; this.closePop();
+        this.cur = name; this.listOpen = false; this.drag = undefined; this.sel = null; this.closePop();
         this.render();
       };
       return b;
@@ -752,10 +760,6 @@ class Roll {
         const big = this.drag === i;
         body += `<circle class="auto-dot" cx="${xOf(p.tick).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="${big ? 4.5 : 3.2}"/>`;
       });
-      if (this.bendMark != null && e.points[this.bendMark + 1]) {
-        const a = e.points[this.bendMark], c = e.points[this.bendMark + 1], mt = (a.tick + c.tick) / 2, mx = xOf(mt), my = yOf(valueAt(e.points, mt));
-        body += `<path class="stand-in-mark" d="M${mx} ${my - 5} L${mx + 5} ${my} L${mx} ${my + 5} L${mx - 5} ${my} Z"/><text class="stand-in-tag" x="${mx + 4}" y="${my + 16}">bend handle · stand-in</text>`;
-      }
       svg += e.on ? body : `<g class="renv-off">${body}</g>`;
     }
     let extra = '';
@@ -776,28 +780,43 @@ class Roll {
 
   /* ---------- the Shape tool: drag a range, then the popover ---------- */
   wireLayer() {
-    let dragging = false;
+    // The Song tab's gesture (songShapeRange.ts, songShapeModel.ts `shapeRange`):
+    // the press's unsnapped tick, the snapped span, and whether the pointer
+    // moved 3 px or more (AUTOMATION_GESTURES.dragThresholdPx).
+    let dragging = false, pressTick = 0, pressX = 0, dragged = false;
     const tickAt = ev => { const r = this.layer.getBoundingClientRect(); return clamp((ev.clientX - r.left + this.body.scrollLeft) / this.ppt, 0, LOOP); };
     const snap = t => { const g = this.snapTicks(); return clamp(Math.round(t / g) * g, 0, LOOP); };
     this.layer.addEventListener('pointermove', ev => {
       if (!dragging) { this.hover = tickAt(ev); if (this.current()) { const v = this.ctl.querySelector('.renv-val'); const e = this.current(); if (v && e.on) v.textContent = offsetText(e.target, valueAt(e.points, this.hover)); } return; }
+      dragged ||= Math.abs(ev.clientX - pressX) >= 3;
       this.sel.b = snap(tickAt(ev)); this.drawEnv();
     });
     this.layer.addEventListener('pointerdown', ev => {
       if (ev.button !== 0 || this.tool !== 'shape' || !this.current()) return;
       try { this.layer.setPointerCapture(ev.pointerId); } catch { /* a pointer already gone */ }
-      this.closePop(); dragging = true;
-      const t = snap(tickAt(ev)); this.sel = { a: t, b: t }; this.drawEnv();
+      this.closePop(); dragging = true; dragged = false; pressX = ev.clientX; pressTick = tickAt(ev);
+      const t = snap(pressTick); this.sel = { a: t, b: t }; this.drawEnv();
     });
     const end = () => {
       if (!dragging) return;
       dragging = false;
-      let a = Math.min(this.sel.a, this.sel.b), b = Math.max(this.sel.a, this.sel.b);
-      if (b - a < Math.max(3, this.snapTicks())) b = Math.min(LOOP, a + BAR);
-      this.sel = { a, b }; this.openPop();
+      const a = Math.min(this.sel.a, this.sel.b), b = Math.max(this.sel.a, this.sel.b);
+      // A drag keeps its span; a click, or a drag that snapped back onto its
+      // own tick, takes the bar under the press, kept inside the loop: a
+      // press at the loop's right edge takes the last full bar (`barAt`).
+      this.sel = dragged && b > a ? { a, b } : barAt(pressTick);
+      this.newDraft(); this.openPop();
     };
     this.layer.addEventListener('pointerup', end);
     this.layer.addEventListener('pointercancel', () => { dragging = false; });
+  }
+  /* A new range's draft (songShapeModel.ts `shapeDraft`): the session keeps
+     shape, rate, phase and duty; Top starts at the envelope's value at the
+     range's start (the top for an empty envelope) and Bottom at the minimum. */
+  newDraft() {
+    const e = this.current(); if (!e || !this.sel) return;
+    this.shape.top = e.points.length > 0 ? toD(valueAt(e.points, this.sel.a)) : 1;
+    this.shape.bottom = 0;
   }
   openPop() {
     this.closePop();
@@ -816,7 +835,7 @@ class Roll {
     pop.querySelector('[data-a=apply]').onclick = () => {
       const a = this.sel.a, b = this.sel.b;
       e.points = splice(e.points, a, b, generate(this.shape, a, b)).map(p => ({ ...p, tick: Math.round(p.tick * 100) / 100 }));
-      this.sel = null; this.drag = undefined; this.bendMark = undefined; this.closePop(); this.drawEnv();
+      this.sel = null; this.drag = undefined; this.closePop(); this.drawEnv();
     };
     this.pop = pop;
     const state = this.host.closest('.state');
@@ -864,7 +883,10 @@ window.addEventListener('resize', () => { cancelAnimationFrame(pending); pending
 
 /* E, D and S pick a tool on the Roll under the pointer, as on the Song tab; Escape closes a list or the popover. */
 window.addEventListener('keydown', e => {
-  if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // As songShapeRange.ts: Escape from a field inside the Shape popover still closes it.
+  const inPop = devices.some(d => d.pop && d.pop.contains(e.target));
+  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && !(e.key === 'Escape' && inPop)) return;
   if (e.key === 'Escape') { for (const d of devices) { if (d.listOpen) { d.listOpen = false; d.closeList(); d.renderCtl(); } if (d.pop) { d.sel = null; d.closePop(); d.drawEnv(); } } return; }
   const t = TOOLS.find(x => x.key === e.key.toLowerCase());
   if (!t || !active || !active.env) return;
