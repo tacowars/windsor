@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Echo slot mockup, for tacowars to approve (windsor#689, epic
+     windsor#686 decision 9). 2026-10-11. Echo's card with a child insert in
+     its wet-path slot, drawn as variant A of the cloudburst bloom mockup
+     (windsor-corpus/cloudburst/docs/design/bloom-card-mockup.html): the
+     child inline after the slot picker, foldable to its rail. Once
+     approved, it is the spec for the nested card ticket (E3).
+     Every cell is copied from today's rack, read in headless Chrome from
+     `npm run dev` on 2026-10-11 (Echo, Chorus, Phaser, Filter and Advanced
+     Drive as each is added, on the master rack and on Send B): labels,
+     readouts, pickers and each dial's angle. The rack's rules are copied
+     from packages/app/src/console.css, and its sizes from
+     insertRackTables.ts. Static and self-contained apart from the fonts:
+     the slot pickers, the switches, the page tabs and the folds work; the
+     knobs are drawings at today's values and don't turn; nothing makes
+     sound. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Echo Slot Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from packages/app/src/console.css. The app is dark only. */
+:root {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  /* The mockup's own: the slot child's ground and its rail (new). */
+  --sub-ground: #1a1f23;
+  --sub-rail: #20272b;
+  --sub-rail-w: 20px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--ground); color: var(--ink); font: 13px/1.45 var(--f-ui); -webkit-font-smoothing: antialiased; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---------- the mockup's own page (not the console) ---------- */
+.doc { max-width: 1480px; margin: 0 auto; padding: 20px 16px 48px; }
+.doc h1 { font: 700 20px/1.2 var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; margin: 8px 0 4px; }
+.doc h2 { font: 600 14px/1.3 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; margin: 34px 0 6px; }
+.doc h2 .tag { color: var(--inset); background: var(--return); border-radius: var(--r); padding: 1px 6px; margin-right: 8px; }
+.doc h2 .tag.ref { background: var(--ink-faint); }
+.doc h3 { font: 600 11px/1.2 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin: 18px 0 6px; }
+.doc p, .doc li { color: var(--ink-dim); max-width: 92ch; }
+.doc p { margin: 6px 0; }
+.doc b, .doc strong { color: var(--ink); font-weight: 600; }
+.doc code { font: 11.5px var(--f-num); color: var(--ink); background: var(--inset); padding: 1px 4px; border-radius: var(--r); overflow-wrap: anywhere; }
+.doc ul, .doc ol { margin: 6px 0; padding-left: 20px; }
+.status { display: inline-block; font: 600 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--return); border: 1px dashed var(--return); border-radius: var(--r); padding: 2px 8px; }
+.flow { font: 11.5px/1.6 var(--f-num); color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; overflow-x: auto; white-space: pre; margin: 10px 0; }
+.flow b { color: var(--modulator); font-weight: 500; }
+.flow i { color: var(--carrier); font-style: normal; }
+.measure { font: 11px var(--f-num); color: var(--ink-faint); margin: 6px 0 0; }
+.measure b { color: var(--carrier); font-weight: 500; }
+.mock-note { font: 11px var(--f-ui); color: #cbbfe6; background: #2a2140; border: 1px dashed var(--return); border-radius: var(--r); padding: 4px 8px; display: inline-block; margin: 4px 0 8px; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 6px 28px; }
+
+/* ---------- the insert rack (console.css, windsor#173), in its order ---------- */
+.insert-row {
+  display: flex; gap: 6px; align-items: stretch; flex-basis: 100%;
+  min-width: 0; max-width: 100%; overflow-x: auto;
+  padding: 6px; background: var(--inset);
+  border: 1px solid var(--line); border-radius: 6px;
+  scrollbar-color: var(--line-bright) var(--inset);
+  /* stripInserts.ts sets these from insertRackTables.ts INSERT_RACK_PX. */
+  --rack-h: 196px; --rack-rail: 24px; --rack-fold: 26px; --rack-tabs-h: 20px;
+  --rack-wide-col: 104px; --rack-add-w: 88px; --rack-picker-w: 230px; --rack-plot-w: 124px;
+  --kc: var(--modulator);
+}
+.insert-row.bus { --kc: var(--carrier); }
+.insert-box { flex: none; height: var(--rack-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.insert-box.off .insert-stack { opacity: 0.4; }
+.insert-rail {
+  width: var(--rack-rail); flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 3px 0; background: var(--panel-hi); border-right: 1px solid var(--line);
+}
+.insert-box.folded { width: var(--rack-fold); cursor: pointer; }
+.insert-box.folded .insert-rail { width: 100%; border-right: 0; }
+.insert-icon {
+  flex: none; width: 18px; height: 18px; display: grid; place-items: center; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r);
+  color: var(--ink-faint); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.insert-icon:hover:not(:disabled) { color: var(--ink); border-color: var(--line-bright); }
+.insert-icon:disabled { opacity: 0.35; cursor: default; }
+.insert-icon.insert-power { color: var(--modulator); font-size: 12px; }
+.insert-box.off .insert-icon.insert-power { color: var(--ink-faint); }
+.insert-switch { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.insert-name {
+  flex: 0 1 auto; min-height: 0; overflow: hidden; text-overflow: ellipsis;
+  writing-mode: vertical-rl; transform: rotate(180deg); padding: 1px 0;
+  background: transparent; border: 0; border-radius: var(--r); color: var(--ink);
+  font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; white-space: nowrap; cursor: pointer;
+}
+.insert-name:hover { background: var(--panel); }
+.insert-num { margin-inline-end: 5px; color: var(--ink-faint); }
+.insert-tools { display: flex; flex-direction: column; gap: 0; margin-top: auto; }
+.insert-tools .insert-icon { height: 16px; }
+.insert-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.insert-tabs {
+  flex: none; height: var(--rack-tabs-h); display: flex; align-items: center; gap: 2px;
+  padding: 2px 6px 0; border-bottom: 1px solid var(--line);
+}
+.insert-tabs button {
+  padding: 2px 6px; background: transparent; border: 1px solid transparent; border-radius: var(--r);
+  color: var(--ink-faint); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+}
+.insert-tabs button:hover { color: var(--ink); }
+.insert-tabs button[aria-selected='true'] { background: var(--kc, var(--modulator)); color: var(--inset); }
+.insert-body { flex: 1; min-height: 0; overflow: hidden; }
+.insert-row :focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.insert-page { height: 100%; display: flex; gap: 2px; padding: 4px 8px 6px; }
+.insert-col { flex: none; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; }
+.insert-col.wide { width: var(--rack-wide-col); align-items: stretch; }
+.insert-col.wide.fit { width: auto; min-width: var(--rack-wide-col); }
+.insert-col.wide.fit select.field { width: var(--rack-wide-col); }
+.insert-col.wide + .insert-col.wide { margin-left: 6px; }
+.insert-col.wide + .insert-col:not(.wide) { margin-left: 6px; }
+.insert-col.wide > .knob { align-self: center; }
+.insert-rule { flex: none; width: 1px; margin: 6px; background: var(--line); }
+.insert-row .knob.rack { width: auto; min-width: 54px; gap: 0; padding: 2px 3px; }
+.insert-row .knob.rack.big { min-width: 64px; }
+.insert-row .knob .dial-arc { stroke: var(--kc, var(--modulator)); }
+.insert-row .knob .knob-val { line-height: 13px; }
+.insert-row .knob .knob-label { line-height: 11px; }
+.insert-row .field-label, .insert-row .field-wrap {
+  display: flex; flex-direction: column; gap: 1px; margin: 0;
+  font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em;
+  line-height: 11px; text-transform: uppercase; color: var(--ink-faint);
+}
+.insert-row select.field {
+  appearance: none; width: 100%; max-width: none; height: 22px; padding: 0 16px 0 6px;
+  background: var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E") no-repeat right 6px center;
+  border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink);
+  font-family: var(--f-ui); font-size: 11.5px; font-weight: 400; letter-spacing: normal; line-height: 20px;
+  text-overflow: ellipsis; text-transform: none; cursor: pointer;
+}
+/* The checkbox switch: a second .insert-switch rule, as console.css has it
+   (so a switch in a page stacks its box over its label, as today). */
+.insert-switch { display: flex; align-items: center; gap: 5px; color: var(--ink-dim); font-family: var(--f-ui); font-size: 11px; line-height: 14px; white-space: nowrap; cursor: pointer; }
+.insert-switch input[type='checkbox'] { appearance: none; flex: none; width: 11px; height: 11px; margin: 0; background: var(--inset); border: 1px solid var(--line-bright); border-radius: 2px; cursor: pointer; }
+.insert-switch input[type='checkbox']:checked { background: var(--kc, var(--modulator)); border-color: var(--kc, var(--modulator)); }
+.insert-note { max-width: var(--rack-wide-col); color: var(--ink-faint); font-size: 10px; line-height: 1.3; }
+.insert-col.drive-plots { width: var(--rack-plot-w); align-self: stretch; justify-content: stretch; align-items: stretch; gap: 4px; }
+.drive-plot { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1px; }
+.drive-plot-name { flex: none; font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; line-height: 11px; text-transform: uppercase; color: var(--ink-faint); }
+.drive-plot svg { flex: 1; min-height: 0; width: 100%; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; }
+.drive-plot-line { fill: none; stroke: var(--kc, var(--modulator)); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.drive-plot-grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.insert-add {
+  flex: none; height: var(--rack-h); width: var(--rack-add-w); display: grid; place-content: center; justify-items: center; gap: 4px;
+  padding: 0; background: transparent; border: 1px dashed var(--line-bright); border-radius: 5px; color: var(--ink-faint);
+  font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.insert-add b { font-size: 20px; font-weight: 400; line-height: 1; }
+
+/* ---------- knob (console.css .knob; knob.ts's rack dial) ---------- */
+.knob { width: 54px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r); user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--ink-dim); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; pointer-events: none; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); pointer-events: none; }
+
+/* ---------- seg (console.css .seg; the Filter card's Mode and Slope) ---------- */
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button {
+  flex: 1; min-width: 44px; background: var(--inset); border: 0; padding: 5px 4px; cursor: pointer;
+  font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim);
+}
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed='true'] { background: var(--seg-color, var(--carrier)); color: #111416; }
+
+/* ---------- new: the slot and its child (variant A) ---------- */
+/* Echo switched off bypasses its child too, so the child dims with it. */
+.insert-box.off .sub { opacity: 0.4; }
+.insert-box.folded .insert-stack, .insert-box.folded .sub { display: none; }
+.sub { flex: none; display: flex; border-left: 1px solid var(--line-bright); background: var(--sub-ground); }
+.sub-rail {
+  width: var(--sub-rail-w); flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 3px 0; background: var(--sub-rail); border-right: 1px solid var(--line);
+}
+.sub.folded { cursor: pointer; }
+.sub.folded .sub-rail { border-right: 0; }
+.sub.folded .sub-stack { display: none; }
+.sub-rail .insert-name { font-size: 9.5px; color: var(--kc); }
+.sub.off .sub-rail .insert-power { color: var(--ink-faint); }
+.sub.off .sub-stack { opacity: 0.4; }
+.sub-stack { display: flex; flex-direction: column; min-width: 0; }
+/* A kind whose card this page doesn't draw: marked as a stand-in. */
+.stand-in { margin: 8px; padding: 8px; width: 180px; border: 1px dashed var(--return); border-radius: var(--r); color: #cbbfe6; font-size: 10.5px; line-height: 1.35; background: #2a2140; }
+.stand-in b { display: block; font: 600 8.5px/12px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--return); margin-bottom: 4px; }
+</style>
+
+<body>
+<div class="doc">
+  <span class="status">Draft for approval · 2026-10-11</span>
+  <h1>Echo · wet-path slot</h1>
+  <p>Echo's rack card with a <b>slot</b>: one child insert on Echo's wet path, before Echo's Mix (epic windsor#686). The card is drawn as variant A of the bloom mockup. The <b>slot picker</b> sits rightmost in Echo's panel, after Echo's own controls. The <b>child</b> sits inline after the picker, with a small rail of its own. Clicking the child's name folds it to that rail. The rack stays one height (196 px), and only the width grows.</p>
+  <p>Echo's own cells are today's, cell for cell: Sync to 120 bpm, Time, Regen, Damp, Q and Mix, and the rail with its switch, name and ◀ ▶ ✕. The children's cells are today's cards too, Mix included. Read the <b>Today</b> row first for comparison. The slot pickers, switches, page tabs and folds work in every row, so any state can be reached from any other. The knobs are drawings at today's values and don't turn. Nothing makes sound.</p>
+  <div class="flow">in ─┬────────────────────────────────────────────────────────────────▶ dry ─┐
+     └▶ delay line (<b>Time</b> <b>Regen</b> <b>Damp</b> <b>Q</b>) ▶ wet ▶ <i>[ Slot ▾ : child ]</i> ▶ ───┴▶ <b>Mix</b> ▶ out</div>
+
+  <div class="cols2">
+    <div>
+      <h3>How it works</h3>
+      <ul>
+        <li><b>The slot column</b> follows a rule after Echo's Mix. It holds a picker labelled <i>Slot</i> and a short note. The picker lists <i>None</i> first, then the Add picker's groups minus Echo (<code>insertAddPicker.ts</code>, <code>INSERT_GROUPS</code>).</li>
+        <li><b>The child's rail</b> holds its own on/off switch and its name, <code>SLOT · &lt;KIND&gt;</code>, in the rack's accent, and nothing else. It has no ◀ ▶ ✕: the child can't move or leave the slot. Setting the picker back to <i>None</i> removes it.</li>
+        <li><b>The child's page</b> is its card as it is on the rack today, its own <b>Mix</b> included (epic decision 3). A child with pages shows its own tabs over the child's area only.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Folding</h3>
+      <ul>
+        <li>Clicking the child's name folds it to its rail (<span id="railW">21</span> px with its border). Echo goes back to its own width, and the picker still names the child. Clicking the name again opens it.</li>
+        <li>Clicking Echo's own name folds the whole insert, child included, to the rack's 26 px fold, as any insert folds today.</li>
+        <li>Switching Echo off dims its child with it, since Echo bypasses its whole wet path. Switching the child off dims only the child.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="states"></div>
+
+  <h2>Questions for tacowars</h2>
+  <ol>
+    <li><b>The slot column's note.</b> It reads <i>Wet path, before Mix</i>, or <i>Empty: the repeats go straight to Mix</i> with no child. Keep it, or drop it and let the picker's label stand alone? Dropping it doesn't change the width.</li>
+    <li><b>The child's on/off glyph.</b> It is drawn in the rail's teal on both racks, as every insert's switch is today, and only the child's name takes the accent (amber on Send B). Keep the teal, or take the accent too?</li>
+    <li><b>Wide children.</b> Advanced Drive's Stage page makes Echo about 1,270 px wide (state 4, Stage 1 tab), so on a laptop Echo can fill the visible rack. Accept this, since folding the child answers it, or limit the slot to one-page kinds?</li>
+    <li><b>The Filter's Mode and Slope buttons on Send B.</b> Today's Filter card lights them in the strip's teal on every rack, while its knobs take the bus's amber (state 6 keeps this). Is that worth a separate fix?</li>
+  </ol>
+</div>
+
+<script>
+'use strict';
+/* ---------- the knob (knob.ts's rack dial, drawn at a fixed angle) ---------- */
+/* knobConstants.ts: arc ±135°, rack r 12, big r 18, pad 6, face inset 3.5, pin inset 5. */
+const ARC0 = -135, ARC1 = 135, PAD = 6, FACE = 3.5, PIN = 5;
+const polar = (c, r, deg) => { const a = (deg - 90) * Math.PI / 180; return [c + r * Math.cos(a), c + r * Math.sin(a)]; };
+const arcPath = (c, r, a0, a1) => {
+  const [x0, y0] = polar(c, r, a0), [x1, y1] = polar(c, r, a1);
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+};
+function h(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+/** A rack dial: `pin` is today's angle in degrees; the arc runs from `zero` (its 0) to the pin. */
+function knob(label, value, pin, zero, big) {
+  const r = big ? 18 : 12, size = r * 2 + PAD, c = size / 2;
+  const node = h('div', big ? 'knob rack big' : 'knob rack');
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', `${label} ${value}`);
+  node.title = label;
+  const a0 = Math.min(zero, pin), a1 = Math.max(zero, pin);
+  node.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE}"></circle>` +
+    `<path class="dial-track" d="${arcPath(c, r, ARC0, ARC1)}"></path>` +
+    `<path class="dial-arc" d="${a1 - a0 < 1 ? '' : arcPath(c, r, a0, a1)}"></path>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN}" transform="rotate(${pin} ${c} ${c})"></line></svg>`;
+  node.append(h('span', 'knob-val', value), h('span', 'knob-label', label));
+  return node;
+}
+const K = (label, value, pin, zero = ARC0) => knob(label, value, pin, zero, false);
+const B = (label, value, pin, zero = ARC0) => knob(label, value, pin, zero, true);
+
+/* ---------- layout (insertLayout.ts) ---------- */
+const col = (...k) => { const c = h('div', 'insert-col'); c.append(...k); return c; };
+const wide = (...k) => { const c = h('div', 'insert-col wide'); c.append(...k); return c; };
+const fit = (...k) => { const c = wide(...k); c.classList.add('fit'); return c; };
+const rule = () => h('div', 'insert-rule');
+const page = (...cols) => { const p = h('div', 'insert-page'); p.append(...cols); return p; };
+const note = (text, title) => { const n = h('div', 'insert-note', text); if (title) n.title = title; return n; };
+/** A picker with its label above it. `options`: [value, text, title?] or { group, items }. */
+function select(label, options, value, o = {}) {
+  const wrap = h('label', 'field-wrap', label);
+  const sel = h('select', 'field');
+  sel.setAttribute('aria-label', o.aria || label);
+  const add = (to, [v, t, title]) => { const opt = new Option(t, v); if (title) opt.title = title; to.append(opt); };
+  for (const opt of options) {
+    if (opt.group) {
+      const g = document.createElement('optgroup');
+      g.label = opt.group;
+      opt.items.forEach((item) => add(g, item));
+      sel.append(g);
+    } else add(sel, opt);
+  }
+  sel.value = value;
+  if (o.change) sel.onchange = () => o.change(sel.value);
+  wrap.append(sel);
+  return wrap;
+}
+function sw(label, checked) {
+  const wrap = h('label', 'insert-switch');
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = checked;
+  wrap.append(input, h('span', '', label));
+  return wrap;
+}
+/** A seg with its small label above it (filterCard.ts `labelled`); today's card colours it with STRIP_COLOR. */
+function seg(label, items, value) {
+  const wrap = h('div');
+  const row = h('div', 'seg');
+  row.style.setProperty('--seg-color', '#5FA8A0');
+  for (const t of items) {
+    const b = h('button', '', t);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(t === value));
+    b.onclick = () => row.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    row.append(b);
+  }
+  wrap.append(h('span', 'field-label', label), row);
+  return wrap;
+}
+
+/* ---------- today's cards, as read from the rack on 2026-10-11 ---------- */
+const TEMPO = [
+  ['', 'Free'],
+  ['1/4', '1/4', 'quarter note at 120 bpm'], ['1/8.', '1/8.', 'dotted eighth at 120 bpm'],
+  ['1/8', '1/8', 'eighth note at 120 bpm'], ['1/8T', '1/8T', 'eighth triplet at 120 bpm'],
+  ['1/16', '1/16', 'sixteenth note at 120 bpm'], ['1/16.', '1/16.', 'dotted sixteenth at 120 bpm'],
+  ['1/4.', '1/4.', 'dotted quarter at 120 bpm'], ['1/2', '1/2', 'half note at 120 bpm'],
+];
+/** echoCard.ts: the tempo picker, Time and Regen, Damp and Q, Mix at the big dial. Mix reads 0.30 as added to a part or the master, 1.00 on a send bus. */
+const echoCols = (bus) => [
+  wide(select('Sync to 120 bpm', TEMPO, '')),
+  col(K('Time', '280m', -5.95), K('Regen', '0.30', -49.74)),
+  col(K('Damp', '3.20k', 35.83), K('Q', '+1.0dB', -62.86, -80.84)),
+  bus ? col(B('Mix', '1.00', 135)) : col(B('Mix', '0.30', -54)),
+];
+
+const SHAPER_PATH = 'M0,76.5 L1,76 L1.9,75.6 L2.9,75.1 L3.8,74.6 L4.8,74.2 L5.7,73.7 L6.7,73.3 L7.6,72.8 L8.6,72.3 L9.5,71.9 L10.5,71.4 L11.4,71 L12.4,70.5 L13.4,70 L14.3,69.6 L15.3,69.1 L16.2,68.6 L17.2,68.2 L18.1,67.7 L19.1,67.3 L20,66.8 L21,66.3 L21.9,65.9 L22.9,65.4 L23.8,65 L24.8,64.5 L25.8,64 L26.7,63.6 L27.7,63.1 L28.6,62.6 L29.6,62.2 L30.5,61.7 L31.5,61.3 L32.4,60.8 L33.4,60.3 L34.3,59.9 L35.3,59.4 L36.2,59 L37.2,58.5 L38.2,58 L39.1,57.4 L40.1,56.9 L41,56.3 L42,55.8 L42.9,55.1 L43.9,54.5 L44.8,53.9 L45.8,53.2 L46.7,52.5 L47.7,51.8 L48.6,51.1 L49.6,50.4 L50.6,49.7 L51.5,48.9 L52.5,48.1 L53.4,47.4 L54.4,46.6 L55.3,45.8 L56.3,45 L57.2,44.1 L58.2,43.3 L59.1,42.5 L60.1,41.7 L61,40.8 L62,40 L63,39.2 L63.9,38.3 L64.9,37.5 L65.8,36.7 L66.8,35.9 L67.7,35 L68.7,34.2 L69.6,33.4 L70.6,32.6 L71.5,31.9 L72.5,31.1 L73.4,30.3 L74.4,29.6 L75.4,28.9 L76.3,28.2 L77.3,27.5 L78.2,26.8 L79.2,26.1 L80.1,25.5 L81.1,24.9 L82,24.2 L83,23.7 L83.9,23.1 L84.9,22.6 L85.8,22 L86.8,21.5 L87.8,21 L88.7,20.6 L89.7,20.1 L90.6,19.7 L91.6,19.2 L92.5,18.7 L93.5,18.3 L94.4,17.8 L95.4,17.4 L96.3,16.9 L97.3,16.4 L98.2,16 L99.2,15.5 L100.2,15 L101.1,14.6 L102.1,14.1 L103,13.7 L104,13.2 L104.9,12.7 L105.9,12.3 L106.8,11.8 L107.8,11.4 L108.7,10.9 L109.7,10.4 L110.6,10 L111.6,9.5 L112.6,9 L113.5,8.6 L114.5,8.1 L115.4,7.7 L116.4,7.2 L117.3,6.7 L118.3,6.3 L119.2,5.8 L120.2,5.4 L121.1,4.9 L122.1,4.4 L123,4 L124,3.5';
+/** advancedDrivePlots.ts at the default stage: soft shaper, lowpass filter (off, so flat). */
+function drivePlots() {
+  const c = col();
+  c.classList.add('drive-plots');
+  c.innerHTML =
+    '<div class="drive-plot" title="Base shaper · before modulation and DC removal"><span class="drive-plot-name">Shaper</span>' +
+    '<svg viewBox="0 0 124 80" preserveAspectRatio="none" role="img" aria-label="Base shaper · before modulation and DC removal">' +
+    '<line class="drive-plot-grid" x1="0" y1="40" x2="124" y2="40"></line><line class="drive-plot-grid" x1="62" y1="0" x2="62" y2="80"></line>' +
+    `<path class="drive-plot-line" d="${SHAPER_PATH}"></path></svg></div>` +
+    '<div class="drive-plot" title="Base filter · 48 kHz reference · −36 to +24 dB"><span class="drive-plot-name">Filter</span>' +
+    '<svg viewBox="0 0 124 80" preserveAspectRatio="none" role="img" aria-label="Base filter · 48 kHz reference · −36 to +24 dB">' +
+    '<line class="drive-plot-grid" x1="0" y1="32" x2="124" y2="32"></line><line class="drive-plot-grid" x1="70.2" y1="0" x2="70.2" y2="80"></line>' +
+    '<path class="drive-plot-line" d="M0,32 L124,32"></path></svg></div>';
+  return c;
+}
+
+/** Each kind's pages, as its card has them today: [{ name, title?, cols() }]. */
+const CARDS = {
+  chorus: [{ name: 'Chorus', cols: () => [
+    wide(select('Starting point', [['', 'Custom'], ['slow', 'Slow'], ['fast', 'Fast'], ['both', 'Both']], '', { aria: 'Chorus preset' })),
+    col(K('Rate', '0.60', 12.77), K('Depth', '2.00', 0)),
+    col(K('Spread', '0.70', 54), K('Mix', '0.50', 0)),
+  ] }],
+  phaser: [{ name: 'Phaser', cols: () => [
+    wide(select('Starting point', [['', 'Custom'], ['classic', 'Classic swirl'], ['color', 'Deep color'], ['acid', 'Acid motion'], ['space', 'Space pad'], ['hollow', 'Hollow orbit']], 'classic', { aria: 'Phaser preset' })),
+    col(K('Rate', '0.20', -14), K('Center', '900', 32.05)),
+    col(K('Depth (oct)', '2.00', 0), K('Feedback', '0.25', 37.5, 0)),
+    col(K('FB bass cut', '350', 32.81), K('Stereo (°)', '0.00', -135)),
+    col(K('Envelope (oct)', '0.00', 0, 0), K('Bass keep', '0.00', -135)),
+    col(K('Mix', '0.50', 0)),
+  ] }],
+  filter: [{ name: 'Filter', cols: () => [
+    fit(seg('Mode', ['LP', 'HP', 'BP', 'Notch', 'Acid'], 'LP'), seg('Slope', ['12 dB', '24 dB'], '12 dB')),
+    col(B('Cutoff', '18.00k', 135)),
+    col(K('Reso', '0.71', -105.57), K('Mix', '1.00', 135)),
+  ] }],
+  'advanced-drive': [
+    { name: 'Main', cols: () => [
+      fit(
+        select('Starting point', [['', 'Custom'], ['warmth', 'Soft warmth'], ['acid', 'Biased acid'], ['drums', 'Parallel drum crunch'], ['diodes', 'Serial diode treatment'], ['bands', 'Warm bass / torn highs'], ['motion', 'Moving stereo edges']], ''),
+        select('Routing', [['single', 'Single'], ['serial', 'Serial'], ['parallel', 'Parallel'], ['multiband', 'Three-band'], ['mid-side', 'Mid/Side']], 'single'),
+        sw('Tone compensation', true),
+      ),
+      col(K('Input dB', '0.00', -27, -27), K('Output dB', '0.00', 67.5, 67.5)),
+      col(K('Tilt dB', '0.00', 0, 0), K('Tilt Hz', '500', -20.4)),
+      col(B('Mix', '1.00', 135)),
+      wide(note('Input → Stage 1 → Output')),
+    ] },
+    { name: 'Stage 1', title: 'Stage 1', cols: () => [
+      fit(sw('Stage on', true), sw('Shaper on', true), sw('Filter on', false), sw('Filter before shaper', false)),
+      wide(
+        select('Shaper', ['soft', 'hard', 'diode', 'tube', 'half-wave', 'full-wave', 'fold', 'crush'].map((s) => [s, s]), 'soft'),
+        select('Filter', ['lowpass', 'highpass', 'bandpass', 'notch', 'peak'].map((s) => [s, s]), 'lowpass'),
+      ),
+      col(K('Amount', '0.25', -67.5), K('Bias', '0.00', 0, 0)),
+      col(K('Level dB', '0.00', 0, 0), K('Cutoff Hz', '12.00k', 115.03)),
+      col(K('Resonance Q', '0.71', -130.14), K('Peak dB', '0.00', 0, 0)),
+      drivePlots(),
+      rule(),
+      col(K('Env → amount', '0.00', 0, 0), K('LFO → amount', '0.00', 0, 0)),
+      col(K('Env → bias', '0.00', 0, 0), K('LFO → bias', '0.00', 0, 0)),
+      col(K('Env → cut oct', '0.00', 0, 0), K('LFO → cut oct', '0.00', 0, 0)),
+    ] },
+    { name: 'Mod', cols: () => [
+      col(K('Attack ms', '10.00', -130.13), K('Release ms', '180.00', -111.93)),
+      col(K('Env gain dB', '0.00', -27, -27), K('LFO Hz', '0', -20.66)),
+      wide(
+        sw('Sync LFO', false),
+        select('Division', ['1/16', '1/8', '1/8D', '1/4', '1/2', '1/1', '2/1'].map((s) => [s, s]), '1/4'),
+        select('Wave', ['sine', 'triangle', 'square', 'up', 'down'].map((s) => [s, s]), 'sine'),
+        note('Env follows the input', 'Envelope follows this insert’s stereo input. Cutoff modulation is in octaves. LFO Hz applies when Sync is off.'),
+      ),
+    ] },
+  ],
+};
+
+/* ---------- the slot picker: None, then INSERT_GROUPS minus Echo ---------- */
+const SLOT_KINDS = [
+  { group: 'EQ', items: [['eq', 'Parametric EQ']] },
+  { group: 'Filter', items: [['filter', 'Filter']] },
+  { group: 'Drive', items: [['drive', 'Classic Drive'], ['advanced-drive', 'Advanced Drive'], ['tape', 'Tape']] },
+  { group: 'Dynamics', items: [['compressor', 'Bus compressor']] },
+  { group: 'Modulation', items: [['chorus', 'Chorus'], ['ensemble', 'Ensemble'], ['phaser', 'Phaser']] },
+  { group: 'Time', items: [['delay', 'Dub delay']] },
+  { group: 'Space', items: [['plate', 'Plate reverb'], ['retro-reverb', 'Retro reverb']] },
+];
+const LABELS = Object.fromEntries(SLOT_KINDS.flatMap((g) => g.items));
+const STAND_IN_EXTRA = {
+  compressor: ' In the slot its sidechain is forced to Internal (epic decision 8).',
+  eq: ' In the slot it has no spectrum and no Listen (epic decision 8).',
+};
+function standInPages(kind) {
+  return [{ name: LABELS[kind], cols: () => {
+    const s = h('div', 'stand-in');
+    s.append(h('b', '', 'Stand-in'), document.createTextNode(`${LABELS[kind]}'s card as it is on the rack today, Mix included. Not drawn in this mockup.${STAND_IN_EXTRA[kind] || ''}`));
+    return [s];
+  } }];
+}
+const pagesOf = (kind) => CARDS[kind] || standInPages(kind);
+
+function slotColumn(v) {
+  const picker = select('Slot', [['none', 'None'], ...SLOT_KINDS], v.slot, {
+    aria: 'Slot: an insert on Echo’s wet path, before Mix',
+    change: (kind) => { v.slot = kind; v.page = 0; v.subFolded = false; v.childOn = true; v.paint(); },
+  });
+  return wide(picker, note(v.slot === 'none' ? 'Empty: the repeats go straight to Mix.' : 'Wet path, before Mix'));
+}
+
+/* ---------- the child: its rail, then its tabs (two or more pages) over its page ---------- */
+function childRail(v) {
+  const label = LABELS[v.slot];
+  const r = h('div', 'sub-rail');
+  const swWrap = h('div', 'insert-switch');
+  const power = h('button', 'insert-icon insert-power', '⏻');
+  power.type = 'button';
+  power.title = power.ariaLabel = `Turn ${label} ${v.childOn ? 'off' : 'on'}`;
+  power.setAttribute('aria-pressed', String(v.childOn));
+  power.onclick = (e) => { e.stopPropagation(); v.childOn = !v.childOn; v.paint(); };
+  swWrap.append(power);
+  const name = h('button', 'insert-name', `SLOT · ${label}`);
+  name.type = 'button';
+  name.title = `${v.subFolded ? 'Open' : 'Fold'} ${label}`;
+  name.setAttribute('aria-expanded', String(!v.subFolded));
+  name.onclick = (e) => { e.stopPropagation(); v.subFolded = !v.subFolded; v.paint(); };
+  r.append(swWrap, name);
+  return r;
+}
+function childStack(v) {
+  const pages = pagesOf(v.slot);
+  const at = Math.min(v.page, pages.length - 1);
+  const stack = h('div', 'sub-stack');
+  if (pages.length > 1) {
+    const tabs = h('div', 'insert-tabs');
+    tabs.setAttribute('role', 'tablist');
+    pages.forEach((pg, i) => {
+      const t = h('button', '', pg.name);
+      t.type = 'button';
+      t.setAttribute('role', 'tab');
+      t.setAttribute('aria-selected', String(i === at));
+      if (pg.title) t.title = pg.title;
+      t.onclick = () => { v.page = i; v.paint(); };
+      tabs.append(t);
+    });
+    stack.append(tabs);
+  }
+  const body = h('div', 'insert-body');
+  body.append(page(...pages[at].cols()));
+  stack.append(body);
+  return stack;
+}
+function child(v) {
+  const sub = h('div', 'sub');
+  sub.classList.toggle('off', !v.childOn);
+  sub.classList.toggle('folded', v.subFolded);
+  sub.append(childRail(v));
+  if (!v.subFolded) sub.append(childStack(v));
+  if (v.subFolded) sub.onclick = () => { v.subFolded = false; v.paint(); };
+  return sub;
+}
+
+/* ---------- Echo's box (insertShell.ts), with the slot when `v.slot` is defined ---------- */
+function echoBox(v) {
+  const box = h('div', 'insert-box');
+  box.classList.toggle('off', !v.echoOn);
+  box.classList.toggle('folded', v.folded);
+  const rail = h('div', 'insert-rail');
+  const swWrap = h('div', 'insert-switch');
+  const power = h('button', 'insert-icon insert-power', '⏻');
+  power.type = 'button';
+  power.title = power.ariaLabel = `Turn Echo ${v.echoOn ? 'off' : 'on'}`;
+  power.setAttribute('aria-pressed', String(v.echoOn));
+  power.onclick = (e) => { e.stopPropagation(); v.echoOn = !v.echoOn; v.paint(); };
+  swWrap.append(power);
+  const name = h('button', 'insert-name');
+  name.type = 'button';
+  name.title = `${v.folded ? 'Open' : 'Fold'} Echo`;
+  name.setAttribute('aria-expanded', String(!v.folded));
+  name.append(h('span', 'insert-num', '1'), document.createTextNode('Echo'));
+  name.onclick = (e) => { e.stopPropagation(); v.folded = !v.folded; v.paint(); };
+  const tools = h('div', 'insert-tools');
+  for (const [glyph, title] of [['◀', 'Move Echo earlier in the chain'], ['▶', 'Move Echo later in the chain'], ['✕', 'Remove Echo']]) {
+    const b = h('button', 'insert-icon', glyph);
+    b.type = 'button';
+    b.title = b.ariaLabel = title;
+    b.disabled = glyph !== '✕'; // the only insert in its chain, as today
+    tools.append(b);
+  }
+  rail.append(swWrap, name, tools);
+  if (v.folded) box.onclick = () => { v.folded = false; v.paint(); };
+  const stack = h('div', 'insert-stack');
+  const body = h('div', 'insert-body');
+  const cols = echoCols(v.bus);
+  if (v.slot !== undefined) cols.push(rule(), slotColumn(v));
+  body.append(page(...cols));
+  stack.append(body);
+  box.append(rail, stack);
+  if (v.slot !== undefined && v.slot !== 'none') box.append(child(v));
+  return box;
+}
+function addSlot(where) {
+  const a = h('div', 'insert-add');
+  a.title = `Add an insert at the ${where}`;
+  a.append(h('b', '', '+'), h('span', '', 'Add insert'));
+  return a;
+}
+
+/* ---------- the states ---------- */
+const STATES = [
+  { id: 'today', tag: 'Today', title: 'Echo as it is today, for comparison', v: {},
+    text: 'Read from the master rack in <code>npm run dev</code>: no slot column. Every row below keeps these cells as they are.' },
+  { id: 's1', tag: '1', title: 'The slot empty (picker on None)', v: { slot: 'none' },
+    text: 'Only the slot column is new: a rule after Mix, then the picker and its note. This width is Echo\'s own width from here on.' },
+  { id: 's2', tag: '2', title: 'A Chorus child', v: { slot: 'chorus' },
+    text: 'The child\'s rail (switch, <code>SLOT · CHORUS</code>), then the Chorus card as today, its Mix included.' },
+  { id: 's3', tag: '3', title: 'A Phaser child', v: { slot: 'phaser' },
+    text: 'The Phaser card as today: Starting point, eight knobs in columns of two, and Mix at the end.' },
+  { id: 's4', tag: '4', title: 'An Advanced Drive child, multi-page', v: { slot: 'advanced-drive' },
+    text: 'The child\'s own tabs (Main, Stage 1, Mod) sit over the child\'s area only, since Echo has one page. Try Stage 1, the widest page. Advanced Drive\'s Mix is on Main.' },
+  { id: 's5', tag: '5', title: 'A folded child', v: { slot: 'chorus', subFolded: true },
+    text: 'The Chorus child folded by its name: only its rail shows, and the picker still names it. Click the name to open it.' },
+  { id: 's6', tag: '6', title: 'Echo on Send B with a Filter child', v: { slot: 'filter', bus: true },
+    text: 'A send bus\'s rack takes the bus accent (<code>--carrier</code>): the knob arcs, the child\'s name and its tabs. Echo\'s Mix reads 1.00, as Echo does when it is added to a send bus.', bus: true },
+];
+const host = document.getElementById('states');
+const views = {};
+function paintMeasure(s) {
+  const v = views[s.id], m = v.measure, box = v.row.querySelector('.insert-box');
+  if (!box) return; // not painted yet
+  const r = box.getBoundingClientRect();
+  let text = `Echo's box: <b>${Math.round(r.width)} × ${Math.round(r.height)} px</b> · rack height 196 px`;
+  if (v.slot !== undefined) text += ` · slot: ${v.slot === 'none' ? 'None' : LABELS[v.slot]}${v.subFolded ? ' (folded)' : ''}`;
+  const empty = views.s1 && views.s1.row.querySelector('.insert-box');
+  if (s.id !== 's1' && v.subFolded && !v.folded && empty) {
+    const ew = Math.round(empty.getBoundingClientRect().width), rail = Math.round(v.row.querySelector('.sub').getBoundingClientRect().width);
+    text += ` · = Echo with its slot empty (${ew} px) + the child's rail (${rail} px) = ${ew + rail} px`;
+  }
+  m.innerHTML = text;
+}
+for (const s of STATES) {
+  const sec = h('section');
+  sec.id = s.id;
+  const h2 = h('h2');
+  const tag = h('span', s.id === 'today' ? 'tag ref' : 'tag', s.tag);
+  h2.append(tag, document.createTextNode(s.title));
+  const p = h('p');
+  p.innerHTML = s.text;
+  const row = h('div', s.bus ? 'insert-row bus' : 'insert-row');
+  row.setAttribute('aria-label', s.bus ? 'Send B inserts' : 'Master inserts');
+  const measure = h('p', 'measure');
+  const tagNote = h('span', 'mock-note', s.bus ? 'Send B\'s rack: Add, 1 Echo, Add.' : 'The master rack: Add, 1 Echo, Add.');
+  sec.append(h2, p, tagNote, row, measure);
+  host.append(sec);
+  const v = Object.assign({ page: 0, childOn: true, subFolded: false, echoOn: true, folded: false, bus: false }, s.v, { row, measure });
+  v.paint = () => {
+    const keep = row.scrollLeft;
+    row.replaceChildren(addSlot('front'), echoBox(v), addSlot('back'));
+    row.scrollLeft = keep;
+    STATES.forEach((t) => views[t.id] && paintMeasure(t));
+  };
+  views[s.id] = v;
+}
+STATES.forEach((s) => views[s.id].paint());
+/* The widths change once the fonts arrive, so measure again then. */
+const remeasure = () => {
+  STATES.forEach(paintMeasure);
+  const sub = views.s5.row.querySelector('.sub');
+  if (sub) document.getElementById('railW').textContent = String(Math.round(sub.getBoundingClientRect().width));
+};
+remeasure();
+document.fonts.ready.then(remeasure);
+</script>
+</body>
+</html>
