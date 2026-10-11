@@ -355,8 +355,7 @@ var BLOOM_SLOT_NAMES = [
   "key",
   "scale",
   "freeze",
-  "enabled",
-  "split"
+  "enabled"
 ];
 var slotOf = (name) => BLOOM_SLOT_NAMES.indexOf(name);
 var SLOT_AMOUNT = slotOf("amount");
@@ -375,14 +374,13 @@ var SLOT_KEY = slotOf("key");
 var SLOT_SCALE = slotOf("scale");
 var SLOT_FREEZE = slotOf("freeze");
 var SLOT_ENABLED = slotOf("enabled");
-var SLOT_SPLIT = slotOf("split");
 var BLOOM_SMOOTHED_MASK = Uint8Array.from(
   BLOOM_SLOT_NAMES,
   (name) => ["amount", "mix", "swell", "sustain", "spread", "shape", "bright", "focus", "density"].includes(
     name
   ) ? 1 : 0
 );
-function bloomDescriptors() {
+function bloomSlotDescriptors() {
   const numbers = Object.entries(BLOOM_BOUNDS).map(([name, [minValue, maxValue]]) => ({
     name,
     minValue,
@@ -409,9 +407,19 @@ function bloomDescriptors() {
     indexOf("key", BLOOM_KEYS, BLOOM_KEY_DEFAULT),
     indexOf("scale", BLOOM_SCALES, BLOOM_SCALE_DEFAULT),
     switchOf("freeze"),
-    switchOf("enabled"),
-    // Written by the stage, not a field: 0 while the slot is empty, 1 with a child.
-    { name: "split", minValue: 0, maxValue: 1, defaultValue: 0, automationRate: "k-rate" }
+    switchOf("enabled")
+  ];
+}
+function bloomDescriptors() {
+  return [
+    ...bloomSlotDescriptors(),
+    {
+      name: BLOOM_SLOT.splitParam,
+      minValue: 0,
+      maxValue: 1,
+      defaultValue: 0,
+      automationRate: "a-rate"
+    }
   ];
 }
 function readBloomSlots(params, slots) {
@@ -2022,13 +2030,12 @@ var BloomOutput = class {
     this.amount = this.mix = this.smoothStep = this.wetGain = this.dryGain = NaN;
     this.level = this.targetLevel = this.levelStep = this.wetLeft = this.wetRight = NaN;
     this.inputLeft = this.inputRight = this.left = this.right = this.spread = NaN;
-    this.split = this.targetSplit = this.splitStep = this.preGain = this.postGain = NaN;
+    this.split = this.gainSplit = this.preGain = this.postGain = NaN;
     this.sendLeft = this.sendRight = this.sendGain = NaN;
     this.slots = slots;
     this.controls = controls;
     this.smoothStep = bloomOnePoleStep(rate, BLOOM_OUTPUT.smoothSeconds);
     this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
-    this.splitStep = 1 / (INSERT_FADE_SECONDS * rate);
     this.panLeft = new Float64Array(BLOOM_BANDS.count);
     this.panRight = new Float64Array(BLOOM_BANDS.count);
     this.scratch = new Float64Array(2);
@@ -2041,16 +2048,14 @@ var BloomOutput = class {
     this.mix = this.slots[SLOT_MIX];
     this.targetLevel = this.slots[SLOT_ENABLED] > 0 ? 1 : 0;
     this.level = this.targetLevel;
-    this.targetSplit = this.slots[SLOT_SPLIT] > 0 ? 1 : 0;
-    this.split = this.targetSplit;
+    this.split = 0;
     this.gains();
     this.wetLeft = this.wetRight = this.left = this.right = 0;
     this.sendLeft = this.sendRight = this.sendGain = 0;
   }
-  /** Once a block: the switch's and the split's targets, and the pan while Spread moves. */
+  /** Once a block: the switch's target, and the pan while Spread moves. */
   configure() {
     this.targetLevel = this.slots[SLOT_ENABLED] > 0 ? 1 : 0;
-    this.targetSplit = this.slots[SLOT_SPLIT] > 0 ? 1 : 0;
     if (this.controls[SLOT_SPREAD] !== this.spread) this.pan();
   }
   /** Each band's pan gains at this block's Spread, in place. */
@@ -2078,8 +2083,9 @@ var BloomOutput = class {
     if (this.split !== 0) this.wetGain *= 1 - this.split;
     this.preGain = BLOOM_OUTPUT.gain * this.amount * this.amount;
     this.postGain = mix < 1 / 2 ? 2 * mix : 1;
+    this.gainSplit = this.split;
   }
-  /** Amount, Mix and the switch, one sample on. */
+  /** Amount, Mix and the switch, one sample on, and the gains again if the split has moved. */
   glide() {
     const slots = this.slots, step = this.smoothStep;
     const amount = slots[SLOT_AMOUNT], mix = slots[SLOT_MIX];
@@ -2093,11 +2099,7 @@ var BloomOutput = class {
     const level = this.level;
     if (level !== this.targetLevel)
       this.level = this.targetLevel > level ? Math.min(this.targetLevel, level + this.levelStep) : Math.max(this.targetLevel, level - this.levelStep);
-    const split2 = this.split;
-    if (split2 !== this.targetSplit) {
-      this.split = this.targetSplit > split2 ? Math.min(this.targetSplit, split2 + this.splitStep) : Math.max(this.targetSplit, split2 - this.splitStep);
-      this.gains();
-    }
+    if (this.split !== this.gainSplit) this.gains();
   }
   tick() {
     this.glide();
@@ -2107,7 +2109,7 @@ var BloomOutput = class {
     const pre = this.preGain;
     this.sendLeft = pre * this.wetLeft;
     this.sendRight = pre * this.wetRight;
-    this.sendGain = this.level * this.postGain * this.split;
+    this.sendGain = this.level * this.postGain;
   }
   /**
    * Asleep: the layer is silent, so the output is the dry share alone. The
@@ -2120,7 +2122,7 @@ var BloomOutput = class {
     this.left = l + this.level * (this.dryGain * l - l);
     this.right = r + this.level * (this.dryGain * r - r);
     this.sendLeft = this.sendRight = 0;
-    this.sendGain = this.level * this.postGain * this.split;
+    this.sendGain = this.level * this.postGain;
   }
 };
 
@@ -2580,7 +2582,7 @@ var BloomDsp = class {
   constructor(rate, slots) {
     this.rate = this.blockStep = this.blockFrames = this.quietFrames = this.sleepWait = NaN;
     this.inputPeak = this.outputPeak = NaN;
-    this.inputLeft = this.inputRight = this.left = this.right = NaN;
+    this.inputLeft = this.inputRight = this.left = this.right = this.split = NaN;
     this.sendLeft = this.sendRight = this.sendGain = NaN;
     this.rate = rate;
     this.slots = slots;
@@ -2603,7 +2605,7 @@ var BloomDsp = class {
     this.dormant = this.asleep = false;
     this.clear();
     this.dormant = false;
-    this.left = this.right = 0;
+    this.left = this.right = this.split = 0;
     this.sendLeft = this.sendRight = this.sendGain = 0;
   }
   configure(frames) {
@@ -2693,6 +2695,7 @@ var BloomDsp = class {
     const output = this.output;
     output.inputLeft = this.inputLeft;
     output.inputRight = this.inputRight;
+    output.split = this.split;
     output.rest();
     this.left = output.left;
     this.right = output.right;
@@ -2715,6 +2718,7 @@ var BloomDsp = class {
     output.inputRight = r;
     output.wetLeft = wetLeft;
     output.wetRight = wetRight;
+    output.split = this.split;
     output.tick();
     const peakLeft = wetLeft < 0 ? -wetLeft : wetLeft, peakRight = wetRight < 0 ? -wetRight : wetRight;
     if (peakLeft > this.outputPeak) this.outputPeak = peakLeft;
@@ -2750,11 +2754,12 @@ var BloomProcessor = class extends AudioWorkletProcessor {
   constructor(options) {
     super();
     this.slots = new Float64Array(BLOOM_SLOT_NAMES.length);
-    for (const descriptor of bloomDescriptors()) {
+    for (const descriptor of bloomSlotDescriptors()) {
       const at = BLOOM_SLOT_NAMES.indexOf(descriptor.name);
       this.slots[at] = Number(options.parameterData?.[descriptor.name] ?? descriptor.defaultValue);
     }
     this.dsp = new BloomDsp(sampleRate, this.slots);
+    this.noSplit = new Float32Array(1);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
@@ -2772,12 +2777,15 @@ var BloomProcessor = class extends AudioWorkletProcessor {
     const frames = out[0].length;
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const sendLeft = outputs[1]?.[0], sendRight = outputs[1]?.[1], sendGain = outputs[2]?.[0];
+    const splits = params[BLOOM_SLOT.splitParam] ?? this.noSplit;
+    const splitStride = splits.length > 1 ? 1 : 0;
     const dsp = this.dsp;
     readBloomSlots(params, this.slots);
     dsp.configure(frames);
     for (let i = 0; i < frames; i++) {
       dsp.inputLeft = i < leftFrames ? left[i] : 0;
       dsp.inputRight = i < rightFrames ? right[i] : 0;
+      dsp.split = splits[i * splitStride];
       dsp.tick();
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
