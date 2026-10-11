@@ -9,14 +9,29 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RollEnvelopePoint } from '@windsor/engine';
-import { ROLL_ENVELOPE_ROW, TICKS_PER_BAR, envelopeValueAt } from '@windsor/engine';
+import {
+  PPQ,
+  ROLL_ENVELOPE_POINTS_MAX,
+  ROLL_ENVELOPE_ROW,
+  ROLL_LOOP_TICKS_MAX,
+  TICKS_PER_BAR,
+  envelopeValueAt,
+} from '@windsor/engine';
 import { hostBarTicks, hostFrame } from './automationEditHost';
 import { rollEnvelopeHost } from './rollEnvelopeHost';
-import { FLAT_POINT, editablePoints, envelopeUndoLabel, settlePoints } from './rollEnvelopeSettle';
+import {
+  FLAT_POINT,
+  editablePoints,
+  envelopeUndoLabel,
+  settlePoints,
+  withinPointCap,
+} from './rollEnvelopeSettle';
 import { defaultRollView } from './rollView';
 import { drawGrain, snapTick, tickAtPx, withBend } from './songAutomationEdit';
 import { laneEdits } from './songAutomationRules';
 import { shapeRange, shapedPoints, stampedPoints } from './songShapeModel';
+import { shapeLanePoints } from './songShapeRange';
+import { shapeRates } from './songShapeTables';
 
 const BAR = TICKS_PER_BAR;
 const LOOP = 2 * BAR;
@@ -136,5 +151,79 @@ describe('the undo steps', () => {
     expect(envelopeUndoLabel('Draw Cutoff', 'Cutoff')).toBe('Draw Cutoff envelope');
     expect(envelopeUndoLabel('Move Cutoff point', 'Cutoff')).toBe('Move Cutoff point');
     expect(envelopeUndoLabel('Bend Cutoff line', 'Cutoff')).toBe('Bend Cutoff line');
+  });
+});
+
+describe('a gesture past the point cap on the longest loop', () => {
+  const LONGEST = ROLL_LOOP_TICKS_MAX;
+  const outside = [P(0, -0.5), P(BAR, 0.5), P(LONGEST - BAR / 2, 1)];
+  const from = 2 * BAR;
+  const to = LONGEST - BAR;
+
+  /** Fits the cap, keeps every found point, rises; the first and last ticks the gesture's own points span. */
+  function fitted(next: readonly RollEnvelopePoint[]) {
+    expect(next.length).toBeLessThanOrEqual(ROLL_ENVELOPE_POINTS_MAX);
+    for (const point of outside) expect(next).toContain(point);
+    const ticks = next.map((p) => p.tick);
+    expect(ticks).toEqual([...ticks].sort((a, b) => a - b));
+    const written = next.filter((point) => !outside.includes(point));
+    return { first: written[0]?.tick, last: written.at(-1)?.tick };
+  }
+
+  it('thins a 1/32 Draw stroke evenly across its whole range', () => {
+    const grain = { ticks: drawGrain(PPQ / 8), axisTicks: LONGEST };
+    const samples = new Map<number, number>();
+    const a = { tick: from, display: 0 };
+    edits.stroke(samples, null, a, grain);
+    edits.stroke(samples, a, { tick: to, display: 1 }, grain);
+    const drawn = edits.drawn(outside, samples, grain);
+    expect(drawn.length).toBeGreaterThan(ROLL_ENVELOPE_POINTS_MAX);
+    const next = settlePoints(drawn, { start: outside, loopTicks: LONGEST, stroke: true });
+    expect(fitted(next)).toEqual({ first: from, last: to });
+  });
+
+  it('thins a Shape at the shortest rate evenly across its whole range', () => {
+    const range = { startTick: from, endTick: to };
+    const rateTicks = shapeRates()[0]!.ticks;
+    const draft = { kind: 'square', rateTicks, top: 1, bottom: 0, phase: 0, duty: 0.5 } as const;
+    const shaped = shapedPoints(outside, range, stampedPoints(ROLL_ENVELOPE_ROW, range, draft));
+    expect(shaped.length).toBeGreaterThan(ROLL_ENVELOPE_POINTS_MAX);
+    const stamp = shaped.filter((p) => !outside.includes(p));
+    const next = settlePoints(shaped, { start: outside, loopTicks: LONGEST, stroke: false });
+    expect(fitted(next)).toEqual({ first: stamp[0]?.tick, last: stamp.at(-1)?.tick });
+    expect(stamp[0]?.tick).toBe(from);
+  });
+
+  it('keeps a result under the cap whole, and the first and last of one over it', () => {
+    const next = [P(0, 0), P(1, 1)];
+    expect(withinPointCap(next, [], 2)).toEqual(next);
+    const over = [...next, P(2, 0), P(3, 1), P(4, 0)];
+    expect(withinPointCap(over, [], 3).map((p) => p.tick)).toEqual([0, 2, 4]);
+  });
+});
+
+describe('the Shape preview on a roll', () => {
+  it('draws exactly what Apply writes for a range ending on the loop’s last tick', () => {
+    const range = { startTick: BAR, endTick: LOOP };
+    const draft = {
+      kind: 'sine',
+      rateTicks: BAR / 4,
+      top: 1,
+      bottom: 0,
+      phase: 0,
+      duty: 0.5,
+    } as const;
+    let start: readonly RollEnvelopePoint[] = [];
+    const lane = {
+      row: ROLL_ENVELOPE_ROW,
+      points: () => (start = editablePoints([], LOOP)),
+      settle: (next: readonly RollEnvelopePoint[]) =>
+        settlePoints(next, { start, loopTicks: LOOP, stroke: false }),
+    };
+    const preview = shapeLanePoints(lane, range, draft);
+    const committed = shapeLanePoints(lane, range, draft);
+    expect(preview).toEqual(committed);
+    expect(preview.at(-1)?.tick).toBe(LOOP - 1);
+    expect(preview.every((p) => p.tick < LOOP)).toBe(true);
   });
 });

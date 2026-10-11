@@ -140,11 +140,9 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
       return name();
     },
     points,
-    commit: (_label, next) =>
-      input.write(
-        settlePoints(next, { start, loopTicks: loop(), stroke: false }),
-        ROLL_ENVELOPE_TOOL_UNDO.shape(name()),
-      ),
+    // The preview and Apply both settle here, so Apply writes the dashed curve.
+    settle: (next) => settlePoints(next, { start, loopTicks: loop(), stroke: false }),
+    commit: (_label, next) => input.write(next, ROLL_ENVELOPE_TOOL_UNDO.shape(name())),
     valueText: (value) => envelopeOffsetText(input.shown()?.envelope.target ?? '', value),
   });
   return shape;

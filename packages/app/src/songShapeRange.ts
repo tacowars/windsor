@@ -67,7 +67,19 @@ export interface ShapeLane {
   commit(label: string, points: readonly AutomationPoint[]): void;
   /** How Top and Bottom read in the popover; the row's own readout when absent (a roll's offsets, windsor#708). */
   readonly valueText?: (value: number) => string;
+  /** The shaped points as the lane keeps them, for the preview and Apply alike; as shaped when absent (a roll's envelope, windsor#708). */
+  readonly settle?: (points: readonly AutomationPoint[]) => AutomationPoint[];
 }
+
+/** The lane's points with the range shaped, as the lane keeps them: what the preview draws and Apply commits. */
+export const shapeLanePoints = (
+  lane: Pick<ShapeLane, 'points' | 'row' | 'settle'>,
+  range: ShapeRange,
+  draft: AutomationShapeSpec,
+): AutomationPoint[] => {
+  const shaped = shapedPoints(lane.points(), range, stampedPoints(lane.row, range, draft));
+  return lane.settle ? lane.settle(shaped) : shaped;
+};
 
 export interface ShapeTool {
   /** Wire the range gesture onto a lane; `refresh` shows the selection on it when it is this lane's. */
@@ -184,7 +196,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     if (!selection || !lane) return;
     const { range, draft } = selection;
     const stamp = stampedPoints(lane.row, range, draft);
-    decorate(lane, range, shapedPoints(lane.points(), range, stamp));
+    decorate(lane, range, shapeLanePoints(lane, range, draft));
     const meter = lane.host.meter();
     const readout = shapeReadout(range, draft, stamp.length, meter);
     const text = lane.valueText ? { valueText: lane.valueText } : {};
@@ -233,7 +245,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       const lane = selectedLane();
       if (!selection || !lane) return close();
       const { range, draft } = selection;
-      const next = shapedPoints(lane.points(), range, stampedPoints(lane.row, range, draft));
+      const next = shapeLanePoints(lane, range, draft);
       close();
       lane.commit(`${shapeLabel(draft.kind)} on ${lane.name}`, next);
     },
