@@ -14,8 +14,8 @@ const fields = (spec: InsertSpec): string[] => automatableInsertFields(spec).map
 const defaults = <S extends InsertSpec>(kind: S['kind']): S => INSERT_KINDS[kind].defaults as S;
 
 describe('insertKindFields', () => {
-  it('appends the switch, On on a switch scale, to all thirteen kinds', () => {
-    expect(INSERT_KIND_NAMES).toHaveLength(13);
+  it('appends the switch, On on a switch scale, to all fourteen kinds', () => {
+    expect(INSERT_KIND_NAMES).toHaveLength(14);
     expect(INSERT_SWITCH_ROW).toMatchObject({ target: 'enabled', label: 'On', min: 0, max: 1 });
     expect(INSERT_SWITCH_ROW.scale).toBe('switch');
     for (const kind of INSERT_KIND_NAMES) {
@@ -26,13 +26,30 @@ describe('insertKindFields', () => {
     }
   });
 
-  it("lists no switch in the continuous table but a host's child's, slot.enabled", () => {
-    for (const rows of Object.values(INSERT_AUTOMATION_FIELDS)) {
-      const own = rows.filter((r) => !r.childKind);
-      expect(own.some((r) => r.target === 'enabled' || r.scale === 'switch')).toBe(false);
-      const switches = rows.filter((r) => r.scale === 'switch');
-      expect(switches.every((r) => r.target === 'slot.enabled' && r.childKind)).toBe(true);
+  // A kind may list its own boolean fields as switch rows, set-only like the
+  // appended `enabled` (record 2026-10-11-bloom-insert decision 13).
+  it("lists no enabled in the table, and as switches only a kind's own booleans and a host's child's", () => {
+    for (const kind of INSERT_KIND_NAMES) {
+      const rows = INSERT_AUTOMATION_FIELDS[kind];
+      expect(
+        rows.some((r) => r.target === 'enabled'),
+        kind,
+      ).toBe(false);
+      for (const r of rows.filter((x) => x.scale === 'switch')) {
+        const owner = r.childKind
+          ? INSERT_KINDS[r.childKind].defaults
+          : INSERT_KINDS[kind].defaults;
+        const field = r.childKind ? r.target.slice('slot.'.length) : r.target;
+        expect(
+          typeof (owner as unknown as Record<string, unknown>)[field],
+          `${kind} ${r.target}`,
+        ).toBe('boolean');
+        expect([r.min, r.max], `${kind} ${r.target}`).toEqual([0, 1]);
+      }
     }
+    expect(INSERT_AUTOMATION_FIELDS.bloom.filter((r) => r.scale === 'switch')).toEqual([
+      expect.objectContaining({ target: 'freeze', label: 'Freeze' }),
+    ]);
   });
 });
 

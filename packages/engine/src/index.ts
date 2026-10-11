@@ -675,6 +675,16 @@ export { DEFAULT_FILTER } from './inserts/filterSpec';
 export type { FilterSpec } from './inserts/filterSpec';
 export { FILTER_BOUNDS, FILTER_MODES, FILTER_MODE_VOICE_IDS } from './inserts/filterConstants';
 export type { FilterMode } from './inserts/filterConstants';
+// bloom, the harmonic pad generator (windsor#712).
+export { DEFAULT_BLOOM } from './inserts/bloomSpec';
+export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';
+export {
+  BLOOM_BOUNDS,
+  BLOOM_KEYS,
+  BLOOM_OCTAVES,
+  BLOOM_SCALES,
+  BLOOM_SHAPES,
+} from './inserts/bloomConstants';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeCore, TapeSpec } from './inserts/tapeSpec';
 export {

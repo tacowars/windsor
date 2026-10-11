@@ -17,6 +17,12 @@ export interface KnobSpec {
    * `max`, and the dial's bottom `ZERO_END_SLICE` runs straight from 0 to it.
    */
   logFloor?: number;
+  /**
+   * A stepped knob (windsor#712): the only values it takes, in order, spaced
+   * evenly round the dial (`knobSteps.ts`). `min` and `max` are its first
+   * and last; a range across 0 still draws its arc from 0.
+   */
+  steps?: readonly number[];
   fmt?: (v: number) => string;
   color?: string;
   /**
@@ -60,6 +66,7 @@ import type { OpenGesture } from './gestureHooks';
 import type { KnobAutomation } from './knobAutomation';
 import { automatedValueText, lockNotice } from './knobAutomation';
 import { AUTO_TAG_TEXT, followAutomation, paintLock } from './knobLock';
+import { nearestStep, stepKeyTarget, steppedScale } from './knobSteps';
 import { notify } from './toast';
 import {
   ARC_END,
@@ -193,7 +200,7 @@ export interface Scale {
 }
 
 /** The part of a spec that decides where a value or a key press lands. */
-export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor'>;
+export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor' | 'steps'>;
 
 const clampNorm = (n: number): number => Math.min(1, Math.max(0, n));
 
@@ -245,6 +252,7 @@ function zeroEndLogScale(floor: number, max: number): Scale {
  * be dialled, shown and committed.
  */
 export function scaleFor(spec: KnobScaleSpec): Scale {
+  if (spec.steps) return steppedScale(spec.steps);
   if (spec.curve === 'log') {
     if (spec.min <= 0) return zeroEndLogScale(spec.logFloor ?? LOG_FLOOR, spec.max);
     return logSweep(Math.max(LOG_FLOOR, spec.min), spec.max);
@@ -271,6 +279,7 @@ export function keyTarget(
   dir: 1 | -1,
   fine: boolean,
 ): number {
+  if (spec.steps) return stepKeyTarget(spec.steps, current, dir);
   const scale = scaleFor(spec);
   let n = scale.toNorm(current) + dir * (fine ? KEY_STEP_FINE : KEY_STEP);
   if (scale.zeroTop !== undefined && n < scale.zeroTop) {
@@ -331,7 +340,8 @@ export function makeKnob(spec: KnobSpec): KnobElement {
 
   const commit = (raw: number): void => {
     let v = raw;
-    if (spec.step) v = Math.round(v / spec.step) * spec.step;
+    if (spec.steps) v = nearestStep(spec.steps, v);
+    else if (spec.step) v = Math.round(v / spec.step) * spec.step;
     v = Math.min(spec.max, Math.max(spec.min, v));
     spec.set(v);
     render();

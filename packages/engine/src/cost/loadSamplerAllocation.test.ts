@@ -1,6 +1,6 @@
 /**
  * What the load sampler (`worklet/loadSampler.ts`, #445) costs the audio
- * thread in each of the eleven processors that bundle it (windsor#214), measured
+ * thread in each of the twelve processors that bundle it (windsor#214), measured
  * on V8 rather than read off the source.
  *
  * Method: `__fixtures__/workletAllocation.ts` runs the shipped bundle in a
@@ -71,6 +71,7 @@ const MEASURE = 2000;
 const BUNDLES = [
   'fm-processor.js',
   'advanced-drive-processor.js',
+  'bloom-processor.js',
   'compressor-processor.js',
   'delay-processor.js',
   'eq-processor.js',
@@ -94,6 +95,7 @@ const CLEAN = new Set([
   'fm-processor.js', // windsor#257
   'tape-processor.js', // windsor#265
   'filter-processor.js', // windsor#622, clean from the start
+  'bloom-processor.js', // windsor#712, clean from the start
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {

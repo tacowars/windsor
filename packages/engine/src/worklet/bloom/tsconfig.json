@@ -1,0 +1,5 @@
+{
+  "extends": "../compressor/tsconfig.json",
+  "files": ["../fm/workletGlobals.d.ts"],
+  "include": ["./**/*.ts"]
+}

@@ -20,6 +20,7 @@ import {
   RETRO_REVERB_WORKLET_URL,
   PHASER_WORKLET_URL,
   FILTER_WORKLET_URL,
+  BLOOM_WORKLET_URL,
   TAPE_WORKLET_URL,
   ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
@@ -79,6 +80,7 @@ export interface WorkletUrls {
   outputStageUrl?: string | URL;
   eqUrl?: string | URL;
   filterUrl?: string | URL;
+  bloomUrl?: string | URL;
 }
 
 export class FmEngine {
@@ -118,6 +120,7 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.delayUrl ?? DELAY_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.eqUrl ?? EQ_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.filterUrl ?? FILTER_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.bloomUrl ?? BLOOM_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.outputStageUrl ?? OUTPUT_STAGE_WORKLET_URL);
     // Catches the sum of many parts peaking together. It starts on the
     // default settings; a song's own reach it through `AudioSystem`.

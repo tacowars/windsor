@@ -14,7 +14,9 @@
  * The switch (`enabled`, windsor#628) is one of those fields on every kind:
  * its lane `set`s, never ramps, and turning it off writes what `set` writes
  * for a spec switched off, which a native kind reaches across its fade
- * (windsor#629).
+ * (windsor#629). A kind's own switch row (bloom's Freeze, record
+ * `2026-10-11-bloom-insert` decision 13) is held to the same: its lane
+ * flips the field and writes what `set` writes for the flipped spec.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -47,11 +49,20 @@ afterAll(undo);
 const ownRows = (kind: InsertKindName): readonly AutomationTargetRow[] =>
   INSERT_AUTOMATION_FIELDS[kind].filter((row) => !row.childKind);
 
-/** `spec` with every catalog field of its kind moved to another value. */
+/** `spec` with the switch `row` flipped, and the lane value that flips it. */
+function flipped(spec: InsertSpec, row: AutomationTargetRow): { value: number; knob: InsertSpec } {
+  const on = !fieldValue(spec, row.target);
+  return { value: Number(on), knob: { ...spec, [row.target]: on } as InsertSpec };
+}
+
+/** `spec` with every catalog field of its kind moved to another value, a switch flipped. */
 function everyKnobMoved(spec: InsertSpec): InsertSpec {
   let next = spec;
   for (const row of ownRows(spec.kind)) {
-    next = withField(next, row.target, otherValue(row, fieldValue(spec, row.target), 0.71));
+    next =
+      row.scale === 'switch'
+        ? flipped(next, row).knob
+        : withField(next, row.target, otherValue(row, fieldValue(spec, row.target), 0.71));
   }
   return next;
 }
@@ -62,9 +73,9 @@ const cases = INSERT_KIND_NAMES.flatMap((kind) =>
     .map((row) => ({ kind, row, field: row.target })),
 );
 
-/** The lane's value away from `spec`'s, and `spec` at it: the open spec's switch goes off. */
+/** The lane's value away from `spec`'s, and `spec` at it: a switch flips (the open spec's goes off). */
 function moved(spec: InsertSpec, row: AutomationTargetRow): { value: number; knob: InsertSpec } {
-  if (row.scale === 'switch') return { value: 0, knob: { ...spec, enabled: false } };
+  if (row.scale === 'switch') return flipped(spec, row);
   const value = otherValue(row, fieldValue(spec, row.target));
   return { value, knob: withField(spec, row.target, value) };
 }
@@ -78,7 +89,7 @@ const CALL: Readonly<Record<AutomationHow, string>> = {
 };
 
 describe('stage.param, every kind and every catalog field', () => {
-  it('covers all thirteen kinds, each with its switch', () => {
+  it('covers all fourteen kinds, each with its switch', () => {
     expect(new Set(cases.map((c) => c.kind)).size).toBe(INSERT_KIND_NAMES.length);
     expect(cases.filter((c) => c.field === 'enabled')).toHaveLength(INSERT_KIND_NAMES.length);
   });
