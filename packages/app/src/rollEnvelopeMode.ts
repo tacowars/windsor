@@ -95,6 +95,8 @@ export class RollEnvelopeMode {
   private readonly shape: ShapeTool;
   /** The shown envelope's target, named, as the last render read it. */
   private shownName = '';
+  /** The last gesture was refused on a full envelope, until the next begins (windsor#724). */
+  private full = false;
   private readonly actions: EnvelopeColumnActions = {
     toggleList: (anchor) => (this.list ? this.list.close() : this.openList(anchor)),
     switchShown: () => {
@@ -130,6 +132,7 @@ export class RollEnvelopeMode {
       shown: () => this.shownEnvelope(),
       write: (points, label) => this.write(points, label),
       hover: (text) => this.column.value(text),
+      refused: (full) => this.refused(full),
       life: {
         hold: (close) => holdRollPopover('shape', close, this),
         release: (close) => releaseRollPopover('shape', close),
@@ -175,6 +178,13 @@ export class RollEnvelopeMode {
     this.host.view.envelope.tool = tool;
     this.shape.toolChanged();
     this.render();
+  }
+
+  /** The hint says an add was refused, or the tool's again: the column alone, so a gesture begun is untouched. */
+  private refused(full: boolean): void {
+    if (full === this.full) return;
+    this.full = full;
+    this.column.render(this.read().state, this.actions);
   }
 
   /** The roll's frame for the tools: the last paint's scene, the pane's height, the song's meter. */
@@ -242,6 +252,7 @@ export class RollEnvelopeMode {
       section: shown ? targetSection(groups, shown.target) : '',
       tool: view.envelope.tool,
       listOpen: this.list !== null,
+      full: this.full,
     };
     return { groups, envelopes, state };
   }

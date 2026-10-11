@@ -30,6 +30,9 @@ export const ROLL_ENVELOPE_HINTS: Readonly<Record<AutomationTool, string>> = {
     'Drag across the pane to select a range, then pick a shape. The dashed line previews it; Apply writes ordinary points you can edit afterwards.',
 };
 
+/** The column's hint in place of the tool's while an add is refused on a full envelope (windsor#724). */
+export const envelopeFullText = (max: number): string => `Envelope full: ${max} points`;
+
 /** The picker's and the column's words. */
 export const ROLL_ENVELOPE_TEXT = {
   envelope: 'Envelope',

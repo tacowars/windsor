@@ -8,15 +8,19 @@
  * (windsor#708). They look like the Song tab's (`.seg.auto-tools`,
  * `.auto-hint`) under their own classes, which the Song tab's tool sync
  * never reaches. Under the section, the envelope's value under the
- * pointer, as the mockup's state 3 shows it.
+ * pointer, as the mockup's state 3 shows it. A gesture refused on a full
+ * envelope puts "Envelope full" in the hint's place until the next one
+ * (windsor#724 decision 1).
  */
 import type { RollEnvelope } from '@windsor/engine';
+import { ROLL_ENVELOPE_POINTS_MAX } from '@windsor/engine';
 import { el } from './dom';
 import type { EnvelopePicker } from './rollEnvelopePicker';
 import {
   ROLL_ENVELOPE_HINTS,
   ROLL_ENVELOPE_TEXT as T,
   envCountText,
+  envelopeFullText,
   voiceCountText,
 } from './rollEnvelopeTables';
 import { AUTOMATION_TOOLS, type AutomationTool } from './songAutomationTables';
@@ -30,7 +34,15 @@ export interface EnvelopeColumnState {
   readonly section: string;
   readonly tool: AutomationTool;
   readonly listOpen: boolean;
+  /** The last gesture was refused: the envelope's heard points fill the cap. */
+  readonly full: boolean;
 }
+
+/** The hint under the tools: the tool's, or the refusal's while `full`. */
+export const envelopeHint = (
+  state: Pick<EnvelopeColumnState, 'tool' | 'full'>,
+  max = ROLL_ENVELOPE_POINTS_MAX,
+): string => (state.full ? envelopeFullText(max) : ROLL_ENVELOPE_HINTS[state.tool]);
 
 /** What its controls do. */
 export interface EnvelopeColumnActions {
@@ -107,7 +119,7 @@ function tools(state: EnvelopeColumnState, actions: EnvelopeColumnActions): HTML
   }
   const item = el('div', 'roll-item renv-span');
   item.append(el('span', 'field-label', T.tool), group);
-  return [item, el('p', 'renv-hint renv-span', ROLL_ENVELOPE_HINTS[state.tool])];
+  return [item, el('p', 'renv-hint renv-span', envelopeHint(state))];
 }
 
 /** The column; `render` redraws all but the Snap the device keeps first in it. */

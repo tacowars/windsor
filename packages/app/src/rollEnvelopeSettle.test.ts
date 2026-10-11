@@ -24,9 +24,12 @@ import {
   FLAT_POINT,
   editablePoints,
   envelopeUndoLabel,
+  settleGesture,
   settlePoints,
   withinPointCap,
 } from './rollEnvelopeSettle';
+import { envelopeHint } from './rollEnvelopeColumn';
+import { ROLL_ENVELOPE_HINTS } from './rollEnvelopeTables';
 import { defaultRollView } from './rollView';
 import { drawGrain, snapTick, tickAtPx, withBend } from './songAutomationEdit';
 import { laneEdits } from './songAutomationRules';
@@ -257,6 +260,41 @@ describe('a gesture on a full envelope whose points a shrunk loop left silent', 
     });
     expect(stamp.length).toBeGreaterThan(2);
     landed(next, stamp);
+  });
+});
+
+describe('a gesture on a full envelope whose every point is heard (windsor#724)', () => {
+  const LONGEST = ROLL_LOOP_TICKS_MAX;
+  /** The cap's worth of points, every other tick from 0, all inside the loop. */
+  const full = Array.from({ length: ROLL_ENVELOPE_POINTS_MAX }, (_, i) => P(2 * i, i % 2));
+  const start = editablePoints(full, LONGEST);
+
+  it('refuses an Edit add between two points and leaves the points as they were', () => {
+    expect(full.at(-1)!.tick).toBeLessThan(LONGEST);
+    const added = edits.add(start, { tick: 1, value: 0.5, onLine: false })!;
+    const settled = settleGesture(added, { start, loopTicks: LONGEST, stroke: false });
+    expect(settled.refused).toBe(true);
+    expect(settled.points).toEqual(full);
+    expect(envelopeHint({ tool: 'edit', full: settled.refused })).toBe(
+      'Envelope full: 4096 points',
+    );
+    expect(envelopeHint({ tool: 'edit', full: false })).toBe(ROLL_ENVELOPE_HINTS.edit);
+  });
+
+  it('lands a Draw across a range, thinned within the cap', () => {
+    const grain = { ticks: drawGrain(PPQ / 8), axisTicks: LONGEST };
+    const samples = new Map<number, number>();
+    const a = { tick: BAR, display: 0 };
+    edits.stroke(samples, null, a, grain);
+    edits.stroke(samples, a, { tick: LONGEST - BAR, display: 1 }, grain);
+    const drawn = edits.drawn(start, samples, grain);
+    const settled = settleGesture(drawn, { start, loopTicks: LONGEST, stroke: true });
+    expect(settled.refused).toBe(false);
+    expect(settled.points.length).toBeLessThanOrEqual(ROLL_ENVELOPE_POINTS_MAX);
+    expect(settled.points).not.toEqual(full);
+    const inRange = settled.points.filter((p) => p.tick >= BAR && p.tick <= LONGEST - BAR);
+    expect(inRange[0]?.tick).toBe(BAR);
+    expect(inRange.at(-1)?.tick).toBe(LONGEST - BAR);
   });
 });
 
