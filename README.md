@@ -4,18 +4,20 @@ A browser-based sequencer and DAW built on a custom four-operator FM engine:
 
 - **Synthesis:** FM, harmonic waveforms and subtractive filtering in
   AudioWorklets.
-- **Sequencers:** Euclidean, grid, chord, arpeggiator and bass/drone, driven
+- **Sequencers:** Euclidean, grid, chord, arpeggiator, piano roll, and bass/drone, driven
   by a harmony timeline.
 - **Mixer:** channel strips with up to eight inserts each (compressor,
-  classic and advanced drive, chorus, ensemble, phaser, dub delay, retro
+  classic and advanced drive, chorus, ensemble, phaser, tape, dub delay, retro
   reverb), a plate and delay return, and a song master.
 
 Everything runs in the browser, and the app deploys as static files. Try it
 at <https://tacowars.github.io/windsor/>. Chrome is the tested browser.
 
-Windsor began as the music engine and arrangement console of the game
-Aotearoa204 and was forked on 2026-09-27. `#<n>` references in the code and
-docs point at that repository's issues.
+Windsor began as the audio engine for a web-based game I was building but I soon became more interested in working on the synthesizer and sequencer than the game itself so I forked it and Windsor was born. The synth takes its influences from some of my favorites like the Korg Opsix and Ableton Lives Operator. The sequencer takes its influences from many sources but I want to call out PB'sScaler and Elektron for being general influences. 
+
+The plate reverb is based on the Datorro algo which is my favorite and I think it couples well with the harmonically rich sounds the synth can make. If you enjoy Windsor let me know. 
+
+The name comes from Windsor Ontario where kids grew up listening to the radio broadcasts of seminal techno artists from Detroit. While Windsor can be used to make any type of electronic music I tihnk that the techno mentality of step sequencing, polymeter, grooves, acid, and rhythm that techno is famous for is at the heart of the design mentality. 
 
 ## Getting started
 
