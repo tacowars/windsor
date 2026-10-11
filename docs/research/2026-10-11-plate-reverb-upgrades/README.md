@@ -21,7 +21,8 @@ is a measured claim.
   into the tank, and fourteen fixed taps read it. There is no control over
   how the reverb builds.
 - **The input is mono.** `_writeInput` sums L and R before the pre-delay, so
-  a panned source's reverb sits in the centre.
+  a plate fed a stereo signal (a group or the master, where parts arrive
+  already panned) puts every source's reverb in the centre.
 - **Two modulation points.** Lines 4 and 8 (the first all-pass in each half)
   are read with a moving delay driven by a sine and a cosine, detuned by
   1.0007 so the two halves drift apart.
@@ -102,13 +103,25 @@ is a measured claim.
   L into the left half of the tank (line 4's input) and R into the right
   half (line 8's), where the shared `split` goes today. The two diffuser
   chains get different lengths so the sides decorrelate.
-- **Why:** on a strip insert, a panned snare's reverb then leans to its
-  side. A mono input still fills both halves.
+- **Why, and where it helps:** a part's own inserts and its sends sit before
+  its pan (`mixer/channelStrip.ts`), so a part's strip and send A hear it
+  centred, and stereo input changes nothing there. It helps wherever the
+  plate is fed stereo:
+  - **on a group or the master,** whose inserts receive their parts already
+    panned (`mixer/groupBus.ts`, `mixer/masterStrip.ts`). A drum group's
+    hard-left hat then gets its reverb on the left;
+  - **after a stereo insert on a strip,** such as a chorus or a delay, whose
+    width the plate now keeps.
+
+  A mono input still fills both halves.
 - **Optional:** inverting one injection decorrelates further. Check its
   mono sum before keeping it.
 - **Format:** none. The wet image changes, but no field does.
-- **Measure:** L/R balance with an impulse on each side, L/R correlation on
-  noise, mono-sum level, and the cost of the second diffuser chain.
+- **Measure:** at the processor, L/R balance with an impulse on each side,
+  L/R correlation on noise, mono-sum level, and the cost of the second
+  diffuser chain. Through the whole graph, a test that routes two parts,
+  hard-panned left and right, into a group carrying the plate, and checks
+  that each side's wet energy follows its part.
 
 ### 4. Lighter, less regular modulation
 
@@ -229,8 +242,8 @@ is a measured claim.
 | 11 | Club Toilets | Drums | room | ~0.6 s | Hard tiles: very small, low diffusion (item 7) |
 | 12 | Railway Arch | Drums | room | ~0.5 s | A brick snare room: dark, ~12 ms pre-delay, lows ×1.3 |
 | 13 | Cloakroom | Drums | room | ~1.2 s | Coats soak up the bass: lows ×0.8 (item 1) |
-| 14 | Stairwell | Drums | room | ~1.3 s | Tall and narrow: panned hats keep their side (item 3) |
-| 15 | Sound Clash | Drums | plate | ~1.2 s | Wide, for panned percussion (item 3) |
+| 14 | Stairwell | Drums | room | ~1.3 s | Tall and narrow: on a drum group, panned hats keep their side (item 3) |
+| 15 | Sound Clash | Drums | plate | ~1.2 s | Wide: on a percussion group, each part's reverb follows its pan (item 3) |
 | 16 | Acetate | Pads & leads | plate | ~1.8 s | Swells in: Build ~0.5 (item 2) |
 | 17 | White Label | Pads & leads | plate | ~2.5 s | Clean and bright, light modulation, for leads (item 4) |
 | 18 | Euphoria | Pads & leads | plate | ~3.5 s | Lush: deeper, irregular modulation (item 4) |
