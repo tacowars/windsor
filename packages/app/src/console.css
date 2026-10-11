@@ -6698,6 +6698,39 @@ select.field.auto-snap {
   line-height: 12px;
 }
 
+/* ---------- the env ring (windsor#725) ---------- */
+/* A knob a Roll clip envelope moves (knobLock.ts sets .env) stays live: its
+   arc and pin keep the patch's value, and a second, lit ring outside the
+   track runs from that value to the one playing now, with a dot on it, in
+   the envelope's colour (the roll's accent, --carrier, as its overlay draws
+   the curve). Its tag reads ENV in that colour unless a lane's lock holds
+   the knob, whose AUTO tag wins. */
+.knob .dial-env,
+.knob .dial-env-dot {
+  display: none;
+}
+.knob.env {
+  --env-color: var(--carrier);
+}
+.knob.env svg {
+  overflow: visible;
+}
+.knob.env .dial-env {
+  display: inline;
+  stroke: var(--env-color);
+  stroke-width: 1.6;
+  fill: none;
+  stroke-linecap: round;
+}
+.knob.env .dial-env-dot {
+  display: inline;
+  fill: var(--env-color);
+}
+.knob.env:not(.locked) .knob-auto {
+  display: block;
+  background: var(--env-color);
+}
+
 /* ---------- controls ---------- */
 
 .seg {

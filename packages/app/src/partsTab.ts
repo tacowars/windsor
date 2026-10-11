@@ -11,10 +11,11 @@
  * and a knob a macro mapping covers locks under the macro's name.
  */
 import type { PartialPatch } from '@windsor/engine';
-import { makePatch, partAt } from '@windsor/engine';
+import { makePatch, partAt, songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $ } from './dom';
 import { knobSongTick, patchKnobAutomation } from './knobAutomation';
+import { knobEnvelopeAt, type KnobEnvelopeQuery } from './knobEnvelope';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
@@ -33,6 +34,7 @@ import {
 } from './patchPanels';
 import { buildBays } from './patchBays';
 import type { PatchEditor } from './partsSession';
+import { getPath } from './patchPath';
 import { startScope } from './scope';
 
 const GRID_HTML = `
@@ -112,6 +114,7 @@ const GRID_HTML = `
  * box's source (#563), and the box re-reads its unsaved dot — and the rebuild.
  */
 function patchEditor(ctx: AppCtx): PatchEditor {
+  const envelope = knobEnvelopeReader(ctx);
   const commit = (push: () => boolean): void => {
     const preset = partAt(ctx.model.doc, ctx.parts.selected)?.preset;
     const wasDocument = preset !== undefined && ctx.model.doc.patches?.[preset] !== undefined;
@@ -133,8 +136,37 @@ function patchEditor(ctx: AppCtx): PatchEditor {
         path,
         knobSongTick(ctx.model.doc, ctx.transport.position()),
       ),
+    envelope,
   };
   return editor;
+}
+
+/**
+ * The editor's env ring read (windsor#725): the selected part's clip
+ * envelope on a knob's path at the audible tick. One query, refilled per
+ * read, so a knob's frame allocates nothing.
+ */
+function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
+  const query: KnobEnvelopeQuery = {
+    part: undefined,
+    macros: [],
+    path: '',
+    base: 0,
+    tick: 0,
+    running: false,
+    songTicks: 0,
+  };
+  return (path, out) => {
+    const { doc } = ctx.model;
+    query.part = partAt(doc, ctx.parts.selected);
+    query.macros = ctx.parts.patch.macros;
+    query.path = path;
+    query.base = Number(getPath(ctx.parts.patch, path) ?? 0);
+    query.tick = ctx.transport.position();
+    query.running = ctx.transport.running;
+    query.songTicks = songTicksOf(doc);
+    return knobEnvelopeAt(query, out);
+  };
 }
 
 function refreshPatchUi(editor: PatchEditor): void {

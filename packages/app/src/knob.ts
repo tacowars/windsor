@@ -49,6 +49,15 @@ export interface KnobSpec {
    * name (windsor#561).
    */
   automation?: () => KnobAutomation | null;
+  /**
+   * Which Roll clip envelope moves the knob (windsor#725): null while none
+   * does, else the centre it moves around and the value playing now. The
+   * knob stays live: its arc and pin keep the patch's value, which a drag
+   * still sets, and a second, lit ring in the envelope's colour shows the
+   * playing value, its tag reading ENV (`knobEnvelope.ts`, `knobLock.ts`).
+   * A lane's lock wins the tag; the ring still shows what plays.
+   */
+  envelope?: () => KnobEnvelope | null;
 }
 
 /**
@@ -65,7 +74,8 @@ import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestur
 import type { OpenGesture } from './gestureHooks';
 import type { KnobAutomation } from './knobAutomation';
 import { automatedValueText, lockNotice } from './knobAutomation';
-import { AUTO_TAG_TEXT, followAutomation, paintLock } from './knobLock';
+import type { KnobEnvelope } from './knobEnvelope';
+import { AUTO_TAG_TEXT, followKnob, paintEnvelope, paintLock } from './knobLock';
 import { nearestStep, stepKeyTarget, steppedScale } from './knobSteps';
 import { notify } from './toast';
 import {
@@ -75,6 +85,8 @@ import {
   ARIA_VALUE_PRECISION,
   DRAG_RANGE_FINE_PX,
   DRAG_RANGE_PX,
+  ENV_DOT_R,
+  ENV_RING_GAP,
   FACE_INSET,
   HALF_TURN_DEGREES,
   KEY_STEP,
@@ -139,19 +151,23 @@ function knobClass(spec: Pick<KnobSpec, 'compact' | 'dial'>): string {
  * patch was imported, so every knob escapes it here, at the sink.
  */
 export function knobMarkup(
-  spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation'>,
+  spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation' | 'envelope'>,
 ): string {
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
   const label = spec.compact ? '' : `<span class="knob-label">${escapeHtml(spec.label)}</span>`;
   const tag = escapeHtml(AUTO_TAG_TEXT);
-  const auto = spec.automation ? `<span class="knob-auto">${tag}</span>` : '';
+  const auto = spec.automation || spec.envelope ? `<span class="knob-auto">${tag}</span>` : '';
+  const ring = spec.envelope
+    ? `<path class="dial-env" d=""></path><circle class="dial-env-dot" cx="${c}" cy="${c}" r="${ENV_DOT_R}"></circle>`
+    : '';
   return (
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
     `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE_INSET}"></circle>` +
     `<path class="dial-track" d="${arcPath(c, c, r, ARC_START, ARC_END)}"></path>` +
     `<path class="dial-arc" d=""></path>` +
     `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN_INSET}"></line>` +
+    ring +
     `</svg>` +
     `<span class="knob-val"></span>${auto}${label}`
   );
@@ -310,6 +326,35 @@ export function knobAria(spec: Pick<KnobSpec, 'fmt'>, v: number): KnobAria {
   };
 }
 
+/** The dial angle, in degrees, of `v` on `toNorm`'s sweep. */
+const angleOf = (toNorm: (v: number) => number, v: number): number =>
+  ARC_START + Math.min(1, Math.max(0, toNorm(v))) * (ARC_END - ARC_START);
+
+/**
+ * The env ring's painter (windsor#725), or null on a knob with no ring: given
+ * the centre's and the playing value's dial angles, its arc runs between
+ * them outside the track, and its dot sits on the playing value, resting on
+ * the centre while nothing plays. The stylesheet hides the ring off `.env`.
+ */
+function envelopeRingPainter(
+  node: HTMLElement,
+  c: number,
+  dialR: number,
+): ((base: number, playing: number) => void) | null {
+  const ring = node.querySelector('.dial-env');
+  const dot = node.querySelector('.dial-env-dot');
+  if (!ring || !dot) return null;
+  const r = dialR + ENV_RING_GAP;
+  return (base, playing) => {
+    const a0 = Math.min(base, playing);
+    const a1 = Math.max(base, playing);
+    ring.setAttribute('d', a1 - a0 < ARC_MIN_DEGREES ? '' : arcPath(c, c, r, a0, a1));
+    const [x, y] = polar(c, c, r, playing);
+    dot.setAttribute('cx', x.toFixed(2));
+    dot.setAttribute('cy', y.toFixed(2));
+  };
+}
+
 /** Build one knob. The element re-renders itself after every commit. */
 export function makeKnob(spec: KnobSpec): KnobElement {
   const node = knobDom(spec) as KnobElement;
@@ -318,13 +363,13 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const out = node.querySelector('.knob-val') as HTMLElement;
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
+  const paintRing = envelopeRingPainter(node, c, r);
   const { toNorm, fromNorm } = scaleFor(spec);
 
   const render = (): void => {
     const lock = spec.automation?.() ?? null;
     const v = lock ? lock.value : spec.get();
-    const n = Math.min(1, Math.max(0, toNorm(v)));
-    const ang = ARC_START + n * (ARC_END - ARC_START);
+    const ang = angleOf(toNorm, v);
     const zeroN = spec.min < 0 && spec.max > 0 ? toNorm(0) : 0;
     const zeroAng = ARC_START + zeroN * (ARC_END - ARC_START);
     const a0 = Math.min(zeroAng, ang);
@@ -336,6 +381,10 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     node.setAttribute('aria-valuenow', aria.valuenow);
     node.setAttribute('aria-valuetext', lock ? automatedValueText(aria.valuetext) : aria.valuetext);
     if (spec.automation) paintLock(node, lock);
+    if (!spec.envelope || !paintRing) return;
+    const env = spec.envelope();
+    paintEnvelope(node, env, lock);
+    if (env) paintRing(angleOf(toNorm, env.base), angleOf(toNorm, env.playing));
   };
 
   const commit = (raw: number): void => {
@@ -351,7 +400,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   attachKnobInput(node, spec, { toNorm, fromNorm }, commit);
   node.refresh = render;
   render();
-  if (spec.automation) followAutomation(node, spec.automation, render);
+  if (spec.automation || spec.envelope) followKnob(node, spec, render);
   return node;
 }
 

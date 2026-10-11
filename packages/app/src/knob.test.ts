@@ -22,6 +22,7 @@ import {
 } from './knob';
 import type { KnobSpec, Scale } from './knob';
 import type { KnobAutomation } from './knobAutomation';
+import type { KnobEnvelope } from './knobEnvelope';
 import { ENVELOPE_KNOBS } from './patchKnobTables';
 import { notify } from './toast';
 
@@ -45,8 +46,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A Level knob on part 0's strip, attached to a stand-in element; `lock` says what holds it. */
-function levelKnob(ctx: Ctx, lock?: () => KnobAutomation | null): FakeElement {
+/**
+ * A Level knob on part 0's strip, attached to a stand-in element; `lock`
+ * says what holds it, `envelope` what clip envelope moves it.
+ */
+function levelKnob(
+  ctx: Ctx,
+  lock?: () => KnobAutomation | null,
+  envelope?: () => KnobEnvelope | null,
+): FakeElement {
   const node = new FakeElement();
   const spec: KnobSpec = {
     label: 'Level',
@@ -57,6 +65,7 @@ function levelKnob(ctx: Ctx, lock?: () => KnobAutomation | null): FakeElement {
     get: () => levelOf(ctx),
     set: (v) => void ctx.change(level(v)),
     ...(lock ? { automation: lock } : {}),
+    ...(envelope ? { envelope } : {}),
   };
   attachKnobInput(node as unknown as HTMLElement, spec, LINEAR, (v) => spec.set(v));
   return node;
@@ -289,6 +298,29 @@ describe('a knob a lane holds (windsor#351)', () => {
     expect(notify).toHaveBeenCalledWith(
       'Accent is automated in the song. Switch its lane off to edit it.',
     );
+  });
+});
+
+describe('a knob a clip envelope moves (windsor#725)', () => {
+  it('stays live: a drag sets the patch value, the centre the ring moves around', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    vi.mocked(notify).mockClear();
+    const ring = (): KnobEnvelope => ({ base: levelOf(ctx), playing: levelOf(ctx) / 2 });
+    const node = levelKnob(ctx, () => null, ring);
+    dragDown(node, 4);
+    fire(node, 'pointerup');
+    expect(levelOf(ctx)).not.toBe(before);
+    expect(ring().base).toBe(levelOf(ctx));
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('carries the ring and the tag in its markup', () => {
+    const markup = knobMarkup({ label: 'Cutoff', envelope: () => null });
+    expect(markup).toContain('class="dial-env"');
+    expect(markup).toContain('class="dial-env-dot"');
+    expect(markup).toContain('class="knob-auto"');
+    expect(knobMarkup({ label: 'Cutoff' })).not.toContain('dial-env');
   });
 });
 

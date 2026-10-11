@@ -3,10 +3,13 @@
  * knob reads and writes, and the knob bound to one path (#620 decision 3 —
  * the working patch itself is the `PartsSession`). A knob on one of the 29
  * voice targets locks while the selected part has a lane on it that is on
- * (windsor#351): the editor answers which (`PatchEditor.automation`).
+ * (windsor#351): the editor answers which (`PatchEditor.automation`). It
+ * shows an env ring while a roll's clip envelope moves it (windsor#725,
+ * `PatchEditor.envelope`), and stays live.
  */
 import { makeKnob, type KnobSpec } from './knob';
 import { voiceKnobTarget } from './knobAutomation';
+import { emptyKnobEnvelope } from './knobEnvelope';
 import type { PatchEditor } from './partsSession';
 
 export const getPath = (obj: unknown, path: string): unknown =>
@@ -24,11 +27,20 @@ export function setPath(obj: unknown, path: string, value: unknown): void {
   if (target != null) (target as Record<string, unknown>)[last] = value;
 }
 
-/** The lock on the knob at `path`: only a voice target's, and only when the editor answers. */
-function pathLock(editor: PatchEditor, path: string): Pick<KnobSpec, 'automation'> {
+/**
+ * The lock and the env ring on the knob at `path`: only a voice target's, and
+ * each only when the editor answers. The ring's answer is the knob's own,
+ * reused frame after frame.
+ */
+function pathLock(editor: PatchEditor, path: string): Pick<KnobSpec, 'automation' | 'envelope'> {
+  if (voiceKnobTarget(path) === null) return {};
   const automation = editor.automation?.bind(editor);
-  if (!automation || voiceKnobTarget(path) === null) return {};
-  return { automation: () => automation(path) };
+  const envelope = editor.envelope?.bind(editor);
+  const out = emptyKnobEnvelope();
+  return {
+    ...(automation ? { automation: () => automation(path) } : {}),
+    ...(envelope ? { envelope: () => envelope(path, out) } : {}),
+  };
 }
 
 /** A knob bound to a path in the working patch; every commit pushes the patch. */
