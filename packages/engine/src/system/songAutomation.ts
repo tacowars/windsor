@@ -212,6 +212,16 @@ export class SongAutomation {
     return this.playerValue?.lanesOf(owner) ?? [];
   }
 
+  /**
+   * The voice paths the part on `slot`'s clip envelopes hold a slot for
+   * now, into `out`: `AutomationPlayer.envelopeTargets`; none before `begin`.
+   */
+  envelopeTargets(slot: number, out: string[]): string[] {
+    if (this.playerValue) return this.playerValue.envelopeTargets(slot, out);
+    out.length = 0;
+    return out;
+  }
+
   dispose(): void {
     this.playerValue?.dispose();
     this.playerValue = null;

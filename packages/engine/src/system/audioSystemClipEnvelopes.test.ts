@@ -75,8 +75,11 @@ const slotParam = (part: AudioPart, path: string): FakeParam =>
 describe('clip envelopes on the live system', () => {
   it('raises a held note’s Cutoff slot tick by tick as the song plays', async () => {
     const { sys, drone, play } = await rig(droneRoll([RISE]));
+    expect(sys.envelopeTargets(FULL_SLOT.drone, [])).toEqual([]);
     sys.startMusic();
     play(2);
+    // What the console's env ring reads (windsor#725): the targets the part's envelopes hold.
+    expect(sys.envelopeTargets(FULL_SLOT.drone, [])).toEqual(['filter.cutoff']);
     expect(posted(drone).filter((m) => m.type === 'noteOn')).toHaveLength(1);
     expect(posted(drone).filter((m) => m.type === 'noteOff')).toHaveLength(0);
     const slot = slotParam(drone, 'filter.cutoff');

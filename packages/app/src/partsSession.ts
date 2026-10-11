@@ -21,6 +21,7 @@
 import type { ArrangementDocument, DocumentPart, Patch, PartsPartial } from '@windsor/engine';
 import { clonePatch, makePatch, partAt } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
+import type { KnobEnvelope } from './knobEnvelope';
 import { library, libraryPatch } from './libraryModel';
 import { resolveSlot } from './partSelectionSync';
 
@@ -168,4 +169,10 @@ export interface PatchEditor {
    * (windsor#351): null while none that is on holds it. Absent, nothing locks.
    */
   automation?(path: string): KnobAutomation | null;
+  /**
+   * The clip envelope a roll of the selected part plays on the knob at
+   * `path` (windsor#725), written into `out`: null while none moves it.
+   * Absent, no knob shows an env ring.
+   */
+  envelope?(path: string, out: KnobEnvelope): KnobEnvelope | null;
 }

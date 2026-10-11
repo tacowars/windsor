@@ -27,8 +27,11 @@
  *   or to the lane's, and the slot is given back once that ramp is over
  *   (`sweep`), unless a lane holds the target. A new target is admitted only
  *   while the part's voice lanes and its other tracks leave a slot free; a
- *   song lane's target is always admitted and shares its slot. One not
- *   admitted is skipped, and asked about again next tick; nothing throws.
+ *   song lane's target is always admitted and shares its slot, in the
+ *   roll's order (`admittedEnvelopes`, `clipEnvelopeAdmission.ts`). What
+ *   the tracks hold is read back by `heldPaths`, for the app's env ring.
+ *   One not admitted is skipped, and asked
+ *   about again next tick; nothing throws.
  * - **Only what can sound** (windsor#718). An envelope is admitted only
  *   when it can change the sound (`envelopeSounds`): it plays, and its
  *   target has a handle (no macro of the patch maps it, windsor#560) on a
@@ -55,7 +58,9 @@ import type { AutomationHandle } from './automationHandles';
 import { isOffsetHandle } from './automationHandles';
 import type { AutomationOwner } from './automationOwner';
 import type { AutomationResolver } from './automationPlayer';
-import { VOICE_PREFIX, voiceTargetId } from './automationTargets';
+import { voiceTargetId } from './automationTargets';
+import type { EnvelopeAdmissionQuery } from './clipEnvelopeAdmission';
+import { admittedEnvelopes } from './clipEnvelopeAdmission';
 import type { ClipEnvelopeSource } from './clipEnvelopeSource';
 import {
   emptyClipEnvelopeFrame,
@@ -85,12 +90,6 @@ export interface RewindAt {
   readonly ending: boolean;
 }
 
-/** Whether lane target `target` is the voice target at `path`, without building its id. */
-const isTargetOf = (target: string, path: string): boolean =>
-  target.length === VOICE_PREFIX.length + path.length &&
-  target.startsWith(VOICE_PREFIX) &&
-  target.endsWith(path);
-
 /** The lane playing `target` among `lanes`, if any. */
 function laneOn(lanes: readonly PlayingLane[], target: string): PlayingLane | undefined {
   for (let i = 0; i < lanes.length; i++) if (lanes[i]!.target === target) return lanes[i];
@@ -110,9 +109,20 @@ export class ClipEnvelopeTracks {
   /** Targets found with no handle (a macro maps them), not resolved again until `refresh`. */
   private readonly refused = new Set<string>();
   private readonly window: EnvelopeWindow;
+  /** `admit`'s question and answer, refilled per call. */
+  private readonly admission: EnvelopeAdmissionQuery;
+  private readonly admitted: string[] = [];
 
   constructor(private readonly options: ClipEnvelopeTrackOptions) {
     this.window = new EnvelopeWindow(options.stepSeconds);
+    this.admission = {
+      lanes: [],
+      held: this.tracks,
+      envelopes: [],
+      loopTicks: 1,
+      slots: options.slots,
+      sounds: this.sounds,
+    };
   }
 
   /** Nothing to play and no slot held: the player may forget the part's tracks. */
@@ -127,6 +137,19 @@ export class ClipEnvelopeTracks {
       if (tracks[i]!.covered && tracks[i]!.target === target) return true;
     }
     return false;
+  }
+
+  /**
+   * The voice paths this part's tracks hold a slot for now, written into
+   * `out` (cleared first): the envelopes the engine has admitted, which the
+   * app's env ring reads while the transport plays (windsor#725), so it
+   * never works admission out again. Allocates nothing past `out`'s growth.
+   */
+  heldPaths(out: string[]): string[] {
+    const { tracks } = this;
+    out.length = 0;
+    for (let i = 0; i < tracks.length; i++) out.push(tracks[i]!.path);
+    return out;
   }
 
   /**
@@ -276,30 +299,21 @@ export class ClipEnvelopeTracks {
   }
 
   /**
-   * A track for `envelope`, its first tick: when it can change the sound
-   * (`envelopeSounds`) and its lane shares a slot, or a slot is free.
+   * A track for `envelope`, its first tick: when `admittedEnvelopes`, the
+   * one admission order, admits it among the frame's envelopes, over the
+   * lanes and the tracks there are now.
    */
   private admit(envelope: RollEnvelope, lanes: readonly PlayingLane[]): Track | undefined {
     const path = envelope.target;
     if (this.refused.has(path)) return undefined;
-    let shared = false;
-    let used = 0;
-    for (let i = 0; i < lanes.length; i++) {
-      const lane = lanes[i]!;
-      if (isTargetOf(lane.target, path)) shared = true;
-      if (isOffsetHandle(lane.handle)) used++;
-    }
-    for (let i = 0; i < this.tracks.length; i++) {
-      if (!laneOn(lanes, this.tracks[i]!.target)) used++;
-    }
-    if (!shared && used >= this.options.slots) return undefined;
+    const { admission } = this;
+    admission.lanes = lanes;
+    admission.envelopes = this.frame.envelopes;
+    admission.loopTicks = this.frame.loopTicks;
+    if (!admittedEnvelopes(admission, this.admitted).includes(path)) return undefined;
     const target = voiceTargetId(path);
     const handle = this.options.resolve(this.options.owner, target)?.handle;
-    // The envelope plays (the tick asked): what fails is the target, until `refresh`.
-    if (!envelopeSounds(envelope, this.frame.loopTicks, handle)) {
-      this.refused.add(path);
-      return undefined;
-    }
+    if (!targetSounds(handle)) return undefined;
     const track: Track = {
       path,
       target,
@@ -316,4 +330,17 @@ export class ClipEnvelopeTracks {
     this.tracks.push(track);
     return track;
   }
+
+  /**
+   * Whether `path`'s target sounds, asked by `admittedEnvelopes` once a
+   * slot is there for it (windsor#718); one that does not is refused, not
+   * resolved again until `refresh`.
+   */
+  private readonly sounds = (path: string): boolean => {
+    if (this.refused.has(path)) return false;
+    const { owner, resolve } = this.options;
+    if (targetSounds(resolve(owner, voiceTargetId(path))?.handle)) return true;
+    this.refused.add(path);
+    return false;
+  };
 }

@@ -421,6 +421,17 @@ export class EngineHost {
     return this.system?.regionStepAt(slot, region, tick) ?? null;
   }
 
+  /**
+   * The voice paths the part on `slot`'s clip envelopes hold a slot for
+   * now, into `out`: the engine's admitted set, which the env ring reads
+   * while the transport plays (windsor#725). None while audio is off.
+   */
+  envelopeTargets(slot: number, out: string[]): string[] {
+    if (this.system) return this.system.envelopeTargets(slot, out);
+    out.length = 0;
+    return out;
+  }
+
   /** The engine part on a slot, for the Parts tab and keyboard (#597: never by label). */
   part(slot: number): AudioPart | null {
     return this.system?.engine.getPart(musicPartName(slot)) ?? null;

@@ -22,6 +22,7 @@
 import { el } from './dom';
 import { makeKnob, type KnobElement, type KnobSpec } from './knob';
 import type { KnobAutomation } from './knobAutomation';
+import { emptyKnobEnvelope } from './knobEnvelope';
 import { followAutomation } from './knobLock';
 import type { PatchEditor } from './partsSession';
 import {
@@ -66,6 +67,29 @@ function halfLock(
   };
 }
 
+/**
+ * One knob's share of the ratio's env ring (windsor#725): its half of the
+ * centre and of the playing ratio, as `halfLock` splits the lock.
+ */
+function halfEnvelope(
+  editor: PatchEditor,
+  i: number,
+  half: (ratio: number) => number,
+): Pick<KnobSpec, 'envelope'> {
+  const envelope = editor.envelope?.bind(editor);
+  if (!envelope) return {};
+  const out = emptyKnobEnvelope();
+  return {
+    envelope: () => {
+      const env = envelope(`ops.${i}.ratio`, out);
+      if (!env) return null;
+      env.base = half(env.base);
+      env.playing = half(env.playing);
+      return env;
+    },
+  };
+}
+
 function writeRatio(editor: PatchEditor, i: number, ratio: number): void {
   const target = editor.patch.ops[i];
   if (!target) return;
@@ -97,6 +121,7 @@ export function ratioKnobSpecs(
       set: (v) => writeRatio(editor, i, withCoarse(readRatio(editor, i), v)),
       onChange,
       ...halfLock(editor, i, (ratio) => split(ratio).coarse),
+      ...halfEnvelope(editor, i, (ratio) => split(ratio).coarse),
     },
     fine: {
       label: 'Fine',
@@ -109,6 +134,7 @@ export function ratioKnobSpecs(
       set: (v) => writeRatio(editor, i, withFine(readRatio(editor, i), v)),
       onChange,
       ...halfLock(editor, i, (ratio) => split(ratio).fine),
+      ...halfEnvelope(editor, i, (ratio) => split(ratio).fine),
     },
   };
 }

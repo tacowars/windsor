@@ -78,6 +78,20 @@ function patchValue(patch: Patch, path: string): number {
   return typeof node === 'number' ? node : NaN;
 }
 
+/** Whether `patch` has a value at `path` an offset could move (windsor#718): a macro past its count has none. */
+const patchDefines = (patch: Patch, path: string): boolean =>
+  Number.isFinite(patchValue(patch, path));
+
+/**
+ * Whether an offset on the voice target at `path` can change what `patch`
+ * plays (windsor#718, windsor#725): no macro of the patch maps the target,
+ * so the part has a handle on it, and the patch has a value there. The
+ * patch-side reading of `targetSounds` (`automation/clipEnvelopeSource.ts`),
+ * by which the app's env ring shows its label only where an envelope can sound.
+ */
+export const voiceTargetSounds = (patch: Patch, path: string): boolean =>
+  !macroMapsTarget(patch, path) && patchDefines(patch, path);
+
 /**
  * The offset that makes `value`, a lane value in the row's units, sound over
  * `patch`: its difference from the patch's value, or for a ratio row the
@@ -210,7 +224,7 @@ export function voiceAutomationHandle(
   if (known) return known;
   const handle = offsetHandle(slotTarget(part, path), {
     offsetOf: (value) => voiceOffset(part.patch, path, row, value),
-    defined: () => Number.isFinite(patchValue(part.patch, path)),
+    defined: () => patchDefines(part.patch, path),
   });
   byPath.set(path, handle);
   return handle;

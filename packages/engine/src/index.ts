@@ -570,7 +570,10 @@ export type { RollNote, RollSequencerConfig } from './sequencing/rollSequencer';
 // The Roll's clip envelopes (windsor#701): their type, cap, check, row and evaluator.
 export { ROLL_ENVELOPES_MAX, assertRollEnvelopes } from './sequencing/rollEnvelope';
 export type { RollEnvelope, RollEnvelopePoint } from './sequencing/rollEnvelope';
-export { envelopeValueAt } from './sequencing/rollEnvelopeValue';
+export { envelopeHeard, envelopeValueAt } from './sequencing/rollEnvelopeValue';
+// Whether a clip envelope on a voice target can sound under a patch (windsor#725). Which ones
+// hold a slot while the song plays is `AudioSystem.envelopeTargets`, the engine's own state.
+export { voiceTargetSounds } from './synth/voiceAutomation';
 export { ROLL_ENVELOPE_POINTS_MAX, ROLL_ENVELOPE_ROW } from './sequencing/rollEnvelopeTables';
 export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
