@@ -58,6 +58,13 @@ export type {
 } from './song/arrangement';
 export { ArrangementPlayer } from './song/arrangementPlayer';
 export { regionPattern } from './song/regionPattern';
+export { bounceToRoll } from './song/bounceToRoll';
+export type {
+  BounceFollower,
+  BounceRefusal,
+  BounceResult,
+  BounceSummary,
+} from './song/bounceToRollTypes';
 export {
   lookupPreset,
   partLabel,
