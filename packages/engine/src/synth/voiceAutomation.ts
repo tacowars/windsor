@@ -33,13 +33,19 @@
  * maps, for the quantum before the resync and for a held voice on an older
  * patch.
  *
+ * A roll's clip envelope (windsor#702) writes the same slot through the same
+ * handle: its offsets are already in the row's curve (a step value times
+ * the row's span), so it writes them as they are (`scheduleOffset`,
+ * `holdOffset`), the lane's own offset (`offsetOf`) added in where a lane
+ * moves the target too (`automation/clipEnvelopeTracks.ts`).
+ *
  * A part hands out one handle per target, so a resync finds the same one.
  * The nine decay rows have handles too (windsor#347): the worklet reshapes a
  * decay already running from its level. `fmProcessorAutomation.test.ts` and
  * `fmProcessorAutomationDecay.test.ts` pin the handles and the worklet
  * together.
  */
-import type { AutomationHandle, AutomationHow } from '../automation/automationHandles';
+import type { AutomationHow, OffsetHandle } from '../automation/automationHandles';
 import type { AutomationTargetRow } from '../automation/automationLane';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { Patch } from '../patch/patch';
@@ -103,21 +109,33 @@ function write(param: AudioParam, offset: number, time: number, how: AutomationH
   else param.setValueAtTime(offset, time);
 }
 
-/** A handle that writes each lane value as its offset onto `target`. */
-function offsetHandle(target: OffsetTarget, offsetOf: (value: number) => number): AutomationHandle {
+/**
+ * A handle that writes each lane value as its offset onto `target`, and an
+ * offset as itself: a lane's plus a clip envelope's (windsor#702).
+ */
+function offsetHandle(target: OffsetTarget, offsetOf: (value: number) => number): OffsetHandle {
+  const scheduleOffset = (offset: number, time: number, how: AutomationHow): void => {
+    const param = target.take();
+    if (param) write(param, offset, time, how);
+  };
+  const holdOffset = (offset: number, time: number): void => {
+    const param = target.take();
+    if (!param) return;
+    param.cancelScheduledValues(time);
+    param.setValueAtTime(offset, time);
+  };
   return {
+    offsetOf,
+    scheduleOffset,
+    holdOffset,
     schedule(value, time, how): void {
-      const param = target.take();
-      if (param) write(param, offsetOf(value), time, how);
+      scheduleOffset(offsetOf(value), time, how);
     },
     cancelFrom(time): void {
       target.held()?.cancelScheduledValues(time);
     },
     hold(value, time): void {
-      const param = target.take();
-      if (!param) return;
-      param.cancelScheduledValues(time);
-      param.setValueAtTime(offsetOf(value), time);
+      holdOffset(offsetOf(value), time);
     },
     release(time): void {
       const param = target.held();
@@ -146,7 +164,7 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
  * would release and hold again. A rebuilt part is a new `AudioPart`, and
  * starts with none.
  */
-const handles = new WeakMap<AudioPart, Map<string, AutomationHandle>>();
+const handles = new WeakMap<AudioPart, Map<string, OffsetHandle>>();
 
 /**
  * The handle for `target` on `strip`'s part, or undefined when there is
@@ -159,7 +177,7 @@ export function voiceAutomationHandle(
   strip: PartStrip,
   target: VoiceTarget,
   row: AutomationTargetRow,
-): AutomationHandle | undefined {
+): OffsetHandle | undefined {
   const { path } = target;
   const part = strip.part;
   if (macroMapsTarget(part.patch, path)) return undefined;
