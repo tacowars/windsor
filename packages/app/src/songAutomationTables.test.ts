@@ -36,9 +36,12 @@ describe('voiceGroupLabel', () => {
 });
 
 describe('INACTIVE_WHY', () => {
-  it('answers every kind whose rows can be unread', () => {
+  it('answers every kind whose own rows can be unread', () => {
+    // A host's slot rows (`childKind`) are unread with the slot's child; the
+    // generic reason covers them until the slot has a UI (windsor#688, #689).
     for (const [kind, rows] of Object.entries(INSERT_AUTOMATION_FIELDS)) {
-      if (rows.some((row) => row.available)) expect(INACTIVE_WHY, kind).toHaveProperty(kind);
+      const own = rows.filter((row) => !row.childKind);
+      if (own.some((row) => row.available)) expect(INACTIVE_WHY, kind).toHaveProperty(kind);
     }
   });
 
