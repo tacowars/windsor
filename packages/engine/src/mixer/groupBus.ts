@@ -138,8 +138,7 @@ export function createGroupBus(
     },
     fadeTo(to: number, seconds: number): void {
       const now = context.currentTime;
-      fade.gain.cancelScheduledValues(now);
-      fade.gain.setValueAtTime(fade.gain.value, now);
+      holdAt(fade.gain, now);
       fade.gain.linearRampToValueAtTime(to, now + seconds);
     },
   };

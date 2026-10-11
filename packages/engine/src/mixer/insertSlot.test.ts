@@ -49,7 +49,7 @@ const fadeOf = (child: FakeChild): FakeGain => targets(child.output)[0] as unkno
 const wired = (r: ReturnType<typeof rig>): FakeChild[] =>
   children.filter((c) => targets(r.host.send).includes(fake(c.input)));
 const ramp = (from: number, to: number, at = NOW) => [
-  { call: 'cancelScheduledValues', value: from, time: at },
+  { call: 'cancelAndHoldAtTime', value: from, time: at },
   { call: 'setValueAtTime', value: from, time: at },
   { call: 'linearRampToValueAtTime', value: to, time: at + INSERT_FADE_SECONDS },
 ];

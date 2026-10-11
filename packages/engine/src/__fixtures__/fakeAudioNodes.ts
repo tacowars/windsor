@@ -32,7 +32,12 @@ export interface FakeHost {
 }
 
 export class FakeParam {
-  value: number;
+  private current: number;
+  /**
+   * A clock a test sets to make `value` read the timeline at it, as a browser
+   * does (windsor#694); unset, `value` is what the last call named.
+   */
+  readsTimelineAt: (() => number) | undefined;
   /** Nodes connected into this param: a-rate modulation summed onto `value`, as the spec has it. */
   readonly inputs: FakeNode[] = [];
   /**
@@ -47,7 +52,23 @@ export class FakeParam {
     readonly minValue = -Infinity,
     readonly maxValue = Infinity,
   ) {
-    this.value = value;
+    this.current = value;
+  }
+
+  /**
+   * What the last call named, as the fake applies each call at once; or,
+   * once `readsTimelineAt` is set and something is scheduled, the timeline's
+   * value at that clock, as a browser reports it (windsor#694).
+   * Firefox reads the timeline as it stands, so a value read after a cancel
+   * no longer sees the cancelled ramp; this does the same.
+   */
+  get value(): number {
+    const clock = this.readsTimelineAt;
+    return clock && this.automation.length > 0 ? this.valueAt(clock()) : this.current;
+  }
+
+  set value(value: number) {
+    this.current = value;
   }
 
   setValueAtTime(value: number, time?: number): this {
@@ -73,9 +94,9 @@ export class FakeParam {
 
   /** Logs the call and leaves `value` at what it names (a cancel names the current value). */
   private record(call: string, value: number, time?: number): this {
-    if (this.automation.length === 0) this.before = this.value;
+    if (this.automation.length === 0) this.before = this.current;
     this.automation.push({ call, value, ...(time === undefined ? {} : { time }) });
-    this.value = value;
+    this.current = value;
     return this;
   }
 
@@ -86,7 +107,7 @@ export class FakeParam {
   valueAt(time: number): number {
     return timelineValueAt(
       this.automation,
-      this.automation.length > 0 ? this.before : this.value,
+      this.automation.length > 0 ? this.before : this.current,
       time,
     );
   }
