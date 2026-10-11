@@ -110,8 +110,13 @@ is a measured claim.
   then need the cubic read.
 - **A less regular source:** replace the sine/cosine pair with an LFO that
   doesn't repeat audibly, for example a triangle whose direction flips at
-  random intervals, or smoothed noise. One phase per point, and nothing
+  irregular intervals, or smoothed noise. One phase per point, and nothing
   allocated per block.
+- **Deterministic:** the irregularity comes from a seeded generator that
+  lives in the processor's state, never `Math.random()`. The seed is fixed
+  per instance and reset whenever the tank is cleared. So the same input
+  and parameters always render the same samples, and
+  `mixer/reverbGolden.test.ts` can keep pinning them bit for bit.
 - **Default:** light. A plate's modulation should keep a long note from
   ringing at the tank's resonances, not be heard as chorus.
 - **Measure:** the spectral spread of a steady 1 kHz sine (RMS width within
@@ -167,8 +172,12 @@ is a measured claim.
 
   These are aims for the ear, and each converts to fields once items 1, 2
   and 7 fix the units.
-- **Format:** an additive field defaulting to `plate`. Whether today's
-  `room` row moves to the room voicing is decided when it's tuned.
+- **Format:** the field is new, but the plate row's shorter diffusers change
+  how every song saved before item 7 sounds: an absent `voicing` reads as
+  `plate`, and the plate row is no longer the plate it was saved with. So
+  item 7 bumps `ARRANGEMENT_VERSION` too, with no upgrade, as item 1 does.
+  Today's `room` space gets its room-voiced successor in item 8 (Back
+  Room).
 - **Measure:** first arrival, early density, and the T30 of each voicing
   across Size.
 
