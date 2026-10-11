@@ -121,6 +121,8 @@ interface Issued {
 
 /** An owner with no lanes, as its envelope tracks read it. */
 const NO_LANES: readonly Playing[] = [];
+/** The song lanes of an owner registered by its envelopes alone. */
+const NO_SONG_LANES: readonly AutomationLane[] = [];
 
 const fold = (tick: number, songTicks: number): number =>
   ((tick % songTicks) + songTicks) % songTicks;
@@ -175,11 +177,16 @@ export class AutomationPlayer {
    * A part's clip envelopes (windsor#702): what its regions play, or null
    * when none plays one. A running transport restarts the part from now, as
    * a lane edit does; a part without envelopes before or after is untouched.
+   * A part the player did not know yet (one added live without
+   * `automation`) is registered with no lanes, as `load` registers every
+   * part, so a resync, `owners`, a removal, a stop and a dispose reach it
+   * as they reach a part with lanes.
    */
   setEnvelopes(owner: AutomationOwner, source: ClipEnvelopeSource | null): void {
     const key = ownerKey(owner);
     let tracks = this.envelopes.get(key);
     if (!source && !tracks) return;
+    if (!this.lanes.has(key)) this.lanes.set(key, { owner, lanes: NO_SONG_LANES });
     if (!tracks) {
       const { resolve } = this.options;
       const options = { owner, resolve, stepSeconds: this.stepSeconds, slots: FM_LANES_MAX };
@@ -189,7 +196,7 @@ export class AutomationPlayer {
     if (this.running) this.restart(key, this.options.now());
   }
 
-  /** The owners that hold lanes, in the order they were first set. */
+  /** The owners the player knows, lanes or envelopes, in the order they were first set. */
   owners(): readonly AutomationOwner[] {
     return [...this.lanes.values()].map((held) => held.owner);
   }
@@ -218,12 +225,16 @@ export class AutomationPlayer {
   /**
    * Find every lane's target again and restart it from now: a tempo change,
    * a song-length change, or a part or group whose inserts or patch changed,
-   * or whose insert chain was rebuilt (windsor#345). One owner, or every one.
+   * or whose insert chain was rebuilt (windsor#345). One owner, or every one
+   * the player knows: a part's envelope tracks find their targets again
+   * with its lanes, whether or not it has any.
    */
   resync(owner?: AutomationOwner): void {
     const now = this.options.now();
-    for (const key of owner === undefined ? [...this.lanes.keys()] : [ownerKey(owner)]) {
-      if (this.lanes.has(key)) this.replay(key, now);
+    const keys = new Set(this.lanes.keys());
+    for (const key of this.envelopes.keys()) keys.add(key);
+    for (const key of owner === undefined ? keys : [ownerKey(owner)]) {
+      if (keys.has(key)) this.replay(key, now);
     }
   }
 
