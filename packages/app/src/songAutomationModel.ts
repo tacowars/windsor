@@ -44,6 +44,7 @@ import {
 } from '@windsor/engine';
 import { INSERT_LABELS } from './insertKnobTables';
 import { macroName, offersVoicePath } from './macroTargets';
+import { voiceSlotTargets } from './partVoiceSlots';
 import { getPath } from './patchPath';
 import type { LaneOwner } from './songAutomationOwner';
 import { isGroupLaneOwner, ownerInserts, ownerLanes, ownerStrip } from './songAutomationOwner';
@@ -71,13 +72,11 @@ export interface PickerGroup {
 /** A part's or a group's lanes; none when it has no `automation`. */
 export const lanesOf = (owner: LaneOwner): readonly AutomationLane[] => ownerLanes(owner);
 
-/** How many of `lanes` move the voice, against `FM_LANES_MAX`. */
-export const voiceLaneCount = (lanes: readonly AutomationLane[]): number =>
-  lanes.filter((lane) => targetKind(lane.target) === 'voice').length;
-
-/** The mixer cell under the picker (decision 4): "Voice 3/8". */
-export const voiceCountLabel = (lanes: readonly AutomationLane[]): string =>
-  `Voice ${voiceLaneCount(lanes)}/${FM_LANES_MAX}`;
+/**
+ * The mixer cell under the picker (decision 4): "Voice 3/8", `used` the
+ * part's voice slots (`voiceSlotsUsed`), its clip envelopes' included.
+ */
+export const voiceCountLabel = (used: number): string => `Voice ${used}/${FM_LANES_MAX}`;
 
 /** The folded part's badge: "1 lane", "2 lanes". */
 export const laneCountLabel = (count: number): string => `${count} lane${count === 1 ? '' : 's'}`;
@@ -117,7 +116,7 @@ export function laneRow(
   return row && name !== undefined ? { ...row, label: name } : row;
 }
 
-type OptionOf = (target: AutomationTargetId, label: string, full?: boolean) => PickerOption;
+type OptionOf = (target: AutomationTargetId, label: string, refused?: boolean) => PickerOption;
 
 /** One group per insert in `inserts`, each listing the fields its settings leave read. */
 function insertPickerGroups(inserts: readonly InsertSpec[], option: OptionOf): PickerGroup[] {
@@ -132,18 +131,18 @@ function insertPickerGroups(inserts: readonly InsertSpec[], option: OptionOf): P
   });
 }
 
-/** The voice's groups by section, each macro `patch` defines under its name; `full` disables them all. */
+/** The voice's groups by section, each macro `patch` defines under its name; `refused` disables a path. */
 function voicePickerGroups(
   patch: Patch | undefined,
   option: OptionOf,
-  full: boolean,
+  refused: (path: string) => boolean,
 ): PickerGroup[] {
   const voice = new Map<string, PickerOption[]>();
   for (const row of VOICE_AUTOMATION_ROWS) {
     if (!offersVoicePath(patch, row.path)) continue;
     const label = voiceGroupLabel(row.section, OP_NAMES);
     const name = macroName(patch, row.path) ?? row.label;
-    voice.set(label, [...(voice.get(label) ?? []), option(row.target, name, full)]);
+    voice.set(label, [...(voice.get(label) ?? []), option(row.target, name, refused(row.path))]);
   }
   return [...voice].map(([label, options]) => ({ label, options }));
 }
@@ -164,10 +163,10 @@ const GROUP_STRIP: ReadonlySet<AutomationTargetId> = new Set(GROUP_STRIP_TARGETS
 export function pickerGroups(owner: LaneOwner, patch?: Patch): PickerGroup[] {
   const lanes = lanesOf(owner);
   const used = new Set<string>(lanes.map((lane) => lane.target));
-  const option: OptionOf = (target, label, full = false) => ({
+  const option: OptionOf = (target, label, refused = false) => ({
     target,
     label,
-    disabled: used.has(target) || full,
+    disabled: used.has(target) || refused,
   });
   const inserts = insertPickerGroups(ownerInserts(owner), option);
   if (isGroupLaneOwner(owner)) {
@@ -177,7 +176,10 @@ export function pickerGroups(owner: LaneOwner, patch?: Patch): PickerGroup[] {
       ...inserts,
     ];
   }
-  const voiceFull = voiceLaneCount(lanes) >= FM_LANES_MAX;
+  // The part's voice slots, shared with its clip envelopes (epic windsor#699
+  // decision 6): when full, only a target that already holds one stays open.
+  const held = voiceSlotTargets(owner);
+  const voiceFull = held.size >= FM_LANES_MAX;
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
   const seq = seqTargetIds(owner.sequencer.kind).map((target) =>
     option(target, catalogRow(target)?.label ?? target),
@@ -185,7 +187,7 @@ export function pickerGroups(owner: LaneOwner, patch?: Patch): PickerGroup[] {
   return [
     { label: MIXER_GROUP_LABEL, options: mixer },
     ...inserts,
-    ...voicePickerGroups(patch, option, voiceFull),
+    ...voicePickerGroups(patch, option, (path) => voiceFull && !held.has(path)),
     ...(seq.length > 0 ? [{ label: SEQ_GROUP_LABEL, options: seq }] : []),
   ];
 }

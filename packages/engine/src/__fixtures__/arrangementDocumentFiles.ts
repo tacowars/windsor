@@ -19,6 +19,7 @@ export type CurrentDocumentFile =
   | 'figure-part'
   | 'figure-process'
   | 'nothing-usable'
+  | 'roll-envelopes'
   | 'roll-part'
   | 'silent-song';
 

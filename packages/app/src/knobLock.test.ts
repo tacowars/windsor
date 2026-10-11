@@ -14,7 +14,7 @@ import {
 } from '@windsor/engine';
 import { AUTOMATION_PART } from '@windsor/engine/__fixtures__/automationSong';
 import { insertKnobAutomation } from './knobAutomation';
-import { switchShowsOn } from './knobLock';
+import { envelopeMoved, switchShowsOn } from './knobLock';
 import { LANE_KIND_COLOR } from './songAutomationTables';
 
 const BAR = TICKS_PER_BAR;
@@ -50,5 +50,19 @@ describe("an insert's power button", () => {
   it('is free, showing the insert, once the lane is off or deleted', () => {
     expect(shown(partWith([{ ...LANE, on: false }]), 2 * BAR)).toEqual({ on: true, color: null });
     expect(shown(partWith([]), 2 * BAR)).toEqual({ on: true, color: null });
+  });
+});
+
+describe("an env-ringed knob's follow (windsor#725)", () => {
+  it('redraws only when the ring shows, hides or moves, and copies what it saw', () => {
+    const last = { shown: false, base: 0, playing: 0 };
+    const out = { base: 1000, playing: 1000 };
+    expect(envelopeMoved(last, null)).toBe(false);
+    expect(envelopeMoved(last, out)).toBe(true);
+    expect(envelopeMoved(last, out)).toBe(false);
+    out.playing = 1200;
+    expect(envelopeMoved(last, out)).toBe(true);
+    expect(last.playing).toBe(1200);
+    expect(envelopeMoved(last, null)).toBe(true);
   });
 });

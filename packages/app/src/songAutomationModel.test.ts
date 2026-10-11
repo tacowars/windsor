@@ -51,6 +51,7 @@ import {
   withLane,
   withoutLane,
 } from './songAutomationModel';
+import { voiceSlotsUsed } from './partVoiceSlots';
 
 const SLOT = AUTOMATION_PART.slot;
 const tapeTarget = (field: string): AutomationTargetId =>
@@ -179,8 +180,9 @@ describe('the picker', () => {
     const options = full.flatMap((g) => g.options);
     expect(options.filter((o) => isVoice(o.target)).every((o) => o.disabled)).toBe(true);
     expect(options.filter((o) => !isVoice(o.target)).some((o) => o.disabled)).toBe(false);
-    expect(voiceCountLabel(lanes)).toBe(`Voice ${FM_LANES_MAX}/${FM_LANES_MAX}`);
-    expect(voiceCountLabel(lanesOf(AUTOMATION_PART))).toBe('Voice 2/8');
+    const counted = voiceSlotsUsed(partWith(AUTOMATION_PART.strip.inserts, lanes));
+    expect(voiceCountLabel(counted)).toBe(`Voice ${FM_LANES_MAX}/${FM_LANES_MAX}`);
+    expect(voiceCountLabel(voiceSlotsUsed(AUTOMATION_PART))).toBe('Voice 2/8');
   });
 
   it('numbers two inserts of one kind', () => {

@@ -386,9 +386,11 @@ Output (`{ group: id }`), not a send.
 **Add a harmony mode**
 
 - A **scale** is an entry in `SCALES` (`audioConstants.ts`, surfaced by
-  `scaleSampler.ts`'s `SCALE_NAMES` / `scaleOffsets`); the transport strip
-  picks it up from `SCALE_NAMES` (#708), so no list is written twice. Degrees
-  past the scale fold with octave carry (`foldDegree`).
+  `scaleSampler.ts`'s `SCALE_NAMES` / `scaleOffsets`), plus its display
+  name and its group in `scaleNameTables.ts` (windsor#721), which the
+  transport's grouped Scale picker and the roll summary both read;
+  `scaleNameTables.test.ts` fails on a scale without both. Degrees past the
+  scale fold with octave carry (`foldDegree`).
 - A **chord quality, voicing or duration** is `chordTables.ts`
   (`CHORD_QUALITIES` / `QUALITY_INTERVALS` / `QUALITY_LABELS`,
   `CHORD_VOICINGS`, `CHORD_DURATIONS`) plus the stacking rule in

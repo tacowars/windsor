@@ -46,6 +46,10 @@ export interface RollControlsTarget {
 /** The controls, and the readouts' refresh after a repaint. */
 export interface RollControls {
   readonly root: HTMLElement;
+  /** The two columns of note controls, which the Envelopes tab hides (windsor#707). */
+  readonly cols: HTMLElement;
+  /** Snap's field, which heads whichever tab's column shows. */
+  readonly snap: HTMLElement;
   refresh(): void;
 }
 
@@ -123,7 +127,11 @@ function quantiseItem(target: RollControlsTarget): { node: HTMLElement; refresh:
   return { node: wrap, refresh };
 }
 
-function firstColumn(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
+function firstColumn(target: RollControlsTarget): {
+  node: HTMLElement;
+  snap: HTMLElement;
+  refresh: () => void;
+} {
   const { view } = target;
   const snap = select(
     'Snap',
@@ -134,7 +142,7 @@ function firstColumn(target: RollControlsTarget): { node: HTMLElement; refresh: 
       target.repaint();
     },
   );
-  snap.classList.add('roll-item');
+  snap.classList.add('roll-item', 'roll-snap');
   const loop = loopItem(target);
   const keys = segs(
     [
@@ -163,6 +171,7 @@ function firstColumn(target: RollControlsTarget): { node: HTMLElement; refresh: 
   col.append(snap, loop.node, item('Keys', keys), item('Fold', fold), quantise.node);
   return {
     node: col,
+    snap,
     refresh: () => {
       loop.refresh();
       quantise.refresh();
@@ -232,6 +241,8 @@ export function rollControls(target: RollControlsTarget): RollControls {
   root.appendChild(cols);
   return {
     root,
+    cols,
+    snap: first.snap,
     refresh: () => {
       first.refresh();
       second.refresh();

@@ -18,6 +18,8 @@
  * - `SystemLoadMeter`: which processors report their load, and the sum.
  * - `SongAutomation`: the parts' and groups' automation lanes on the transport
  *   (windsor#344, windsor#614), told of every partial after it has landed.
+ * - `BloomChordFollower`: the song's chord on the transport for every bloom on
+ *   Song chord (windsor#729), re-planned after every partial that landed.
  *
  * What stays here is construction, the lifecycle (`init`, `update`,
  * `dispose`) and the two document transactions, which span them all.
@@ -34,6 +36,10 @@ import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { AutomationLane } from '../automation/automationLane';
 import { groupOwner, partOwner } from '../automation/automationOwner';
 import type { AudioLoadReadout } from '../cost/audioLoad';
+import type { Harmony } from '../harmony/harmonyTimeline';
+import { BloomChordFollower } from '../inserts/bloomChordFollower';
+import { harmonyInsertRegistry } from '../inserts/harmonyInsertRegistry';
+import { INSERT_KINDS } from '../inserts/insertRegistry';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
@@ -49,7 +55,9 @@ import type { ReturnBus } from '../mixer/returnBus';
 import { SidechainDesk } from '../mixer/sidechainDesk';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
+import { songTicks } from '../sequencing/meter';
 import { Scheduler } from '../sequencing/scheduler';
+import type { Arrangement } from '../song/arrangement';
 import type { ArrangementPartial } from '../song/arrangement';
 import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
 import type { ApplyResult, MusicEventHandler, RegionStep } from '../song/arrangementPlayer';
@@ -106,6 +114,35 @@ export interface MusicReadout extends PlaybackReadout {
   load: AudioLoadReadout;
 }
 
+/** The song's length in ticks, by its bars and meter. */
+const songLength = ({ transport }: Pick<Arrangement, 'transport'>): number =>
+  songTicks(transport.bars, transport.meter);
+
+/**
+ * Re-plan Song chord after a live edit, by what it touched (windsor#729): a
+ * harmony or transport edit rebuilds the timeline from one read of the
+ * arrangement (a clone, so never on other edits); a part, group, master or
+ * return edit may have switched a bloom to Song chord, which needs the
+ * changes already issued, and clones nothing.
+ */
+function replanChords(
+  chords: BloomChordFollower,
+  partial: DocumentPartial,
+  arrangement: () => Arrangement,
+): void {
+  if (partial.harmony !== undefined || partial.transport !== undefined) {
+    const song = arrangement();
+    chords.setSong(song.harmony, songLength(song));
+  } else if (
+    partial.parts !== undefined ||
+    partial.groups !== undefined ||
+    partial.master !== undefined ||
+    partial.returns !== undefined
+  ) {
+    chords.replan();
+  }
+}
+
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -117,6 +154,7 @@ export class AudioSystem {
 
   private readonly meter: SystemLoadMeter;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
+  private readonly insertHarmony: ReturnType<typeof harmonyInsertRegistry>;
   private readonly graph: StandingGraph;
   private readonly groups: GroupBuses;
   private readonly parts: PartStrips;
@@ -124,13 +162,17 @@ export class AudioSystem {
   private readonly sidechains: SidechainDesk;
   private readonly playback: MusicPlayback;
   private readonly automation: SongAutomation;
+  private chords: BloomChordFollower | null = null;
   private started = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
     this.meter = new SystemLoadMeter(this.engine.context, options.meterLoad ?? true);
-    this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
+    // Every stage passes through both: the song's key under the tempo (windsor#717).
+    // A bloom created on a running song is handed its chord (windsor#729).
+    this.insertHarmony = harmonyInsertRegistry(INSERT_KINDS, () => this.chords?.replan());
+    this.insertTempo = tempoInsertRegistry(this.scheduler.bpm, this.insertHarmony.registry);
     // Passed to every strip and the song master: how it builds an insert, whom
     // it tells when its chain changes, and how it waits out a fade (#652).
     const routeOptions: RouteOptions = {
@@ -275,6 +317,7 @@ export class AudioSystem {
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
     this.insertTempo.setTempo(arrangement.transport.bpm);
+    this.insertHarmony.setHarmony(arrangement.harmony.root, arrangement.harmony.scale);
     // Before the parts, so a part that starts on a group connects to it directly (windsor#285).
     this.groups.build(groups ?? []);
     for (const part of arrangement.parts) {
@@ -299,7 +342,16 @@ export class AudioSystem {
       onEvent,
     );
     this.automation.load(document);
-    this.playback.load(player, lanes);
+    // Built once the loop is set, so it first holds the chord where the transport rests.
+    this.chords = new BloomChordFollower({
+      transport: this.scheduler.transport,
+      now: () => this.engine.context.currentTime,
+      sink: (mask, time, hold) => this.insertHarmony.setChord(mask, time, hold),
+      harmony: arrangement.harmony,
+      songTicks: songLength(arrangement),
+      restTick: () => this.scheduler.transport.currentTick,
+    });
+    this.playback.load(player, [lanes, this.chords]);
   }
 
   /** Start (or resume) the transport. A no-op while muted or before `initMusic`. */
@@ -379,6 +431,9 @@ export class AudioSystem {
       return result;
     }
     this.insertTempo.setTempo(this.scheduler.bpm);
+    // The song's key, forwarded only when its root or scale changed (`harmonyInsertRegistry`).
+    const { root, scale } = player.readout();
+    this.insertHarmony.setHarmony(root, scale as Harmony['scale']);
     const ignored = [...result.ignored, ...groupPlan.ignored];
     ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
     // `GroupBuses` draws the order: groups built and edited, strips, members released, solo, removals.
@@ -397,6 +452,8 @@ export class AudioSystem {
     }
     this.sidechains.commit(routing.graph);
     this.automation.apply(partial, () => player.arrangement, player);
+    // Whatever moved a chord or its time, from now (windsor#729).
+    if (this.chords) replanChords(this.chords, partial, () => player.arrangement);
     return { ok: true, ignored };
   }
 
@@ -455,6 +512,17 @@ export class AudioSystem {
     return this.automation.lanesOf(groupOwner(id));
   }
 
+  /**
+   * The voice paths the clip envelopes of the part on `slot` hold a voice
+   * slot for now, written into the caller's `out` (windsor#725): what the
+   * engine has admitted, which the console's env ring reads each frame
+   * instead of working admission out again. Allocation-free; none before
+   * `initMusic`, or for a part whose regions play no envelope.
+   */
+  envelopeTargets(slot: number, out: string[]): string[] {
+    return this.automation.envelopeTargets(slot, out);
+  }
+
   /** A return by name, once `init()` has built them. */
   returnBus(name: string): ReturnBus | undefined {
     return this.graph.returnBus(name);
@@ -478,6 +546,8 @@ export class AudioSystem {
   dispose(): void {
     this.playback.dispose();
     this.automation.dispose();
+    this.chords?.dispose();
+    this.chords = null;
     this.sidechains.dispose();
     // Before the strips, whose rotation outputs the bank's edges leave from.
     this.partMeters.dispose();

@@ -118,9 +118,31 @@ frames, the cutoff gliding geometrically and the Reso linearly across a
 quantum. The console card is `app/src/filterCard.ts`. Cost:
 `docs/research/2026-10-06-filter-insert/README.md`.
 
+bloom (windsor#712, record `2026-10-11-bloom-insert`) is the kind `bloom`, a
+harmonic pad generator: it hears its input in 48 semitone bands (F2–E6) and
+plays a band-limited waveform at each band that sounds, levelled by a shared
+compressor, then mixes the layer with the dry signal. `inserts/bloomSpec.ts`
+(Amount, Mix, Swell, Sustain, Freeze, Spread, Shape, Bright, Octave, Key,
+Scale, Low, High, Focus, Density, enabled; no presets), `bloomConstants.ts`
+(the ranges, defaults and lists, and the route's tunables) and
+`bloomInsert.ts`; every lever is bit-neutral at its default, which
+`bloomGolden.test.ts` pins. The DSP is `worklet/bloom/`, one module a seam,
+each with its tunables in its own constants file under `inserts/`: the
+analysis is `bloomDecimator.ts` → `bloomBands.ts` (`bloomBandsConstants.ts`),
+then `bloomDynamics.ts` (`bloomDynamicsConstants.ts`), `bloomEnvelope.ts`
+(`bloomEnvelopeConstants.ts`), `bloomGenerator.ts` and
+`bloomGeneratorPitch.ts` (`bloomGeneratorConstants.ts`), `bloomSynth.ts` with
+`bloomTables.ts`, `bloomTone.ts`, and `bloomOutput.ts`
+(`bloomOutputConstants.ts`). Its per-sample log2 and 2^x are
+`fm/portablePowers.ts`'s, so an edit there rebuilds both bundles. Amount,
+Mix, Spread, Shape, Bright, Focus and Density are lanes, Swell and Sustain
+log lanes with a floor, and Freeze a switch lane; Octave, Low, High, Key and
+Scale are not targets. The console card is `app/src/bloomCard.ts`. Cost:
+`docs/research/2026-10-11-bloom-insert/README.md`.
+
 The wet-path slot (epic windsor#686, record `2026-10-11-wet-path-slot`): a
 **host** insert carries one child insert of another kind on its wet path,
-before its Mix. Echo is the only host so far. To make a kind a host:
+before its Mix. Echo and bloom are hosts. To make a kind a host:
 
 - add `slot` to its `fields`, and `slot: null` to its defaults; the registry's
   `normaliseInsertEntry` reads the slot, and the kind's own normaliser never
@@ -134,9 +156,11 @@ in `createInsertChain`, so the child is built from the chain's registry,
 metered and tempo-fed. The `insert.<hostId>.slot.<field>` lanes follow from
 the rows. The card is `app/src/insertSlotArea.ts` and `insertChildBox.ts` over
 a `child` target in `insertTarget.ts`. In app code that address is a
-`child`, never a "slot", which already means a part's slot. A worklet host
-(Delay, Plate, Retro Reverb, bloom) first needs extra worklet outputs for
-its wet layer before its Mix, with its golden unchanged while the slot is
+`child`, never a "slot", which already means a part's slot. A kind that
+mixes inside its worklet (Delay, Plate, Retro Reverb) first needs extra
+worklet outputs, as bloom has (`BLOOM_SLOT`, `inserts/bloomInsert.ts`): the
+wet layer leaves on one output and comes back through a native `ret` gain
+that another output drives, with its golden unchanged while the slot is
 empty. The card's spec is `docs/design/echo-slot-mockup.html`.
 
 A gain that cancels a ramp and starts another goes through `holdAt`

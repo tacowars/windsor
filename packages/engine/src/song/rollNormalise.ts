@@ -13,16 +13,39 @@
  * reported except the sort, and a `velocity` of 1 leaves no key, so an
  * export carries no default. A note at or past `loopTicks` is kept: it is
  * silent until the loop grows back over it.
+ *
+ * **Envelopes** (windsor#701, epic windsor#699). An envelope whose target is
+ * not a voice target, one on a target an earlier envelope holds, and those
+ * past `ROLL_ENVELOPES_MAX` are dropped; a missing `on` is true. A point
+ * whose tick or value is not a finite number, or whose bend is present and
+ * not one, is dropped. The tick is clamped into 0..`ROLL_LOOP_TICKS_MAX` − 1,
+ * the value and the bend into −1..1 (a missing bend is 0). The points are
+ * then sorted by tick; of two on one tick the later in the list is kept,
+ * since it is the value the tick reads on a song lane's step; and those past
+ * `ROLL_ENVELOPE_POINTS_MAX` are trimmed. An envelope left with no points is
+ * kept: it reads 0. Each change is reported but the sort, and an empty list
+ * leaves no key, as a velocity of 1 does. A point at or past `loopTicks` is
+ * kept, silent like a note there.
  */
 import { MIDI_MIDDLE_C, MIDI_NOTE_MAX, ROLL_NOTES_MAX } from '../audioConstants';
 import { ticksPerBar } from '../sequencing/meter';
+import {
+  ROLL_ENVELOPES_MAX,
+  type RollEnvelope,
+  type RollEnvelopePoint,
+} from '../sequencing/rollEnvelope';
+import { ROLL_ENVELOPE_POINTS_MAX } from '../sequencing/rollEnvelopeTables';
 import { ROLL_LOOP_TICKS_MAX, type RollNote } from '../sequencing/rollSequencer';
+import { isVoiceTargetPath } from '../sequencing/stepModLanes';
+import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 import { DIVISORS } from '../sequencing/scheduler';
 import type { RollDriver } from './arrangement';
 import { isRecord, show, type FieldNormaliser } from './arrangementFields';
 
-const ROLL_KEYS = ['loopTicks', 'notes'];
+const ROLL_KEYS = ['loopTicks', 'notes', 'envelopes'];
 const NOTE_KEYS = ['tick', 'ticks', 'pitch', 'velocity'];
+const ENVELOPE_KEYS = ['target', 'on', 'points'];
+const POINT_KEYS = ['tick', 'value', 'bend'];
 
 /** A written note's mutable shape while the list is settled. */
 type DraftNote = { tick: number; ticks: number; pitch: number; velocity?: number };
@@ -31,10 +54,13 @@ export function rollDriver(raw: unknown, path: string, n: FieldNormaliser): Roll
   const o = n.section(raw, path);
   n.dropUnknown(o, ROLL_KEYS, path);
   const at = `${path}.loopTicks`;
-  return {
+  const driver: RollDriver = {
     loopTicks: n.int(o.loopTicks, ticksPerBar(n.meter), 1, ROLL_LOOP_TICKS_MAX, at),
     notes: rollNotes(o.notes, `${path}.notes`, n),
   };
+  const envelopes = rollEnvelopes(o.envelopes, `${path}.envelopes`, n);
+  if (envelopes.length > 0) driver.envelopes = envelopes;
+  return driver;
 }
 
 /** The list: each note read, then sorted, de-duplicated, de-overlapped and capped. */
@@ -125,4 +151,75 @@ function withoutOverlaps(sorted: DraftNote[], path: string, n: FieldNormaliser):
     out.push(note);
   }
   return out;
+}
+
+/** The envelopes: each read, with a junk or repeated target and those past the cap dropped. */
+function rollEnvelopes(raw: unknown, path: string, n: FieldNormaliser): RollEnvelope[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list of envelopes — no envelopes`);
+    return [];
+  }
+  const envelopes: RollEnvelope[] = [];
+  const seen = new Set<VoiceTargetPath>();
+  raw.forEach((item, i) => {
+    const at = `${path}[${i}]`;
+    const drop = (why: string): void => n.correction(`${at}: ${why} — envelope dropped`);
+    if (!isRecord(item)) return drop(`${show(item)} is not an envelope`);
+    n.dropUnknown(item, ENVELOPE_KEYS, at);
+    const { target } = item;
+    if (!isVoiceTargetPath(target)) return drop(`${show(target)} is not a voice target`);
+    if (seen.has(target)) return drop(`${target} already has an envelope`);
+    if (envelopes.length >= ROLL_ENVELOPES_MAX) {
+      return drop(`more than ${ROLL_ENVELOPES_MAX} envelopes`);
+    }
+    seen.add(target);
+    const on = n.bool(item.on, true, `${at}.on`);
+    envelopes.push({ target, on, points: envelopePoints(item.points, `${at}.points`, n) });
+  });
+  return envelopes;
+}
+
+/** An envelope's points: read, sorted, one to a tick (the later kept), and capped. */
+function envelopePoints(raw: unknown, path: string, n: FieldNormaliser): RollEnvelopePoint[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list of points — no points`);
+    return [];
+  }
+  const read: RollEnvelopePoint[] = [];
+  raw.forEach((item, i) => {
+    const point = envelopePoint(item, `${path}[${i}]`, n);
+    if (point) read.push(point);
+  });
+  // `sort` is stable: of two points on one tick, the later written stays the later.
+  read.sort((a, b) => a.tick - b.tick);
+  const single = read.filter((point, i) => read[i + 1]?.tick !== point.tick);
+  if (single.length < read.length) {
+    n.correction(
+      `${path}: ${read.length - single.length} points shared a tick — the earlier dropped`,
+    );
+  }
+  if (single.length > ROLL_ENVELOPE_POINTS_MAX) {
+    n.correction(`${path}: ${single.length} points trimmed to ${ROLL_ENVELOPE_POINTS_MAX}`);
+  }
+  return single.slice(0, ROLL_ENVELOPE_POINTS_MAX);
+}
+
+const finite = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/** One point, clamped, or null (reported) when a field is not a finite number. */
+function envelopePoint(raw: unknown, path: string, n: FieldNormaliser): RollEnvelopePoint | null {
+  const o = isRecord(raw) ? raw : {};
+  if (!finite(o.tick) || !finite(o.value) || (o.bend !== undefined && !finite(o.bend))) {
+    n.correction(`${path}: ${show(raw)} is not a point — dropped`);
+    return null;
+  }
+  n.dropUnknown(o, POINT_KEYS, path);
+  return {
+    tick: n.num(o.tick, 0, 0, ROLL_LOOP_TICKS_MAX - 1, `${path}.tick`),
+    value: n.num(o.value, 0, -1, 1, `${path}.value`),
+    bend: n.num(o.bend, 0, -1, 1, `${path}.bend`),
+  };
 }

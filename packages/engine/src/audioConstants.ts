@@ -56,6 +56,18 @@ export const SCALES = {
   lydian: [0, 2, 4, 6, 7, 9, 11],
   pentatonicMajor: [0, 2, 4, 7, 9],
   pentatonicMinor: [0, 3, 5, 7, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+  /** The ascending (jazz) form at every step. */
+  melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+  phrygianDominant: [0, 1, 4, 5, 7, 8, 10],
+  /** Burrows/Sachs spelling; `japaneseIn` is the same pitch set from its ♭2. */
+  hirajoshi: [0, 2, 3, 7, 8],
+  japaneseIn: [0, 1, 5, 7, 8],
+  majorBlues: [0, 2, 3, 4, 7, 9],
+  minorBlues: [0, 3, 5, 6, 7, 10],
+  wholeTone: [0, 2, 4, 6, 8, 10],
 } as const satisfies Record<string, readonly number[]>;
 
 /* --------------------- arrangement document bounds ---------------------- */
@@ -193,16 +205,17 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 9 since RV-4 (a Retro Reverb's
- * Size lane is drawn and played on a log scale). Version 8 (windsor#626: a
+ * A document's document-format version: 10 since windsor#728 (bloom's
+ * Scale values are Windsor's `SCALE_NAMES`). Version 9 (RV-4: a Retro
+ * Reverb's Size lane on a log scale), version 8 (windsor#626: a
  * Filter insert's Reso lane on a log scale), version 7 (windsor#590: the
  * embedded patches are patch format 4, the operators' `opLp` and `opHp`),
  * version 6 (windsor#300: patch format 3, the drive out of the filter) and
- * version 5 (windsor#224: Tape's Drive feeds the magnetic core) upgrade to 9
+ * version 5 (windsor#224: Tape's Drive feeds the magnetic core) upgrade to 10
  * through `SONG_MIGRATIONS`; versions 2 to 4 are refused (record
  * `2026-09-28-format-versions-refuse-never-destroy`).
  */
-export const ARRANGEMENT_VERSION = 9;
+export const ARRANGEMENT_VERSION = 10;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

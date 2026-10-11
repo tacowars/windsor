@@ -80,5 +80,7 @@ describe('keyName', () => {
   it('names the key as the summary does', () => {
     expect(keyName(HARMONY)).toBe('A minor');
     expect(keyName({ ...HARMONY, root: 0, scale: [0, 2, 4] })).toBe('C custom scale');
+    expect(keyName({ ...HARMONY, root: 0, scale: 'hirajoshi' })).toBe('C hirajoshi');
+    expect(keyName({ ...HARMONY, scale: 'harmonicMinor' })).toBe('A harmonic minor');
   });
 });

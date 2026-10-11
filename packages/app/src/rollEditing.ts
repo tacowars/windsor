@@ -66,6 +66,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
     body: host.body,
     previewNotes: () => host.previewNotes(),
     repaint: () => host.repaint(),
+    inert: () => view.page === 'envelopes',
   });
   const scene = (): RollScene | null => host.scene();
   const frame = (): RollFrame => rollFrame(host.source(), view);

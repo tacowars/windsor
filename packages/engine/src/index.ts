@@ -58,6 +58,13 @@ export type {
 } from './song/arrangement';
 export { ArrangementPlayer } from './song/arrangementPlayer';
 export { regionPattern } from './song/regionPattern';
+export { bounceToRoll } from './song/bounceToRoll';
+export type {
+  BounceFollower,
+  BounceRefusal,
+  BounceResult,
+  BounceSummary,
+} from './song/bounceToRollTypes';
 export {
   lookupPreset,
   partLabel,
@@ -567,6 +574,14 @@ export {
   defaultRollConfig,
 } from './sequencing/rollSequencer';
 export type { RollNote, RollSequencerConfig } from './sequencing/rollSequencer';
+// The Roll's clip envelopes (windsor#701): their type, cap, check, row and evaluator.
+export { ROLL_ENVELOPES_MAX, assertRollEnvelopes } from './sequencing/rollEnvelope';
+export type { RollEnvelope, RollEnvelopePoint } from './sequencing/rollEnvelope';
+export { envelopeHeard, envelopeValueAt } from './sequencing/rollEnvelopeValue';
+// Whether a clip envelope on a voice target can sound under a patch (windsor#725). Which ones
+// hold a slot while the song plays is `AudioSystem.envelopeTargets`, the engine's own state.
+export { voiceTargetSounds } from './synth/voiceAutomation';
+export { ROLL_ENVELOPE_POINTS_MAX, ROLL_ENVELOPE_ROW } from './sequencing/rollEnvelopeTables';
 export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';
@@ -670,6 +685,16 @@ export { DEFAULT_FILTER } from './inserts/filterSpec';
 export type { FilterSpec } from './inserts/filterSpec';
 export { FILTER_BOUNDS, FILTER_MODES, FILTER_MODE_VOICE_IDS } from './inserts/filterConstants';
 export type { FilterMode } from './inserts/filterConstants';
+// bloom, the harmonic pad generator (windsor#712).
+export { DEFAULT_BLOOM } from './inserts/bloomSpec';
+export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';
+export {
+  BLOOM_BOUNDS,
+  BLOOM_OCTAVES,
+  BLOOM_SCALE_DEFAULT,
+  BLOOM_SHAPES,
+} from './inserts/bloomConstants';
+export { pitchMask } from './inserts/bloomPitches';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeCore, TapeSpec } from './inserts/tapeSpec';
 export {

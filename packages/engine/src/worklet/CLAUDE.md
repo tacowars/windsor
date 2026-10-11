@@ -137,6 +137,35 @@ test project, as `fm/` is); `inserts/filter*.test.ts` run the bundle through
 `__fixtures__/filterHarness.ts`, and `inserts/filterAllocation.test.ts` pins
 rules 2 and 7 through `__fixtures__/filterChangeScenario.ts`.
 
+`bloom/` is bloom, the harmonic pad generator (windsor#712, record
+`2026-10-11-bloom-insert`), built as `generated/bloom-processor.js` with its
+own `tsconfig.json`. `bloomProcessor.ts` owns the descriptors, the block
+loop, `stop` and the load reports; `bloomSlots.ts` lays the controls out as
+`Float64Array` slots in descriptor order; `bloomDsp.ts` is the route, its
+diagram in the header. One module a seam, each with its tunables in its own
+`inserts/bloom*Constants.ts`: `bloomDecimator.ts` brings the mono input
+down to about 12 kHz for the analysis, `bloomBands.ts` (with
+`bloomBandsMath.ts`) runs the 48 semitone bands and their selection,
+`bloomDynamics.ts` the shared compressor and each band's ceiling,
+`bloomEnvelope.ts` (with `bloomEnvelopeMath.ts`'s presence detector) Swell,
+Sustain and Freeze, `bloomGenerator.ts` (with `bloomGeneratorMath.ts`) Shape
+and Bright and `bloomGeneratorPitch.ts` Octave, Key and Scale,
+`bloomSynth.ts` (with `bloomSynthMath.ts`) the host-rate synthesis from the
+band-limited tables of `bloomTables.ts`, `bloomTone.ts` the fixed FIR and
+Bright's tilt, and `bloomOutput.ts` Spread, Amount, Mix and the switch.
+No transcendental `Math` runs anywhere the render depends on, the
+constructors included: `bloomPortable.ts` holds bloom's `bloomExp` and
+`bloomOnePoleStep` over `inserts/tapePortableMath.ts`'s 2^x, and the
+per-sample log2 and 2^x are `fm/portablePowers.ts`'s `log2InPlace` and
+`exp2InPlace`, imported, so **an edit to `fm/portablePowers.ts` rebuilds
+both `fm-processor.js` and `bloom-processor.js`**. The tests under
+`inserts/bloom*.test.ts` run the bundle through `__fixtures__/bloomHarness.ts`;
+`inserts/bloomGolden.test.ts` pins the render against
+`__fixtures__/bloomGolden.json` (refresh only with
+`WINDSOR_REFRESH_BLOOM_GOLDEN=1`), and `inserts/bloomAllocation.test.ts`
+pins rules 2 and 7 through `__fixtures__/bloomChangeScenario.ts`. Its cost
+is in `docs/research/2026-10-11-bloom-insert/`.
+
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
 worklet lifecycle/load reports; `retroReverbDsp.ts` owns host/internal-clock
@@ -240,7 +269,7 @@ build output. The map of `fm/` (#644):
 | `voiceLadder.ts` | `updateVoiceLadder` and `renderVoiceLadder` (windsor#573): the live Reso onto the ladder, then `tuneLadder`, once per control block; and the pass over a render chunk after either loop: the chunk through the ladder, then the steal fade and the pan, added into the part's accumulators |
 | `ladderTables.ts` | `LADDER_SATURATOR` (windsor#573): tanh as the [7/6] Lambert rational held at ±1 past its limit, within 1e-4 of `Math.tanh`; and the 2× solver's decimator taps, read on every Acid sample since windsor#593 |
 | `voiceDrive.ts` | `VoiceDrive` and `updateVoiceDrive` (windsor#300): the voice's drive stage between the carriers and the filter, heard with the filter on or off. Its state, its five curves by `DRIVE_SHAPE` id (`soft`, the filter's former soft clip to the bit, then Advanced Drive's `hard`, `diode`, `tube` and `fold` in portable arithmetic) and its control-rate half (the bypass, which is the patch's `drive.on` switch or unity gain with no bias, windsor#309; the bias's offset; the tone pole's coefficient). Both render loops write the per-sample stage out, `soft` and the tone inline. |
-| `portablePowers.ts` | `log2InPlace` and `exp2InPlace` (windsor#300): base-2 log and power in place, from `+ − × ÷` and a double's bits, so the diode curve and the tone's cutoff give the same bits on arm64 and x64 |
+| `portablePowers.ts` | `log2InPlace` and `exp2InPlace` (windsor#300): base-2 log and power in place, from `+ − × ÷` and a double's bits, so the diode curve and the tone's cutoff give the same bits on arm64 and x64. `bloom/` imports both (windsor#712), so an edit here rebuilds `bloom-processor.js` too |
 | `operatorFilter.ts` | `OperatorFilter` and `bindOperatorFilter` (windsor#362; every wave since windsor#590, record `2026-10-04-operator-filters-on-every-wave`): an operator's own two-pole Butterworth lowpass and highpass on its wave, from its `opLp` and `opHp` (0 off), each moved by `opTrack` octaves an octave of the played note from middle C (`2^(opTrack (note − 60) / 12)` through `exp2InPlace`), held to 20 Hz..0.45 fs. Four to a voice; `bindVoiceConstants` tunes them when the voice binds a patch or its note (a note-on, a rebind, a slide's `retarget`), retuning a section only when its effective cutoff changed. The filter sits after the operator's feedback tap: `fb1`/`fb2` take the raw wave, `out` the filtered one. The generic loop calls `process` through `point` while one is on; the kernel writes `process` out per operator, its operations in its order, and never skips an operator whose filter is on |
 | `portableTangent.ts` | `tanInPlace` (windsor#362): the tangent in place over `tapePortableMathTables.ts`, for the operator filters' prewarp, the same bits on arm64 and x64 |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
@@ -253,7 +282,7 @@ build output. The map of `fm/` (#644):
 | `macroMappings.ts` | `effectiveMacroMappings`, `macroMapsTarget` (windsor#560): the mappings the voice applies for a patch (the first `MACROS_MAX` macros, the first `MACRO_MAPPINGS_MAX` mappings of each, voice targets that are not macros, the first mapping per target), normalised; `normalisePatch` builds the macros' mappings from it and the main thread reads the same list |
 | `macroShape.ts` | `macroMappedValue` (windsor#566): what a mapping plays at a macro value, the voice's shaping as one scalar for the main thread (the index exports it), held to `voiceMacros.ts` over a sweep by `macroShape.test.ts` |
 | `voiceMacros.ts` | a patch's macros on the voice (windsor#560, record `2026-10-04-patch-macro-knobs`): `compileMacros`, the mappings as typed arrays on the normalised patch (`MacroTables`, so `WorkletPatch` is `Patch & MacroTables`), at construction and at each `patch` message, a ratio row's ends raised to its floor and `log2(max / min)` worked out there; and `applyMacroBases`, each mapped target's base from its macro's shaped value (Linear, Exp, Log, S, inverted first; geometric on a ratio row through `exp2InPlace`) with the step's push over it, ignoring any lane on it. `bindOwnValues` and `bindLiveValues` call it after the macro rows resolve; a patch with no mappings never does |
-| `voiceOffsets.ts` | the song lanes on the voice (windsor#346, windsor#347): `VOICE_SLOT_COUNT` and the slots' parameter names, `mapVoiceSlots` (a slot map to target codes, at a message; the cutoff is a slot like any other since windsor#419), `latchVoiceOffsets` (the slots into the part's offsets, each quantum), `applyVoiceOffsets` (each control block: `liveValues`, the own value where no lane moves a target and otherwise the lane's absolute value with the step's push over it, then the feedback ramp's ends, the LFOs' absolute `rate`, and the decays into the envelopes, a changed curve through `Envelope.reshapeDecay`), and `primeVoiceOffsets` / `keepVoiceOffsets` + `rebindVoiceOffsets` for a note-on and a live retune. Only a lane's offset changing reshapes a decay, never a rebind: a curve a lane holds over an edited base stays as it plays until the lane resyncs (`decayRebound`). An offset of 0 changes nothing, to the bit, except that a decay time or an LFO rate a slot maps plays at least its row's floor, 1 ms or 0.02 Hz (`partFloors`); a part with no slot mapped floors nothing |
+| `voiceOffsets.ts` | the song lanes and a roll's clip envelopes on the voice (windsor#346, windsor#347, windsor#718): `VOICE_SLOT_COUNT` and the slots' parameter names, `mapVoiceSlots` (a slot map to target codes, and which slots are `relative`, at a message; the cutoff is a slot like any other since windsor#419), `latchVoiceOffsets` (the slots into the part's offsets, each quantum), `applyVoiceOffsets` (each control block: `liveValues`, the own value where no lane moves a target and otherwise the lane's absolute value with the step's push over it, then the feedback ramp's ends, the LFOs' absolute `rate`, and the decays into the envelopes, a changed curve through `Envelope.reshapeDecay`), and `primeVoiceOffsets` / `keepVoiceOffsets` + `rebindVoiceOffsets` for a note-on and a live retune. Only a lane's offset changing reshapes a decay, never a rebind: a curve a lane holds over an edited base stays as it plays until the lane resyncs (`decayRebound`). An offset of 0 changes nothing, to the bit, except that a decay time or an LFO rate a song lane's slot maps plays at least its row's floor, 1 ms or 0.02 Hz (`partFloors`). A `relative` slot (a clip envelope with no song lane on its target) sets no floor, so its 0 plays the patch's own value, an exact-0 decay or LFO rate included (`clipEnvelopeExactZero.test.ts`). A part with no slot mapped floors nothing |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
 | `tsconfig.json` | the folder's own `tsc -p` project (#654): the engine's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
 | `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
@@ -265,7 +294,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`,
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`, `bloom/`,
    `outputStage/`, `tape/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so

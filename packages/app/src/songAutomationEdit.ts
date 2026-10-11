@@ -37,28 +37,29 @@ import {
 } from './songAutomationTables';
 import { pxToTick, tickToPx } from './songViewTables';
 
-/** Where a lane is drawn: the view's zoom, the lane's height and the song's length. */
+/** Where a lane is drawn: the zoom, the lane's height and the axis's length (windsor#706). */
 export interface LaneFrame {
   readonly pxPerBar: number;
-  /** The song's bar in ticks, which `pxPerBar` spans (windsor#430); 4/4's when absent. */
+  /** The bar in ticks, which `pxPerBar` spans (windsor#430); 4/4's when absent. */
   readonly ticksPerBar?: number;
   readonly heightPx: number;
-  readonly songTicks: number;
+  /** The axis's length in ticks, from tick 0: the song's, or a roll's loop. */
+  readonly axisTicks: number;
   readonly drawing?: AutomationDrawing;
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
-/** `tick` on the grain (`grainTicks` 0 or `free`: the nearest whole tick), inside the song. */
+/** `tick` on the grain (`grainTicks` 0 or `free`: the nearest whole tick), inside the axis. */
 export function snapTick(
   tick: number,
   grainTicks: number,
-  songTicks: number,
+  axisTicks: number,
   free = false,
 ): number {
   const snapped =
     free || grainTicks <= 0 ? Math.round(tick) : Math.round(tick / grainTicks) * grainTicks;
-  return clamp(snapped, 0, songTicks);
+  return clamp(snapped, 0, axisTicks);
 }
 
 /** Draw's grain: the Snap grain, or `drawOffGrainTicks` while Snap is Off (decision 3). */
@@ -67,9 +68,9 @@ export const drawGrain = (
   gestures: AutomationGestures = AUTOMATION_GESTURES,
 ): number => (snapTicks > 0 ? snapTicks : gestures.drawOffGrainTicks);
 
-/** The song tick at `x` px into the lane, inside the song. */
+/** The tick at `x` px into the lane, inside the axis. */
 export const tickAtPx = (x: number, frame: LaneFrame): number =>
-  clamp(pxToTick(x, frame.pxPerBar, frame.ticksPerBar), 0, frame.songTicks);
+  clamp(pxToTick(x, frame.pxPerBar, frame.ticksPerBar), 0, frame.axisTicks);
 
 /** The display height (0..1) at `y` px from the lane's top. */
 export function displayAtPx(y: number, frame: LaneFrame): number {
@@ -225,7 +226,7 @@ export const deletePoint = (
   index: number,
 ): AutomationPoint[] => (points.length <= 1 ? [...points] : points.filter((_, i) => i !== index));
 
-/** A pointer position in a Draw stroke: a song tick and a display height. */
+/** A pointer position in a Draw stroke: a tick on the axis and a display height. */
 export interface StrokePosition {
   readonly tick: number;
   readonly display: number;
@@ -242,14 +243,14 @@ export function strokeTo(
   samples: Map<number, number>,
   from: StrokePosition | null,
   to: StrokePosition,
-  grain: { readonly ticks: number; readonly songTicks: number },
+  grain: { readonly ticks: number; readonly axisTicks: number },
 ): void {
-  const end = snapTick(to.tick, grain.ticks, grain.songTicks);
+  const end = snapTick(to.tick, grain.ticks, grain.axisTicks);
   if (!from) {
     samples.set(end, to.display);
     return;
   }
-  const start = snapTick(from.tick, grain.ticks, grain.songTicks);
+  const start = snapTick(from.tick, grain.ticks, grain.axisTicks);
   if (start === end) {
     // Both samples fall in one cell: the pointer's newest height is the cell's.
     samples.set(end, to.display);

@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The bloom card mockup, for tacowars to approve (windsor#711, epic
+     windsor#710 decision 6). 2026-10-11. bloom's rack card in today's card
+     style: all 15 controls on one page, grouped by function, and the place
+     Windsor's generic slot area (windsor#692) takes once E2 (windsor#713)
+     makes bloom a wet-path host. Once approved, it is the spec for E1's
+     card (windsor#712).
+     The rack's rules are copied from packages/app/src/console.css, its sizes
+     from insertRackTables.ts, the dial from knob.ts and knobConstants.ts,
+     the readouts from consoleFormat.ts, and the slot area from the approved
+     docs/design/echo-slot-mockup.html as built in insertSlotArea.ts. The
+     ranges and defaults are the prepared bloom port's (bloomConstants.ts and
+     the record 2026-10-11-bloom-insert), so E1 can copy them.
+     Static and self-contained apart from the fonts: the knobs drag
+     (double-click resets), and the pickers, switches, Freeze, the slot tab,
+     the folds and the theme switch work. Nothing makes sound. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Bloom Card Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Dark: the tokens copied from packages/app/src/console.css (the app is dark only today). */
+:root, .th-dark {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --on-accent: #111416;
+  --sub-ground: #1a1f23;
+  --sub-rail: #20272b;
+  --note-ink: #cbbfe6;
+  --note-bg: #2a2140;
+  color-scheme: dark;
+}
+/* Light: the mockup's own token set, so the card can be judged on a light
+   ground too. The same roles, re-valued; no rule below changes with it. */
+:root[data-theme='light'], .th-light {
+  --ground: #e9edee;
+  --panel: #f7f9f9;
+  --panel-hi: #edf1f2;
+  --inset: #ffffff;
+  --line: #d5dcde;
+  --line-bright: #b4c0c3;
+  --ink: #1b2225;
+  --ink-dim: #4d5b60;
+  --ink-faint: #7a888d;
+  --carrier: #b97a1f;
+  --modulator: #2e8178;
+  --return: #7656b0;
+  --hot: #c04f27;
+  --on-accent: #ffffff;
+  --sub-ground: #f0f3f4;
+  --sub-rail: #e3e9ea;
+  --note-ink: #4f3a7d;
+  --note-bg: #efe9fa;
+  color-scheme: light;
+}
+:root {
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--ground); color: var(--ink); font: 13px/1.45 var(--f-ui); -webkit-font-smoothing: antialiased; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---------- the mockup's own page (not the console) ---------- */
+.doc { max-width: 1480px; margin: 0 auto; padding: 20px 16px 48px; }
+.doc h1 { font: 700 20px/1.2 var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; margin: 8px 0 4px; }
+.doc h2 { font: 600 14px/1.3 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; margin: 34px 0 6px; }
+.doc h2 .tag { color: var(--inset); background: var(--return); border-radius: var(--r); padding: 1px 6px; margin-right: 8px; }
+.doc h2 .tag.ref { background: var(--ink-faint); }
+.doc h3 { font: 600 11px/1.2 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin: 18px 0 6px; }
+.doc p, .doc li { color: var(--ink-dim); max-width: 92ch; }
+.doc p { margin: 6px 0; }
+.doc b, .doc strong { color: var(--ink); font-weight: 600; }
+.doc code { font: 11.5px var(--f-num); color: var(--ink); background: var(--inset); padding: 1px 4px; border-radius: var(--r); overflow-wrap: anywhere; }
+.doc ul, .doc ol { margin: 6px 0; padding-left: 20px; }
+.status { display: inline-block; font: 600 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--return); border: 1px dashed var(--return); border-radius: var(--r); padding: 2px 8px; }
+.flow { font: 11.5px/1.6 var(--f-num); color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; overflow-x: auto; white-space: pre; margin: 10px 0; }
+.flow b { color: var(--modulator); font-weight: 500; }
+.flow i { color: var(--carrier); font-style: normal; }
+.measure { font: 11px var(--f-num); color: var(--ink-faint); margin: 6px 0 0; }
+.measure b { color: var(--carrier); font-weight: 500; }
+.mock-note { font: 11px var(--f-ui); color: var(--note-ink); background: var(--note-bg); border: 1px dashed var(--return); border-radius: var(--r); padding: 4px 8px; display: inline-block; margin: 4px 0 8px; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 6px 28px; }
+.view-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin: 14px 0 4px; }
+.view-bar .field-label { font: 600 9.5px/1 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-right: 6px; }
+.view-bar > div { display: flex; align-items: center; }
+.view-bar .seg button { min-width: 64px; }
+table.ctl { border-collapse: collapse; font-size: 12px; margin: 8px 0; display: block; overflow-x: auto; }
+table.ctl th, table.ctl td { text-align: left; padding: 3px 14px 3px 0; border-bottom: 1px solid var(--line); color: var(--ink-dim); vertical-align: top; }
+table.ctl th { font: 600 9.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+table.ctl td:first-child { color: var(--ink); white-space: nowrap; }
+table.ctl td code { white-space: nowrap; }
+/* A whole theme drawn in place, whatever the page's theme. */
+.themed { background: var(--ground); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; margin: 8px 0 14px; }
+.themed > .theme-name { font: 600 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 6px; }
+
+/* ---------- the insert rack (console.css, windsor#173), in its order ---------- */
+.insert-row {
+  display: flex; gap: 6px; align-items: stretch; flex-basis: 100%;
+  min-width: 0; max-width: 100%; overflow-x: auto;
+  padding: 6px; background: var(--inset);
+  border: 1px solid var(--line); border-radius: 6px;
+  scrollbar-color: var(--line-bright) var(--inset);
+  /* stripInserts.ts sets these from insertRackTables.ts INSERT_RACK_PX. */
+  --rack-h: 196px; --rack-rail: 24px; --rack-fold: 26px; --rack-tabs-h: 20px;
+  --rack-wide-col: 104px; --rack-add-w: 88px; --sub-rail-w: 20px; --slot-tab-w: 22px;
+  --kc: var(--modulator);
+}
+.insert-row.bus { --kc: var(--carrier); }
+.insert-box { flex: none; height: var(--rack-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.insert-box.off .insert-stack { opacity: 0.4; }
+.insert-rail {
+  width: var(--rack-rail); flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 3px 0; background: var(--panel-hi); border-right: 1px solid var(--line);
+}
+.insert-box.folded { width: var(--rack-fold); cursor: pointer; }
+.insert-box.folded .insert-rail { width: 100%; border-right: 0; }
+.insert-icon {
+  flex: none; width: 18px; height: 18px; display: grid; place-items: center; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r);
+  color: var(--ink-faint); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.insert-icon:hover:not(:disabled) { color: var(--ink); border-color: var(--line-bright); }
+.insert-icon:disabled { opacity: 0.35; cursor: default; }
+.insert-icon.insert-power { color: var(--modulator); font-size: 12px; }
+.insert-box.off .insert-icon.insert-power { color: var(--ink-faint); }
+.insert-switch { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.insert-name {
+  flex: 0 1 auto; min-height: 0; overflow: hidden; text-overflow: ellipsis;
+  writing-mode: vertical-rl; transform: rotate(180deg); padding: 1px 0;
+  background: transparent; border: 0; border-radius: var(--r); color: var(--ink);
+  font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; white-space: nowrap; cursor: pointer;
+}
+.insert-name:hover { background: var(--panel); }
+.insert-num { margin-inline-end: 5px; color: var(--ink-faint); }
+.insert-tools { display: flex; flex-direction: column; gap: 0; margin-top: auto; }
+.insert-tools .insert-icon { height: 16px; }
+.insert-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.insert-tabs {
+  flex: none; height: var(--rack-tabs-h); display: flex; align-items: center; gap: 2px;
+  padding: 2px 6px 0; border-bottom: 1px solid var(--line);
+}
+.insert-body { flex: 1; min-height: 0; overflow: hidden; }
+.insert-row :focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.insert-page { height: 100%; display: flex; gap: 2px; padding: 4px 8px 6px; }
+.insert-col { flex: none; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; }
+.insert-col.wide { width: var(--rack-wide-col); align-items: stretch; }
+.insert-col.wide + .insert-col.wide { margin-left: 6px; }
+.insert-col.wide + .insert-col:not(.wide) { margin-left: 6px; }
+.insert-rule { flex: none; width: 1px; margin: 6px; background: var(--line); }
+.insert-row .knob.rack { width: auto; min-width: 54px; gap: 0; padding: 2px 3px; }
+.insert-row .knob.rack.big { min-width: 64px; }
+.insert-row .knob .dial-arc { stroke: var(--kc, var(--modulator)); }
+.insert-row .knob .knob-val { line-height: 13px; }
+.insert-row .knob .knob-label { line-height: 11px; }
+.insert-row .field-label, .insert-row .field-wrap {
+  display: flex; flex-direction: column; gap: 1px; margin: 0;
+  font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em;
+  line-height: 11px; text-transform: uppercase; color: var(--ink-faint);
+}
+.insert-row select.field {
+  appearance: none; width: 100%; max-width: none; height: 22px; padding: 0 16px 0 6px;
+  background: var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%237a888d'/%3E%3C/svg%3E") no-repeat right 6px center;
+  border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink);
+  font-family: var(--f-ui); font-size: 11.5px; font-weight: 400; letter-spacing: normal; line-height: 20px;
+  text-overflow: ellipsis; text-transform: none; cursor: pointer;
+}
+.insert-add {
+  flex: none; height: var(--rack-h); width: var(--rack-add-w); display: grid; place-content: center; justify-items: center; gap: 4px;
+  padding: 0; background: transparent; border: 1px dashed var(--line-bright); border-radius: 5px; color: var(--ink-faint);
+  font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.insert-add b { font-size: 20px; font-weight: 400; line-height: 1; }
+
+/* ---------- knob (console.css .knob; knob.ts's rack dial) ---------- */
+.knob { width: 54px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r); user-select: none; cursor: ns-resize; touch-action: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--ink-dim); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; pointer-events: none; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; pointer-events: none; }
+
+/* ---------- seg (console.css .seg): the page's own theme switch ---------- */
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button {
+  flex: 1; min-width: 44px; background: var(--inset); border: 0; padding: 5px 4px; cursor: pointer;
+  font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim);
+}
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed='true'] { background: var(--modulator); color: var(--on-accent); }
+
+/* ---------- the slot area (console.css, windsor#692), as built ---------- */
+.insert-box.off .sub { opacity: 0.4; }
+.insert-box.folded .insert-stack, .insert-box.folded .sub, .insert-box.folded .slot-tab, .insert-box.folded .slot-open { display: none; }
+.sub { flex: none; display: flex; border-left: 1px solid var(--line-bright); background: var(--sub-ground); }
+.sub-rail {
+  width: var(--sub-rail-w); flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 3px 0; background: var(--sub-rail); border-right: 1px solid var(--line);
+}
+.sub.folded { cursor: pointer; }
+.sub.folded .sub-rail { border-right: 0; }
+.sub-rail .insert-name { font-size: 9.5px; color: var(--kc); }
+.sub-rail .insert-icon.insert-power { color: var(--kc); }
+.sub.off .sub-rail .insert-power { color: var(--ink-faint); }
+.sub.off .sub-stack { opacity: 0.4; }
+.sub-stack { display: flex; flex-direction: column; min-width: 0; }
+.slot-tab {
+  width: var(--slot-tab-w); flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 5px 0; background: var(--panel-hi); border: 0; border-left: 1px solid var(--line); border-radius: 0;
+  color: var(--ink-faint); cursor: pointer;
+}
+.slot-tab.open { border-right: 1px solid var(--line); }
+.slot-tab:hover { color: var(--ink); background: var(--panel); }
+.slot-tab-glyph { font-size: 13px; line-height: 1; }
+.slot-tab-label { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.slot-open { flex: none; display: flex; }
+
+/* ---------- new: bloom's own ---------- */
+/* Freeze: a latching button in the envelope's column, filled in the chain's
+   accent while it holds, the way the console's .btn[aria-pressed] fills.
+   Its lamp is the difference from the rail's ⏻, which is a glyph. */
+.latch {
+  width: 54px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 0; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r);
+  color: var(--ink-dim); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer;
+}
+.latch i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-bright); }
+.latch:hover { color: var(--ink); border-color: var(--ink-faint); }
+.latch[aria-pressed='true'] { background: var(--kc); border-color: var(--kc); color: var(--on-accent); }
+.latch[aria-pressed='true'] i { background: var(--on-accent); }
+/* A group: its columns, and (only with captions on) its name over them. */
+.grp { flex: none; display: flex; flex-direction: column; min-height: 0; }
+.grp-cap {
+  flex: none; height: 12px; padding: 0 3px; margin-bottom: 2px; border-bottom: 1px solid var(--line);
+  font: 600 8px/12px var(--f-panel); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap;
+}
+.grp-cols { flex: 1; min-height: 0; display: flex; gap: 2px; }
+.no-caps .grp-cap { display: none; }
+</style>
+
+<body>
+<div class="doc">
+  <span class="status">Draft for approval · 2026-10-11</span>
+  <h1>bloom · console card</h1>
+  <p>The rack card for <b>bloom</b>, the harmonic pad generator insert (epic windsor#710). All 15 controls sit on one page, grouped by function: <b>Envelope</b>, <b>Generator</b>, <b>Bands</b>, <b>Dynamics</b> and <b>Output</b>, with today's rules between the groups. The rail is any insert's rail. The rack stays one height (196 px), and only the width grows.</p>
+  <p>Every value is from the prepared port's <code>bloomConstants.ts</code>: ranges, defaults and steps. The knobs drag (double-click resets), so the readouts can be tried across their ranges. The pickers, Freeze, the switches, the slot tab and the folds work. Nothing makes sound.</p>
+  <div class="flow">in ─┬──────────────────────────────────────────────────────────────────────────────────────────▶ dry ─┐
+     └▶ 48 bands (<b>Low</b> <b>High</b> <b>Focus</b>) ▶ <b>Density</b> ▶ envelope (<b>Swell</b> <b>Sustain</b> <b>Freeze</b>) ▶ generator   │
+          ▶ (<b>Shape</b> <b>Bright</b> <b>Octave</b> <b>Key</b> <b>Scale</b>) ▶ <b>Spread</b> ▶ <b>Amount</b> ▶ <i>[ Slot ▾ : child ]</i> (E2) ▶ wet ──┴▶ <b>Mix</b> ▶ out</div>
+
+  <div class="view-bar" role="group" aria-label="View">
+    <div><span class="field-label">Theme</span><div class="seg" id="themeSeg"></div></div>
+    <div><span class="field-label">Group captions</span><div class="seg" id="capSeg"></div></div>
+  </div>
+  <p>The app is dark only today. The light theme is this page's own token set, so the card can be judged on both grounds, and the switch above turns the page to it. Group captions are off in the proposal (today's cards have none). Turn them on to compare.</p>
+
+  <h2><span class="tag ref">Both</span>The card in dark and light</h2>
+  <p>State 3 below (a Chorus child in the slot, after E2), drawn in both themes at once. The rest of the page follows the theme switch.</p>
+  <div id="both"></div>
+
+  <div class="cols2">
+    <div>
+      <h3>The groups, left to right</h3>
+      <ul>
+        <li><b>Envelope:</b> Swell and Sustain, then <b>Freeze</b> under them. Freeze is the held case of Sustain, so it sits in their column.</li>
+        <li><b>Generator:</b> Shape and Bright, then Octave, then the Key and Scale pickers in a wide column. Key and Scale are lists and are not automation targets, so they're pickers, as every enum on a card is today.</li>
+        <li><b>Bands:</b> Low and High, which step through the 48 bands by note, then Focus.</li>
+        <li><b>Dynamics:</b> Density, alone.</li>
+        <li><b>Output:</b> Amount and Spread, then Mix at the big dial, last, as every insert's Mix is.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Freeze, and the slot</h3>
+      <ul>
+        <li><b>Freeze</b> is a latching button with a lamp. Off, it is an outlined button. On, it fills in the chain's accent (teal on a strip, amber on a send bus). The rail's ⏻ stays the insert's power, a glyph with no box. While a lane holds Freeze, it takes the locked ring in the lane's colour, as the rail's switch does (windsor#631).</li>
+        <li><b>The slot</b> (E2) is today's slot area as Echo has it: the collapsed <i>›</i> tab at the right edge, the picker after a rule following Mix, and the child inline with its own rail. bloom's card draws none of it. E1 ships the card as row 1 shows it.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>The controls</h3>
+  <table class="ctl">
+    <tr><th>Control</th><th>Range</th><th>Default</th><th>Readout</th><th>Dial</th></tr>
+    <tr><td>Swell</td><td>0–10 s</td><td>0</td><td><code>0m</code>, <code>350m</code>, <code>1.20s</code> (the console's <code>fmtMs</code>)</td><td>log, exact 0 at its foot (zero-end, floor 10 ms)</td></tr>
+    <tr><td>Sustain</td><td>0–30 s</td><td>0</td><td>as Swell</td><td>log, exact 0 at its foot (floor 10 ms)</td></tr>
+    <tr><td>Freeze</td><td>off / on</td><td>off</td><td>the button's fill and lamp</td><td>a latching button</td></tr>
+    <tr><td>Shape</td><td>0–4</td><td>2</td><td>a corner, <code>saw</code>, or the two it sits between, <code>saw→square</code></td><td>linear</td></tr>
+    <tr><td>Bright</td><td>−12…+6 dB/oct</td><td>0</td><td><code>+0.0dB/oct</code></td><td>linear, arc from 0</td></tr>
+    <tr><td>Octave</td><td>−12, 0, +7, +12, +19, +24</td><td>0</td><td><code>0st</code>, <code>+7st</code>, <code>-12st</code></td><td>six steps, arc from 0</td></tr>
+    <tr><td>Key</td><td>C…B (sharps)</td><td>C</td><td>picker</td><td>—</td></tr>
+    <tr><td>Scale</td><td>Chromatic, Major, Minor, Dorian, Mixolydian, Pentatonic major, Pentatonic minor</td><td>Chromatic</td><td>picker</td><td>—</td></tr>
+    <tr><td>Low, High</td><td>F2…E6 (MIDI 41–88)</td><td>F2, E6</td><td><code>F2</code>, <code>A#3</code> (the console's <code>noteName</code>)</td><td>48 steps</td></tr>
+    <tr><td>Focus</td><td>×0.5…×2</td><td>×1</td><td><code>×1.00</code></td><td>log (×1 at the top)</td></tr>
+    <tr><td>Density</td><td>0–1</td><td>1 − 1/1.8</td><td>the ratio 1/(1 − Density): <code>1.0:1</code> … <code>1.8:1</code> … <code>12:1</code> … <code>∞:1</code></td><td>linear</td></tr>
+    <tr><td>Amount</td><td>0–1</td><td>1</td><td><code>1.00</code></td><td>linear</td></tr>
+    <tr><td>Spread</td><td>0–1</td><td>0</td><td><code>0.00</code></td><td>linear</td></tr>
+    <tr><td>Mix</td><td>0–1</td><td>0.5</td><td><code>0.50</code></td><td>linear, the big dial</td></tr>
+  </table>
+  <p>Amount, Spread and Mix read 0–1 to two places, as every insert's Mix and Spread read today (the record's percentages are the same numbers). Low and High never cross: dragging one past the other stops at it (in this page, and proposed for the card).</p>
+
+  <div id="states"></div>
+
+  <h2>Questions for tacowars</h2>
+  <ol>
+    <li><b>Group captions.</b> The proposal separates the groups with today's rules only. Turn the captions on above to see each group named over its columns (12 px each, with the knobs still fitting the height). Rules only, or captions?</li>
+    <li><b>bloom's Add picker group</b> (record decision 15 settles it with the card). Proposed: a new group <b>Generate</b>, last, after Space, holding bloom alone, since bloom adds a layer rather than processing the sound. The alternative is Modulation or Space.</li>
+    <li><b>The name</b> is drawn lowercase, <i>bloom</i>, in pickers and tooltips, as the record writes it (the rail shows it in capitals, as it shows every name). Lowercase, or <i>Bloom</i> like the other kinds?</li>
+  </ol>
+</div>
+
+<script>
+'use strict';
+/* ---------- the knob (knob.ts's rack dial, with knob.ts's scales) ---------- */
+/* knobConstants.ts: arc ±135°, rack r 12, big r 18, pad 6, face inset 3.5, pin inset 5, zero-end slice 0.02. */
+const ARC0 = -135, ARC1 = 135, PAD = 6, FACE = 3.5, PIN = 5, ZERO_END_SLICE = 0.02, DRAG_PX = 150;
+const polar = (c, r, deg) => { const a = (deg - 90) * Math.PI / 180; return [c + r * Math.cos(a), c + r * Math.sin(a)]; };
+const arcPath = (c, r, a0, a1) => {
+  const [x0, y0] = polar(c, r, a0), [x1, y1] = polar(c, r, a1);
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+};
+function h(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+const clamp01 = (n) => Math.min(1, Math.max(0, n));
+/** knob.ts scaleFor: linear, log, or a log whose min is 0 (a straight slice from 0 to the floor), or steps. */
+function scaleFor(o) {
+  if (o.steps) {
+    const n = o.steps.length - 1;
+    return { to: (v) => Math.max(0, o.steps.indexOf(v)) / n, from: (x) => o.steps[Math.round(clamp01(x) * n)] };
+  }
+  if (o.curve === 'log') {
+    const floor = o.min <= 0 ? o.floor : o.min, lo = Math.log(floor), hi = Math.log(o.max);
+    const sweep = { to: (v) => (Math.log(Math.max(floor, v)) - lo) / (hi - lo), from: (x) => (x <= 0 ? floor : x >= 1 ? o.max : Math.exp(lo + x * (hi - lo))) };
+    if (o.min > 0) return sweep;
+    const top = ZERO_END_SLICE;
+    return {
+      to: (v) => (v <= 0 ? 0 : v < floor ? (v / floor) * top : top + (1 - top) * sweep.to(v)),
+      from: (x) => (x <= 0 ? 0 : x < top ? floor * (x / top) : sweep.from((x - top) / (1 - top))),
+    };
+  }
+  return { to: (v) => (v - o.min) / (o.max - o.min), from: (x) => o.min + clamp01(x) * (o.max - o.min) };
+}
+/** A rack dial bound to `v.vals[key]`; it drags and double-click resets. */
+function knob(v, key) {
+  const o = SPECS[key], big = !!o.big, r = big ? 18 : 12, size = r * 2 + PAD, c = size / 2;
+  const node = h('div', big ? 'knob rack big' : 'knob rack');
+  node.tabIndex = 0;
+  node.setAttribute('role', 'slider');
+  node.setAttribute('aria-label', o.label);
+  node.title = `${o.label}: ${o.help}`;
+  if (o.minW) node.style.minWidth = `${o.minW}px`;
+  node.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE}"></circle>` +
+    `<path class="dial-track" d="${arcPath(c, r, ARC0, ARC1)}"></path><path class="dial-arc" d=""></path>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN}"></line></svg>`;
+  const out = h('span', 'knob-val'), arc = node.querySelector('.dial-arc'), pin = node.querySelector('.dial-pin');
+  node.append(out, h('span', 'knob-label', o.label));
+  const s = scaleFor(o);
+  const lo = o.steps ? o.steps[0] : o.min, hi = o.steps ? o.steps[o.steps.length - 1] : o.max;
+  const render = () => {
+    const val = v.vals[key], ang = ARC0 + clamp01(s.to(val)) * (ARC1 - ARC0);
+    /* knob.ts: a range across 0 draws its arc from 0, any other from its foot. */
+    const za = ARC0 + (lo < 0 && hi > 0 ? s.to(0) : 0) * (ARC1 - ARC0);
+    const a0 = Math.min(za, ang), a1 = Math.max(za, ang);
+    arc.setAttribute('d', a1 - a0 < 1 ? '' : arcPath(c, r, a0, a1));
+    pin.setAttribute('transform', `rotate(${ang.toFixed(2)} ${c} ${c})`);
+    out.textContent = o.fmt(val);
+    node.setAttribute('aria-valuetext', out.textContent);
+  };
+  const set = (val) => { v.vals[key] = o.limit ? o.limit(val, v.vals) : val; render(); v.remeasure(); };
+  let drag = null;
+  node.addEventListener('pointerdown', (e) => { node.setPointerCapture(e.pointerId); drag = { y: e.clientY, n: s.to(v.vals[key]) }; });
+  node.addEventListener('pointermove', (e) => { if (drag) set(s.from(drag.n + (drag.y - e.clientY) / DRAG_PX)); });
+  node.addEventListener('pointerup', () => { drag = null; });
+  node.addEventListener('dblclick', () => set(o.def));
+  render();
+  return node;
+}
+
+/* ---------- readouts (consoleFormat.ts, and bloom's own) ---------- */
+const fmt2 = (x) => x.toFixed(2);
+const fmtMs = (x) => (x < 1 ? `${(x * 1000).toFixed(0)}m` : `${x.toFixed(2)}s`);
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const noteName = (m) => `${NOTE_NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
+const SHAPES = ['sine', 'triangle', 'saw', 'square', 'pulse'];
+/** A corner's name, or the two corners it sits between (fmtVowel's rule: a fraction that rounds to an end reads as that end). */
+function fmtShape(x) {
+  const last = SHAPES.length - 1, at = Math.min(Math.max(x, 0), last);
+  const lower = Math.min(Math.floor(at), last - 1), pct = Math.round((at - lower) * 100);
+  if (pct === 0) return SHAPES[lower];
+  if (pct === 100) return SHAPES[lower + 1];
+  return `${SHAPES[lower]}→${SHAPES[lower + 1]}`;
+}
+const fmtBright = (x) => `${x >= 0 ? '+' : ''}${x.toFixed(1)}dB/oct`;
+const fmtOctave = (x) => `${x > 0 ? '+' : ''}${x}st`;
+const fmtFocus = (x) => `×${x.toFixed(2)}`;
+/** The shared compressor's ratio, 1/(1 − Density): one place under 10, whole from 10, ∞ at 1. */
+function fmtDensity(d) {
+  if (d >= 1) return '∞:1';
+  const ratio = 1 / (1 - d);
+  return `${ratio < 10 ? ratio.toFixed(1) : ratio.toFixed(0)}:1`;
+}
+
+/* ---------- bloom's controls: bloomConstants.ts's bounds and defaults ---------- */
+const LOWEST = 41, HIGHEST = 88; // F2 and E6
+const BANDS = Array.from({ length: HIGHEST - LOWEST + 1 }, (_, i) => LOWEST + i);
+const SPECS = {
+  swell: { label: 'Swell', min: 0, max: 10, def: 0, curve: 'log', floor: 0.01, fmt: fmtMs, help: 'attack on each band, 90 % of the way in this time. 0 follows the input at once' },
+  sustain: { label: 'Sustain', min: 0, max: 30, def: 0, curve: 'log', floor: 0.01, fmt: fmtMs, help: 'a band whose input has left falls 60 dB in this time, at its own pitch' },
+  shape: { label: 'Shape', min: 0, max: 4, def: 2, fmt: fmtShape, minW: 78, help: 'one sweep: sine, triangle, saw, square, then a pulse narrowing from ½ to 0.1' },
+  bright: { label: 'Bright', min: -12, max: 6, def: 0, fmt: fmtBright, minW: 78, help: 'a tilt on the partials in dB per octave, power kept' },
+  octave: { label: 'Octave', steps: [-12, 0, 7, 12, 19, 24], def: 0, fmt: fmtOctave, help: 'each band played at this interval in semitones: −12, 0, +7, +12, +19, +24' },
+  low: { label: 'Low', steps: BANDS, def: LOWEST, fmt: noteName, limit: (x, vals) => Math.min(x, vals.high), help: 'the lowest band that sounds, F2…E6' },
+  high: { label: 'High', steps: BANDS, def: HIGHEST, fmt: noteName, limit: (x, vals) => Math.max(x, vals.low), help: 'the highest band that sounds, F2…E6' },
+  focus: { label: 'Focus', min: 0.5, max: 2, def: 1, curve: 'log', fmt: fmtFocus, help: 'every band\'s width at constant level: narrow rings longer and speaks later' },
+  density: { label: 'Density', min: 0, max: 1, def: 1 - 1 / 1.8, fmt: fmtDensity, help: 'the shared compressor\'s ratio, levelling the bands against each other. 1.8:1 is the default' },
+  amount: { label: 'Amount', min: 0, max: 1, def: 1, fmt: fmt2, help: 'the layer\'s level, squared law' },
+  spread: { label: 'Spread', min: 0, max: 1, def: 0, fmt: fmt2, help: 'even bands lean left, odd bands right. 0 is mono' },
+  mix: { label: 'Mix', min: 0, max: 1, def: 0.5, fmt: fmt2, big: true, help: '0.50 is the dry signal plus the full layer; 1.00 is the layer alone' },
+};
+const DEFAULTS = Object.fromEntries(Object.entries(SPECS).map(([k, o]) => [k, o.def]));
+const KEYS = NOTE_NAMES.map((n) => [n, n]);
+const SCALES = [['chromatic', 'Chromatic'], ['major', 'Major'], ['minor', 'Minor'], ['dorian', 'Dorian'], ['mixolydian', 'Mixolydian'], ['pentatonic-major', 'Pentatonic major'], ['pentatonic-minor', 'Pentatonic minor']];
+
+/* ---------- layout (insertLayout.ts) ---------- */
+const col = (...k) => { const c = h('div', 'insert-col'); c.append(...k); return c; };
+const wide = (...k) => { const c = h('div', 'insert-col wide'); c.append(...k); return c; };
+const rule = () => h('div', 'insert-rule');
+const page = (...cols) => { const p = h('div', 'insert-page'); p.append(...cols); return p; };
+/** A group: its name (shown only with captions on) over its columns. */
+const grp = (name, ...cols) => {
+  const g = h('div', 'grp'), cc = h('div', 'grp-cols');
+  cc.append(...cols);
+  g.append(h('div', 'grp-cap', name), cc);
+  return g;
+};
+/** A picker with its label above it. `options`: [value, text] or { group, items }. */
+function select(label, options, value, o = {}) {
+  const wrap = h('label', 'field-wrap', label);
+  const sel = h('select', 'field');
+  sel.setAttribute('aria-label', o.aria || label);
+  const add = (to, [val, text]) => to.append(new Option(text, val));
+  for (const opt of options) {
+    if (opt.group) {
+      const g = document.createElement('optgroup');
+      g.label = opt.group;
+      opt.items.forEach((item) => add(g, item));
+      sel.append(g);
+    } else add(sel, opt);
+  }
+  sel.value = value;
+  sel.onchange = () => o.change && o.change(sel.value);
+  wrap.append(sel);
+  return wrap;
+}
+function freezeButton(v) {
+  const b = h('button', 'latch');
+  b.type = 'button';
+  b.setAttribute('aria-pressed', String(v.freeze));
+  b.title = v.freeze ? 'Freeze: holding every sounding band. Press to let go' : 'Freeze: hold every sounding band as a drone';
+  b.append(h('i'), document.createTextNode('Freeze'));
+  b.onclick = () => { v.freeze = !v.freeze; v.paint(); };
+  return b;
+}
+
+/* ---------- bloom's page ---------- */
+function bloomCols(v) {
+  const k = (key) => knob(v, key);
+  return [
+    grp('Envelope', col(k('swell'), k('sustain'), freezeButton(v))),
+    rule(),
+    grp('Generator',
+      col(k('shape'), k('bright')),
+      col(k('octave')),
+      wide(
+        select('Key', KEYS, v.key, { change: (x) => { v.key = x; } }),
+        select('Scale', SCALES, v.scale, { change: (x) => { v.scale = x; } }),
+      ),
+    ),
+    rule(),
+    grp('Bands', col(k('low'), k('high')), col(k('focus'))),
+    rule(),
+    grp('Dynamics', col(k('density'))),
+    rule(),
+    grp('Output', col(k('amount'), k('spread')), col(k('mix'))),
+  ];
+}
+
+/* ---------- the slot (E2): None, then INSERT_GROUPS minus bloom, Echo included ---------- */
+const SLOT_KINDS = [
+  { group: 'EQ', items: [['eq', 'Parametric EQ']] },
+  { group: 'Filter', items: [['filter', 'Filter']] },
+  { group: 'Drive', items: [['drive', 'Classic Drive'], ['advanced-drive', 'Advanced Drive'], ['tape', 'Tape']] },
+  { group: 'Dynamics', items: [['compressor', 'Bus compressor']] },
+  { group: 'Modulation', items: [['chorus', 'Chorus'], ['ensemble', 'Ensemble'], ['phaser', 'Phaser']] },
+  { group: 'Time', items: [['echo', 'Echo'], ['delay', 'Dub delay']] },
+  { group: 'Space', items: [['plate', 'Plate reverb'], ['retro-reverb', 'Retro reverb']] },
+];
+const LABELS = Object.fromEntries(SLOT_KINDS.flatMap((g) => g.items));
+/** Chorus as today's card draws it (read from the rack for echo-slot-mockup.html): drawings at its defaults. */
+function staticKnob(label, value, pinDeg) {
+  const r = 12, size = r * 2 + PAD, c = size / 2;
+  const node = h('div', 'knob rack');
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', `${label} ${value}`);
+  node.style.cursor = 'default';
+  node.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE}"></circle>` +
+    `<path class="dial-track" d="${arcPath(c, r, ARC0, ARC1)}"></path>` +
+    `<path class="dial-arc" d="${arcPath(c, r, ARC0, pinDeg)}"></path>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN}" transform="rotate(${pinDeg} ${c} ${c})"></line></svg>`;
+  node.append(h('span', 'knob-val', value), h('span', 'knob-label', label));
+  return node;
+}
+const chorusCols = () => [
+  wide(select('Starting point', [['', 'Custom'], ['slow', 'Slow'], ['fast', 'Fast'], ['both', 'Both']], '', { aria: 'Chorus preset' })),
+  col(staticKnob('Rate', '0.60', 12.77), staticKnob('Depth', '2.00', 0)),
+  col(staticKnob('Spread', '0.70', 54), staticKnob('Mix', '0.50', 0)),
+];
+function slotColumn(v) {
+  return wide(select('Slot', [['none', 'None'], ...SLOT_KINDS], v.slot, {
+    aria: 'Slot: an insert on bloom’s layer, after Amount and before Mix',
+    change: (kind) => { v.slot = kind; v.subFolded = false; v.childOn = true; v.slotOpen = kind === 'none'; v.paint(); },
+  }));
+}
+function slotTab(v) {
+  const t = h('button', v.slotOpen ? 'slot-tab open' : 'slot-tab');
+  t.type = 'button';
+  t.title = t.ariaLabel = v.slotOpen ? 'Collapse the empty slot' : 'Expand the slot: add an insert on bloom’s layer';
+  t.setAttribute('aria-expanded', String(v.slotOpen));
+  t.append(h('span', 'slot-tab-glyph', v.slotOpen ? '‹' : '›'), h('span', 'slot-tab-label', 'Slot'));
+  t.onclick = (e) => { e.stopPropagation(); v.slotOpen = !v.slotOpen; v.paint(); };
+  return t;
+}
+function slotOpen(v) {
+  const wrap = h('div', 'slot-open');
+  wrap.append(slotTab(v), page(slotColumn(v)));
+  return wrap;
+}
+function standIn(kind) {
+  const n = h('div', 'mock-note', `${LABELS[kind]}'s card as it is on the rack today. Not drawn in this mockup.`);
+  n.style.cssText = 'margin:8px;width:180px;display:block';
+  return n;
+}
+function child(v) {
+  const label = LABELS[v.slot];
+  const sub = h('div', 'sub');
+  sub.classList.toggle('off', !v.childOn);
+  sub.classList.toggle('folded', v.subFolded);
+  const r = h('div', 'sub-rail');
+  const swWrap = h('div', 'insert-switch');
+  const power = h('button', 'insert-icon insert-power', '⏻');
+  power.type = 'button';
+  power.title = power.ariaLabel = `Turn ${label} ${v.childOn ? 'off' : 'on'}`;
+  power.onclick = (e) => { e.stopPropagation(); v.childOn = !v.childOn; v.paint(); };
+  swWrap.append(power);
+  const name = h('button', 'insert-name', `SLOT · ${label}`);
+  name.type = 'button';
+  name.title = `${v.subFolded ? 'Open' : 'Fold'} ${label}`;
+  name.onclick = (e) => { e.stopPropagation(); v.subFolded = !v.subFolded; v.paint(); };
+  const tools = h('div', 'insert-tools');
+  const del = h('button', 'insert-icon', '✕');
+  del.type = 'button';
+  del.title = del.ariaLabel = `Remove ${label} from the slot`;
+  del.onclick = (e) => { e.stopPropagation(); v.slot = 'none'; v.slotOpen = false; v.subFolded = false; v.childOn = true; v.paint(); };
+  tools.append(del);
+  r.append(swWrap, name, tools);
+  sub.append(r);
+  if (v.subFolded) sub.onclick = () => { v.subFolded = false; v.paint(); };
+  else {
+    const stack = h('div', 'sub-stack'), body = h('div', 'insert-body');
+    body.append(v.slot === 'chorus' ? page(...chorusCols()) : standIn(v.slot));
+    stack.append(body);
+    sub.append(stack);
+  }
+  return sub;
+}
+
+/* ---------- bloom's box (insertShell.ts), with the slot area when `v.slot` is set (E2) ---------- */
+function bloomBox(v) {
+  const box = h('div', 'insert-box');
+  box.classList.toggle('off', !v.on);
+  box.classList.toggle('folded', v.folded);
+  const rail = h('div', 'insert-rail');
+  const swWrap = h('div', 'insert-switch');
+  const power = h('button', 'insert-icon insert-power', '⏻');
+  power.type = 'button';
+  power.title = power.ariaLabel = `Turn bloom ${v.on ? 'off' : 'on'}`;
+  power.setAttribute('aria-pressed', String(v.on));
+  power.onclick = (e) => { e.stopPropagation(); v.on = !v.on; v.paint(); };
+  swWrap.append(power);
+  const name = h('button', 'insert-name');
+  name.type = 'button';
+  name.title = `${v.folded ? 'Open' : 'Fold'} bloom`;
+  name.append(h('span', 'insert-num', '1'), document.createTextNode('bloom'));
+  name.onclick = (e) => { e.stopPropagation(); v.folded = !v.folded; v.paint(); };
+  const tools = h('div', 'insert-tools');
+  for (const [glyph, title] of [['◀', 'Move bloom earlier in the chain'], ['▶', 'Move bloom later in the chain'], ['✕', 'Remove bloom']]) {
+    const b = h('button', 'insert-icon', glyph);
+    b.type = 'button';
+    b.title = b.ariaLabel = title;
+    b.disabled = glyph !== '✕'; // the only insert in its chain
+    tools.append(b);
+  }
+  rail.append(swWrap, name, tools);
+  if (v.folded) box.onclick = () => { v.folded = false; v.paint(); };
+  const stack = h('div', 'insert-stack'), body = h('div', 'insert-body');
+  const cols = bloomCols(v);
+  const hasChild = v.slot !== undefined && v.slot !== 'none';
+  if (hasChild) cols.push(rule(), slotColumn(v));
+  body.append(page(...cols));
+  stack.append(body);
+  box.append(rail, stack);
+  if (v.slot === 'none') box.append(v.slotOpen ? slotOpen(v) : slotTab(v));
+  if (hasChild) box.append(child(v));
+  return box;
+}
+function addSlot(where) {
+  const a = h('div', 'insert-add');
+  a.title = `Add an insert at the ${where}`;
+  a.append(h('b', '', '+'), h('span', '', 'Add insert'));
+  return a;
+}
+
+/* ---------- the states ---------- */
+const MOVED = { swell: 1.2, sustain: 8, shape: 3.4, bright: -3, octave: 12, low: 45, high: 81, focus: 0.71, density: 0.75, amount: 0.8, spread: 0.6, mix: 0.7 };
+const STATES = [
+  { id: 's1', tag: '1', title: 'At its defaults, as E1 ships it', v: {},
+    text: 'No slot area: E1 ships bloom as a plain insert. Shape reads <i>saw</i>, Low and High <i>F2</i> and <i>E6</i>, Density <i>1.8:1</i>, Octave <i>0st</i>. Drag any knob to try its readout; double-click resets it.' },
+  { id: 's2a', tag: '2a', title: 'After E2: the slot empty, collapsed (default)', v: { slot: 'none' },
+    text: 'The slot area as Echo has it today: a 22 px tab at the right edge, with <i>›</i> and a vertical <i>Slot</i>. Click it to expand the slot.' },
+  { id: 's2b', tag: '2b', title: 'The slot empty, expanded', v: { slot: 'none', slotOpen: true },
+    text: 'The tab turns to <i>‹</i> and the picker follows it on <i>None</i>. The picker lists the Add picker\'s groups minus bloom, Echo included.' },
+  { id: 's3', tag: '3', title: 'A Chorus child', v: { slot: 'chorus' },
+    text: 'A rule after Mix, the slot picker, then the child\'s rail (switch, <code>SLOT · CHORUS</code>, ✕) and the Chorus card as today, its Mix included. The child plays bloom\'s layer after Amount, before Mix.' },
+  { id: 's4', tag: '4', title: 'Off its defaults, frozen, the child folded', v: { vals: MOVED, freeze: true, key: 'D', scale: 'dorian', slot: 'chorus', subFolded: true },
+    text: 'Freeze on, filled in the strip accent. Shape between square and pulse reads <i>square→pulse</i>; Octave <i>+12st</i>; Low and High <i>A2</i> and <i>A5</i>; Density 0.75 reads <i>4.0:1</i>. The Chorus child is folded to its rail: click its name to open it.' },
+  { id: 's5', tag: '5', title: 'On Send B, frozen, with a Chorus child', v: { vals: MOVED, freeze: true, key: 'D', scale: 'dorian', slot: 'chorus' }, bus: true,
+    text: 'A send bus\'s rack takes the bus accent (<code>--carrier</code>): the knob arcs, Freeze\'s fill, and the child\'s switch and name.' },
+];
+const views = {};
+function makeView(s, row, measure) {
+  const v = Object.assign({ on: true, folded: false, freeze: false, key: 'C', scale: 'chromatic', slotOpen: false, subFolded: false, childOn: true }, s.v);
+  v.vals = { ...DEFAULTS, ...(s.v.vals || {}) };
+  v.remeasure = () => {
+    const box = row.querySelector('.insert-box');
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    let text = `bloom's box: <b>${Math.round(r.width)} × ${Math.round(r.height)} px</b> · rack height 196 px`;
+    if (v.slot !== undefined) text += ` · slot: ${v.slot === 'none' ? (v.slotOpen ? 'None, expanded' : 'None, collapsed') : LABELS[v.slot]}${v.subFolded ? ' (folded)' : ''}`;
+    measure.innerHTML = text;
+  };
+  v.paint = () => {
+    const keep = row.scrollLeft;
+    row.replaceChildren(addSlot('front'), bloomBox(v), addSlot('back'));
+    row.scrollLeft = keep;
+    v.remeasure();
+  };
+  return v;
+}
+function section(host, s, cls) {
+  const row = h('div', s.bus ? 'insert-row bus' : 'insert-row');
+  row.setAttribute('aria-label', s.bus ? 'Send B inserts' : 'Master inserts');
+  const measure = h('p', 'measure');
+  const tagNote = h('span', 'mock-note', s.bus ? 'Send B\'s rack: Add, 1 bloom, Add.' : 'The master rack: Add, 1 bloom, Add.');
+  host.append(tagNote, row, measure);
+  const v = makeView(s, row, measure);
+  views[`${s.id}${cls || ''}`] = v;
+  return v;
+}
+const statesHost = document.getElementById('states');
+for (const s of STATES) {
+  const sec = h('section');
+  sec.id = s.id;
+  const h2 = h('h2');
+  h2.append(h('span', 'tag', s.tag), document.createTextNode(s.title));
+  const p = h('p');
+  p.innerHTML = s.text;
+  sec.append(h2, p);
+  statesHost.append(sec);
+  section(sec, s);
+}
+const bothHost = document.getElementById('both');
+for (const [cls, title] of [['th-dark', 'Dark (the console today)'], ['th-light', 'Light (this page\'s own tokens)']]) {
+  const wrap = h('div', `themed ${cls}`);
+  wrap.append(h('p', 'theme-name', title));
+  bothHost.append(wrap);
+  section(wrap, STATES.find((s) => s.id === 's3'), cls);
+}
+const paintAll = () => Object.values(views).forEach((v) => v.paint());
+
+/* ---------- the page's view switches ---------- */
+function viewSeg(id, items, initial, apply) {
+  const segEl = document.getElementById(id);
+  for (const [val, text] of items) {
+    const b = h('button', '', text);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(val === initial));
+    b.onclick = () => {
+      segEl.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      apply(val);
+    };
+    segEl.append(b);
+  }
+  apply(initial);
+}
+viewSeg('themeSeg', [['dark', 'Dark'], ['light', 'Light']], 'dark', (t) => { document.documentElement.dataset.theme = t; });
+viewSeg('capSeg', [['off', 'Off'], ['on', 'On']], 'off', (c) => { document.body.classList.toggle('no-caps', c === 'off'); paintAll(); });
+/* The widths change once the fonts arrive, so measure again then. */
+document.fonts.ready.then(() => Object.values(views).forEach((v) => v.remeasure()));
+</script>
+</body>
+</html>

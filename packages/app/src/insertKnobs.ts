@@ -55,9 +55,13 @@ function rackKnob<S>(
   ctx: AppCtx,
   slot: InsertTarget,
   index: number,
-  { f, label, o }: InsertKnobEntry<S>,
+  { f, label, o, limit }: InsertKnobEntry<S>,
   knob: { readonly onChange: (() => void) | undefined; readonly dial: 'rack' | 'rack-big' },
 ): HTMLElement {
+  const stop = (v: number): number => {
+    const spec = insertsOf(ctx, slot)[index] as S | undefined;
+    return limit && spec ? limit(v, spec) : v;
+  };
   return makeKnob({
     label,
     ...o,
@@ -70,7 +74,7 @@ function rackKnob<S>(
       return typeof value === 'number' ? value : o.def;
     },
     set: (v) => {
-      const inserts = setInsertField(insertsOf(ctx, slot), index, f, v);
+      const inserts = setInsertField(insertsOf(ctx, slot), index, f, stop(v));
       if (ctx.change(targetChange(ctx, slot, inserts)).ok) knob.onChange?.();
     },
   });

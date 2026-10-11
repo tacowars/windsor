@@ -17,7 +17,8 @@ import {
   scaleOffsets,
 } from '@windsor/engine';
 import { pitchClassOf } from './rollRows';
-import { ROLL_CUSTOM_SCALE_NAME, ROLL_SCALE_NAMES } from './rollTables';
+import { ROLL_CUSTOM_SCALE_NAME } from './rollTables';
+import { SCALE_DISPLAY_NAMES } from './scaleNameTables';
 
 /** How a pitch sits on a chord. */
 export type RollTier = 'root' | 'chord' | 'scale' | 'out';
@@ -81,7 +82,7 @@ export function chordLabel(harmony: Harmony, chord: HarmonyChord | null): string
 export function keyName(harmony: Harmony): string {
   const root = CHORD_NOTE_NAMES[pitchClassOf(harmony.root)] ?? String(harmony.root);
   const scale =
-    typeof harmony.scale === 'string' ? ROLL_SCALE_NAMES[harmony.scale] : ROLL_CUSTOM_SCALE_NAME;
+    typeof harmony.scale === 'string' ? SCALE_DISPLAY_NAMES[harmony.scale] : ROLL_CUSTOM_SCALE_NAME;
   return `${root} ${scale}`;
 }
 

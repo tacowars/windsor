@@ -1,0 +1,9 @@
+{
+  "about": "sha256 of each bloom scenario's interleaved Float32 render (a noise burst, a 220 Hz tone and a C-E-G chord, 2 s) through inserts/bloomGolden.test.ts. Written only by that test under WINDSOR_REFRESH_BLOOM_GOLDEN=1, and only when a render change is intended.",
+  "hashes": {
+    "default": "56b38afccaabc14d1c6dd5c68cc81644c1a77bfe941f8d4bd16b3b907800eacc",
+    "wet": "2543f814df89b15472eb0fae399a477de68c19b4c50cd9ebd6cf32d305789a93",
+    "default-44100": "3c46758c6e52aabfa5ac5fe75c5aef66654ad3d16467e365779a80bbe912fd93",
+    "default-96000": "94fb5667d1556548a3b26e6c1a1e8870ccb13956cf952953a20e9cef6ccabf1c"
+  }
+}

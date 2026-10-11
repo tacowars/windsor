@@ -2704,8 +2704,10 @@ var VOICE_SLOT_PARAMS = [
   "voiceSlot6",
   "voiceSlot7"
 ];
-function mapVoiceSlots(slotTargets, floors, paths) {
+function mapVoiceSlots(map, paths, relative) {
+  const { slotTargets, partFloors: floors } = map;
   const list = Array.isArray(paths) ? paths : null;
+  const relatives = Array.isArray(relative) ? relative : null;
   let mapped = false;
   floors.fill(-Infinity);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
@@ -2713,7 +2715,8 @@ function mapVoiceSlots(slotTargets, floors, paths) {
     slotTargets[s] = code;
     if (code < 0) continue;
     mapped = true;
-    if (VOICE_TARGET_FLOOR[code] > 0) floors[code] = VOICE_TARGET_FLOOR[code];
+    const floored = !(relatives && s < relatives.length && relatives[s] === true);
+    if (floored && VOICE_TARGET_FLOOR[code] > 0) floors[code] = VOICE_TARGET_FLOOR[code];
   }
   return mapped;
 }
@@ -4516,7 +4519,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
     this.partFloors = new Float64Array(VOICE_TARGET_COUNT);
     this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
-    this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, opts.voiceSlots);
+    this.slotsMapped = mapVoiceSlots(this, opts.voiceSlots, opts.voiceSlotsRelative);
     this.noteIn = new Float64Array(NOTE_IN_COUNT);
     this.slideIn = false;
     this.stepModIn = null;
@@ -4588,7 +4591,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.load.start(msg.quanta);
         break;
       case "voiceSlots":
-        this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, msg.slots);
+        this.slotsMapped = mapVoiceSlots(this, msg.slots, msg.relative);
         if (!this.slotsMapped) this.partOffsets.fill(0);
         break;
     }

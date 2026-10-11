@@ -44,13 +44,13 @@ import {
 } from './songShapeTables';
 import { formatPosition } from './transportModel';
 
-/** A selected range of song ticks, `startTick < endTick`. */
+/** A selected range of ticks on the axis, `startTick < endTick`. */
 export interface ShapeRange {
   readonly startTick: number;
   readonly endTick: number;
 }
 
-/** A press and its drag under the Shape tool, in song ticks. */
+/** A press and its drag under the Shape tool, in ticks on the axis. */
 export interface ShapeDrag {
   /** Where the press landed, unsnapped: the bar under it is a click's range. */
   readonly pressTick: number;
@@ -63,23 +63,23 @@ export interface ShapeDrag {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
-/** The bar under `tick`, inside a song of `songTicks`. */
-export function barAt(tick: number, songTicks: number, barTicks = TICKS_PER_BAR): ShapeRange {
-  const bar = Math.min(barTicks, songTicks);
-  const start = clamp(Math.floor(tick / barTicks) * barTicks, 0, songTicks - bar);
+/** The bar under `tick`, inside an axis of `axisTicks`. */
+export function barAt(tick: number, axisTicks: number, barTicks = TICKS_PER_BAR): ShapeRange {
+  const bar = Math.min(barTicks, axisTicks);
+  const start = clamp(Math.floor(tick / barTicks) * barTicks, 0, axisTicks - bar);
   return { startTick: start, endTick: start + bar };
 }
 
 /** The range a drag selects (decision 1): the span dragged, or one bar for a press that did not drag. */
 export function shapeRange(
   drag: ShapeDrag,
-  songTicks: number,
+  axisTicks: number,
   barTicks = TICKS_PER_BAR,
 ): ShapeRange {
   const startTick = Math.min(drag.fromTick, drag.toTick);
   const endTick = Math.max(drag.fromTick, drag.toTick);
   if (drag.dragged && endTick > startTick) return { startTick, endTick };
-  return barAt(drag.pressTick, songTicks, barTicks);
+  return barAt(drag.pressTick, axisTicks, barTicks);
 }
 
 /** Whether `kind` repeats at the rate; Ramp and S-curve span the range once. */

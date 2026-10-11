@@ -30,6 +30,13 @@ export const KNOB_RACK_PAD_PX = 6;
 /** The face sits inside the track; the pin stops short of the rim. */
 export const FACE_INSET = 3.5;
 export const PIN_INSET = 5;
+/**
+ * The env ring (windsor#725): how far outside the dial's track it runs, and
+ * the radius of its dot on the playing value. The default dial's SVG pads
+ * 4 px round the track, so the ring's 1.6 px stroke at 2.6 px out fits it.
+ */
+export const ENV_RING_GAP = 2.6;
+export const ENV_DOT_R = 1.8;
 /** An arc shorter than this is not drawn at all (the value sits on zero). */
 export const ARC_MIN_DEGREES = 0.4;
 /** Degrees in a half turn, for the polar conversion and the large-arc flag. */

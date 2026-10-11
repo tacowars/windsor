@@ -7,11 +7,13 @@
  * compressor's attack, ratio and release), tempo-synced divisions, Tape's
  * seed and its optional core override are not targets.
  *
- * The one switch that is a target, each insert's own on/off (windsor#628,
- * record `2026-10-06-insert-switch-lanes`), is not listed per kind:
+ * Each insert's own on/off (windsor#628, record
+ * `2026-10-06-insert-switch-lanes`) is not listed per kind:
  * `INSERT_SWITCH_ROW` is the row, and `insertKindFields`
  * (`automationInsertFields.ts`) appends it to every kind whose spec has
- * `enabled`.
+ * `enabled`. A kind may list a boolean field of its own as a `switch` row,
+ * set-only like `enabled` (bloom's Freeze, record `2026-10-11-bloom-insert`
+ * decision 13); other switches, enums and stepped fields stay out.
  *
  * A field nested in a list is spelled with its index, `bands.3.freq` or
  * `stages.0.amount`, so it sits after the insert's id in
@@ -38,6 +40,7 @@ import {
   DRIVE_DSP,
   DRIVE_STAGE_BOUNDS,
 } from '../inserts/advancedDriveConstants';
+import { BLOOM_BOUNDS } from '../inserts/bloomConstants';
 import { COMPRESSOR_BOUNDS } from '../inserts/compressorConstants';
 import { DELAY_BOUNDS } from '../inserts/delayConstants';
 import { ECHO_BOUNDS } from '../inserts/echoConstants';
@@ -95,6 +98,16 @@ const UNIT: Bounds = [0, 1];
  * `DELAY_TIME_MIN`); the lane's floor is the same, and 0 sits below it.
  */
 const ECHO_TIME_LOG_FLOOR = 0.02;
+
+/**
+ * bloom's Swell and Sustain lanes start their log sweeps at these, in
+ * seconds, as Echo's Time does; 0 (the default, off) sits below each.
+ * Swell's 10 ms is under the 20 ms the controls are smoothed over, so the
+ * floor and 0 sound alike; Sustain's 50 ms is the shortest fall Freeze lets
+ * go with (record `2026-10-11-bloom-insert` decisions 7 and 12).
+ */
+const BLOOM_SWELL_LOG_FLOOR = 0.01;
+const BLOOM_SUSTAIN_LOG_FLOOR = 0.05;
 
 /** One row: a field, its label, its bounds, its scale and its unit. */
 function row(
@@ -343,6 +356,25 @@ const FILTER_ROWS = [
   row('mix', 'Mix', FILTER_BOUNDS.mix),
 ];
 
+const B = BLOOM_BOUNDS;
+/**
+ * bloom's continuous levers and Freeze, a switch lane held between points
+ * (record `2026-10-11-bloom-insert` decision 12). Octave, Low and High are
+ * stepped and Key and Scale lists: none is a target.
+ */
+const BLOOM_ROWS = [
+  row('amount', 'Amount', B.amount),
+  row('mix', 'Mix', B.mix),
+  { ...row('swell', 'Swell', B.swell, 'log', 's'), floor: BLOOM_SWELL_LOG_FLOOR },
+  { ...row('sustain', 'Sustain', B.sustain, 'log', 's'), floor: BLOOM_SUSTAIN_LOG_FLOOR },
+  row('freeze', 'Freeze', UNIT, 'switch'),
+  row('spread', 'Spread', B.spread),
+  row('shape', 'Shape', B.shape),
+  row('bright', 'Bright', B.bright, 'linear', 'dB/oct'),
+  row('focus', 'Focus', B.focus, 'log'),
+  row('density', 'Density', B.density),
+];
+
 /** An insert's on/off switch (windsor#628): `enabled`, 0 off and 1 on, held between points. */
 export const INSERT_SWITCH_ROW: InsertFieldRow = row('enabled', 'On', UNIT, 'switch');
 
@@ -378,6 +410,7 @@ const KIND_ROWS: KindRows = {
   echo: ECHO_ROWS,
   eq: EQ_ROWS,
   filter: FILTER_ROWS,
+  bloom: BLOOM_ROWS,
 };
 
 /** The prefix a host's slot rows carry (record `2026-10-11-wet-path-slot`). */
@@ -409,9 +442,11 @@ export function slotRows(host: InsertKindName, table: KindRows = KIND_ROWS): Ins
 
 /**
  * Each insert kind's continuous fields, the targets a lane may move on it,
- * and on a host its slot rows: Echo's are every other kind's, under `slot.`.
+ * and on a host its slot rows: Echo's and bloom's are every other kind's,
+ * under `slot.`.
  */
 export const INSERT_AUTOMATION_FIELDS: KindRows = {
   ...KIND_ROWS,
   echo: [...ECHO_ROWS, ...slotRows('echo')],
+  bloom: [...BLOOM_ROWS, ...slotRows('bloom')],
 };

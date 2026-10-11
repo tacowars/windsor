@@ -2,14 +2,15 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. Four upgrades ship, 5 → 6
+ * patch of an unreadable format is refused whole. Five upgrades ship, 5 → 6
  * (windsor#300: the snapshot's patches to patch format 3, pinned by
  * `songDriveUpgrade.test.ts`), 6 → 7 (windsor#590: to patch format 4,
  * the operators' `noiseLp` and `noiseHp` renamed), 7 → 8 (windsor#626:
  * the Filter's Reso lane on a log scale, an identity step pinned by
- * `songFilterResoUpgrade.test.ts`) and 8 → 9 (RV-4: Retro Reverb's Size
+ * `songFilterResoUpgrade.test.ts`), 8 → 9 (RV-4: Retro Reverb's Size
  * lane on a log scale, an identity step pinned by
- * `songRetroSizeUpgrade.test.ts`); versions 2 (#705), 3 (record
+ * `songRetroSizeUpgrade.test.ts`) and 9 → 10 (windsor#728: bloom's Scale
+ * values renamed to Windsor's, pinned here); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused.
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
@@ -50,8 +51,8 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 describe('upgradeSong', () => {
-  it('ships four upgrades, 5 → 6 to 8 → 9: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8']);
+  it('ships five upgrades, 5 → 6 to 9 → 10: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
@@ -218,5 +219,78 @@ describe("a song's patch snapshot", () => {
     expect((document as { patches: Record<string, Doc> }).patches['kick']).toEqual({
       volume: 0.25,
     });
+  });
+});
+
+describe("a version-9 song's blooms (windsor#728)", () => {
+  const bloom = (scale: string, extra: Doc = {}): Doc => ({
+    kind: 'bloom',
+    key: 'F#',
+    scale,
+    ...extra,
+  });
+  const chain = (doc: unknown, ...path: (string | number)[]): Doc[] =>
+    path.reduce<unknown>((at, key) => (at as Record<string | number, unknown>)[key], doc) as Doc[];
+
+  it('renames minor and the pentatonics on every chain, a host’s child included', () => {
+    const raw: Doc = {
+      ...song([{ ...KICK, strip: { inserts: [bloom('pentatonic-minor'), { kind: 'eq' }] } }]),
+      version: 9,
+      groups: [{ id: 'g', inserts: [bloom('minor')] }],
+      returns: { a: { inserts: [bloom('pentatonic-major', { slot: bloom('minor') })] } },
+      master: { inserts: [bloom('dorian'), bloom('pentatonic-minor')] },
+    };
+    const { document, refused } = upgradeSong(raw);
+    expect(refused).toBeUndefined();
+    expect(chain(document, 'parts', 0, 'strip', 'inserts')).toEqual([
+      bloom('pentatonicMinor'),
+      { kind: 'eq' },
+    ]);
+    expect(chain(document, 'groups', 0, 'inserts')).toEqual([bloom('naturalMinor')]);
+    expect(chain(document, 'returns', 'a', 'inserts')).toEqual([
+      bloom('pentatonicMajor', { slot: bloom('naturalMinor') }),
+    ]);
+    expect(chain(document, 'master', 'inserts')).toEqual([
+      bloom('dorian'),
+      bloom('pentatonicMinor'),
+    ]);
+  });
+
+  it('leaves another kind’s scale-named field alone', () => {
+    const raw: Doc = {
+      ...song([KICK]),
+      version: 9,
+      master: { inserts: [{ kind: 'x', scale: 'minor' }] },
+    };
+    expect(chain(upgradeSong(raw).document, 'master', 'inserts')).toEqual([
+      { kind: 'x', scale: 'minor' },
+    ]);
+  });
+
+  it('loads a pentatonic-minor bloom on a part strip and the master as pentatonicMinor, with no correction', () => {
+    const raw: Doc = {
+      ...song([{ ...KICK, strip: { inserts: [bloom('pentatonic-minor')] } }]),
+      version: 9,
+      master: { inserts: [bloom('pentatonic-minor')] },
+    };
+    const result = makeArrangement(raw);
+    expect(result.corrections).toEqual([]);
+    expect(result.document.version).toBe(ARRANGEMENT_VERSION);
+    expect(result.document.parts[0]!.strip!.inserts[0]).toMatchObject({
+      key: 'F#',
+      scale: 'pentatonicMinor',
+    });
+    expect(result.document.master!.inserts[0]).toMatchObject({
+      key: 'F#',
+      scale: 'pentatonicMinor',
+    });
+  });
+
+  it('keeps key and scale through a version-10 round trip', () => {
+    const raw: Doc = { ...song([KICK]), master: { inserts: [bloom('wholeTone', { key: 'A#' })] } };
+    const once = makeArrangement(raw).document;
+    const twice = makeArrangement(JSON.parse(JSON.stringify(once))).document;
+    expect(twice.master!.inserts[0]).toMatchObject({ key: 'A#', scale: 'wholeTone' });
+    expect(twice).toEqual(once);
   });
 });

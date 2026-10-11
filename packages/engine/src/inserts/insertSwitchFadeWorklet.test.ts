@@ -1,7 +1,7 @@
 /**
  * Every worklet insert's on/off switch is click-free (windsor#630): the
  * shipped bundles of Filter, the compressor, Phaser, Delay, Tape, Advanced
- * Drive, Retro Reverb and EQ, each switched off and back on under a steady
+ * Drive, Retro Reverb, EQ and bloom, each switched off and back on under a steady
  * sine, crossfade dry and wet linearly over `INSERT_SWITCH_FADE_S`.
  *
  * - **No click:** no sample-to-sample step across either switch is larger
@@ -28,6 +28,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { advancedDriveParams, loadAdvancedDrive } from '../__fixtures__/advancedDriveHarness';
+import { bloomParams, loadBloom } from '../__fixtures__/bloomHarness';
 import { compressorParams, loadCompressor } from '../__fixtures__/compressorHarness';
 import { delayParams, loadDelay } from '../__fixtures__/delayHarness';
 import { eqParams, loadEq } from '../__fixtures__/eqHarness';
@@ -150,6 +151,15 @@ const KINDS: Kind[] = [
         i === 2 ? { ...b, type: 'bell' as const, freq: HZ, gain: 9, q: 1, on: true } : b,
       );
       return { processor: loadEq(RATE), params: eqParams({ ...DEFAULT_EQ, bands }) };
+    },
+    latency: 0,
+    rings: true,
+  },
+  {
+    name: 'bloom',
+    load: () => {
+      const params = bloomParams({ mix: 0.5 });
+      return { processor: loadBloom(RATE, params), params };
     },
     latency: 0,
     rings: true,

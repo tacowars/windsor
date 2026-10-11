@@ -46,6 +46,11 @@ describe('fixedDegreeOptions', () => {
     ]);
   });
 
+  it('offers one choice per degree on a 5- or 6-note scale (windsor#721)', () => {
+    expect(fixedDegreeOptions({ ...C_MINOR, scale: 'hirajoshi' }, 0)).toHaveLength(5);
+    expect(fixedDegreeOptions({ ...C_MINOR, scale: 'wholeTone' }, 0)).toHaveLength(6);
+  });
+
   it('keeps a written degree past the scale, folded with its carry', () => {
     const options = fixedDegreeOptions(C_MINOR, 9);
     expect(options.at(-1)).toEqual({ value: '9', label: 'X D# +1' });

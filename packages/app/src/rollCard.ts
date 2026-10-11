@@ -5,17 +5,20 @@
  * the body the Song pane's frame (`sequencerDevice.ts`) puts beside the
  * shared rail, which carries Expand (`rollExpand.ts`) among its tools.
  *
- * One tab, Notes, with the summary at its right; the controls
- * (`rollControls.ts`); and the roll's four panes (`rollPanes.ts`), painted
- * from a `RollScene` (`rollPaint.ts`, `rollNotesPaint.ts`). It edits
- * (windsor#603) through `rollEditing.ts`, whose edit in progress it draws
- * over the document.
+ * Two tabs, Notes · Envelopes, with the summary at their right
+ * (`rollEnvelopeTabs.ts`); the controls (`rollControls.ts`); and the
+ * roll's four panes (`rollPanes.ts`), painted from a `RollScene`
+ * (`rollPaint.ts`, `rollNotesPaint.ts`). It edits (windsor#603) through
+ * `rollEditing.ts`, whose edit in progress it draws over the document. The
+ * Envelopes tab (windsor#707) is `rollEnvelopeMode.ts`: its column, the
+ * picker and the envelope over the notes.
  *
  * One playhead loop (`watchPlayhead`) per card: each frame it repaints when
  * the roll, the region or the harmony changed under it, moves the key guide
  * when its chord moved, places the playhead, and reads Rec (`rollRecView.ts`,
- * windsor#663). A resize refits Fit and Fold. The view settings are the
- * part's for the session (`rollView.ts`).
+ * windsor#663). A resize refits Fit and Fold, and the pane keeps its spot
+ * across a repaint (`rollViewSpot.ts`). The view settings are the part's
+ * for the session (`rollView.ts`).
  */
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -23,6 +26,8 @@ import { el } from './dom';
 import { DARK, readPlayhead } from './regionPlayhead';
 import { type RollControls, rollControls } from './rollControls';
 import { type RollEditing, rollEditing } from './rollEditing';
+import { RollEnvelopeMode } from './rollEnvelopeMode';
+import { rollTabs } from './rollEnvelopeTabs';
 import { type RollExpander, rollExpander } from './rollExpand';
 import { chordLabel, tonesAt } from './rollHarmony';
 import { guideTick, playingTick, pointerTick, rollPlayhead, standingTick } from './rollGuide';
@@ -34,11 +39,10 @@ import {
   paintNotes,
 } from './rollNotesPaint';
 import { markKeys, paintBody, paintHead, paintKeys } from './rollPaint';
-import { type RollPanes, rollPanes, syncPanes } from './rollPanes';
+import { type RollPanes, rollPanes } from './rollPanes';
 import { type RollRecView, rollRecView } from './rollRecView';
-import { type TickWindow, rollInstances, rollWindow, windowHolds } from './rollRepeats';
-import { nearestRow, rowIndexAt } from './rollRows';
-import { type RollScene, centrePitch, rollScene } from './rollScene';
+import { type TickWindow, rollInstances, windowHolds } from './rollRepeats';
+import { type RollScene, rollScene } from './rollScene';
 import {
   type RollSource,
   readRollSource,
@@ -48,13 +52,7 @@ import {
   withDraft,
 } from './rollSource';
 import { sourceSummary } from './rollSummary';
-import {
-  ROLL_COLORS,
-  ROLL_DRAW_BUDGET,
-  ROLL_EMPTY_CENTRE_PITCH,
-  ROLL_NOTE,
-  ROLL_UNFIT_BEAT_PX,
-} from './rollTables';
+import { ROLL_COLORS, ROLL_DRAW_BUDGET, ROLL_NOTE, ROLL_UNFIT_BEAT_PX } from './rollTables';
 import {
   type RollViewState,
   type RollZoom,
@@ -67,39 +65,22 @@ import {
   zoomRows,
   zoomTime,
 } from './rollView';
+import { RollViewSpot } from './rollViewSpot';
 import { KIND_LABELS } from './sequencerConstants';
 import type { DeviceBody } from './sequencerDevice';
 import { watchPlayhead } from './stepStrip';
-
-/** The tab bar: Notes, and the summary at its right. */
-function tabBar(): { row: HTMLElement; summary: HTMLElement } {
-  const row = el('div', 'roll-tabs');
-  row.setAttribute('role', 'tablist');
-  row.setAttribute('aria-label', 'Roll pages');
-  const tab = el('span', 'roll-tab', 'Notes');
-  tab.setAttribute('role', 'tab');
-  tab.setAttribute('aria-selected', 'true');
-  const summary = el('span', 'roll-summary');
-  row.append(tab, summary);
-  return { row, summary };
-}
-
-/** Where the view sits, kept across a repaint: the tick at the left edge and the pitch in the middle. */
-interface ViewSpot {
-  readonly tick: number;
-  readonly pitch: number;
-}
 
 /** One Roll card: its state, its paint and its loop. */
 class RollDevice {
   readonly body = el('div', 'seq-device-body roll-device-body');
   private readonly view: RollViewState;
-  private readonly tabs = tabBar();
+  private readonly tabs = rollTabs();
   private readonly panes: RollPanes;
   private readonly controls: RollControls;
   private readonly expander: RollExpander;
   private readonly editing: RollEditing;
   private readonly rec: RollRecView;
+  private readonly envelopes: RollEnvelopeMode;
   private source: RollSource;
   private sourceSeen: string;
   private scene: RollScene | null = null;
@@ -113,7 +94,7 @@ class RollDevice {
   private guideTargets: GuideTargets | null = null;
   private guideKey = '';
   private hover: number | null = null;
-  private spot: ViewSpot | null = null;
+  private readonly spot: RollViewSpot;
   private playhead = DARK;
 
   constructor(
@@ -124,10 +105,10 @@ class RollDevice {
     this.view = rollViewOf(slot);
     this.source = readRollSource(ctx.model.doc, slot, region);
     this.sourceSeen = sourceKey(this.source);
-    for (const [prop, colour] of Object.entries(ROLL_COLORS)) {
+    for (const [prop, colour] of Object.entries(ROLL_COLORS))
       this.body.style.setProperty(prop, colour);
-    }
     this.panes = rollPanes(() => this.scrolled());
+    this.spot = new RollViewSpot(this.panes);
     this.editing = rollEditing({
       ctx,
       slot,
@@ -145,7 +126,8 @@ class RollDevice {
       body: this.body,
       title: () => `${partAt(ctx.model.doc, slot)?.name ?? ''} — ${KIND_LABELS.roll}`,
       changed: () => {
-        this.spot = null;
+        this.envelopes.closePopovers();
+        this.spot.forget();
         this.paint();
       },
     });
@@ -170,6 +152,7 @@ class RollDevice {
       quantise: () => this.editing.quantise(),
       rec: this.rec.control,
     });
+    this.envelopes = this.envelopeMode();
     this.wire();
     this.paint();
     this.watch();
@@ -186,6 +169,23 @@ class RollDevice {
       scene: () => this.scene,
       layer: () => this.notesLayer,
       repaint: () => this.paint(),
+    });
+  }
+
+  /** The Envelopes tab on this device (windsor#707), once the controls and the editor are built. */
+  private envelopeMode(): RollEnvelopeMode {
+    return new RollEnvelopeMode({
+      ctx: this.ctx,
+      slot: this.slot,
+      region: this.region,
+      body: this.body,
+      panes: this.panes,
+      view: this.view,
+      tabs: this.tabs,
+      controls: this.controls,
+      editor: this.editing.editor,
+      attached: () => this.expander.attached(),
+      scene: () => this.scene,
     });
   }
 
@@ -242,43 +242,11 @@ class RollDevice {
     this.body.append(this.tabs.row, page);
   }
 
-  private keepSpot(): void {
-    const { scene, panes } = this;
-    if (!scene || panes.body.clientHeight === 0) return;
-    const { rows } = scene.rows;
-    const mid = rows[rowIndexAt(rows, panes.body.scrollTop + panes.body.clientHeight / 2)];
-    this.spot = { tick: panes.body.scrollLeft / scene.pxPerTick, pitch: mid?.pitch ?? 0 };
-  }
-
-  private restoreSpot(): void {
-    const { scene, panes } = this;
-    if (!scene || panes.body.clientHeight === 0) return;
-    const pitch = this.spot?.pitch ?? centrePitch(this.source.notes, ROLL_EMPTY_CENTRE_PITCH);
-    const row = nearestRow(scene.rows.rows, pitch);
-    const tick = this.spot?.tick ?? 0;
-    panes.body.scrollTop = row ? row.top + row.h / 2 - panes.body.clientHeight / 2 : 0;
-    panes.body.scrollLeft = tick * scene.pxPerTick;
-    syncPanes(panes);
-    this.keepSpot();
-  }
-
-  /** The ticks the notes pane shows, widened by `margin` screens either side. */
-  private viewTicks(scene: RollScene, margin?: number): TickWindow {
-    const { body } = this.panes;
-    const view = {
-      scrollPx: body.scrollLeft,
-      widthPx: body.clientWidth,
-      pxPerTick: scene.pxPerTick,
-      regionTicks: scene.regionTicks,
-    };
-    return rollWindow(view, margin);
-  }
-
   /** Draw the notes and stems the view's window holds, never every repeat of the region. */
   private paintWindow(): void {
     const { scene, notesLayer } = this;
     if (!scene || !notesLayer) return;
-    const ticks = this.viewTicks(scene);
+    const ticks = this.spot.ticks(scene);
     const instances = rollInstances(scene.notes, {
       loopTicks: scene.loopTicks,
       regionTicks: scene.regionTicks,
@@ -297,9 +265,10 @@ class RollDevice {
 
   /** A scroll keeps the spot, and redraws the notes once the view leaves what was drawn. */
   private scrolled(): void {
-    this.keepSpot();
+    this.spot.keep(this.scene);
+    this.envelopes.scrolled();
     const { scene, painted } = this;
-    if (!scene || !painted || windowHolds(painted, this.viewTicks(scene, 0))) return;
+    if (!scene || !painted || windowHolds(painted, this.spot.ticks(scene, 0))) return;
     this.paintWindow();
     this.light();
   }
@@ -329,9 +298,10 @@ class RollDevice {
     this.guideTargets = { keys, chords: head.chords, corner: panes.corner };
     this.guideKey = '';
     this.rec.summary(sourceSummary(this.source, snapOf(view.snap).label));
-    this.restoreSpot();
+    this.spot.restore(this.scene, this.source.notes);
     this.paintWindow();
     this.controls.refresh();
+    this.envelopes.paint();
     this.updateGuide();
     this.light();
   }
@@ -365,8 +335,8 @@ class RollDevice {
   private watch(): void {
     let restored = false;
     watchPlayhead({
-      attached: () => this.expander.attached(),
-      shown: () => this.body.closest('[hidden]') === null,
+      attached: () => this.envelopes.keepPopovers(this.expander.attached()),
+      shown: () => this.envelopes.keepPopovers(this.body.closest('[hidden]') === null),
       repaintIf: () => {
         if (!restored) {
           restored = true;

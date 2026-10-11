@@ -33,13 +33,24 @@
  * maps, for the quantum before the resync and for a held voice on an older
  * patch.
  *
+ * A roll's clip envelope (windsor#702) writes the same slot through the same
+ * handle: its offsets are already in the row's curve (a step value times
+ * the row's span), so it writes them as they are (`scheduleOffset`,
+ * `holdOffset`), the lane's own offset (`offsetOf`) added in where a lane
+ * moves the target too (`automation/clipEnvelopeTracks.ts`). An envelope's
+ * 0 is the patch's own value, an exact-0 decay or LFO rate included, so a
+ * slot it writes with no lane on the target is `relative` (windsor#718):
+ * the worklet floors nothing there. A lane's write makes it absolute again.
+ * An envelope is admitted only where the patch `defined` its target: a
+ * macro past the patch's count has no value an offset could move.
+ *
  * A part hands out one handle per target, so a resync finds the same one.
  * The nine decay rows have handles too (windsor#347): the worklet reshapes a
  * decay already running from its level. `fmProcessorAutomation.test.ts` and
  * `fmProcessorAutomationDecay.test.ts` pin the handles and the worklet
  * together.
  */
-import type { AutomationHandle, AutomationHow } from '../automation/automationHandles';
+import type { AutomationHow, OffsetHandle } from '../automation/automationHandles';
 import type { AutomationTargetRow } from '../automation/automationLane';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { Patch } from '../patch/patch';
@@ -67,6 +78,20 @@ function patchValue(patch: Patch, path: string): number {
   return typeof node === 'number' ? node : NaN;
 }
 
+/** Whether `patch` has a value at `path` an offset could move (windsor#718): a macro past its count has none. */
+const patchDefines = (patch: Patch, path: string): boolean =>
+  Number.isFinite(patchValue(patch, path));
+
+/**
+ * Whether an offset on the voice target at `path` can change what `patch`
+ * plays (windsor#718, windsor#725): no macro of the patch maps the target,
+ * so the part has a handle on it, and the patch has a value there. The
+ * patch-side reading of `targetSounds` (`automation/clipEnvelopeSource.ts`),
+ * by which the app's env ring shows its label only where an envelope can sound.
+ */
+export const voiceTargetSounds = (patch: Patch, path: string): boolean =>
+  !macroMapsTarget(patch, path) && patchDefines(patch, path);
+
 /**
  * The offset that makes `value`, a lane value in the row's units, sound over
  * `patch`: its difference from the patch's value, or for a ratio row the
@@ -91,9 +116,12 @@ export function voiceOffset(
   return from > 0 && to > 0 ? Math.log2(to / from) : 0;
 }
 
-/** Where a handle writes: the param, taking a slot when it needs one, and the param it has now. */
+/**
+ * Where a handle writes: the param, taking a slot when it needs one (its
+ * offset of 0 the patch's own value when `relative`), and the param it has now.
+ */
 interface OffsetTarget {
-  take(): AudioParam | undefined;
+  take(relative: boolean): AudioParam | undefined;
   held(): AudioParam | undefined;
   free(): void;
 }
@@ -103,23 +131,50 @@ function write(param: AudioParam, offset: number, time: number, how: AutomationH
   else param.setValueAtTime(offset, time);
 }
 
-/** A handle that writes each lane value as its offset onto `target`. */
-function offsetHandle(target: OffsetTarget, offsetOf: (value: number) => number): AutomationHandle {
+/** What a voice handle reads of its target besides the slot: how a value is an offset, and whether the patch has it. */
+interface OffsetReading {
+  readonly offsetOf: (value: number) => number;
+  readonly defined: () => boolean;
+}
+
+/**
+ * A handle that writes each lane value as its offset onto `target`, and an
+ * offset as itself: a lane's plus a clip envelope's (windsor#702).
+ */
+function offsetHandle(target: OffsetTarget, reading: OffsetReading): OffsetHandle {
+  const { offsetOf, defined } = reading;
+  let relative = false;
+  const scheduleOffset = (offset: number, time: number, how: AutomationHow): void => {
+    const param = target.take(relative);
+    if (param) write(param, offset, time, how);
+  };
+  const holdOffset = (offset: number, time: number): void => {
+    const param = target.take(relative);
+    if (!param) return;
+    param.cancelScheduledValues(time);
+    param.setValueAtTime(offset, time);
+  };
   return {
+    offsetOf,
+    defined,
+    scheduleOffset,
+    holdOffset,
+    setRelative(on): void {
+      relative = on;
+    },
     schedule(value, time, how): void {
-      const param = target.take();
-      if (param) write(param, offsetOf(value), time, how);
+      relative = false;
+      scheduleOffset(offsetOf(value), time, how);
     },
     cancelFrom(time): void {
       target.held()?.cancelScheduledValues(time);
     },
     hold(value, time): void {
-      const param = target.take();
-      if (!param) return;
-      param.cancelScheduledValues(time);
-      param.setValueAtTime(offsetOf(value), time);
+      relative = false;
+      holdOffset(offsetOf(value), time);
     },
     release(time): void {
+      relative = false;
       const param = target.held();
       if (!param) return;
       param.cancelScheduledValues(time);
@@ -134,7 +189,7 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
   const paramOf = (slot: number | undefined): AudioParam | undefined =>
     slot === undefined ? undefined : part.voiceSlotParams[slot];
   return {
-    take: () => paramOf(part.takeVoiceSlot(path)),
+    take: (relative) => paramOf(part.takeVoiceSlot(path, relative)),
     held: () => paramOf(part.voiceSlotOf(path)),
     free: () => part.freeVoiceSlot(path),
   };
@@ -146,7 +201,7 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
  * would release and hold again. A rebuilt part is a new `AudioPart`, and
  * starts with none.
  */
-const handles = new WeakMap<AudioPart, Map<string, AutomationHandle>>();
+const handles = new WeakMap<AudioPart, Map<string, OffsetHandle>>();
 
 /**
  * The handle for `target` on `strip`'s part, or undefined when there is
@@ -159,7 +214,7 @@ export function voiceAutomationHandle(
   strip: PartStrip,
   target: VoiceTarget,
   row: AutomationTargetRow,
-): AutomationHandle | undefined {
+): OffsetHandle | undefined {
   const { path } = target;
   const part = strip.part;
   if (macroMapsTarget(part.patch, path)) return undefined;
@@ -167,8 +222,10 @@ export function voiceAutomationHandle(
   if (!byPath) handles.set(part, (byPath = new Map()));
   const known = byPath.get(path);
   if (known) return known;
-  const offsetOf = (value: number): number => voiceOffset(part.patch, path, row, value);
-  const handle = offsetHandle(slotTarget(part, path), offsetOf);
+  const handle = offsetHandle(slotTarget(part, path), {
+    offsetOf: (value) => voiceOffset(part.patch, path, row, value),
+    defined: () => patchDefines(part.patch, path),
+  });
   byPath.set(path, handle);
   return handle;
 }

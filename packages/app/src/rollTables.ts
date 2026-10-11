@@ -6,8 +6,6 @@
  * these as defaults, and the CSS reads `ROLL_DEVICE_PX` and `ROLL_COLORS`
  * as custom properties the device sets, as `SEQUENCER_DEVICE_PX` is set.
  */
-import type { ScaleName } from '@windsor/engine';
-
 /** One Snap choice: its label and its grain in ticks on the 24 PPQ grid. */
 export interface RollSnap {
   readonly label: string;
@@ -155,17 +153,6 @@ export const ROLL_COLORS: Readonly<Record<string, string>> = {
 
 /** Bars are counted to a tenth in the summary and the Loop readout. */
 export const ROLL_BAR_FRACTIONS = 10;
-
-/** How the summary names the song's scale: `A minor`. */
-export const ROLL_SCALE_NAMES: Readonly<Record<ScaleName, string>> = {
-  major: 'major',
-  naturalMinor: 'minor',
-  dorian: 'dorian',
-  mixolydian: 'mixolydian',
-  lydian: 'lydian',
-  pentatonicMajor: 'major pentatonic',
-  pentatonicMinor: 'minor pentatonic',
-};
 
 /** A scale given as its own offsets. */
 export const ROLL_CUSTOM_SCALE_NAME = 'custom scale';

@@ -69,10 +69,31 @@ export function seg(
   return box;
 }
 
+export interface SelectOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+/** Options under an `<optgroup>` labelled `group`. */
+export interface SelectGroup {
+  readonly group: string;
+  readonly options: readonly SelectOption[];
+}
+
 /** A labelled `<select class="field">`. */
 export function select(
   label: string,
-  options: readonly { value: string; label: string }[],
+  options: readonly SelectOption[],
+  current: string,
+  onPick: (value: string) => void,
+): HTMLElement {
+  return groupedSelect(label, options, current, onPick);
+}
+
+/** `select()` whose items may be `<optgroup>`s, each in the order given. */
+export function groupedSelect(
+  label: string,
+  items: readonly (SelectOption | SelectGroup)[],
   current: string,
   onPick: (value: string) => void,
 ): HTMLElement {
@@ -82,7 +103,16 @@ export function select(
   sel.className = 'field';
   sel.name = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   sel.setAttribute('aria-label', label);
-  for (const option of options) sel.add(new Option(option.label, option.value));
+  for (const item of items) {
+    if (!('group' in item)) {
+      sel.add(new Option(item.label, item.value));
+      continue;
+    }
+    const group = document.createElement('optgroup');
+    group.label = item.group;
+    for (const option of item.options) group.appendChild(new Option(option.label, option.value));
+    sel.appendChild(group);
+  }
   sel.value = current;
   sel.onchange = (): void => onPick(sel.value);
   wrap.appendChild(sel);

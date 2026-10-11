@@ -6,6 +6,7 @@
 import type { AutomationHandle } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { StripStage } from '../mixer/channelStrip';
+import type { Harmony } from '../harmony/harmonyTimeline';
 
 /**
  * A host's wet path (record `2026-10-11-wet-path-slot`): where its slot's
@@ -52,6 +53,19 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
   set(spec: S): void;
   /** Optional song tempo input; the registry initializes it and forwards live changes. */
   setTempo?(bpm: number): void;
+  /**
+   * Optional song key input (windsor#717): the harmony's root (pitch class)
+   * and scale. `harmonyInsertRegistry` hands a new stage the current key and
+   * forwards a change of root or scale.
+   */
+  setHarmony?(root: number, scale: Harmony['scale']): void;
+  /**
+   * Optional song chord input (windsor#729): the pitch set of the chord the
+   * harmony track is on, from `time` on the audio clock; `hold` cancels what
+   * was scheduled from `time` first. `harmonyInsertRegistry` forwards what
+   * `bloomChordFollower.ts` schedules to every live stage.
+   */
+  setChord?(mask: number, time: number, hold: boolean): void;
   /**
    * A song lane's handle on `field` (windsor#345, record
    * `2026-10-01-song-automation-lanes` decision 1): the param or params `set`

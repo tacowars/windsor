@@ -141,7 +141,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
     this.partFloors = new Float64Array(VOICE_TARGET_COUNT);
     this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
-    this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, opts.voiceSlots);
+    this.slotsMapped = mapVoiceSlots(this, opts.voiceSlots, opts.voiceSlotsRelative);
 
     // The note-on the render is starting (`NOTE_IN_*`), its slide flag and its
     // step's offsets, copied from the message as the render takes it (windsor#270).
@@ -256,8 +256,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
         this.load.start(msg.quanta);
         break;
       case 'voiceSlots':
-        // windsor#346: a lane added, moved or removed. A free slot offsets nothing.
-        this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, msg.slots);
+        // windsor#346, windsor#718: a lane or an envelope moved. A free slot offsets nothing.
+        this.slotsMapped = mapVoiceSlots(this, msg.slots, msg.relative);
         if (!this.slotsMapped) this.partOffsets.fill(0);
         break;
     }

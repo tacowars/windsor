@@ -46,7 +46,7 @@ import { AUTOMATION_GESTURES, SNAP_CHOICES } from './songAutomationTables';
 const BAR = TICKS_PER_BAR;
 const SIXTEENTH = PPQ / 4;
 const H = 56;
-const frame: LaneFrame = { pxPerBar: 96, heightPx: H, songTicks: 4 * BAR };
+const frame: LaneFrame = { pxPerBar: 96, heightPx: H, axisTicks: 4 * BAR };
 const pan = requireCatalogRow('strip.pan');
 const level = requireCatalogRow('strip.level');
 const P = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
@@ -132,7 +132,7 @@ describe('the Edit gestures', () => {
   });
 
   it('adds a point on the line at the line value', () => {
-    const tick = snapTick(tickAtPx(96, frame), SIXTEENTH, frame.songTicks);
+    const tick = snapTick(tickAtPx(96, frame), SIXTEENTH, frame.axisTicks);
     const { points } = addPointOnLine(pan, ramp, tick)!;
     expect(points[1]).toEqual(P(BAR, 0));
     // The curve through it is unchanged.
@@ -234,7 +234,7 @@ describe('the Edit gestures', () => {
 });
 
 describe('Draw', () => {
-  const grain = { ticks: SIXTEENTH, songTicks: 4 * BAR };
+  const grain = { ticks: SIXTEENTH, axisTicks: 4 * BAR };
 
   it('writes the grain ticks between two positions, on the line joining them', () => {
     const samples = new Map<number, number>();

@@ -16,14 +16,24 @@
  * An insert's power button locks the same way under a lane on its on/off
  * switch (windsor#631, record `2026-10-06-insert-switch-lanes` decision 9):
  * `paintLock` lights it, and it shows the lane's level (`switchShowsOn`).
+ *
+ * A knob a Roll clip envelope moves (windsor#725) is not locked: it takes
+ * `.env`, its tag reads ENV in the envelope's colour (`console.css`'s "env
+ * ring" section), and `knob.ts` draws its second ring at the playing value.
+ * Under a lane's lock too, the tag is the lock's. The same frame loop
+ * follows the ring.
  */
 import { switchValue } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
 import { sameKnobAutomation } from './knobAutomation';
+import type { KnobEnvelope } from './knobEnvelope';
 import { watchPlayhead, type FrameSource } from './stepStrip';
 
 /** The AUTO tag's text. */
 export const AUTO_TAG_TEXT = 'AUTO';
+
+/** The tag a knob a clip envelope moves reads, while no lock holds it (windsor#725). */
+export const ENV_TAG_TEXT = 'ENV';
 
 /** The tag a lock reads: its macro's name, else AUTO. */
 export const lockTagText = (lock: KnobAutomation | null): string => lock?.macro ?? AUTO_TAG_TEXT;
@@ -36,6 +46,20 @@ export function paintLock(node: HTMLElement, lock: KnobAutomation | null): void 
   if (tag) tag.textContent = lockTagText(lock);
   if (lock) node.style.setProperty('--lock-color', lock.color);
   else node.style.removeProperty('--lock-color');
+}
+
+/**
+ * Light or clear the env ring's look on `node` (windsor#725): `.env` while an
+ * envelope moves the knob, and its tag reads ENV unless `lock` holds the knob.
+ */
+export function paintEnvelope(
+  node: HTMLElement,
+  envelope: KnobEnvelope | null,
+  lock: KnobAutomation | null,
+): void {
+  node.classList.toggle('env', envelope !== null);
+  const tag = node.querySelector('.knob-auto');
+  if (tag) tag.textContent = envelope && !lock ? ENV_TAG_TEXT : lockTagText(lock);
 }
 
 /** Whether an insert's power button shows on: the lane's level while one holds it, else `enabled`. */
@@ -53,17 +77,58 @@ export function followAutomation(
   render: () => void,
   frame?: FrameSource,
 ): void {
-  let last = automation();
+  followKnob(node, { automation }, render, frame);
+}
+
+/** What a knob follows: the lock on it, and the clip envelope moving it. */
+export interface KnobReads {
+  readonly automation?: () => KnobAutomation | null;
+  readonly envelope?: () => KnobEnvelope | null;
+}
+
+/**
+ * Whether an envelope reading moved from the last one, `last` then taking it
+ * (copied: the reading may be the knob's one reused answer).
+ */
+export function envelopeMoved(
+  last: KnobEnvelope & { shown: boolean },
+  now: KnobEnvelope | null,
+): boolean {
+  const shown = now !== null;
+  if (shown === last.shown && (!now || (now.base === last.base && now.playing === last.playing))) {
+    return false;
+  }
+  last.shown = shown;
+  last.base = now?.base ?? 0;
+  last.playing = now?.playing ?? 0;
+  return true;
+}
+
+/**
+ * `followAutomation` over both of a knob's reads, on one watch: a frame
+ * whose lock or envelope answers differently redraws it once.
+ */
+export function followKnob(
+  node: HTMLElement,
+  reads: KnobReads,
+  render: () => void,
+  frame?: FrameSource,
+): void {
+  const { automation, envelope } = reads;
+  let last = automation?.() ?? null;
+  const lastEnvelope = { shown: false, base: 0, playing: 0 };
+  if (envelope) envelopeMoved(lastEnvelope, envelope());
   watchPlayhead({
     attached: () => node.isConnected,
     shown: () => node.closest('[hidden]') === null,
     playheadAt: () => 0,
     mark: () => undefined,
     repaintIf: () => {
-      const now = automation();
-      if (sameKnobAutomation(now, last)) return;
+      const now = automation?.() ?? null;
+      const lockMoved = !sameKnobAutomation(now, last);
       last = now;
-      render();
+      const ringMoved = envelope ? envelopeMoved(lastEnvelope, envelope()) : false;
+      if (lockMoved || ringMoved) render();
     },
     ...(frame ? { frame } : {}),
   });

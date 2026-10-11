@@ -6,9 +6,10 @@
  * windsor#97). Before a player is loaded, `start` and `seek` do nothing and
  * the queries answer "nothing"; stop and mute still act on the transport.
  *
- * The automation player (windsor#344) hears every tick itself, but not a
- * stop or a seek, which issue none: it is loaded beside the arrangement
- * player as the follower these are reported to.
+ * The automation player (windsor#344) and Bloom's song chord (windsor#729)
+ * hear every tick themselves, but not a stop or a seek, which issue none:
+ * they are loaded beside the arrangement player as the followers these are
+ * reported to.
  */
 import type { ArrangementPlayer, ArrangementReadout, RegionStep } from '../song/arrangementPlayer';
 import type { Scheduler } from '../sequencing/scheduler';
@@ -25,11 +26,13 @@ export interface TransportFollower {
   stop(): void;
   /** The halted transport moved to `tick`. */
   seek(tick: number): void;
+  /** ■ rewound the halted transport to `tick`, after `stop`; optional. */
+  rewound?(tick: number): void;
 }
 
 export class MusicPlayback {
   private playerValue: ArrangementPlayer | null = null;
-  private follower: TransportFollower | null = null;
+  private followers: readonly TransportFollower[] = [];
   private muted = false;
 
   /** `scheduler` is the transport the player is bound to; `context` is the clock a release is timed on. */
@@ -43,10 +46,10 @@ export class MusicPlayback {
     return this.playerValue;
   }
 
-  /** Take the player `initMusic` built, and its follower; from here on the transport controls drive them. */
-  load(player: ArrangementPlayer, follower?: TransportFollower): void {
+  /** Take the player `initMusic` built, and its followers; from here on the transport controls drive them. */
+  load(player: ArrangementPlayer, followers: readonly TransportFollower[] = []): void {
     this.playerValue = player;
-    this.follower = follower ?? null;
+    this.followers = followers;
   }
 
   /** Start (or resume) the transport. A no-op while muted or before a player is loaded. */
@@ -73,7 +76,7 @@ export class MusicPlayback {
     this.muted = muted;
     if (muted) {
       this.scheduler.stop();
-      this.follower?.stop();
+      for (const follower of this.followers) follower.stop();
       this.playerValue?.releaseAll(this.context.currentTime);
     } else {
       this.start();
@@ -88,10 +91,12 @@ export class MusicPlayback {
    */
   stop(): void {
     this.scheduler.stop();
-    this.follower?.stop();
+    for (const follower of this.followers) follower.stop();
     this.playerValue?.releaseAll(this.context.currentTime);
     this.scheduler.reset();
     this.playerValue?.reset();
+    const rest = this.scheduler.transport.currentTick;
+    for (const follower of this.followers) follower.rewound?.(rest);
   }
 
   /**
@@ -104,7 +109,7 @@ export class MusicPlayback {
    */
   seek(tick: number): boolean {
     if (!this.playerValue || !this.scheduler.seek(tick)) return false;
-    this.follower?.seek(tick);
+    for (const follower of this.followers) follower.seek(tick);
     this.playerValue.releaseAll(this.context.currentTime);
     this.playerValue.reset();
     return true;
@@ -141,7 +146,7 @@ export class MusicPlayback {
     this.scheduler.stop();
     this.playerValue?.dispose();
     this.playerValue = null;
-    this.follower = null;
+    this.followers = [];
     this.muted = false;
   }
 }
