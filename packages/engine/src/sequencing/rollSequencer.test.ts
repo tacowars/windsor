@@ -3,7 +3,9 @@
  * the song's meter, and the check refusing each field out of its range. The
  * performer (windsor#600), tick by tick: onsets at the loop position,
  * releases at the note's length or the loop's end, releases before onsets,
- * live edits, and nothing allocated on an empty tick.
+ * live edits, and nothing allocated on an empty tick. Slide by overlap
+ * (windsor#739): a note-on slides while another pitch from an earlier tick is
+ * still held.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -35,7 +37,10 @@ const at = (tick: number): PartTickEvent => ({
   regionIndex: 0,
 });
 
-/** Play local ticks `from` to `to` − 1: each event as `tick:on|off:pitch`, velocity after a `@`. */
+/**
+ * Play local ticks `from` to `to` − 1: each event as `tick:on|off:pitch`,
+ * velocity after a `@`, and a `~` on a note-on that slides.
+ */
 function play(roll: RollSequencer, to: number, from = 0): string[] {
   const out: string[] = [];
   for (let t = from; t < to; t++) out.push(...roll.handleTick(at(t)).map(label));
@@ -44,7 +49,7 @@ function play(roll: RollSequencer, to: number, from = 0): string[] {
 
 const label = (e: NoteEvent): string =>
   e.kind === 'noteOn'
-    ? `${e.tick}:on:${e.note}${e.velocity === undefined ? '' : `@${e.velocity}`}`
+    ? `${e.tick}:on:${e.note}${e.velocity === undefined ? '' : `@${e.velocity}`}${e.slide ? '~' : ''}`
     : `${e.tick}:off:${e.note}`;
 
 const roll = (notes: RollNote[], loopTicks = 96): RollSequencer =>
@@ -212,5 +217,63 @@ describe('the Roll performer (windsor#600)', () => {
     const quiet = roll([{ tick: 0, ticks: 6, pitch: 60 }]);
     play(quiet, 7);
     expect(quiet.handleTick(at(7))).toBe(first);
+  });
+});
+
+describe('slide by overlap in the Roll (windsor#739)', () => {
+  it('slides into a note started while another pitch is held, not one that touches it', () => {
+    const notes = [
+      { tick: 0, ticks: 13, pitch: 45 },
+      { tick: 12, ticks: 12, pitch: 48 },
+      { tick: 24, ticks: 6, pitch: 50 },
+    ];
+    expect(play(roll(notes), 31)).toEqual([
+      '0:on:45',
+      '12:on:48~',
+      '13:off:45',
+      '24:off:48',
+      '24:on:50',
+      '30:off:50',
+    ]);
+  });
+
+  it('never slides notes of one tick into each other, but each slides from a note held across them', () => {
+    const chord = [60, 64].map((pitch) => ({ tick: 12, ticks: 6, pitch }));
+    expect(play(roll(chord), 13)).toEqual(['12:on:60', '12:on:64']);
+    const held = { tick: 0, ticks: 24, pitch: 40 };
+    expect(play(roll([held, ...chord]), 13)).toEqual(['0:on:40', '12:on:60~', '12:on:64~']);
+  });
+
+  it('retriggers a held pitch struck again, sliding it only while another pitch is held', () => {
+    // Alone, the retrigger slides from nothing: 'releases a held pitch before it strikes it again'.
+    const both = roll([
+      { tick: 0, ticks: 48, pitch: 40 },
+      { tick: 6, ticks: 6, pitch: 60 },
+      { tick: 12, ticks: 6, pitch: 60 },
+    ]);
+    expect(play(both, 13)).toEqual(['0:on:40', '6:on:60~', '12:off:60', '12:on:60~']);
+  });
+
+  it("holds nothing across the loop's wrap: a note cut at the loop's end is gone at tick 0", () => {
+    const notes = [
+      { tick: 0, ticks: 6, pitch: 62 },
+      { tick: 90, ticks: 48, pitch: 60 },
+    ];
+    expect(play(roll(notes), 97)).toEqual([
+      '0:on:62',
+      '6:off:62',
+      '90:on:60',
+      '96:off:60',
+      '96:on:62',
+    ]);
+  });
+
+  it('does not slide from a held note a live edit removes', () => {
+    const held = { tick: 0, ticks: 48, pitch: 60 };
+    const next = { tick: 12, ticks: 6, pitch: 64 };
+    const r = roll([held, next]);
+    play(r, 10);
+    r.reconfigure({ loopTicks: 96, notes: [next] });
+    expect(play(r, 13, 10)).toEqual(['10:off:60', '12:on:64']);
   });
 });
