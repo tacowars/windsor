@@ -73,7 +73,10 @@ describe('the bloom stage', () => {
     stage.set(next);
     expect(context.nodes.map((n) => n.outbound)).toEqual(edges);
     expect(values()).toEqual(bloomValues(next));
-    expect(bloomValues(next)).toMatchObject({ freeze: 1, key: 3, scale: 3, enabled: 0 });
+    // D♯ dorian: D♯ F F♯ G♯ A♯ C C♯, pitch classes 3 5 6 8 10 0 1, as one 12-bit set.
+    expect(bloomValues(next)).toMatchObject({ freeze: 1, pitches: 0b010101101011, enabled: 0 });
+    expect(bloomValues(next)).not.toHaveProperty('key');
+    expect(bloomValues(DEFAULT_BLOOM).pitches).toBe(4095);
   });
 
   it('hands out lanes for the numbers, enabled and freeze only', () => {

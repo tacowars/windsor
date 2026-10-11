@@ -17,32 +17,16 @@ export const BLOOM_NAME = 'bloom';
 /** The Octave control's intervals, in semitones (a stepped knob). */
 export const BLOOM_OCTAVES = [-12, 0, 7, 12, 19, 24] as const;
 
-/** Scale's root. */
-export const BLOOM_KEYS = [
-  'C',
-  'C#',
-  'D',
-  'D#',
-  'E',
-  'F',
-  'F#',
-  'G',
-  'G#',
-  'A',
-  'A#',
-  'B',
-] as const;
-
-/** Scale's choices; `chromatic` is off. The intervals are `BLOOM_SCALE_STEPS` (generator). */
-export const BLOOM_SCALES = [
-  'chromatic',
-  'major',
-  'minor',
-  'dorian',
-  'mixolydian',
-  'pentatonic-major',
-  'pentatonic-minor',
-] as const;
+/**
+ * Key and Scale reach the processor as one pitch set (windsor#728, record
+ * `2026-10-11-bloom-follows-the-song`): a 12-bit mask, bit p set when pitch
+ * class p (C = 0) is allowed. Every class allowed is chromatic, the default;
+ * the processor reads an empty set as every class. The lists Key and Scale
+ * pick from are Windsor's own (`bloomPitches.ts`), worked out on the main
+ * thread, so the worklet holds no scale table.
+ */
+export const BLOOM_PITCH_CLASSES = 12;
+export const BLOOM_PITCHES_ALL = (1 << BLOOM_PITCH_CLASSES) - 1;
 
 /**
  * Shape's corners, in order along its 0..4 morph (a continuous waveform
@@ -101,8 +85,9 @@ export const BLOOM_DEFAULTS = {
   enabled: true,
 };
 
-export const BLOOM_KEY_DEFAULT: (typeof BLOOM_KEYS)[number] = 'C';
-export const BLOOM_SCALE_DEFAULT: (typeof BLOOM_SCALES)[number] = 'chromatic';
+/** Key's and Scale's defaults: C, and `chromatic`, Scale's off (every pitch class). */
+export const BLOOM_KEY_DEFAULT = 'C';
+export const BLOOM_SCALE_DEFAULT = 'chromatic';
 
 /** The route's tunables (`worklet/bloom/bloomDsp.ts`). */
 export const BLOOM_DSP = {

@@ -12,9 +12,9 @@
  */
 // reads-by-path: packages/engine/src/worklet/generated/**, packages/engine/src/__fixtures__/**
 import { describe, expect, it } from 'vitest';
-import { bloomRig, renderBloom, tone } from '../__fixtures__/bloomHarness';
-import { BLOOM_OCTAVES, BLOOM_SCALES } from './bloomConstants';
-import type { BloomSpec } from './bloomSpec';
+import { bloomParams, bloomRig, renderBloom, tone } from '../__fixtures__/bloomHarness';
+import { BLOOM_OCTAVES } from './bloomConstants';
+import type { BloomScale, BloomSpec } from './bloomSpec';
 
 const RATE = 48000;
 const HZ = 250;
@@ -228,10 +228,10 @@ describe('bloom Key and Scale', () => {
     // [key, scale, what, input MIDI note, expected MIDI note]
     ['C', 'major', 'C♯4 → C4 (a tie goes down)', 61, 60],
     ['C', 'major', 'F♯4 → F4 (a tie goes down)', 66, 65],
-    ['C', 'minor', 'E4 → E♭4', 64, 63],
+    ['C', 'naturalMinor', 'E4 → E♭4', 64, 63],
     ['D', 'major', 'F4 → E4 (the key moves the scale)', 65, 64],
-    ['C', 'pentatonic-major', 'F4 → E4 (nearest, not a tie)', 65, 64],
-    ['C', 'pentatonic-major', 'F♯4 → G4 (nearest, up)', 66, 67],
+    ['C', 'pentatonicMajor', 'F4 → E4 (nearest, not a tie)', 65, 64],
+    ['C', 'pentatonicMajor', 'F♯4 → G4 (nearest, up)', 66, 67],
   ];
   for (const [k, scale, what, from, to] of cases) {
     it(`${k} ${scale}: ${what}`, () => {
@@ -265,11 +265,25 @@ describe('bloom Key and Scale', () => {
   });
 });
 
+/**
+ * Bloom's scales before windsor#728; every pitch set's corners, at every
+ * Octave and rate, are `bloomPitchSet.test.ts`'s.
+ */
+const ORIGINAL_SCALES: BloomScale[] = [
+  'chromatic',
+  'major',
+  'naturalMinor',
+  'dorian',
+  'mixolydian',
+  'pentatonicMajor',
+  'pentatonicMinor',
+];
+
 describe('bloom partials under Nyquist', () => {
   it('caps every band at every Octave, Key and Scale, at every rate, below 0.45 · rate even at its edge', () => {
     for (const rate of [44100, 48000, 96000]) {
       for (const octave of BLOOM_OCTAVES) {
-        for (const scale of BLOOM_SCALES) {
+        for (const scale of ORIGINAL_SCALES) {
           const rig = bloomRig({ octave, scale, key: 'F#' }, rate);
           const dsp = rig.processor.dsp as unknown as {
             generator: GeneratorInternals;
@@ -340,12 +354,11 @@ describe('bloom generator controls move without a click', () => {
       const rig = bloomRig({ mix: 1, ...before });
       const settled = rig.render(0.5 * RATE, tone(hz, 0.25, RATE));
       const steadyBefore = slew(settled.left, 0.3 * RATE, 0.5 * RATE);
+      const next = bloomParams({ mix: 1, ...before, ...after });
       const moved = rig.render(0.5 * RATE, tone(hz, 0.25, RATE), {
         onBlock: (frame, params) => {
           if (frame === 0)
-            for (const [field, value] of Object.entries(after))
-              params[field]![0] =
-                field === 'scale' ? BLOOM_SCALES.indexOf(value as never) : (value as number);
+            for (const [name, values] of Object.entries(next)) params[name]![0] = values[0]!;
         },
       });
       const steadyAfter = slew(moved.left, 0.3 * RATE, 0.5 * RATE);

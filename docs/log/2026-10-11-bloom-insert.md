@@ -57,6 +57,8 @@ the kind's constants files, one file a module.
    | Density | 0–100 % | 1 − 1/1.8 (1.8:1) | The shared compressor's ratio, 1/(1 − Density), with makeup pivoted at −12 dBFS so the layer doesn't move |
    | On | | on | The standard `enabled` switch, faded over `INSERT_SWITCH_FADE_S` |
 
+   Key and Scale: superseded in part by `2026-10-11-bloom-follows-the-song`.
+
 5. **The analysis** runs decimated, at the host rate over 4 (44.1, 48 kHz)
    or 8 (88.2, 96 kHz), about 12 kHz.
    - The input is summed to mono, (L + R)/2, and brought down by a cascade of

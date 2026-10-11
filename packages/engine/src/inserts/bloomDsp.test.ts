@@ -188,7 +188,7 @@ describe('the controls', () => {
       'shape',
       'bright',
       'focus',
-    ].concat(['density', 'low', 'high', 'octave', 'key', 'scale', 'freeze', 'enabled']);
+    ].concat(['density', 'low', 'high', 'octave', 'pitches', 'freeze', 'enabled']);
     expect(order.slice().sort()).toEqual(Object.keys(params).sort());
     const slots = processor.dsp.slots;
     expect(order.map((_, i) => slots[i])).toEqual(order.map((name) => params[name]![0]));

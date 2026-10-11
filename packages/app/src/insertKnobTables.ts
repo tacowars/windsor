@@ -16,6 +16,7 @@ import type {
 import {
   BLOOM_BOUNDS,
   BLOOM_OCTAVES,
+  BLOOM_SCALE_DEFAULT,
   BLOOM_SHAPES,
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -42,6 +43,7 @@ import type { KnobSpec } from './knob';
 import { knobRangeOf } from './patchKnobRange';
 import { DELAY_LINE_KNOBS, SPACE_KNOBS } from './returnControls';
 import type { SeqKnobOpts } from './sequencerKnobTables';
+import { KEY_OPTIONS } from './transportTables';
 
 /** What each kind is called on its card and in the Add picker. */
 export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
@@ -243,9 +245,22 @@ const fmtFocus = (v: number): string => `×${v.toFixed(2)}`;
 /** Bloom's Octave step in semitones, signed: `-12st`, `0st`, `+7st`. */
 export const fmtBloomOctave = (v: number): string => `${v > 0 ? '+' : ''}${v}st`;
 
-/** Bloom's Scale choices as the card names them: `pentatonic-major` reads `Pentatonic major`. */
-export const bloomScaleLabel = (scale: string): string =>
-  scale.charAt(0).toUpperCase() + scale.slice(1).replace('-', ' ');
+/**
+ * Bloom's Key picker (windsor#728): the transport's Key names, which are the
+ * spelling Bloom stores (`C` … `B`), so each is its own value.
+ */
+export const BLOOM_KEY_ITEMS: readonly (readonly [string, string])[] = KEY_OPTIONS.map(
+  ({ label }) => [label, label] as const,
+);
+
+/**
+ * Bloom's Scale picker: `chromatic`, Bloom's off, alone and first; the
+ * transport's scale groups (`SCALE_OPTION_GROUPS`) follow under their
+ * `<optgroup>`s, with the transport's names.
+ */
+export const BLOOM_SCALE_OFF_ITEMS: readonly (readonly [string, string])[] = [
+  [BLOOM_SCALE_DEFAULT, BLOOM_SCALE_DEFAULT],
+];
 
 /**
  * Low and High never cross (the approved mockup, windsor#711): a turn past

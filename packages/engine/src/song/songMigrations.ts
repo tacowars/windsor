@@ -72,17 +72,76 @@ const filterResoOnLogScale = (doc: RawDocument): RawDocument => doc;
  */
 const retroSizeOnLogScale = (doc: RawDocument): RawDocument => doc;
 
+/** bloom's Scale values renamed to Windsor's `SCALE_NAMES` at version 10 (windsor#728). */
+const BLOOM_SCALE_RENAMES: Readonly<Record<string, string>> = {
+  minor: 'naturalMinor',
+  'pentatonic-major': 'pentatonicMajor',
+  'pentatonic-minor': 'pentatonicMinor',
+};
+
+/** One insert entry with a bloom's Scale renamed, and a host's `slot` child through the same. */
+function renameBloomEntry(entry: unknown): unknown {
+  if (!isRecord(entry)) return entry;
+  let out = entry;
+  const scale = entry['scale'];
+  if (
+    entry['kind'] === 'bloom' &&
+    typeof scale === 'string' &&
+    Object.hasOwn(BLOOM_SCALE_RENAMES, scale)
+  )
+    out = { ...out, scale: BLOOM_SCALE_RENAMES[scale] };
+  if (isRecord(entry['slot'])) out = { ...out, slot: renameBloomEntry(entry['slot']) };
+  return out;
+}
+
+/** `holder` with its `inserts` chain renamed, when it is a record holding a list. */
+function renameBloomChain(holder: unknown): unknown {
+  if (!isRecord(holder) || !Array.isArray(holder['inserts'])) return holder;
+  return { ...holder, inserts: holder['inserts'].map(renameBloomEntry) };
+}
+
+/** Each value of a list or a record through `step`; anything else as it is. */
+function eachOf(value: unknown, step: (item: unknown) => unknown): unknown {
+  if (Array.isArray(value)) return value.map(step);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, step(item)]));
+}
+
 /**
- * Four upgrades ship, 5 → 6, 6 → 7, 7 → 8 and 8 → 9. Version 2 was retired by
- * #705, version 3 by windsor#238 (record `2026-10-01-retire-song-version-3`)
- * and version 4 by windsor#224, each with no upgrade, so a song saved at any
- * of them is refused.
+ * Version 9 → 10 (windsor#728, record `2026-10-11-bloom-follows-the-song`):
+ * bloom's Scale list became Windsor's `SCALE_NAMES`, so its `minor`,
+ * `pentatonic-major` and `pentatonic-minor` are renamed `naturalMinor`,
+ * `pentatonicMajor` and `pentatonicMinor` on every bloom in the song: each
+ * part's strip, each group's chain, the master's and each return's, and a
+ * host's `slot` child. The pitch classes are the same, so the song sounds as
+ * it did. A version-9 snapshot already holds the current patch format.
+ */
+function bloomScalesRenamed(doc: RawDocument): RawDocument {
+  const out: RawDocument = { ...doc };
+  if (Array.isArray(doc['parts']) || isRecord(doc['parts']))
+    out['parts'] = eachOf(doc['parts'], (part) =>
+      isRecord(part) && isRecord(part['strip'])
+        ? { ...part, strip: renameBloomChain(part['strip']) }
+        : part,
+    );
+  if (doc['groups'] !== undefined) out['groups'] = eachOf(doc['groups'], renameBloomChain);
+  if (doc['returns'] !== undefined) out['returns'] = eachOf(doc['returns'], renameBloomChain);
+  if (doc['master'] !== undefined) out['master'] = renameBloomChain(doc['master']);
+  return out;
+}
+
+/**
+ * Five upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9 and 9 → 10. Version 2 was
+ * retired by #705, version 3 by windsor#238 (record
+ * `2026-10-01-retire-song-version-3`) and version 4 by windsor#224, each
+ * with no upgrade, so a song saved at any of them is refused.
  */
 export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   5: snapshotToPatchFormatThree,
   6: snapshotToPatchFormatFour,
   7: filterResoOnLogScale,
   8: retroSizeOnLogScale,
+  9: bloomScalesRenamed,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

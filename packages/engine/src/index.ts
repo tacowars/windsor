@@ -683,11 +683,11 @@ export { DEFAULT_BLOOM } from './inserts/bloomSpec';
 export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';
 export {
   BLOOM_BOUNDS,
-  BLOOM_KEYS,
   BLOOM_OCTAVES,
-  BLOOM_SCALES,
+  BLOOM_SCALE_DEFAULT,
   BLOOM_SHAPES,
 } from './inserts/bloomConstants';
+export { pitchMask } from './inserts/bloomPitches';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeCore, TapeSpec } from './inserts/tapeSpec';
 export {

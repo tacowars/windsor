@@ -1,7 +1,9 @@
 /**
- * The generator's pitch stage (`bloomGenerator.ts`): Octave and Scale as a
- * ratio per band, R = octave · 2^(m/12) (`BLOOM_OCTAVE_RATIOS`; m the
- * semitones to the nearest scale note, ties down), and each sounding band's
+ * The generator's pitch stage (`bloomGenerator.ts`): Octave and the pitch
+ * set (Key and Scale, `pitches`) as a ratio per band, R = octave · 2^(m/12)
+ * (`BLOOM_OCTAVE_RATIOS`; m the semitones from the band's pitch class to the
+ * nearest one in the set, round the circle, ties down; `corrections`, written
+ * by `bloomMaskCorrections` at a retune), and each sounding band's
  * synthesis phase `wave` with |wave| = |u|, so the low-level darkening is the
  * same per partial at every pitch.
  *
@@ -24,7 +26,7 @@
  * counts retunes. No transcendental `Math`; no double crosses a call; every
  * double field is born NaN.
  */
-import { BLOOM_LOWEST_NOTE } from '../../inserts/bloomConstants';
+import { BLOOM_LOWEST_NOTE, BLOOM_PITCH_CLASSES } from '../../inserts/bloomConstants';
 import { BLOOM_BANDS } from '../../inserts/bloomBandsConstants';
 import { BLOOM_GENERATOR as C, BLOOM_OCTAVE_RATIOS } from '../../inserts/bloomGeneratorConstants';
 import { cosine, exp2, sine } from '../../inserts/tapePortableMath';
@@ -32,9 +34,8 @@ import type { BloomEnvelope } from './bloomEnvelope';
 import {
   BLOOM_GENERATOR_ATAN,
   BLOOM_GENERATOR_COSINE,
-  BLOOM_GENERATOR_DEGREES,
   BLOOM_GENERATOR_SINE,
-  bloomScaleCorrections,
+  bloomMaskCorrections,
 } from './bloomGeneratorMath';
 
 class BloomGeneratorPitch {
@@ -49,13 +50,17 @@ class BloomGeneratorPitch {
   stepIm: Float64Array;
   centreCos: Float64Array;
   centreSin: Float64Array;
-  /** e^{iω} of every note a band can be re-pitched to, from the lowest band − `reach`. */
+  /**
+   * e^{iω} of every note a band can be re-pitched to, from the lowest band −
+   * `reach`: `pitchReach`, the most any pitch set can move a band, fixed so
+   * every set reads inside the tables.
+   */
   noteCos: Float64Array;
   noteSin: Float64Array;
   reach: number;
   semitone: Float64Array;
+  /** Per pitch class (C = 0): the semitones to the nearest class in the set, for the set last retuned to. */
   corrections: Int32Array;
-  scales: number;
   partials: Int32Array;
   /** The phase each band is synthesised at, and mode 2's state. */
   waveRe: Float64Array;
@@ -89,10 +94,8 @@ class BloomGeneratorPitch {
     this.lastIm = new Float64Array(n);
     this.stamp = new Int32Array(n);
     this.clock = 2;
-    this.corrections = bloomScaleCorrections();
-    this.scales = this.corrections.length / BLOOM_GENERATOR_DEGREES;
-    let reach = 0;
-    for (const m of this.corrections) reach = Math.max(reach, Math.abs(m));
+    this.corrections = new Int32Array(BLOOM_PITCH_CLASSES);
+    const reach = C.pitchReach;
     this.reach = reach;
     const perOctave = BLOOM_BANDS.semitonesPerOctave;
     this.semitone = Float64Array.from({ length: 2 * reach + 1 }, (_, i) =>
@@ -110,17 +113,16 @@ class BloomGeneratorPitch {
     this.centreSin = this.noteSin.slice(reach, reach + n);
   }
 
-  /** Every band's mode, ratio, step and partial count for Octave step `octave`, `key` and `scale`. */
-  retune(octave: number, key: number, scale: number): void {
+  /** Every band's mode, ratio, step and partial count for Octave step `octave` and the pitch set `mask`. */
+  retune(octave: number, mask: number): void {
+    bloomMaskCorrections(mask, this.corrections);
     const ratio = BLOOM_OCTAVE_RATIOS[octave],
       num = ratio[0],
       den = ratio[1],
-      row = scale * BLOOM_GENERATOR_DEGREES,
       reach = this.reach,
-      degrees = BLOOM_GENERATOR_DEGREES;
+      classes = BLOOM_PITCH_CLASSES;
     for (let b = 0; b < BLOOM_BANDS.count; b++) {
-      const degree = (((BLOOM_LOWEST_NOTE + b - key) % degrees) + degrees) % degrees;
-      const m = this.corrections[row + degree];
+      const m = this.corrections[(BLOOM_LOWEST_NOTE + b) % classes];
       const r = (num / den) * this.semitone[m + reach];
       this.ratio[b] = r;
       this.power[b] = num;

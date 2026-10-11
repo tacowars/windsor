@@ -26,7 +26,7 @@ describe('the bloom spec', () => {
       bright: BLOOM_BOUNDS.bright[0],
       octave: -12,
       key: 'F#',
-      scale: 'pentatonic-minor',
+      scale: 'pentatonicMinor',
       low: 48,
       high: 72,
       focus: 0.5,
