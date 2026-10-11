@@ -7,7 +7,7 @@
 export const ENSEMBLE_NAME = 'ensemble';
 
 export const ENSEMBLE_BOUNDS = {
-  slowRate: [0.05, 2],
+  slowRate: [0.04, 2],
   slowDepth: [0, 4],
   fastRate: [2, 10],
   fastDepth: [0, 1],
