@@ -21,7 +21,7 @@ import type { Swing } from '@windsor/engine';
 import { songTicksOf } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
-import { el, html, select } from './dom';
+import { el, groupedSelect, html, select, type SelectGroup, type SelectOption } from './dom';
 import { isModifierKey, mergedGesture } from './gestureHooks';
 import { makeNumberBox } from './numberDrag';
 import { keyFacts, spaceAction } from './transportKeys';
@@ -57,7 +57,7 @@ import {
   KEY_OPTIONS,
   METER_LABEL,
   METER_OPTIONS,
-  SCALE_OPTIONS,
+  SCALE_OPTION_GROUPS,
   SWING_GRID_LABEL,
   SWING_GRID_OPTIONS,
   SWING_KNOB,
@@ -194,9 +194,9 @@ function keyPickers(ctx: AppCtx): HTMLElement[] {
     if (ctx.change(keyChange(Number(value))).ok) ctx.render();
   });
   const current = typeof scale === 'string' ? scale : CUSTOM_SCALE;
-  const options = [...SCALE_OPTIONS];
-  if (current === CUSTOM_SCALE) options.push({ value: CUSTOM_SCALE, label: CUSTOM_SCALE });
-  const scalePick = select('Scale', options, current, (name) => {
+  const items: (SelectOption | SelectGroup)[] = [...SCALE_OPTION_GROUPS];
+  if (current === CUSTOM_SCALE) items.push({ value: CUSTOM_SCALE, label: CUSTOM_SCALE });
+  const scalePick = groupedSelect('Scale', items, current, (name) => {
     const partial = scaleChange(name);
     if (partial && ctx.change(partial).ok) ctx.render();
   });

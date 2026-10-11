@@ -28,6 +28,44 @@ describe('chordTheory', () => {
     ]);
   });
 
+  it('stacks the harmonic and melodic minor triads, augmented III included (windsor#721)', () => {
+    expect(qualities(SCALES.harmonicMinor, 3)).toEqual([
+      'min',
+      'dim',
+      'aug',
+      'min',
+      'maj',
+      'maj',
+      'dim',
+    ]);
+    expect(qualities(SCALES.melodicMinor, 3)).toEqual([
+      'min',
+      'min',
+      'aug',
+      'maj',
+      'maj',
+      'dim',
+      'dim',
+    ]);
+  });
+
+  it('builds a full triad on every degree of the 5- and 6-note scales (windsor#721)', () => {
+    for (const scale of [
+      SCALES.hirajoshi,
+      SCALES.japaneseIn,
+      SCALES.minorBlues,
+      SCALES.wholeTone,
+    ]) {
+      for (let degree = 0; degree < scale.length; degree++) {
+        const stack = chordTones(scale, degree, 3);
+        expect(stack).toHaveLength(3);
+        expect(stack[1]!).toBeGreaterThan(stack[0]!);
+        expect(stack[2]!).toBeGreaterThan(stack[1]!);
+      }
+    }
+    expect(qualities(SCALES.wholeTone, 3).every((q) => q === 'aug')).toBe(true);
+  });
+
   it('knows the natural minor, dorian, mixolydian and lydian sets', () => {
     expect(qualities(SCALES.naturalMinor, 3)).toEqual([
       'min',

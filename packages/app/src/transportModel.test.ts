@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   ARRANGEMENT_VERSION,
+  SCALE_NAMES,
   BARS_MAX,
   BPM_MAX,
   BPM_MIN,
@@ -54,6 +55,7 @@ import {
   NUMBER_DRAG_THRESHOLD_PX,
   METER_OPTIONS,
   SCALE_OPTIONS,
+  SCALE_OPTION_GROUPS,
   SWING_GRID_OPTIONS,
   SWING_KNOB,
   TAP_TEMPO,
@@ -155,6 +157,15 @@ describe("the strip's writes", () => {
       'B',
     ]);
     expect(SCALE_OPTIONS.every((o) => scaleChange(o.value) !== null)).toBe(true);
+    expect(SCALE_OPTIONS).toHaveLength(SCALE_NAMES.length);
+    expect(SCALE_OPTION_GROUPS.map((g) => g.group)).toEqual([
+      'Modes',
+      'Minor',
+      'Pentatonic',
+      'Blues',
+      'Symmetric',
+    ]);
+    expect(SCALE_OPTIONS.find((o) => o.value === 'naturalMinor')?.label).toBe('minor');
   });
 });
 
