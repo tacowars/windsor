@@ -16,13 +16,16 @@
      as the browser read them; so are the Song tab's tools (.seg.auto-tools),
      curve (.auto-line, .auto-fill, .auto-dot), buttons (.auto-btn), drag
      readout (.readout) and Shape popover (.shape-pop), which are drawn as
-     they are. What is new, the ENV toggle, the target picker and its list,
-     the zero line and the tools column, is in the "envelope mode" block of
-     the stylesheet and the script.
-     Self-contained apart from the fonts. What works: the ENV toggle, the
-     picker (pick, mark, switch on and off, delete), the tools with E, D and
-     S, the roll's Snap, and the Shape tool (drag a range, then the
-     popover's shapes, sliders, Cancel and Apply). The curves are drawings:
+     they are. What is new, the Envelopes tab, its controls (the target
+     picker and its list, the switch and ✕), the zero line and the layer
+     over the note pane, is in the "envelope mode" block of the stylesheet
+     and the script. Round 2 of tacowars's review (2026-10-11): the
+     Envelopes tab swaps the controls column, and the keys column stays
+     44 px with no toggle.
+     Self-contained apart from the fonts. What works: the Notes and
+     Envelopes tabs, the picker (pick, mark, switch on and off, delete), the
+     tools with E, D and S, the roll's Snap on both tabs, and the Shape tool
+     (drag a range, then the popover's shapes, sliders, Cancel and Apply). The curves are drawings:
      Edit and Draw don't edit them. The roll's own controls are inert
      copies. Nothing makes sound. -->
 <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
@@ -215,31 +218,22 @@ select.field { width: 100%; max-width: 260px; background: var(--inset); border: 
 .shape-note { margin-right: auto; font-size: 11px; color: var(--ink-faint); }
 
 /* ---------- envelope mode: what this mockup adds ---------- */
-.roll-device { --renv-col-w: 112px; --renv-tools-w: 176px; --lane-c: var(--carrier); }
+.roll-device { --lane-c: var(--carrier); }
 .roll-grid { position: relative; }
-/* Today's panes land in these cells by the grid's auto-flow; named here so the envelope layers can share them. */
+/* Today's panes land in these cells by the grid's auto-flow; named here so the envelope layer can share them. */
 .roll-corner { grid-area: 1 / 1; } .roll-head { grid-area: 1 / 2; } .roll-keys { grid-area: 2 / 1; }
 .roll-body { grid-area: 2 / 2; } .roll-vcorner { grid-area: 3 / 1; } .roll-vel { grid-area: 3 / 2; }
-/* The toggle at the top of the keys column, over the top rows. */
-.renv-toggle {
-  grid-row: 2; grid-column: 1; align-self: start; z-index: 3; margin: 2px;
-  height: var(--roll-ctl-h); display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0;
-  background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r);
-  color: var(--ink-dim); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
-}
-.renv-toggle svg { width: 11px; height: 8px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; flex: none; }
-.renv-toggle:hover { color: var(--ink); border-color: var(--ink-faint); }
-.renv-toggle[aria-pressed="true"] { background: var(--carrier); border-color: var(--carrier); color: var(--inset); }
-/* On: the column widens and holds the toggle, the picker, and the envelope's switch and ✕. */
-.env-on.seq-device.roll-device { min-width: calc(var(--roll-min-w) + var(--renv-tools-w) + var(--renv-col-w) - var(--roll-keys-w)); }
-.env-on .roll-grid { grid-template-columns: var(--renv-col-w) minmax(0, 1fr); }
-.env-on .roll-keys { visibility: hidden; }
+/* The tab row: Notes · Envelopes, drawn as the Figure card's tabs (.figure-tabs button). */
+.roll-tabs button { height: 17px; padding: 2px 8px; background: transparent; border: 0; border-radius: var(--r) var(--r) 0 0; color: var(--ink-faint); font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; line-height: 1.1; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.roll-tabs button:hover { color: var(--ink); }
+.roll-tabs button[aria-selected='true'] { background: var(--carrier); color: var(--inset); }
+/* Envelopes: the notes dim and stop responding under the envelope. */
 .env-on .roll-notes { opacity: 0.3; pointer-events: none; }
-.renv-col {
-  grid-row: 2; grid-column: 1; z-index: 2; min-height: 0; overflow: hidden;
-  display: flex; flex-direction: column; gap: 4px; padding: 26px 4px 4px;
-  background: var(--panel-hi); border-right: 1px solid var(--line);
-}
+/* The Envelopes tab's controls: the same column, the same width as the note controls they replace. */
+.roll-ctl-cols[hidden], .renv-ctl[hidden], .renv-layer[hidden] { display: none; }
+.renv-ctl { display: grid; grid-template-columns: var(--roll-ctl-w) var(--roll-ctl-w); column-gap: var(--roll-ctl-gap); row-gap: 5px; align-content: start; }
+.renv-ctl .renv-span { grid-column: 1 / -1; }
+.renv-ctl .auto-hint { flex: none; margin: 0; font-size: 10.5px; line-height: 1.35; }
 .renv-pick {
   display: flex; align-items: center; gap: 5px; width: 100%; height: var(--roll-ctl-h); padding: 0 16px 0 5px;
   background: var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E") no-repeat right 6px center;
@@ -249,11 +243,12 @@ select.field { width: 100%; max-width: 260px; background: var(--inset); border: 
 .renv-pick .nm { overflow: hidden; text-overflow: ellipsis; }
 .renv-pick.none { color: var(--ink-faint); }
 .renv-pick .auto-chip { height: 12px; margin: 0; flex: none; }
+.renv-at { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .renv-row { display: flex; align-items: center; gap: 3px; min-width: 0; }
-.renv-kind { min-width: 0; padding-left: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-num); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
-.renv-val { flex: 1; min-width: 0; overflow: hidden; font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--lane-c); white-space: nowrap; }
+.renv-row .auto-count { margin-left: 3px; line-height: 11px; }
+.renv-kind { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-num); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); }
+.renv-val { min-width: 0; overflow: hidden; font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--lane-c); white-space: nowrap; }
 .renv-val.off { color: var(--ink-faint); }
-.renv-col .auto-count { margin-top: auto; line-height: 12px; }
 /* The envelope over the notes pane: the curve across the loop, ghosted over the repeats. */
 .renv-layer { grid-row: 2; grid-column: 2; position: relative; z-index: 2; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .renv-layer[data-tool="edit"] { cursor: crosshair; }
@@ -265,11 +260,6 @@ select.field { width: 100%; max-width: 260px; background: var(--inset); border: 
 .renv-ghost { opacity: var(--roll-ghost); }
 .renv-off { opacity: 0.32; }
 .renv-layer .readout { top: auto; }
-/* The tools column, after the roll's two. */
-.renv-tools[hidden], .renv-col[hidden], .renv-layer[hidden] { display: none; }
-.seq-section.renv-tools { width: var(--renv-tools-w); gap: 6px; }
-.renv-tools .auto-hint { flex: none; font-size: 10.5px; line-height: 1.35; }
-.renv-tools .renv-snapnote { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); }
 /* The picker's list: the marked targets first, then the voice sections. */
 .renv-list {
   --lane-c: var(--carrier); position: absolute; z-index: 20; width: 214px; max-height: 300px; overflow-y: auto; overscroll-behavior: contain;
@@ -331,23 +321,23 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
   <header class="top">
     <div class="eyebrow">Windsor · Roll mockup · windsor#700</div>
     <h1>Clip envelopes in the Roll</h1>
-    <p class="lede">A roll carries up to four <b>clip envelopes</b>: voice automation that loops with the roll's loop and travels with its region, as in Ableton Live's clip view. The <b>ENV</b> toggle at the top of the keys column switches the note pane into envelope mode. The column then holds a <b>picker</b> of the voice targets, and the chosen target's envelope is drawn over the notes, which dim and stop responding. The Song tab's <b>Edit, Draw and Shape</b> tools (<kbd>E</kbd> <kbd>D</kbd> <kbd>S</kbd>) and its Shape popover edit it, on the roll's own Snap. Values run −1..1: the middle line is 0, the patch's own setting, and the readout shows the offset.</p>
-    <p class="lede">Each Roll below is live: <b>try the toggle, the picker, the tools, and the Shape tool</b> (drag a range across the pane). The curves are drawings. Everything but the toggle, the picker, the tools column and the curve is today's Roll, copied from the app.</p>
+    <p class="lede">A roll carries up to four <b>clip envelopes</b>: voice automation that loops with the roll's loop and travels with its region, as in Ableton Live's clip view. The card's tab row reads <b>Notes · Envelopes</b>. The <b>Envelopes</b> tab swaps the note controls for the envelope controls, in the same column and the same width: the roll's <b>Snap</b> first, as on Notes, then a <b>picker</b> of the voice targets with the envelope's switch and ✕, then the Song tab's <b>Edit, Draw and Shape</b> tools (<kbd>E</kbd> <kbd>D</kbd> <kbd>S</kbd>) with their hint. The chosen target's envelope is drawn over the note pane, whose notes dim and stop responding; the keys column keeps its 44 px and its keys. The Shape popover is the Song tab's. Values run −1..1: the middle line is 0, the patch's own setting, and the readout shows the offset.</p>
+    <p class="lede">Each Roll below is live: <b>try the tabs, the picker, the tools, and the Shape tool</b> (drag a range across the pane). The curves are drawings. Everything but the Envelopes tab, its controls and the curve is today's Roll, copied from the app; the Notes tab is today's controls, unchanged.</p>
     <nav class="states" aria-label="States">
       <a href="#s1">1 · today</a><a href="#s2">2 · empty</a><a href="#s3">3 · Draw</a><a href="#s4">4 · Edit</a><a href="#s5">5 · Shape</a><a href="#s6">6 · three envelopes</a><a href="#s7">7 · slots full</a><a href="#s8">8 · Expand</a><a href="#questions">questions</a>
     </nav>
   </header>
 
   <section class="state" id="s1"><h2><span class="n">1</span>Today's Roll, for comparison</h2>
-    <p>The Pad's Roll as the app draws it today: a 2-bar loop in a 4-bar region, the repeats hatched. No toggle.</p>
+    <p>The Pad's Roll as the app draws it today: a 2-bar loop in a 4-bar region, the repeats hatched. One tab, Notes.</p>
     <div class="rack seq-rack" data-state="today"></div></section>
 
   <section class="state pad-list" id="s2"><h2><span class="n">2</span>Envelope mode, no envelope yet</h2>
-    <p><b>ENV</b> is on. The keys column widens and becomes the envelope column: the toggle, then the picker, open on the voice targets. The pane is empty but for the flat 0 line, the patch's own setting. The notes dim; the tools column joins the roll's controls. Switch ENV off to see the toggle at rest in today's 44 px keys column.</p>
+    <p>The <b>Envelopes</b> tab is selected. The controls column holds Snap, the picker, open on the voice targets, and the tools, in the width the note controls had. The pane is empty but for the flat 0 line, the patch's own setting, and the notes dim. The keys column is today's. Pick <b>Notes</b> to see today's controls come back.</p>
     <div class="rack seq-rack" data-state="empty"></div></section>
 
   <section class="state" id="s3"><h2><span class="n">3</span>A Cutoff envelope drawn with Draw</h2>
-    <p>Drawn across the loop on the 1/16 Snap. Past the loop, over the hatched repeats, it is ghosted as the notes are. The column shows the target, its section, its switch and ✕, and its value at the cursor.</p>
+    <p>Drawn across the loop on the 1/16 Snap. Past the loop, over the hatched repeats, it is ghosted as the notes are. Under the picker, the controls show the target's section, its value at the cursor, its switch and ✕.</p>
     <div class="rack seq-rack" data-state="draw"></div></section>
 
   <section class="state" id="s4"><h2><span class="n">4</span>Edit: a point dragged</h2>
@@ -367,7 +357,7 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
     <div class="rack seq-rack" data-state="full"></div></section>
 
   <section class="state" id="s8"><h2><span class="n">8</span>The same Roll in Expand</h2>
-    <p>Expanded, the rows are 15 px and the envelope has the height to work in. The column and the tools are the same.</p>
+    <p>Expanded, the rows are 15 px and the envelope has the height to work in. The tabs and the controls column are the same.</p>
     <div class="wide-scroll"><div class="wide-frame rack" data-state="wide">
       <div class="roll-overlay-head"><span class="roll-overlay-title">Pad — Roll</span><span class="roll-overlay-note">Expanded · Esc closes</span></div>
     </div></div></section>
@@ -375,10 +365,7 @@ nav.states a:hover { color: var(--ink); border-color: var(--line-bright); }
   <section class="choices" id="questions" aria-label="Questions">
     <h2>Questions for tacowars</h2>
     <ol>
-      <li><b>The toggle's look and place.</b> Drawn as a small ENV button at the top of the keys column, over the top two key rows in the device. The alternative is the corner above the keys, which today names the guide chord.</li>
-      <li><b>The notes in envelope mode.</b> Drawn at 30 % and inert, so the envelope reads against the music. The alternative is hiding them.</li>
-      <li><b>The column widens.</b> In envelope mode the keys column goes from 44 to 112 px and the keys give way to the picker, so target names fit. The alternative keeps 44 px and opens the picker only as a list over the pane.</li>
-      <li><b>The tools column.</b> Edit, Draw and Shape sit in a third column after the roll's two, with the tool's hint. The roll's controls are unchanged, and Snap stays the roll's.</li>
+      <li><b>The notes on the Envelopes tab.</b> Drawn at 30 % and inert, so the envelope reads against the music. The alternative is hiding them.</li>
       <li><b>A bend handle.</b> The Song tab has none: you drag the line. State 4 draws a stand-in diamond. Draw one here and on the Song tab, or keep the Song tab's way?</li>
     </ol>
   </section>
@@ -452,7 +439,10 @@ const STATES = {
 /* ---------- today's device markup, as the app built it ---------- */
 const RAIL = `<div class="seq-rail"><span class="seq-dot" aria-hidden="true"></span><button class="seq-name" type="button" title="Fold the Roll device to its rail, or open it" aria-expanded="true">Roll</button><span class="seq-rail-spacer"></span><button class="seq-icon seq-line-icon roll-expand" type="button" title="Expand: open the roll wide" aria-label="Expand"><span class="seq-icon-svg"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7"></path></svg></span></button><span class="seq-rail-gap"></span><span class="seq-region" title="Region 1 of 1">1/1</span><button class="seq-icon seq-line-icon" type="button" title="Split the region in two at its middle bar" aria-label="Split the region in two at its middle bar"><span class="seq-icon-svg"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="3" width="4" height="6" rx="1"></rect><rect x="7" y="3" width="4" height="6" rx="1"></rect><path d="M6 1v10" stroke-dasharray="1.5 1.5"></path></svg></span></button><button class="seq-icon seq-line-icon danger" type="button" title="Delete this region, leaving a rest" aria-label="Delete this region, leaving a rest"><span class="seq-icon-svg"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"></path></svg></span></button></div>`;
 const RAIL_WIDE = RAIL.replace('M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7', 'M6.8 1.8v3.4h3.4M10.5 1.5 6.8 5.2M5.2 10.2V6.8H1.8M1.5 10.5l3.7-3.7').replace('title="Expand: open the roll wide" aria-label="Expand"', 'title="Close the wide view (Esc)" aria-label="Close wide view"');
-const TABS = `<div class="roll-tabs" role="tablist" aria-label="Roll pages"><span class="roll-tab" role="tab" aria-selected="true">Notes</span><span class="roll-summary">2-bar loop in a 4-bar region · 14 notes · A minor · snap 1/16</span></div>`;
+const SUMMARY = '<span class="roll-summary">2-bar loop in a 4-bar region · 14 notes · A minor · snap 1/16</span>';
+const TABS_TODAY = `<div class="roll-tabs" role="tablist" aria-label="Roll pages"><span class="roll-tab" role="tab" aria-selected="true">Notes</span>${SUMMARY}</div>`;
+// New: the second tab. The buttons are drawn as the Figure card's tabs.
+const TABS = `<div class="roll-tabs" role="tablist" aria-label="Roll pages"><button type="button" role="tab" data-page="notes">Notes</button><button type="button" role="tab" data-page="env">Envelopes</button>${SUMMARY}</div>`;
 const snapOptions = ['1/4', '1/8', '1/8T', '1/16', '1/16T', '1/32', 'Off'].map((l, i) => `<option value="${i}"${i === 3 ? ' selected' : ''}>${l}</option>`).join('');
 const CONTROLS = rows => `<div class="seq-section roll-controls"><div class="roll-ctl-cols"><div class="roll-ctl"><div class="roll-item"><span class="field-label">Snap</span><select class="field" name="snap" aria-label="Snap">${snapOptions}</select></div><div class="roll-item"><span class="field-label roll-loop-label">Loop<em>≤ 4 bars</em></span><div class="roll-stepper"><button class="roll-step" type="button" aria-label="Shorter loop" title="Shorter loop">−</button><span class="roll-readout">2 bars</span><button class="roll-step" type="button" aria-label="Longer loop" title="Longer loop">+</button></div></div><div class="roll-item"><span class="field-label">Keys</span><div class="seg roll-seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">12</button><button type="button" aria-pressed="false">Scale</button></div></div><div class="roll-item"><span class="field-label">Fold</span><div class="seg roll-seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">All</button><button type="button" aria-pressed="false">Fold</button></div></div><div class="roll-item"><span class="field-label roll-loop-label">Quantise<em>to 1/16</em></span><button class="roll-qbtn" type="button">All notes</button></div></div><div class="roll-ctl"><div class="knob" role="img" style="--knob-color: #5FA8A0;" aria-label="Vel 0.80"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 33.82 16.65"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(81 19 19)"></line></svg><span class="knob-val">0.80</span><span class="knob-label">Vel</span></div><div class="roll-item"><span class="field-label">Zoom</span><div class="roll-zooms"><i title="Horizontal zoom">↔</i><div class="roll-stepper"><button class="roll-step" type="button" aria-label="Zoom out in time">−</button><button class="roll-step roll-fit on" type="button" aria-label="Fit the region to the width">fit</button><button class="roll-step" type="button" aria-label="Zoom in in time">+</button></div><i title="Vertical zoom">↕</i><div class="roll-stepper"><button class="roll-step" type="button" aria-label="Shorter rows">−</button><span class="roll-readout">${rows} px/row</span><button class="roll-step" type="button" aria-label="Taller rows">+</button></div></div></div><div class="roll-item"><span class="field-label">Audition</span><div class="seg roll-seg" style="--seg-color: #5FA8A0;"><button type="button" aria-pressed="true">On</button><button type="button" aria-pressed="false">Off</button></div></div><div class="roll-item rec-item"><span class="field-label roll-loop-label">Rec<em class="rec-state"></em></span><div class="seg roll-seg rec-seg"><button class="rec-off" type="button" aria-pressed="true">Off</button><button class="rec-on" type="button" aria-pressed="false"><i class="rec-dot"></i>Rec</button></div><span class="rec-hint">No region under the playhead</span></div></div></div></div>`;
 
@@ -505,7 +495,6 @@ const splice = (pts, a, b, mid) => [...pts.filter(p => p.tick < a), ...mid, ...p
 /* ---------- dom ---------- */
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const px = n => `${n}px`;
-const ENV_ICON = '<svg viewBox="0 0 11 8" aria-hidden="true"><path d="M.5 7.5 L3 1.5 L6 5 L10.5 .5"/></svg>';
 const devices = [];
 let active = null;
 
@@ -527,14 +516,13 @@ class Roll {
     dev.style.setProperty('--kc', '#5FA8A0');
     const body = el('div', 'seq-device-body roll-device-body');
     body.setAttribute('style', ROLL_COLORS);
-    body.innerHTML = TABS;
+    body.innerHTML = this.spec.today ? TABS_TODAY : TABS;
     const page = el('div', 'roll-page');
     page.innerHTML = CONTROLS(this.rowPx);
-    this.tools = el('div', 'seq-section renv-tools');
     const main = el('div', 'seq-section roll-main');
     this.grid = el('div', 'roll-grid');
     main.append(this.grid);
-    page.append(this.tools, main);
+    page.append(main);
     body.append(page);
     dev.innerHTML = this.wide ? RAIL_WIDE : RAIL;
     dev.append(body);
@@ -554,16 +542,21 @@ class Roll {
     this.grid.append(this.corner, this.head, this.keys, this.body, el('div', 'roll-vcorner', 'VEL'), this.vel);
     this.body.addEventListener('scroll', () => this.sync());
     for (const f of [this.head, this.keys, this.vel]) f.addEventListener('wheel', e => this.forward(e), { passive: false });
-    if (this.spec.today) { this.tools.hidden = true; return; }
-    // Envelope mode: the toggle, the column, the layer and the tools.
-    this.toggle = el('button', 'renv-toggle', ENV_ICON + '<span>Env</span>');
-    this.toggle.type = 'button';
-    this.toggle.title = 'Envelopes: draw voice automation over the notes, looping with the roll';
-    this.toggle.onclick = () => { this.env = !this.env; this.listOpen = this.env && this.envs.length === 0; this.closePop(); this.render(); };
-    this.col = el('div', 'renv-col');
+    if (this.spec.today) return;
+    // The Envelopes tab: its controls in the controls column, and the layer over the note pane.
+    this.tabs = [...body.querySelectorAll('.roll-tabs button[data-page]')];
+    for (const t of this.tabs) t.onclick = () => {
+      const env = t.dataset.page === 'env';
+      if (env === this.env) return;
+      this.env = env; this.listOpen = env && this.envs.length === 0; this.sel = null; this.closePop(); this.render();
+    };
+    this.noteCols = page.querySelector('.roll-ctl-cols');
+    this.snapItem = this.snapSel.closest('.roll-item');
+    this.ctl = el('div', 'renv-ctl');
+    this.noteCols.after(this.ctl);
     this.layer = el('div', 'renv-layer');
     this.layer.addEventListener('wheel', e => this.forward(e), { passive: false });
-    this.grid.append(this.col, this.layer, this.toggle);
+    this.grid.append(this.layer);
     this.wireLayer();
     dev.addEventListener('pointerenter', () => { active = this; });
   }
@@ -579,12 +572,13 @@ class Roll {
   render() {
     this.dev.classList.toggle('env-on', this.env);
     if (this.spec.today) { this.paint(); return; }
-    this.toggle.setAttribute('aria-pressed', String(this.env));
-    this.toggle.setAttribute('aria-label', this.env ? 'Envelopes on' : 'Envelopes');
-    this.tools.hidden = !this.env; this.col.hidden = !this.env; this.layer.hidden = !this.env;
+    for (const t of this.tabs) t.setAttribute('aria-selected', String((t.dataset.page === 'env') === this.env));
+    this.noteCols.hidden = this.env; this.ctl.hidden = !this.env; this.layer.hidden = !this.env;
+    // One Snap, the roll's: the same select, first in whichever page is shown.
+    if (this.env) this.ctl.prepend(this.snapItem); else this.noteCols.querySelector('.roll-ctl').prepend(this.snapItem);
     this.paint();
     if (!this.env) { this.closeList(); this.closePop(); return; }
-    this.renderTools(); this.renderCol(); this.drawEnv();
+    this.renderCtl(); this.drawEnv();
     if (this.listOpen) this.openList(); else this.closeList();
     if (this.sel && this.sel.done !== false && this.tool === 'shape') this.openPop();
   }
@@ -639,23 +633,11 @@ class Roll {
     this.sync();
   }
 
-  /* ---------- the tools column ---------- */
-  renderTools() {
-    const entry = TOOLS.find(t => t.tool === this.tool);
-    this.tools.innerHTML = `<div class="roll-item"><span class="field-label">Tool</span><div class="seg auto-tools" role="group" aria-label="Tool">${TOOLS.map(t => `<button type="button" data-tool="${t.tool}" title="${t.label} (${t.key.toUpperCase()})" aria-pressed="${t.tool === this.tool}">${t.label}</button>`).join('')}</div></div><p class="auto-hint" style="margin:0">${entry.hint}</p><span class="renv-snapnote">Snap: the roll's</span>`;
-    this.tools.querySelectorAll('button[data-tool]').forEach(b => b.onclick = () => this.setTool(b.dataset.tool));
-    this.layer.dataset.tool = this.tool;
-  }
-  setTool(tool) {
-    this.tool = tool;
-    if (tool !== 'shape') { this.sel = null; this.closePop(); }
-    this.renderTools(); this.drawEnv();
-  }
-
-  /* ---------- the column: toggle, picker, switch and ✕ ---------- */
-  renderCol() {
+  /* ---------- the Envelopes tab's controls: Snap, the picker, switch and ✕, the tools ---------- */
+  renderCtl() {
     const e = this.current(), t = e && TARGETS.get(e.target);
-    this.col.replaceChildren();
+    for (const n of [...this.ctl.children]) if (n !== this.snapItem) n.remove();
+    const pickItem = el('div', 'roll-item', '<span class="field-label">Envelope</span>');
     const pick = el('button', 'renv-pick' + (e ? '' : ' none'));
     pick.type = 'button';
     pick.setAttribute('aria-haspopup', 'listbox');
@@ -664,9 +646,10 @@ class Roll {
     pick.title = 'The envelope shown: pick a voice target';
     pick.onclick = () => { this.listOpen = !this.listOpen; this.render(); };
     this.pickBtn = pick;
-    this.col.append(pick);
+    pickItem.append(pick);
+    const at = el('div', 'renv-at'), row = el('div', 'renv-row');
+    const count = el('span', 'auto-count', `Env ${this.envs.length}/${ENVELOPES_MAX}<br>Voice ${this.slotsUsed()}/${SLOTS_MAX}`);
     if (e) {
-      const row = el('div', 'renv-row');
       const on = el('button', 'auto-btn' + (e.on ? ' on' : ''), '●');
       on.type = 'button'; on.setAttribute('aria-pressed', String(e.on)); on.setAttribute('aria-label', 'Envelope on');
       on.title = e.on ? 'Switch this envelope off' : 'Switch this envelope on';
@@ -674,13 +657,24 @@ class Roll {
       const del = el('button', 'auto-btn', '×');
       del.type = 'button'; del.setAttribute('aria-label', `Delete the ${e.target} envelope`); del.title = 'Delete this envelope';
       del.onclick = () => { this.envs = this.envs.filter(x => x !== e); this.cur = this.envs[0]?.target ?? null; this.drag = undefined; this.bendMark = undefined; this.closePop(); this.sel = null; this.render(); };
-      const at = this.hover ?? 0;
-      const val = el('span', 'renv-val' + (e.on ? '' : ' off'), e.on ? offsetText(e.target, valueAt(e.points, at % LOOP)) : 'off');
+      const hx = this.hover ?? 0;
+      const val = el('span', 'renv-val' + (e.on ? '' : ' off'), e.on ? offsetText(e.target, valueAt(e.points, hx % LOOP)) : 'off');
       val.title = 'The offset at the pointer';
-      row.append(val, on, del);
-      this.col.append(el('span', 'renv-kind', t.group), row);
+      at.append(el('span', 'renv-kind', t.group), val);
+      row.append(on, del);
     }
-    this.col.append(el('span', 'auto-count', `Env ${this.envs.length}/${ENVELOPES_MAX}<br>Voice ${this.slotsUsed()}/${SLOTS_MAX}`));
+    row.append(count);
+    const entry = TOOLS.find(x => x.tool === this.tool);
+    const tools = el('div', 'roll-item renv-span', `<span class="field-label">Tool</span><div class="seg auto-tools" role="group" aria-label="Tool">${TOOLS.map(x => `<button type="button" data-tool="${x.tool}" title="${x.label} (${x.key.toUpperCase()})" aria-pressed="${x.tool === this.tool}">${x.label}</button>`).join('')}</div>`);
+    tools.querySelectorAll('button[data-tool]').forEach(b => b.onclick = () => this.setTool(b.dataset.tool));
+    this.ctl.append(pickItem, at, row, tools, el('p', 'auto-hint renv-span', entry.hint));
+    this.layer.dataset.tool = this.tool;
+  }
+  setTool(tool) {
+    this.tool = tool;
+    if (tool !== 'shape') { this.sel = null; this.closePop(); }
+    this.renderCtl(); this.drawEnv();
+    if (this.listOpen) this.openList();
   }
 
   /* ---------- the picker's list ---------- */
@@ -786,7 +780,7 @@ class Roll {
     const tickAt = ev => { const r = this.layer.getBoundingClientRect(); return clamp((ev.clientX - r.left + this.body.scrollLeft) / this.ppt, 0, LOOP); };
     const snap = t => { const g = this.snapTicks(); return clamp(Math.round(t / g) * g, 0, LOOP); };
     this.layer.addEventListener('pointermove', ev => {
-      if (!dragging) { this.hover = tickAt(ev); if (this.current()) { const v = this.col.querySelector('.renv-val'); const e = this.current(); if (v && e.on) v.textContent = offsetText(e.target, valueAt(e.points, this.hover)); } return; }
+      if (!dragging) { this.hover = tickAt(ev); if (this.current()) { const v = this.ctl.querySelector('.renv-val'); const e = this.current(); if (v && e.on) v.textContent = offsetText(e.target, valueAt(e.points, this.hover)); } return; }
       this.sel.b = snap(tickAt(ev)); this.drawEnv();
     });
     this.layer.addEventListener('pointerdown', ev => {
@@ -871,13 +865,13 @@ window.addEventListener('resize', () => { cancelAnimationFrame(pending); pending
 /* E, D and S pick a tool on the Roll under the pointer, as on the Song tab; Escape closes a list or the popover. */
 window.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-  if (e.key === 'Escape') { for (const d of devices) { if (d.listOpen) { d.listOpen = false; d.closeList(); d.renderCol(); } if (d.pop) { d.sel = null; d.closePop(); d.drawEnv(); } } return; }
+  if (e.key === 'Escape') { for (const d of devices) { if (d.listOpen) { d.listOpen = false; d.closeList(); d.renderCtl(); } if (d.pop) { d.sel = null; d.closePop(); d.drawEnv(); } } return; }
   const t = TOOLS.find(x => x.key === e.key.toLowerCase());
   if (!t || !active || !active.env) return;
   e.preventDefault(); active.setTool(t.tool);
 });
 document.addEventListener('pointerdown', e => {
-  for (const d of devices) if (d.listOpen && d.list && !d.list.contains(e.target) && !d.pickBtn?.contains(e.target)) { d.listOpen = false; d.closeList(); d.renderCol(); }
+  for (const d of devices) if (d.listOpen && d.list && !d.list.contains(e.target) && !d.pickBtn?.contains(e.target)) { d.listOpen = false; d.closeList(); d.renderCtl(); }
 });
 })();
 </script>
