@@ -2,14 +2,16 @@
  * The lane toolbar (windsor#349 decisions 1 and 6; the mockup
  * `docs/design/automation-lanes-mockup.html`): above the Song lanes while any
  * part is folded open, the Edit, Draw and Shape tools, the Snap select and the
- * tool's hint. The tool and the snap are the view's state, kept for the
- * session and never written to the document.
+ * tool's hint. The tool and the snap are the host's tool state
+ * (`automationEditHost.ts`, windsor#706): on the Song tab the view's, kept
+ * for the session and never written to the document.
  *
  * E, D and S pick the tools while the Song tab shows the toolbar and no field
  * has focus. The audition keyboard plays on the Parts tab alone
  * (`keyboard.ts`'s `qwertyPlaysOn`), so a tool switch never sounds a note.
  */
 import { TICKS_PER_BAR } from '@windsor/engine';
+import type { AutomationToolState } from './automationEditHost';
 import { el } from './dom';
 import {
   AUTOMATION_TOOLS,
@@ -17,7 +19,6 @@ import {
   type AutomationTool,
   type AutomationToolEntry,
 } from './songAutomationTables';
-import type { SongViewState } from './songTab';
 
 const FIELD_TAGS: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
 
@@ -39,7 +40,7 @@ export function toolForKey(
 }
 
 /** Show `state`'s tool: the pressed button, the hint, and the lanes' cursor. */
-export function syncAutomationTool(root: ParentNode, state: SongViewState): void {
+export function syncAutomationTool(root: ParentNode, state: AutomationToolState): void {
   for (const button of root.querySelectorAll<HTMLElement>('.auto-tools button')) {
     button.setAttribute('aria-pressed', String(button.dataset['tool'] === state.automationTool));
   }
@@ -56,7 +57,7 @@ export function syncAutomationTool(root: ParentNode, state: SongViewState): void
  * another tool, windsor#350). Snap's Bar is the song's bar, `barTicks` (windsor#430).
  */
 export function automationToolbar(
-  state: SongViewState,
+  state: AutomationToolState,
   root: () => ParentNode,
   onPick: () => void = () => undefined,
   barTicks: number = TICKS_PER_BAR,
@@ -113,7 +114,7 @@ export function automationToolbar(
  */
 export function wireToolKeys(
   body: HTMLElement,
-  state: SongViewState,
+  state: AutomationToolState,
   onPick: () => void = () => undefined,
 ): void {
   window.addEventListener('keydown', (e) => {

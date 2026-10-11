@@ -21,10 +21,10 @@ import type { AutomationPoint, AutomationTargetRow } from '@windsor/engine';
 import { switchValue, valueAt } from '@windsor/engine';
 import { movePoint, strokeTo, type StrokePosition } from './songAutomationEdit';
 
-/** A Draw stroke's grain: its cell in ticks, inside the song. */
+/** A Draw stroke's grain: its cell in ticks, inside the axis (windsor#706). */
 export interface StrokeGrain {
   readonly ticks: number;
-  readonly songTicks: number;
+  readonly axisTicks: number;
 }
 
 const point = (tick: number, value: number): AutomationPoint => ({ tick, value, bend: 0 });
@@ -79,13 +79,13 @@ export function switchStrokePoints(
   samples: ReadonlyMap<number, number>,
   grain: StrokeGrain,
 ): AutomationPoint[] {
-  const cells = [...samples.keys()].filter((t) => t < grain.songTicks).sort((a, b) => a - b);
+  const cells = [...samples.keys()].filter((t) => t < grain.axisTicks).sort((a, b) => a - b);
   const lo = cells[0];
   const last = cells[cells.length - 1];
   if (lo === undefined || last === undefined) return [...original];
-  const end = Math.min(last + grain.ticks, grain.songTicks);
+  const end = Math.min(last + grain.ticks, grain.axisTicks);
   const drawn = cells.map((tick) => point(tick, samples.get(tick)!));
-  const back = end < grain.songTicks ? [point(end, valueAt(row, original, end))] : [];
+  const back = end < grain.axisTicks ? [point(end, valueAt(row, original, end))] : [];
   return switchSteps([
     ...original.filter((p) => p.tick < lo),
     ...drawn,

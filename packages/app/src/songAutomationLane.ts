@@ -23,7 +23,9 @@
  * step. The value readouts are handed back as `Readout`s, which the view's
  * one playhead loop calls with each new tick (decision 7), so a lane's value
  * follows the playhead without a repaint. The rules are
- * `songAutomationModel.ts`, the geometry `songAutomationCurve.ts`.
+ * `songAutomationModel.ts`, the geometry `songAutomationCurve.ts`. The
+ * curve, its gestures and its Shape range run over the Song view's
+ * automation host (`songAutomationHost.ts`, windsor#706).
  */
 import type {
   AutomationLane,
@@ -34,12 +36,14 @@ import type {
   Region,
 } from '@windsor/engine';
 import { valueAt } from '@windsor/engine';
+import { hostCurveFrame, type AutomationEditHost } from './automationEditHost';
 import { readout } from './automationReadout';
 import { el } from './dom';
 import { withGesture } from './gestureHooks';
 import { curveShape } from './songAutomationCurve';
 import { withPoints } from './songAutomationEdit';
 import { wireLaneEditing } from './songAutomationGesture';
+import { songAutomationHost } from './songAutomationHost';
 import {
   currentValue,
   laneActivity,
@@ -62,7 +66,7 @@ import {
 } from './songAutomationOwner';
 import { AUTOMATION_DRAWING, LANE_KIND_COLOR } from './songAutomationTables';
 import type { SongView } from './songTab';
-import { SONG_VIEW, tickToPx } from './songViewTables';
+import { tickToPx } from './songViewTables';
 
 /** A lane's value cell, set to the lane's value at a song tick. */
 export type Readout = (songTick: number) => void;
@@ -104,20 +108,17 @@ function miniButton(text: string, label: string, focusKey: string): HTMLButtonEl
   return button;
 }
 
-/** Draw `points` into `box`: the fill, the line and the dots, at the view's zoom. */
-function paintCurve(
-  view: SongView,
+/** Draw `points` into `box`: the fill, the line and the dots, at the host's zoom, the axis wide. */
+export function paintCurve(
+  host: AutomationEditHost,
   box: SVGElement,
   row: AutomationTargetRow,
   points: readonly AutomationPoint[],
 ): void {
-  const px = view.state.pxPerBar;
-  const bar = view.ticksPerBar();
-  const widthPx = tickToPx(view.songTicks(), px, bar);
-  const heightPx = SONG_VIEW.automationLanePx;
-  const shape = curveShape(row, points, { widthPx, heightPx, pxPerBar: px, ticksPerBar: bar });
-  box.setAttribute('width', String(widthPx));
-  box.setAttribute('height', String(heightPx));
+  const frame = hostCurveFrame(host);
+  const shape = curveShape(row, points, frame);
+  box.setAttribute('width', String(frame.widthPx));
+  box.setAttribute('height', String(frame.heightPx));
   box.replaceChildren(
     svg('path', { class: 'auto-fill', d: shape.area }),
     svg('path', { class: 'auto-line', d: shape.line }),
@@ -150,8 +151,9 @@ function laneTimeline(
   if (!row) return timeline;
   const switched = row.scale === 'switch';
   timeline.classList.toggle('switch', switched);
+  const host = songAutomationHost(view);
   const box = svg('svg', { 'aria-hidden': 'true' });
-  paintCurve(view, box, row, lane.points);
+  paintCurve(host, box, row, lane.points);
   timeline.appendChild(box);
   const name = row.label;
   const points = (): readonly AutomationPoint[] =>
@@ -161,19 +163,19 @@ function laneTimeline(
     commitLanes(view, live, withPoints(lanesOf(live), lane.target, next), { label });
   };
   wireLaneEditing({
-    view,
+    host,
     timeline,
     row,
     name,
     points,
-    draw: (next) => paintCurve(view, box, row, next),
+    draw: (next) => paintCurve(host, box, row, next),
     commit,
   });
   // The Shape tool's range (windsor#350): a drag selects a range, and the popover stamps it.
   // A switch lane is offered no shape (windsor#631): it holds two levels, and a shape ramps.
   if (switched) return timeline;
   view.shape.attach({
-    view,
+    host,
     key: `${ownerKey(owner)}:${lane.target}`,
     timeline,
     row,
