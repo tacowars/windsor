@@ -48,14 +48,16 @@ is a measured claim.
   both tank-diffusion knobs. Any loss that remains is corrected by a
   measured table, not a guessed factor.
 - **The low band:** `lowDecay` (a multiplier on Decay) and `lowCross` (Hz),
-  named and ranged as the retro reverb's, and built the same way
+  named as the retro reverb's, and built the same way
   (`worklet/retro/retroLowBand.ts`): a first-order shelf from a one-pole
   lowpass and its complement at each gain point. The shelf is exactly the
   low gain at DC and exactly the line's gain at Nyquist, so `lowDecay` 1 is
-  today's path.
-- **Higher crossovers count too.** With `lowCross` in the kHz, the split
-  becomes "everything but the top rings longer", a second way to darken a
-  tail without filtering it. The range should reach about 10 kHz.
+  today's path. `lowDecay` takes the retro reverb's range (0.25 to 4).
+- **`lowCross` reaches higher than the retro reverb's.** Its range is 80 Hz
+  to 10 kHz, where the retro reverb's stops at 2 kHz
+  (`RETRO_REVERB_BOUNDS`). With `lowCross` in the kHz, the split becomes
+  "everything but the top rings longer", a second way to darken a tail
+  without filtering it.
 - **Keep `tankLowCut` and `tankHighCut`.** The low cut is a rumble guard,
   and the high cut stays the plate's main darkening control.
 - **HOLD** keeps its own gain (`HOLD_DECAY`) and bypasses the low band.
