@@ -11,6 +11,11 @@
  * cell's does (`partNoteOn`); absent is 1, and a note at 0 is silent, as a
  * Figure cell at 0 is a rest.
  *
+ * A roll may carry clip envelopes (`envelopes`, windsor#701, epic
+ * windsor#699): voice-target curves in the same loop-local ticks, which
+ * `rollEnvelope.ts` types, checks and evaluates. Absent or empty is none,
+ * and the performer below does not read them.
+ *
  * This file is the field set, its defaults, the check and the performer
  * (windsor#600); the normaliser is `song/rollNormalise.ts`, which also keeps
  * the notes sorted and free of same-pitch overlaps.
@@ -37,6 +42,7 @@ import { ticksPerBar } from './meter';
 import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
+import { assertRollEnvelopes, type RollEnvelope } from './rollEnvelope';
 import { TICKS_PER_BAR, type Unsubscribe } from './scheduler';
 
 /** The longest loop, and so one past the latest onset: `BARS_MAX` bars of 4/4. */
@@ -58,6 +64,11 @@ export interface RollSequencerConfig {
   loopTicks: number;
   /** 0..`ROLL_NOTES_MAX` notes, sorted by `tick` then `pitch`. */
   notes: readonly RollNote[];
+  /**
+   * 0..`ROLL_ENVELOPES_MAX` clip envelopes, each on its own voice target;
+   * absent is none, and the normaliser writes an empty list as absent.
+   */
+  envelopes?: readonly RollEnvelope[];
 }
 
 /** An empty roll looping one bar of `meter` (4/4 when absent). */
@@ -99,6 +110,7 @@ export function assertRollConfig(config: RollSequencerConfig): void {
     throw new RangeError(`notes must be a list of at most ${ROLL_NOTES_MAX}`);
   }
   config.notes.forEach(assertRollNote);
+  if (config.envelopes !== undefined) assertRollEnvelopes(config.envelopes);
 }
 
 /** A pitch no note holds. */

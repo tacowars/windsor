@@ -1,0 +1,104 @@
+{
+  "transport": {
+    "bpm": 120,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 0,
+    "scale": "major"
+  },
+  "patches": {
+    "init-0": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Pad",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 192
+        },
+        {
+          "start": 192,
+          "duration": 192,
+          "pattern": {
+            "kind": "roll",
+            "loopTicks": 96,
+            "notes": [
+              {
+                "tick": 0,
+                "ticks": 96,
+                "pitch": 62
+              }
+            ],
+            "envelopes": [
+              {
+                "target": "macros.0.value",
+                "on": false,
+                "points": [
+                  {
+                    "tick": 0,
+                    "value": 1,
+                    "bend": 0
+                  },
+                  {
+                    "tick": 95,
+                    "value": -1,
+                    "bend": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "sequencer": {
+        "kind": "roll",
+        "loopTicks": 192,
+        "notes": [
+          {
+            "tick": 0,
+            "ticks": 192,
+            "pitch": 60
+          }
+        ],
+        "envelopes": [
+          {
+            "target": "filter.cutoff",
+            "on": true,
+            "points": [
+              {
+                "tick": 0,
+                "value": 0,
+                "bend": 0
+              },
+              {
+                "tick": 47.5,
+                "value": 0.75,
+                "bend": -0.5
+              },
+              {
+                "tick": 96,
+                "value": -0.25,
+                "bend": 0
+              },
+              {
+                "tick": 300,
+                "value": 1,
+                "bend": 0
+              }
+            ]
+          },
+          {
+            "target": "ops.1.level",
+            "on": true,
+            "points": []
+          }
+        ]
+      }
+    }
+  ]
+}
