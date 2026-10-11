@@ -3,15 +3,25 @@
  * the fixture's drone part (slot 3, Vel 0.8) played as a Roll in a 4-bar song.
  * A loop repeats across its region and is cut by the region's end, a note's
  * velocity scales the part's, a seek chases nothing, live edits play on
- * without a restart, and the playhead is the loop tick.
+ * without a restart, and the playhead is the loop tick. An overlap slides
+ * (windsor#739): the player's calls, replayed on an `AudioPart` into a mono
+ * processor, keep one voice, retargeted, through the slid-from note's off.
  */
 import { describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT, onlyParts, withPart } from '../__fixtures__/fullArrangement';
 import { rig, type Rig } from '../__fixtures__/playerRig';
 import type { Call } from '../__fixtures__/recordingPart';
+import {
+  loadProcessor,
+  render,
+  type ProcessorLike,
+  type ScheduledEvent,
+} from '../__fixtures__/workletHarness';
+import { makeEnvelope, makePatch } from '../patch/patch';
 import type { RollNote } from '../sequencing/rollSequencer';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { AudioPart } from '../synth/audioPart';
 import type { ArrangementPartial, PartRegion } from './arrangement';
 
 const BAR = TICKS_PER_BAR;
@@ -46,6 +56,49 @@ function played(r: Rig, from = 0): string[] {
         `${Math.round((c.time ?? 0) / perTick)}:${c.kind === 'noteOn' ? 'on' : 'off'}:${c.note}`,
     );
 }
+
+const BLOCK = 128;
+
+/** One sine carrier sustaining at full level, mono: the patch a slide acts on. */
+const MONO = makePatch({
+  mono: true,
+  glide: 0,
+  ops: [
+    {
+      level: 1,
+      env: makeEnvelope({ attackTime: 0.005, decayTime: 0.005, peakLevel: 1, sustainLevel: 1 }),
+    },
+    { level: 0 },
+    { level: 0 },
+    { level: 0 },
+  ],
+});
+
+/** The part's calls replayed on an `AudioPart`: the worklet messages they post, in order. */
+function posted(calls: readonly Call[]): ScheduledEvent[] {
+  const sent: ScheduledEvent[] = [];
+  const node = {
+    context: { currentTime: 0, sampleRate: 48000 },
+    port: { postMessage: (m: ScheduledEvent) => void sent.push(m) },
+    parameters: { get: () => ({ value: 0 }) },
+  } as unknown as AudioWorkletNode;
+  const part = new AudioPart('drone', node, MONO);
+  for (const c of calls) {
+    if (c.kind === 'noteOn') part.noteOn(c.note ?? 0, c.velocity, c.time, c.extras);
+    if (c.kind === 'noteOffByNote') part.noteOffByNote(c.note ?? 0, c.time);
+  }
+  return sent;
+}
+
+interface Voice {
+  active: boolean;
+  gate: boolean;
+  voiceId: number;
+  note: number;
+}
+
+const gated = (processor: ProcessorLike): Voice[] =>
+  (processor.voices as unknown as Voice[]).filter((v) => v.active && v.gate);
 
 describe('a Roll through the player (windsor#600)', () => {
   it("plays a chord on one tick at the note's velocity times the part's", () => {
@@ -124,5 +177,44 @@ describe('a Roll through the player (windsor#600)', () => {
     expect([0, BAR, BAR + 83, BAR + 84, 3 * BAR].map((t) => r.player.stepAt(drone, t))).toEqual([
       -1, 0, 83, 0, -1,
     ]);
+  });
+
+  it("slides a mono voice into an overlap, and the slid-from note's off leaves it sounding", () => {
+    const r = rollRig([
+      { tick: 0, ticks: 24, pitch: 50 },
+      { tick: 12, ticks: 24, pitch: 55 },
+    ]);
+    ticks(r, 37);
+    expect(played(r)).toEqual(['0:on:50', '12:on:55', '24:off:50', '36:off:55']);
+    const ons = r.parts.drone.calls.filter((c) => c.kind === 'noteOn');
+    expect(ons.map((c) => c.extras?.slide === true)).toEqual([false, true]);
+
+    // The calls' messages into a mono processor, rendered up to each tick asked for.
+    const events = posted(r.parts.drone.calls);
+    const loaded = loadProcessor();
+    const processor = loaded.create(MONO, 4);
+    let done = 0;
+    const renderTo = (t: number): void => {
+      const blocks = Math.ceil((t * r.transport.secondsPerTick * 48000) / BLOCK) - done;
+      const from = done * BLOCK;
+      const due = events.filter((e) => e.frame >= from && e.frame < from + blocks * BLOCK);
+      render(
+        loaded,
+        processor,
+        blocks,
+        due.map((e) => ({ ...e, frame: e.frame - from })),
+      );
+      done += blocks;
+    };
+    renderTo(6);
+    const [voice] = gated(processor);
+    expect([voice?.voiceId, voice?.note]).toEqual([1, 50]);
+    // Past the slid-from note's off on 24: the same voice, retargeted to the slid-to handle.
+    renderTo(30);
+    expect(gated(processor)).toEqual([voice]);
+    expect([voice?.voiceId, voice?.note]).toEqual([2, 55]);
+    // The slid-to note's own off on 36 releases it.
+    renderTo(40);
+    expect(gated(processor)).toEqual([]);
   });
 });

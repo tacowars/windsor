@@ -1,8 +1,8 @@
 # Bounce to Roll, and slide by overlap in the Roll
 
 - **Date:** 2026-10-11
-- **Status:** proposed (decisions agreed with tacowars on 2026-10-11; the
-  mockup awaits approval)
+- **Status:** accepted (decisions agreed with tacowars on 2026-10-11; the
+  mockup approved by tacowars on 2026-10-11)
 - **Links:** this record's issue, windsor#732 · the mockup,
   `docs/research/2026-10-11-bounce-to-roll-mockup/mockup.html` · the Roll
   record `2026-10-04-roll-sequencer` · region patterns in
