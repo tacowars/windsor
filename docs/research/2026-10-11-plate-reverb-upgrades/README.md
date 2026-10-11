@@ -2,8 +2,8 @@
 
 Written 2026-10-11. A proposal: nothing here is built or measured yet. It
 covers the Dattorro plate in `packages/engine/src/worklet/reverb/` (the
-`room` return and the Plate insert) and lists seven changes. Each one
-becomes its own ticket. Every value below is a starting point, to be tuned
+`room` return and the Plate insert) and lists seven changes and a new
+preset bank to show them off. Each one becomes its own ticket. Every value below is a starting point, to be tuned
 by ear and checked with the measurements listed under each item. None of it
 is a measured claim.
 
@@ -41,6 +41,7 @@ is a measured claim.
   loses 60 dB over Decay seconds along the delay it precedes:
   `g = 10^(−3·L / (Decay·fs))`, where `L` is that segment's length in
   samples at the current Size. Size then changes the room, not the tail.
+  The range is the retro reverb's, 0.2 to 20 s.
 - **The loss is charged on every segment.** If all the loss sits at a
   single point, energy held in the all-passes skips it, and the tail
   outlasts the setting by an amount that grows with the delay lengths. The
@@ -51,8 +52,8 @@ is a measured claim.
   named as the retro reverb's, and built the same way
   (`worklet/retro/retroLowBand.ts`): a first-order shelf from a one-pole
   lowpass and its complement at each gain point. The shelf is exactly the
-  low gain at DC and exactly the line's gain at Nyquist, so `lowDecay` 1 is
-  today's path. `lowDecay` takes the retro reverb's range (0.25 to 4).
+  low gain at DC and exactly the line's gain at Nyquist, so at `lowDecay` 1
+  the band does nothing. `lowDecay` takes the retro reverb's range (0.25 to 4).
 - **`lowCross` reaches higher than the retro reverb's.** Its range is 80 Hz
   to 10 kHz, where the retro reverb's stops at 2 kHz
   (`RETRO_REVERB_BOUNDS`). With `lowCross` in the kHz, the split becomes
@@ -63,8 +64,9 @@ is a measured claim.
 - **HOLD** keeps its own gain (`HOLD_DECAY`) and bypasses the low band.
 - **Format:** `decay` changes meaning, so `ARRANGEMENT_VERSION` bumps.
   Converting an old gain to seconds depends on Size and the diffusion
-  settings, so an upgrade would need a measured table. Proposed: no upgrade,
-  and every `SPACES` row is retuned in seconds.
+  settings, so an upgrade would need a measured table. Proposed: no upgrade.
+  Until item 8 replaces them, the `SPACES` rows are converted to seconds
+  from each one's measured T30 today.
 - **Measure:** octave-band T30 against Decay and `lowDecay`, over the whole
   Size and diffusion ranges, including the corners (Size 0.05 and 4, decay
   at both ends of its new range, tank diffusion 0.8).
@@ -150,7 +152,8 @@ is a measured claim.
   less diffusion in the tank so early reflections stay distinct.
 - **The room needs items 1 and 2.** Rooms live at short decays with their
   own low-band behaviour, and their character is in the early field.
-- **Starting points for `SPACES`,** all in seconds after item 1:
+- **Starting points for the voicings,** all in seconds after item 1. Item
+  8's presets are built from them:
 
   | Space | Decay | Low band | Pre-delay | Top | Diffusion | Build |
   |---|---|---|---|---|---|---|
@@ -158,7 +161,7 @@ is a measured claim.
   | Wood room | ~1.3 s | ×0.8 below ~800 Hz | 0 | ~5.5 kHz | full | ~0.1 |
   | Small hard room | ~0.6 s | ×1.25 | ~4 ms | ~9 kHz | input and tank low | 0 |
   | Drum plate | 0.5–1.2 s | ×1.5 below several kHz | 0–10 ms | dark, 3–5 kHz | full | 0–0.1 |
-  | Vocal plate | 0.7–1.2 s | ×1–1.2 | 0–20 ms | shelved from ~5 kHz | input low | 0.15–0.2 |
+  | Vocal plate | 0.7–1.2 s | ×1–1.2 | 0–20 ms | ~5 kHz | input low | 0.15–0.2 |
   | Large plate | 2–2.6 s | ×0.8–1.5 | 10–15 ms | open | full | 0 |
   | Swelling plate | 1.5–2 s | ×1 | 0–10 ms | open | input lower | ~0.5 |
 
@@ -168,6 +171,68 @@ is a measured claim.
   `room` row moves to the room voicing is decided when it's tuned.
 - **Measure:** first arrival, early density, and the T30 of each voicing
   across Size.
+
+### 8. A new preset bank
+
+- **It replaces `SPACES`.** Today's six spaces (`plate`, `room`, `hall`,
+  `cathedral`, `wash`, `shimmer`) give way to a bank of 27, built like the
+  retro reverb's (`inserts/retroReverbPresets.ts`): each preset has a
+  number, a label and a group, and writes every sound field. Mix and the
+  on/off switch stay the user's. The Starting point picker lists the bank
+  by group.
+- **Format:** none. A song stores the values, never a preset name, so
+  replacing the bank changes no saved song.
+- **The names follow the retro bank's theme,** rave and club nights, and
+  reuse none of its twenty.
+- **What it covers:** everyday presets to reach for first, and at least one
+  preset that shows off each of items 1 to 5 and 7.
+- **The default carries over.** Today's default is the `hall` space: a new
+  Plate insert starts there (`PLATE_REVERB_SPACE_DEFAULT`), and so does send
+  bus A. It becomes **Resident**, the new default. Its Decay is today's
+  measured T30 at size 1.4 and decay 0.78, and its new fields sit where they
+  change least. Items 3 to 5 still change its render, so it is checked by
+  ear against a render of today's `hall` on the same material.
+- **Today's other five each have a successor:** `plate` → House Plate,
+  `room` → Back Room, `cathedral` → Old Mill, `wash` → Last Train,
+  `shimmer` → White Label.
+
+| # | Preset | Group | Voicing | Decay | Use, and what it shows |
+|---|---|---|---|---|---|
+| 1 | Resident | Everyday | plate | today's `hall` | The default send: today's sound, carried over |
+| 2 | House Plate | Everyday | plate | ~1.6 s | The all-round plate |
+| 3 | Main Room | Everyday | room | ~1 s | The all-round room |
+| 4 | Back Room | Everyday | room | ~0.6 s | A small room that glues a mix |
+| 5 | Warm-up | Everyday | plate | ~1.1 s | Dark (top ~4 kHz): sits behind anything |
+| 6 | Booth | Everyday | room | ~0.35 s | A tiny, close ambience; Build 0 |
+| 7 | Mic Check | Everyday | plate | ~1 s | Vocals: ~20 ms pre-delay, low input diffusion |
+| 8 | Long Set | Everyday | plate | ~3 s | A smooth, everyday long tail |
+| 9 | Dubplate | Drums | plate | ~0.9 s | Bright and instant: Build 0 and the dense taps (items 2, 5) |
+| 10 | Rewind | Drums | plate | ~1.6 s | A big snare plate whose top dies first: lows ×1.5 below ~5 kHz (item 1) |
+| 11 | Club Toilets | Drums | room | ~0.6 s | Hard tiles: very small, low diffusion (item 7) |
+| 12 | Railway Arch | Drums | room | ~0.5 s | A brick snare room: dark, ~12 ms pre-delay, lows ×1.3 |
+| 13 | Cloakroom | Drums | room | ~1.2 s | Coats soak up the bass: lows ×0.8 (item 1) |
+| 14 | Stairwell | Drums | room | ~1.3 s | Tall and narrow: panned hats keep their side (item 3) |
+| 15 | Sound Clash | Drums | plate | ~1.2 s | Wide, for panned percussion (item 3) |
+| 16 | Acetate | Pads & leads | plate | ~1.8 s | Swells in: Build ~0.5 (item 2) |
+| 17 | White Label | Pads & leads | plate | ~2.5 s | Clean and bright, light modulation, for leads (item 4) |
+| 18 | Euphoria | Pads & leads | plate | ~3.5 s | Lush: deeper, irregular modulation (item 4) |
+| 19 | Hands in the Air | Pads & leads | plate | ~4 s | A slow swell for big chords: Build high (item 2) |
+| 20 | Breakdown | Pads & leads | plate | ~3 s | Dark pads under a breakdown: Build ~0.8 |
+| 21 | Sunrise Set | Pads & leads | plate | ~4 s | Warm: lows ×1.4 |
+| 22 | Afters | Ambient | plate | ~6 s | Long and dark |
+| 23 | Last Train | Ambient | plate | ~8 s | A wash |
+| 24 | Comedown | Ambient | plate | ~5 s | Heavy: dark top, lows ×1.8 |
+| 25 | Old Mill | Ambient | room | ~4 s | The biggest room the voicing reaches, at full Size |
+| 26 | Lights Up | Ambient | plate | ~5 s | Bright and fading, Build mid: the end of the night |
+| 27 | Sound System | Ambient | plate | ~4 s | Dub: the bass blooms, lows ×2 below ~300 Hz |
+
+- **Voiced by measurement, then by ear.** As with the retro bank, each
+  preset is rendered at Mix 1 through the shipped processor on a drum loop,
+  a pad chord and a lead line, for its RT60, level, spectrum and peak, and
+  the bank's levels are matched before tacowars's listen. The figures above
+  are aims, and the values in the table file are the measured outcome.
+- **Measure:** each preset's T30, level against Resident, and peak, in the
+  table file's header.
 
 ## Out of scope
 
@@ -187,9 +252,12 @@ is a measured claim.
 4. Item 4.
 5. Item 5.
 6. Item 7, once items 1 and 2 have landed.
+7. Item 8, last, once every item it shows off has landed.
 
-Every item except item 6 changes the plate's render, so
+Every item from 1 to 7 except item 6 changes the plate's render, so
 `mixer/reverbGolden.test.ts` pins a new one, and each PR is `reviewed`: it
 waits for tacowars's listen on the preview. Each brief asks for a sweep over
 every parameter's whole range up front. CPU figures go beside each PR's
-research note, naming the machine and the backend.
+research note, naming the machine and the backend. Item 8 is `reviewed`
+too: its presets are sound design and the picker changes, so it waits for
+tacowars's listen and look.
