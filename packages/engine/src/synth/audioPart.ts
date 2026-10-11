@@ -45,6 +45,8 @@ export class AudioPart {
   private patchValue: Patch;
   /** Which voice target each slot moves, by patch path; null for a free slot. */
   private readonly slotPaths: (string | null)[];
+  /** Per slot, whether its offset of 0 plays the patch's own value (`VoiceSlotsMessage.relative`). */
+  private readonly slotRelative: boolean[];
   private nextId = 1;
   /** note -> live handles, oldest first. Both maps are kept in step by forget(). */
   private readonly heldByNote = new Map<number, number[]>();
@@ -52,12 +54,16 @@ export class AudioPart {
   /** Note messages kept back instead of posted while held (`holdNotes`); null when not. */
   private held: ScheduledMessage[] | null = null;
 
-  /** `voiceSlots` is the slot map the processor was built with (`ProcessorOptions.voiceSlots`). */
+  /**
+   * `voiceSlots` is the slot map the processor was built with
+   * (`ProcessorOptions.voiceSlots`), and `voiceSlotsRelative` its flags.
+   */
   constructor(
     name: string,
     node: AudioWorkletNode,
     patch: Patch,
     voiceSlots?: readonly (string | null)[],
+    voiceSlotsRelative?: readonly boolean[],
   ) {
     this.name = name;
     this.node = node;
@@ -71,6 +77,7 @@ export class AudioPart {
       requireParam(node, voiceSlotParamName(i)),
     );
     this.slotPaths = Array.from({ length: FM_LANES_MAX }, (_, i) => voiceSlots?.[i] ?? null);
+    this.slotRelative = Array.from({ length: FM_LANES_MAX }, (_, i) => !!voiceSlotsRelative?.[i]);
   }
 
   get patch(): Patch {
@@ -207,13 +214,23 @@ export class AudioPart {
    * The slot that moves the voice target at `path` (windsor#346): the one it
    * has, or the first free one, which the processor is told of. Undefined
    * when every slot is taken; a song holds at most `FM_LANES_MAX` voice lanes.
+   * `relative` is whether the slot's offset of 0 plays the patch's own value,
+   * as a clip envelope's alone does (windsor#718), not a lane's floor; the
+   * processor is told when it changes on a slot already held.
    */
-  takeVoiceSlot(path: string): number | undefined {
+  takeVoiceSlot(path: string, relative = false): number | undefined {
     const held = this.voiceSlotOf(path);
-    if (held !== undefined) return held;
+    if (held !== undefined) {
+      if (this.slotRelative[held] !== relative) {
+        this.slotRelative[held] = relative;
+        this.schedule(this.slotMessage());
+      }
+      return held;
+    }
     const free = this.slotPaths.indexOf(null);
     if (free < 0) return undefined;
     this.slotPaths[free] = path;
+    this.slotRelative[free] = relative;
     this.schedule(this.slotMessage());
     return free;
   }
@@ -223,11 +240,15 @@ export class AudioPart {
     const slot = this.voiceSlotOf(path);
     if (slot === undefined) return;
     this.slotPaths[slot] = null;
+    this.slotRelative[slot] = false;
     this.schedule(this.slotMessage());
   }
 
+  /** The slot map, with its `relative` flags only while a slot has one: a lane's map is as before. */
   private slotMessage(): VoiceSlotsMessage {
-    return { type: 'voiceSlots', slots: [...this.slotPaths] };
+    const message: VoiceSlotsMessage = { type: 'voiceSlots', slots: [...this.slotPaths] };
+    if (this.slotRelative.includes(true)) message.relative = [...this.slotRelative];
+    return message;
   }
 
   /** Hard stop with no release tails. Clicks; for teardown, not playback. */

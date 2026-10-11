@@ -43,8 +43,9 @@
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
  * clamped nor passed through a curve, except that a decay time or an LFO
- * rate a slot maps plays at least its row's floor (1 ms, 0.02 Hz:
- * `partFloors`, windsor#347, windsor#419); and a part
+ * rate a lane's slot maps plays at least its row's floor (1 ms, 0.02 Hz:
+ * `partFloors`, windsor#347, windsor#419); a slot the slot map marks
+ * `relative`, a clip envelope's alone, floors nothing (windsor#718); and a part
  * with no slot mapped reads no slot and floors nothing, so a song without
  * voice lanes renders bit for bit as before (`fmProcessorGolden.test.ts`,
  * `fmProcessorKernel.test.ts`). Functions over the voice, one call a control
@@ -91,16 +92,27 @@ const VOICE_SLOT_PARAMS: readonly string[] = [
   'voiceSlot7',
 ];
 
+/** The part's slot map as `mapVoiceSlots` writes it: the processor's own arrays. */
+interface VoiceSlotMap {
+  readonly slotTargets: Int32Array;
+  readonly partFloors: Float64Array;
+}
+
 /**
  * Map each slot to the code of the target its path names, -1 for none or a
- * path no row carries, and set `floors` to the row floor of each mapped
+ * path no row carries, and set `partFloors` to the row floor of each mapped
  * target that has one (a decay time's 1 ms, an LFO rate's 0.02 Hz),
- * −Infinity for every other target, which no value is below. True when any
- * slot is mapped. Allocates nothing; run at construction and at a message,
- * never in the render.
+ * −Infinity for every other target, which no value is below. A slot
+ * `relative` marks (a roll's clip envelope with no song lane on its target,
+ * windsor#718) sets no floor: its offset of 0 plays the patch's own value,
+ * an exact-0 decay or LFO rate included. True when any slot is mapped.
+ * Allocates nothing; run at construction and at a message, never in the
+ * render.
  */
-function mapVoiceSlots(slotTargets: Int32Array, floors: Float64Array, paths: unknown): boolean {
+function mapVoiceSlots(map: VoiceSlotMap, paths: unknown, relative: unknown): boolean {
+  const { slotTargets, partFloors: floors } = map;
   const list = Array.isArray(paths) ? (paths as unknown[]) : null;
+  const relatives = Array.isArray(relative) ? (relative as unknown[]) : null;
   let mapped = false;
   floors.fill(-Infinity);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
@@ -108,7 +120,8 @@ function mapVoiceSlots(slotTargets: Int32Array, floors: Float64Array, paths: unk
     slotTargets[s] = code;
     if (code < 0) continue;
     mapped = true;
-    if (VOICE_TARGET_FLOOR[code] > 0) floors[code] = VOICE_TARGET_FLOOR[code];
+    const floored = !(relatives && s < relatives.length && relatives[s] === true);
+    if (floored && VOICE_TARGET_FLOOR[code] > 0) floors[code] = VOICE_TARGET_FLOOR[code];
   }
   return mapped;
 }
@@ -143,7 +156,8 @@ const patchValues = new Float64Array(VOICE_TARGET_COUNT);
  * and is heard over a patch decay of 0 too. A decay time or LFO rate a lane
  * moves plays at least its floor even at offset 0 (`partFloors`), which is
  * the offset the main thread sends for a lane at or below the floor over a
- * patch below it; without a lane a decay or rate of 0 stays 0. The curve is
+ * patch below it; without a lane, or under a clip envelope's `relative`
+ * slot at 0 (windsor#718), a decay or rate of 0 stays 0. The curve is
  * written out, not called, since no double crosses a call each control
  * block (rule 2). The macro rows resolve in the same pass, as ordinary
  * rows; then every target the bound patch's macros map is derived afresh

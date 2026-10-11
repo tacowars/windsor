@@ -17,6 +17,11 @@
  * source at all (`clipEnvelopeSource` is null), so the automation player
  * does nothing new for it (decision 8). `frameAt` fills a frame the caller
  * owns and allocates nothing. `clipEnvelopeSource.test.ts`.
+ *
+ * Whether an envelope that plays can change the sound also depends on the
+ * part's patch, which the source does not read: `envelopeSounds` is the one
+ * rule a track is admitted by (windsor#718), and `ClipEnvelopeTracks` runs
+ * it again at every resync (a patch edit, a preset switch).
  */
 import { isInfiniteRegion } from '../sequencing/regionClock';
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
@@ -24,6 +29,8 @@ import { envelopeHeard } from '../sequencing/rollEnvelopeValue';
 import type { RollSequencerConfig } from '../sequencing/rollSequencer';
 import type { MusicPart } from '../song/arrangement';
 import { regionPattern } from '../song/regionPattern';
+import type { AutomationHandle, OffsetHandle } from './automationHandles';
+import { isOffsetHandle } from './automationHandles';
 
 /** What a part's region plays at one transport tick, as `frameAt` fills it. */
 export interface ClipEnvelopeFrame {
@@ -51,6 +58,26 @@ export const emptyClipEnvelopeFrame = (): ClipEnvelopeFrame => ({
 /** Whether `envelope` plays over a loop of `loopTicks`: on, with a point inside the loop. */
 export const envelopePlays = (envelope: RollEnvelope, loopTicks: number): boolean =>
   envelopeHeard(envelope, loopTicks);
+
+/**
+ * Whether an offset through `handle`, the part's handle on an envelope's
+ * target, can change the sound: there is a slot handle (no macro of the
+ * patch maps the target, windsor#560), and the patch has a value there (a
+ * macro past the patch's count has none, windsor#718).
+ */
+export const targetSounds = (handle: AutomationHandle | undefined): handle is OffsetHandle =>
+  handle !== undefined && isOffsetHandle(handle) && handle.defined();
+
+/**
+ * Whether `envelope` can change the sound over a loop of `loopTicks`
+ * through `handle` (windsor#718): it plays, and its target sounds. Only such
+ * an envelope takes a voice slot.
+ */
+export const envelopeSounds = (
+  envelope: RollEnvelope,
+  loopTicks: number,
+  handle: AutomationHandle | undefined,
+): handle is OffsetHandle => envelopePlays(envelope, loopTicks) && targetSounds(handle);
 
 /** The roll `pattern` plays when it carries an envelope that plays; null otherwise. */
 function rollWithEnvelopes(

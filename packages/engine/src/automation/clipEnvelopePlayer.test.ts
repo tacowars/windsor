@@ -59,9 +59,11 @@ describe('an envelope on its voice slot', () => {
       expect(value).toBeGreaterThan(before);
       before = value;
     }
+    // With no lane on its target, the envelope's 0 is the patch's own value (windsor#718).
     expect(rig.lastSlotMap()).toEqual({
       type: 'voiceSlots',
       slots: ['filter.cutoff', ...Array.from({ length: FM_LANES_MAX - 1 }, () => null)],
+      relative: [true, ...Array.from({ length: FM_LANES_MAX - 1 }, () => false)],
     });
   });
 

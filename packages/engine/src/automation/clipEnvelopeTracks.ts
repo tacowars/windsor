@@ -28,9 +28,20 @@
  *   (`sweep`), unless a lane holds the target. A new target is admitted only
  *   while the part's voice lanes and its other tracks leave a slot free; a
  *   song lane's target is always admitted and shares its slot. One not
- *   admitted is skipped, and asked about again next tick; nothing throws. A
- *   target the patch maps from a macro has no handle and stays silent
- *   (windsor#560) until `refresh`.
+ *   admitted is skipped, and asked about again next tick; nothing throws.
+ * - **Only what can sound** (windsor#718). An envelope is admitted only
+ *   when it can change the sound (`envelopeSounds`): it plays, and its
+ *   target has a handle (no macro of the patch maps it, windsor#560) on a
+ *   value the patch has (a macro past the patch's count has none). A
+ *   target that fails stays silent, and takes no slot, until `refresh`
+ *   runs the rule again; there the slots the lanes leave go to the
+ *   envelopes in the roll's order, so one the patch can now move takes its
+ *   place ahead of those after it.
+ * - **Exact zero** (windsor#718). An envelope's 0 is the patch's own value.
+ *   With no lane on its target a track's slot is `relative`, so the worklet
+ *   floors nothing there: a decay time or LFO rate of exactly 0 stays 0
+ *   under an envelope at 0. With a lane the slot is the lane's, absolute,
+ *   floored as a lane's is (windsor#347).
  *
  * `tick` and `sweep` allocate nothing of their own, except the first tick
  * of a target and the slot given back; with a lane on the target the window
@@ -46,7 +57,12 @@ import type { AutomationOwner } from './automationOwner';
 import type { AutomationResolver } from './automationPlayer';
 import { VOICE_PREFIX, voiceTargetId } from './automationTargets';
 import type { ClipEnvelopeSource } from './clipEnvelopeSource';
-import { emptyClipEnvelopeFrame, envelopePlays } from './clipEnvelopeSource';
+import {
+  emptyClipEnvelopeFrame,
+  envelopePlays,
+  envelopeSounds,
+  targetSounds,
+} from './clipEnvelopeSource';
 import type { PlayingLane, Track, TrackTick } from './clipEnvelopeWindow';
 import { EnvelopeWindow, envelopeOffset } from './clipEnvelopeWindow';
 
@@ -131,7 +147,7 @@ export class ClipEnvelopeTracks {
       for (let i = 0; i < envelopes.length; i++) {
         const envelope = envelopes[i]!;
         if (!envelopePlays(envelope, frame.loopTicks)) continue;
-        const track = this.find(envelope.target) ?? this.admit(envelope.target, lanes);
+        const track = this.find(envelope.target) ?? this.admit(envelope, lanes);
         if (!track) continue;
         this.window.write(track, envelope, frame, issued, laneOn(lanes, track.target));
         track.covered = true;
@@ -166,6 +182,7 @@ export class ClipEnvelopeTracks {
         envelope && at.tick !== null
           ? envelopeOffset(track, envelope, loopTick + (at.tick % 1), loopTicks)
           : 0;
+      track.handle.setRelative(lane === undefined);
       if (envelope && !at.ending) {
         track.handle.holdOffset(laneOffset + offset, now);
         this.window.on(track).settle(envelope, this.frame, now);
@@ -194,21 +211,48 @@ export class ClipEnvelopeTracks {
   }
 
   /**
-   * Find every target again (a patch edit, a lane edit, an insert re-wired):
-   * a track whose handle went (a macro now maps it) or changed gives its
-   * slot back, and so do tracks past the slots the lanes leave, so the
-   * song's lanes keep theirs.
+   * Find every target again (a patch edit, a preset switch, a lane edit, an
+   * insert re-wired) and run `envelopeSounds` again (windsor#718): a track
+   * whose target no longer sounds (a macro now maps it, or the patch has no
+   * such macro) or whose handle changed gives its slot back. The slots the
+   * lanes leave go to the envelopes the region of the last tick plays, in
+   * the roll's order, then to any other track (one ramping out); a track
+   * past them gives its slot back, so the song's lanes keep theirs. An
+   * envelope with no track yet keeps its place, and the next tick admits it.
    */
   refresh(now: number, lanes: readonly PlayingLane[]): void {
     this.refused.clear();
     const { owner, resolve, slots } = this.options;
+    const { envelopes, loopTicks } = this.frame;
     let free = slots - lanes.filter((lane) => isOffsetHandle(lane.handle)).length;
+    const kept = new Set<Track>();
+    /** Whether `target` has a slot: its lane's, or one still free, which it takes. */
+    const room = (target: string): boolean => {
+      if (laneOn(lanes, target)) return true;
+      if (free <= 0) return false;
+      free--;
+      return true;
+    };
+    const ordered = new Set<string>();
+    for (const envelope of envelopes) {
+      if (!envelopePlays(envelope, loopTicks)) continue;
+      ordered.add(envelope.target);
+      const target = voiceTargetId(envelope.target);
+      const handle = resolve(owner, target)?.handle;
+      if (!envelopeSounds(envelope, loopTicks, handle) || !room(target)) continue;
+      // A track on a handle that changed goes; the next tick admits the new one here.
+      const track = this.find(envelope.target);
+      if (track?.handle === handle) kept.add(track);
+    }
+    for (const track of this.tracks) {
+      if (ordered.has(track.path)) continue;
+      const found = resolve(owner, voiceTargetId(track.path))?.handle;
+      if (found === track.handle && targetSounds(found) && room(track.target)) kept.add(track);
+    }
     const { tracks } = this;
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i]!;
-      const shared = laneOn(lanes, track.target) !== undefined;
-      const found = resolve(owner, voiceTargetId(track.path))?.handle;
-      if (found === track.handle && (shared || free-- > 0)) continue;
+      if (kept.has(track)) continue;
       if (!laneHolds(lanes, track.handle)) track.handle.release(now);
       tracks.splice(i--, 1);
     }
@@ -231,8 +275,12 @@ export class ClipEnvelopeTracks {
     return undefined;
   }
 
-  /** A track for `path`, its first tick: when its lane shares a slot, or a slot is free. */
-  private admit(path: string, lanes: readonly PlayingLane[]): Track | undefined {
+  /**
+   * A track for `envelope`, its first tick: when it can change the sound
+   * (`envelopeSounds`) and its lane shares a slot, or a slot is free.
+   */
+  private admit(envelope: RollEnvelope, lanes: readonly PlayingLane[]): Track | undefined {
+    const path = envelope.target;
     if (this.refused.has(path)) return undefined;
     let shared = false;
     let used = 0;
@@ -247,7 +295,8 @@ export class ClipEnvelopeTracks {
     if (!shared && used >= this.options.slots) return undefined;
     const target = voiceTargetId(path);
     const handle = this.options.resolve(this.options.owner, target)?.handle;
-    if (!handle || !isOffsetHandle(handle)) {
+    // The envelope plays (the tick asked): what fails is the target, until `refresh`.
+    if (!envelopeSounds(envelope, this.frame.loopTicks, handle)) {
       this.refused.add(path);
       return undefined;
     }

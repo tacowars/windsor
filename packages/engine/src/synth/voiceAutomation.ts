@@ -37,7 +37,12 @@
  * handle: its offsets are already in the row's curve (a step value times
  * the row's span), so it writes them as they are (`scheduleOffset`,
  * `holdOffset`), the lane's own offset (`offsetOf`) added in where a lane
- * moves the target too (`automation/clipEnvelopeTracks.ts`).
+ * moves the target too (`automation/clipEnvelopeTracks.ts`). An envelope's
+ * 0 is the patch's own value, an exact-0 decay or LFO rate included, so a
+ * slot it writes with no lane on the target is `relative` (windsor#718):
+ * the worklet floors nothing there. A lane's write makes it absolute again.
+ * An envelope is admitted only where the patch `defined` its target: a
+ * macro past the patch's count has no value an offset could move.
  *
  * A part hands out one handle per target, so a resync finds the same one.
  * The nine decay rows have handles too (windsor#347): the worklet reshapes a
@@ -97,9 +102,12 @@ export function voiceOffset(
   return from > 0 && to > 0 ? Math.log2(to / from) : 0;
 }
 
-/** Where a handle writes: the param, taking a slot when it needs one, and the param it has now. */
+/**
+ * Where a handle writes: the param, taking a slot when it needs one (its
+ * offset of 0 the patch's own value when `relative`), and the param it has now.
+ */
 interface OffsetTarget {
-  take(): AudioParam | undefined;
+  take(relative: boolean): AudioParam | undefined;
   held(): AudioParam | undefined;
   free(): void;
 }
@@ -109,35 +117,50 @@ function write(param: AudioParam, offset: number, time: number, how: AutomationH
   else param.setValueAtTime(offset, time);
 }
 
+/** What a voice handle reads of its target besides the slot: how a value is an offset, and whether the patch has it. */
+interface OffsetReading {
+  readonly offsetOf: (value: number) => number;
+  readonly defined: () => boolean;
+}
+
 /**
  * A handle that writes each lane value as its offset onto `target`, and an
  * offset as itself: a lane's plus a clip envelope's (windsor#702).
  */
-function offsetHandle(target: OffsetTarget, offsetOf: (value: number) => number): OffsetHandle {
+function offsetHandle(target: OffsetTarget, reading: OffsetReading): OffsetHandle {
+  const { offsetOf, defined } = reading;
+  let relative = false;
   const scheduleOffset = (offset: number, time: number, how: AutomationHow): void => {
-    const param = target.take();
+    const param = target.take(relative);
     if (param) write(param, offset, time, how);
   };
   const holdOffset = (offset: number, time: number): void => {
-    const param = target.take();
+    const param = target.take(relative);
     if (!param) return;
     param.cancelScheduledValues(time);
     param.setValueAtTime(offset, time);
   };
   return {
     offsetOf,
+    defined,
     scheduleOffset,
     holdOffset,
+    setRelative(on): void {
+      relative = on;
+    },
     schedule(value, time, how): void {
+      relative = false;
       scheduleOffset(offsetOf(value), time, how);
     },
     cancelFrom(time): void {
       target.held()?.cancelScheduledValues(time);
     },
     hold(value, time): void {
+      relative = false;
       holdOffset(offsetOf(value), time);
     },
     release(time): void {
+      relative = false;
       const param = target.held();
       if (!param) return;
       param.cancelScheduledValues(time);
@@ -152,7 +175,7 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
   const paramOf = (slot: number | undefined): AudioParam | undefined =>
     slot === undefined ? undefined : part.voiceSlotParams[slot];
   return {
-    take: () => paramOf(part.takeVoiceSlot(path)),
+    take: (relative) => paramOf(part.takeVoiceSlot(path, relative)),
     held: () => paramOf(part.voiceSlotOf(path)),
     free: () => part.freeVoiceSlot(path),
   };
@@ -185,8 +208,10 @@ export function voiceAutomationHandle(
   if (!byPath) handles.set(part, (byPath = new Map()));
   const known = byPath.get(path);
   if (known) return known;
-  const offsetOf = (value: number): number => voiceOffset(part.patch, path, row, value);
-  const handle = offsetHandle(slotTarget(part, path), offsetOf);
+  const handle = offsetHandle(slotTarget(part, path), {
+    offsetOf: (value) => voiceOffset(part.patch, path, row, value),
+    defined: () => Number.isFinite(patchValue(part.patch, path)),
+  });
   byPath.set(path, handle);
   return handle;
 }

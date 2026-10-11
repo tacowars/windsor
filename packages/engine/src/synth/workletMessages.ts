@@ -61,6 +61,13 @@ export type NoteMessage = NoteOnMessage | NoteOffMessage;
 export interface VoiceSlotsMessage {
   type: 'voiceSlots';
   slots: (string | null)[];
+  /**
+   * Per slot, whether its offset of 0 plays the patch's own value: a roll's
+   * clip envelope's slot with no song lane on its target (windsor#718).
+   * Absent or false, a decay time or LFO rate the slot maps plays at least
+   * its row's floor, as a lane's absolute value does (windsor#347).
+   */
+  relative?: boolean[];
 }
 
 /**
@@ -167,6 +174,8 @@ export interface ProcessorOptions {
    * lanes play from its first sample. Absent, every slot is free.
    */
   voiceSlots?: (string | null)[];
+  /** The map's `relative` flags (`VoiceSlotsMessage.relative`, windsor#718); absent, none. */
+  voiceSlotsRelative?: boolean[];
   /**
    * Pins the processor's one random source — free-running operator phase, the
    * per-voice noise seed and `panRandom` jitter — so a render is reproducible.
