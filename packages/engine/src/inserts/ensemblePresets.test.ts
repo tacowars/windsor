@@ -2,7 +2,7 @@
  * The ensemble's presets (#695 decision 9): each applies, is matched back,
  * keeps the user's Width, Mix and on switch, reads Custom after an edit, sits
  * inside the bounds, and cites a public source. The kind's defaults are the
- * Solina preset.
+ * Light preset (the Solina's values).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -12,7 +12,7 @@ import { DEFAULT_ENSEMBLE } from './ensembleSpec';
 import { ENSEMBLE_PRESETS, applyEnsemblePreset, matchingEnsemblePreset } from './ensemblePresets';
 
 describe('ENSEMBLE_PRESETS', () => {
-  it('cites a public source for every preset, and none is generic', () => {
+  it('cites a public source for every preset', () => {
     expect(ENSEMBLE_PRESETS.length).toBeGreaterThan(0);
     for (const preset of ENSEMBLE_PRESETS) {
       expect(preset.source.urls.length, preset.id).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe('ENSEMBLE_PRESETS', () => {
     },
   );
 
-  it('starts a new ensemble on the Solina', () => {
-    expect(matchingEnsemblePreset(DEFAULT_ENSEMBLE)).toBe('solina');
+  it('starts a new ensemble on Light', () => {
+    expect(matchingEnsemblePreset(DEFAULT_ENSEMBLE)).toBe('light');
   });
 });

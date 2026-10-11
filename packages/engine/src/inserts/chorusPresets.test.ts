@@ -1,5 +1,5 @@
 /**
- * The chorus's Juno presets (#695 decision 4): each applies, is matched back,
+ * The chorus's presets (#695 decision 4): each applies, is matched back,
  * keeps the user's Mix and on switch, reads Custom after an edit, and sits
  * inside the kind's ranges, so a normalised song keeps it exactly.
  */
@@ -10,8 +10,8 @@ import { CHORUS_INSERT, DEFAULT_CHORUS } from './chorusInsert';
 import { CHORUS_PRESETS, applyChorusPreset, matchingChorusPreset } from './chorusPresets';
 
 describe('CHORUS_PRESETS', () => {
-  it('names the three Juno modes, each from its measured source', () => {
-    expect(CHORUS_PRESETS.map((p) => p.id)).toEqual(['juno-1', 'juno-2', 'juno-1-2']);
+  it('names the three Juno-60 modes, each from its measured source', () => {
+    expect(CHORUS_PRESETS.map((p) => p.id)).toEqual(['slow', 'fast', 'both']);
     for (const preset of CHORUS_PRESETS) {
       expect(preset.source.urls.length, preset.id).toBeGreaterThan(0);
       expect(preset.source.measured, preset.id).toBe(true);
@@ -29,10 +29,10 @@ describe('CHORUS_PRESETS', () => {
     expect(matchingChorusPreset({ ...applied, depth: applied.depth + 0.01 })).toBeUndefined();
   });
 
-  it('runs I + II mono and I, II wide, and leaves an unknown id alone', () => {
+  it('runs Both mono and Slow, Fast wide, and leaves an unknown id alone', () => {
     const byId = Object.fromEntries(CHORUS_PRESETS.map((p) => [p.id, p.settings]));
-    expect(byId['juno-1-2']?.spread).toBe(0);
-    expect(byId['juno-1']?.spread).toBe(1);
+    expect(byId.both?.spread).toBe(0);
+    expect(byId.slow?.spread).toBe(1);
     expect(applyChorusPreset(DEFAULT_CHORUS, 'nope')).toBe(DEFAULT_CHORUS);
     expect(matchingChorusPreset(DEFAULT_CHORUS)).toBeUndefined();
   });

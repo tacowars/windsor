@@ -1,7 +1,9 @@
 /**
  * The chorus's presets (#695 decision 4): the Juno-60's three chorus modes,
- * from pendragon-andyh's measurements of recordings. Mix and the on switch
- * stay the user's. The Juno sweeps one delay per side from 1.66 to 5.35 ms
+ * I, II and I + II, from pendragon-andyh's measurements of recordings. They
+ * are named Slow, Fast and Both, for what they do and never for the machine
+ * (`docs/log/2026-10-11-insert-presets-carry-no-brand-names.md`). Mix and
+ * the on switch stay the user's. The Juno sweeps one delay per side from 1.66 to 5.35 ms
  * (I and II) or 3.3 to 3.7 ms (I + II), so Depth is half that span; the
  * insert's own line centres and its second voice stay as they are, which is
  * why these are the Juno's rates and swings on this chorus, not a model of
@@ -22,20 +24,20 @@ const JUNO_FAST_SWING_MS = 0.2;
 
 export const CHORUS_PRESETS: readonly InsertPreset<ChorusSpec>[] = [
   {
-    id: 'juno-1',
-    label: 'Juno I',
+    id: 'slow',
+    label: 'Slow',
     settings: { rate: 0.513, depth: JUNO_SLOW_SWING_MS, spread: 1 },
     source: JUNO,
   },
   {
-    id: 'juno-2',
-    label: 'Juno II',
+    id: 'fast',
+    label: 'Fast',
     settings: { rate: 0.863, depth: JUNO_SLOW_SWING_MS, spread: 1 },
     source: JUNO,
   },
   {
-    id: 'juno-1-2',
-    label: 'Juno I + II',
+    id: 'both',
+    label: 'Both',
     settings: { rate: 9.75, depth: JUNO_FAST_SWING_MS, spread: 0 },
     source: JUNO,
   },

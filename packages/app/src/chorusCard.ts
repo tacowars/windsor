@@ -1,6 +1,6 @@
 /**
  * The chorus insert's card (#642): Rate (Hz), Depth (ms), Spread and Mix,
- * beside a preset picker (Juno I, II, I + II) (#695).
+ * beside a preset picker (Slow, Fast, Both) (#695).
  */
 import {
   CHORUS_PRESETS,

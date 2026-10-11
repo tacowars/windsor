@@ -1,7 +1,8 @@
 /**
  * The ensemble's presets (#695 decision 9): string machines with a public
- * source, each labelled by what the source states. No preset exists without
- * a source, and none is generic. Width, Mix and the on switch stay the
+ * source. No preset exists without a source. Each is labelled for what it
+ * does, never for the machine
+ * (`docs/log/2026-10-11-insert-presets-carry-no-brand-names.md`). Width, Mix and the on switch stay the
  * user's. Sources, per-value provenance and the machines dropped for want of
  * one: `docs/research/2026-09-25-695-ensemble.md`.
  *
@@ -19,11 +20,11 @@ const { slowRate, slowDepth, fastRate, fastDepth, delay, tone } = ENSEMBLE_DEFAU
 
 export const ENSEMBLE_PRESETS: readonly InsertPreset<EnsembleSpec>[] = [
   {
-    // The kind's defaults are the Solina's (`ensembleConstants.ts` says which
-    // values are stated). The Logan String Melody states the same rates and
-    // chips, so one preset serves both: two would be indistinguishable.
-    id: 'solina',
-    label: 'ARP Solina / Logan String Melody',
+    // The ARP Solina: the kind's defaults are its values (`ensembleConstants.ts`
+    // says which are stated). The Logan String Melody states the same rates
+    // and chips, so one preset serves both: two would be indistinguishable.
+    id: 'light',
+    label: 'Light',
     settings: { slowRate, slowDepth, fastRate, fastDepth, delay, tone },
     source: {
       urls: [
@@ -35,11 +36,12 @@ export const ENSEMBLE_PRESETS: readonly InsertPreset<EnsembleSpec>[] = [
     },
   },
   {
-    // Rates: the 1976 service notes' scope traces, 6.25 Hz (160 ms) and
-    // 0.66 Hz. Three 512-stage MN3002 lines against the Solina's 185-stage
-    // TCA350s: a longer centre, and Sound On Sound's "faster, deeper" mode I.
-    id: 'rs-202',
-    label: 'Roland RS-202 (Ensemble I)',
+    // The Roland RS-202's Ensemble I. Rates: the 1976 service notes' scope
+    // traces, 6.25 Hz (160 ms) and 0.66 Hz. Three 512-stage MN3002 lines
+    // against the Solina's 185-stage TCA350s: a longer centre, and Sound On
+    // Sound's "faster, deeper" mode I.
+    id: 'deep',
+    label: 'Deep',
     settings: {
       slowRate: 0.66,
       slowDepth: RS202_SLOW_DEPTH_MS,

@@ -24,7 +24,7 @@ export const ENSEMBLE_BOUNDS = {
 export const ENSEMBLE_FAST_SHARE = 21 / 79;
 /**
  * The ARP/Eminent Solina (and the Logan String Melody, the same TCA350 triple
- * chorus): the `solina` preset reads these. Stated — 0.6 and 6 Hz, the 12 kHz
+ * chorus): the `light` preset reads these. Stated — 0.6 and 6 Hz, the 12 kHz
  * second-order filter before the lines, no dry signal. Approximated — the
  * depths (no source gives a swing in ms: the Juno-60's measured ±1.85 ms is
  * the scale, scaled down for the Solina's "quite shallow depth") and the line
