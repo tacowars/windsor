@@ -4,14 +4,21 @@
  * signal path is `bloomDsp.ts`. Output 0 is bloom's output (the dry share
  * alone while the slot's split is 1); when the node has them, output 1 is the
  * layer after Amount (stereo) and output 2 the gain the child's return takes
- * (mono), written every frame, zeros included (`BLOOM_SLOT`). Loading the
- * module builds the wavetables for the context's rate (`bloomTables.ts`).
+ * (mono), written every frame, zeros included (`BLOOM_SLOT`). `split` is the
+ * one a-rate param: read sample by sample when it is moving (128 values), the
+ * one value otherwise, and 0 for a caller that lacks it. Loading the module
+ * builds the wavetables for the context's rate (`bloomTables.ts`).
  */
-import { BLOOM_NAME } from '../../inserts/bloomConstants';
+import { BLOOM_NAME, BLOOM_SLOT } from '../../inserts/bloomConstants';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
 import { BloomDsp } from './bloomDsp';
-import { BLOOM_SLOT_NAMES, bloomDescriptors, readBloomSlots } from './bloomSlots';
+import {
+  BLOOM_SLOT_NAMES,
+  bloomDescriptors,
+  bloomSlotDescriptors,
+  readBloomSlots,
+} from './bloomSlots';
 import type { BloomParams, BloomSlotName } from './bloomSlots';
 import { bloomTables } from './bloomTables';
 
@@ -20,6 +27,8 @@ class BloomProcessor extends AudioWorkletProcessor {
   slots: Float64Array;
   running: boolean;
   load: LoadSampler;
+  /** `split` for a caller without the param: 0, the empty slot. */
+  noSplit: Float32Array;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return bloomDescriptors();
@@ -28,11 +37,12 @@ class BloomProcessor extends AudioWorkletProcessor {
   constructor(options: AudioWorkletNodeOptions) {
     super();
     this.slots = new Float64Array(BLOOM_SLOT_NAMES.length);
-    for (const descriptor of bloomDescriptors()) {
+    for (const descriptor of bloomSlotDescriptors()) {
       const at = BLOOM_SLOT_NAMES.indexOf(descriptor.name as BloomSlotName);
       this.slots[at] = Number(options.parameterData?.[descriptor.name] ?? descriptor.defaultValue);
     }
     this.dsp = new BloomDsp(sampleRate, this.slots);
+    this.noSplit = new Float32Array(1);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
@@ -56,6 +66,8 @@ class BloomProcessor extends AudioWorkletProcessor {
     const sendLeft = outputs[1]?.[0],
       sendRight = outputs[1]?.[1],
       sendGain = outputs[2]?.[0];
+    const splits: Float32Array = params[BLOOM_SLOT.splitParam] ?? this.noSplit;
+    const splitStride = splits.length > 1 ? 1 : 0;
     const dsp = this.dsp;
     readBloomSlots(params, this.slots);
     dsp.configure(frames);
@@ -63,6 +75,7 @@ class BloomProcessor extends AudioWorkletProcessor {
       // Through fields, not arguments, which V8 boxes across a call it does not inline.
       dsp.inputLeft = i < leftFrames ? left![i] : 0;
       dsp.inputRight = i < rightFrames ? right![i] : 0;
+      dsp.split = splits[i * splitStride];
       dsp.tick();
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;

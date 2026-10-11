@@ -1,10 +1,13 @@
 /**
  * bloom's controls as `Float64Array` slots in descriptor order (worklet
  * rule 3), and the descriptors themselves: the numbers of `BLOOM_BOUNDS`,
- * then Key and Scale as indices, then the Freeze and on/off switches, then
- * `split` (the wet-path slot's crossing, `BLOOM_SLOT`). The
+ * then Key and Scale as indices, then the Freeze and on/off switches. The
  * processor copies each block's k-rate values in with `readBloomSlots`; the
  * route smooths the continuous ones into `controls` (`BLOOM_SMOOTHED_MASK`).
+ *
+ * One more descriptor follows the slots' and has no slot: `split`, the
+ * wet-path slot's crossing (`BLOOM_SLOT`). It is a-rate, so the processor
+ * reads it sample by sample and hands it to the output on its own.
  *
  * Every module reads the controls it owns by these slot names, so a lever
  * is wired by its module alone.
@@ -16,6 +19,7 @@ import {
   BLOOM_KEYS,
   BLOOM_SCALE_DEFAULT,
   BLOOM_SCALES,
+  BLOOM_SLOT,
 } from '../../inserts/bloomConstants';
 
 const BLOOM_SLOT_NAMES = [
@@ -35,7 +39,6 @@ const BLOOM_SLOT_NAMES = [
   'scale',
   'freeze',
   'enabled',
-  'split',
 ] as const;
 
 type BloomSlotName = (typeof BLOOM_SLOT_NAMES)[number];
@@ -57,8 +60,6 @@ const SLOT_KEY = slotOf('key');
 const SLOT_SCALE = slotOf('scale');
 const SLOT_FREEZE = slotOf('freeze');
 const SLOT_ENABLED = slotOf('enabled');
-/** The slot's split, 0 (no child) or 1 (the layer goes through the child), stepped. */
-const SLOT_SPLIT = slotOf('split');
 
 /** The slots the route smooths (one-pole per block): the continuous controls, 1. The rest step, 0. */
 const BLOOM_SMOOTHED_MASK = Uint8Array.from(BLOOM_SLOT_NAMES, (name) =>
@@ -71,7 +72,8 @@ const BLOOM_SMOOTHED_MASK = Uint8Array.from(BLOOM_SLOT_NAMES, (name) =>
 
 type BloomParams = Record<string, Float32Array>;
 
-function bloomDescriptors(): AudioParamDescriptor[] {
+/** The descriptors of the slots, in slot order. */
+function bloomSlotDescriptors(): AudioParamDescriptor[] {
   const numbers = Object.entries(BLOOM_BOUNDS).map(([name, [minValue, maxValue]]) => ({
     name,
     minValue,
@@ -99,15 +101,30 @@ function bloomDescriptors(): AudioParamDescriptor[] {
     indexOf('scale', BLOOM_SCALES, BLOOM_SCALE_DEFAULT),
     switchOf('freeze'),
     switchOf('enabled'),
-    // Written by the stage, not a field: 0 while the slot is empty, 1 with a child.
-    { name: 'split', minValue: 0, maxValue: 1, defaultValue: 0, automationRate: 'k-rate' },
+  ];
+}
+
+/**
+ * Every descriptor: the slots', then `split`. `split` is ramped by the stage,
+ * never a field: 0 while the slot is empty, 1 with a child, crossing on the
+ * same ramp as the child's fade (`inserts/bloomInsert.ts`), so it is a-rate.
+ */
+function bloomDescriptors(): AudioParamDescriptor[] {
+  return [
+    ...bloomSlotDescriptors(),
+    {
+      name: BLOOM_SLOT.splitParam,
+      minValue: 0,
+      maxValue: 1,
+      defaultValue: 0,
+      automationRate: 'a-rate',
+    },
   ];
 }
 
 /**
  * Each control's value this block into `slots`, in descriptor order. A param
- * the caller lacks keeps its slot (a harness that predates `split`); a
- * worklet always has every descriptor.
+ * the caller lacks keeps its slot; a worklet always has every descriptor.
  */
 function readBloomSlots(params: BloomParams, slots: Float64Array): void {
   for (let i = 0; i < BLOOM_SLOT_NAMES.length; i++) {
@@ -132,11 +149,11 @@ export {
   SLOT_OCTAVE,
   SLOT_SCALE,
   SLOT_SHAPE,
-  SLOT_SPLIT,
   SLOT_SPREAD,
   SLOT_SUSTAIN,
   SLOT_SWELL,
   bloomDescriptors,
+  bloomSlotDescriptors,
   readBloomSlots,
 };
 export type { BloomParams, BloomSlotName };

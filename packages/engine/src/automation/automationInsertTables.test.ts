@@ -45,27 +45,38 @@ describe('INSERT_AUTOMATION_FIELDS', () => {
     for (const kind of INSERT_KIND_NAMES) expect(fields(kind)).not.toContain('enabled');
   });
 
-  it("gives Echo, the host, every other kind's rows and switch under slot., labelled Slot", () => {
-    const own = INSERT_AUTOMATION_FIELDS.echo.filter((r) => !r.childKind);
-    expect(own.map((r) => r.target)).toEqual(['delayTime', 'feedback', 'damp', 'resonance', 'mix']);
-    expect(INSERT_AUTOMATION_FIELDS.echo.slice(0, own.length)).toEqual(own);
-    expect(slotRows('echo')).toHaveLength(INSERT_AUTOMATION_FIELDS.echo.length - own.length);
-    for (const kind of INSERT_KIND_NAMES) {
-      const slot = slotRows('echo').filter((r) => r.childKind === kind);
-      if (kind === 'echo') {
-        expect(slot).toEqual([]);
-        continue;
+  it("gives each host, Echo and Bloom, every other kind's rows and switch under slot., labelled Slot", () => {
+    const echoOwn = INSERT_AUTOMATION_FIELDS.echo.filter((r) => !r.childKind);
+    expect(echoOwn.map((r) => r.target)).toEqual([
+      'delayTime',
+      'feedback',
+      'damp',
+      'resonance',
+      'mix',
+    ]);
+    const hosts = ['echo', 'bloom'] as const;
+    for (const host of hosts) {
+      const own = INSERT_AUTOMATION_FIELDS[host].filter((r) => !r.childKind);
+      expect(INSERT_AUTOMATION_FIELDS[host].slice(0, own.length)).toEqual(own);
+      expect(slotRows(host)).toHaveLength(INSERT_AUTOMATION_FIELDS[host].length - own.length);
+      for (const kind of INSERT_KIND_NAMES) {
+        const slot = slotRows(host).filter((r) => r.childKind === kind);
+        if (kind === host) {
+          expect(slot).toEqual([]);
+          continue;
+        }
+        // A child's own slot is none (record `2026-10-11-wet-path-slot` decision 2): its own rows only.
+        const child = insertKindFields(kind).filter((r) => !r.childKind);
+        expect(slot.map((r) => r.target)).toEqual(child.map((r) => `slot.${r.target}`));
+        expect(slot.map((r) => r.label)).toEqual(child.map((r) => `Slot ${r.label}`));
+        slot.forEach((r, i) => {
+          expect(r).toMatchObject({ min: child[i]!.min, max: child[i]!.max });
+          expect(r.scale).toBe(child[i]!.scale);
+        });
       }
-      const child = insertKindFields(kind);
-      expect(slot.map((r) => r.target)).toEqual(child.map((r) => `slot.${r.target}`));
-      expect(slot.map((r) => r.label)).toEqual(child.map((r) => `Slot ${r.label}`));
-      slot.forEach((r, i) => {
-        expect(r).toMatchObject({ min: child[i]!.min, max: child[i]!.max });
-        expect(r.scale).toBe(child[i]!.scale);
-      });
     }
-    // Only the host's own rows sit in the plain tables of the other kinds.
-    for (const kind of INSERT_KIND_NAMES.filter((k) => k !== 'echo')) {
+    // Only the hosts' own rows sit in the plain tables of the other kinds.
+    for (const kind of INSERT_KIND_NAMES.filter((k) => !(hosts as readonly string[]).includes(k))) {
       expect(INSERT_AUTOMATION_FIELDS[kind].some((r) => r.childKind)).toBe(false);
     }
   });

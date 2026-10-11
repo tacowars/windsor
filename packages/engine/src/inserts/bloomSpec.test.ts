@@ -67,8 +67,9 @@ describe('the bloom spec', () => {
       low: 47,
       high: BLOOM_BOUNDS.high[1],
     });
-    expect(n.corrections).toHaveLength(12);
-    for (const field of ['shimmer', 'mix', 'freeze', 'shape', 'octave', 'key', 'scale', 'slot'])
+    // The slot is the registry's: the kind's own normaliser leaves it empty and reports nothing.
+    expect(n.corrections).toHaveLength(11);
+    for (const field of ['shimmer', 'mix', 'freeze', 'shape', 'octave', 'key', 'scale'])
       expect(n.corrections.some((c) => c.startsWith(`fx.${field}:`))).toBe(true);
   });
 });

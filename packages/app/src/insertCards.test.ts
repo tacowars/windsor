@@ -227,8 +227,8 @@ describe('FILTER_INSERT_KNOBS (windsor#622)', () => {
 
 describe('BLOOM_KNOBS (windsor#712)', () => {
   it("covers every Bloom number from DEFAULT_BLOOM, on Bloom's bounds", () => {
-    // Freeze, Key and Scale are not numbers.
-    const notKnobs = ['kind', 'enabled', 'freeze', 'key', 'scale'];
+    // Freeze, Key and Scale are not numbers, and the slot is the child's.
+    const notKnobs = ['kind', 'enabled', 'freeze', 'key', 'scale', 'slot'];
     const fields = INSERT_KINDS.bloom.fields.filter((f) => !notKnobs.includes(f));
     expect(BLOOM_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of BLOOM_KNOBS) {
@@ -239,7 +239,8 @@ describe('BLOOM_KNOBS (windsor#712)', () => {
 
   it("takes a lane's field's scale and floor from its automation row", () => {
     const byField = Object.fromEntries(BLOOM_KNOBS.map((k) => [k.f, k.o]));
-    for (const row of INSERT_AUTOMATION_FIELDS.bloom.filter((r) => r.scale !== 'switch')) {
+    const own = INSERT_AUTOMATION_FIELDS.bloom.filter((r) => !r.childKind);
+    for (const row of own.filter((r) => r.scale !== 'switch')) {
       const o = byField[row.target]!;
       expect(o.curve, row.target).toBe(row.scale === 'log' ? 'log' : undefined);
       expect(o.logFloor, row.target).toBe(row.floor);

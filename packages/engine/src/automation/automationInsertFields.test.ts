@@ -47,9 +47,9 @@ describe('insertKindFields', () => {
         expect([r.min, r.max], `${kind} ${r.target}`).toEqual([0, 1]);
       }
     }
-    expect(INSERT_AUTOMATION_FIELDS.bloom.filter((r) => r.scale === 'switch')).toEqual([
-      expect.objectContaining({ target: 'freeze', label: 'Freeze' }),
-    ]);
+    expect(
+      INSERT_AUTOMATION_FIELDS.bloom.filter((r) => r.scale === 'switch' && !r.childKind),
+    ).toEqual([expect.objectContaining({ target: 'freeze', label: 'Freeze' })]);
   });
 });
 

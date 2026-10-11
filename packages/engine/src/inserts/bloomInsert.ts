@@ -1,9 +1,23 @@
 /**
- * bloom's stage: input → processor → output. The stage owns DSP lifetime,
- * the mixer owns output edges.
+ * bloom's stage. The stage owns DSP lifetime, the mixer owns output edges.
+ *
+ *   input ─▶ processor ─(0: dry + layer · (1 − split))──────────────────────▶ output
+ *                      ─(1: the layer after Amount)─▶ [slot child ─▶ fade] ─▶ ret ─┘
+ *                      ─(2: Mix's wet share × switch)─▶ ret.gain
+ *
+ * bloom is a host (record `2026-10-11-bloom-insert` decision 14, E2): it
+ * mixes inside its worklet, and a child can't return into the worklet
+ * without a cycle, so the layer leaves on output 1 and comes back through
+ * `ret`, a native gain at 0 whose gain is output 2 (`BLOOM_SLOT`). The slot
+ * module (`mixer/insertSlot.ts`) wires the child between them and fades it;
+ * `route` ramps the processor's a-rate `split` over the same window with
+ * `fadeRamp`, so the layer leaves output 0 exactly as the child's fade
+ * brings it back. All three outputs and `ret` are built with the stage, so
+ * the first child takes the normal arrival path.
  */
+import { fadeRamp } from './fadeRamp';
 import { ownParam, workletFieldParams } from './insertFieldHandles';
-import type { InsertKind, InsertStage } from './insertKind';
+import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import { BLOOM_BOUNDS, BLOOM_KEYS, BLOOM_NAME, BLOOM_SCALES, BLOOM_SLOT } from './bloomConstants';
 import {
   BLOOM_FIELDS,
@@ -33,26 +47,54 @@ const numberOrSwitch = ownParam(BLOOM_BOUNDS);
 const bloomParamOf = (field: string): string | undefined =>
   field === 'freeze' ? field : numberOrSwitch(field);
 
-/** bloom's kind: input → processor → output. */
+/**
+ * bloom's wet path: the child takes output 1 and returns into `ret`, whose
+ * gain output 2 drives; `route` crosses `split` from where it has reached
+ * now, so a reversal mid-window turns round with no step.
+ */
+function bloomWetPath(
+  context: BaseAudioContext,
+  processor: AudioWorkletNode,
+  ret: GainNode,
+): WetPath {
+  const ramp = fadeRamp(context, processor.parameters.get(BLOOM_SLOT.splitParam)!);
+  return {
+    send: { node: processor, output: BLOOM_SLOT.wetOutput },
+    ret,
+    route: (on: boolean): void => ramp.to(on ? 1 : 0),
+  };
+}
+
+/** bloom's nodes, wired as the diagram at the top has them. */
+function bloomGraph(context: BaseAudioContext, spec: BloomSpec) {
+  const processor = new AudioWorkletNode(context, BLOOM_NAME, {
+    numberOfInputs: 1,
+    numberOfOutputs: BLOOM_SLOT.outputs,
+    outputChannelCount: [...BLOOM_SLOT.outputChannelCount],
+    channelCount: 2,
+    channelCountMode: 'explicit',
+    parameterData: bloomValues(spec),
+  });
+  const input = context.createGain();
+  const output = context.createGain();
+  // Silent until a child plays into it; its gain is output 2 alone.
+  const ret = context.createGain();
+  ret.gain.value = 0;
+  input.connect(processor);
+  processor.connect(output, BLOOM_SLOT.mixOutput);
+  processor.connect(ret.gain, BLOOM_SLOT.wetGainOutput);
+  ret.connect(output);
+  return { processor, input, output, ret };
+}
+
+/** bloom's kind: input → processor → output, with its slot's return beside it. */
 export const BLOOM_INSERT: InsertKind<BloomSpec> = {
   fields: BLOOM_FIELDS,
   defaults: DEFAULT_BLOOM,
   normalise: normaliseBloom,
   create(context, spec): InsertStage<BloomSpec> {
     let current = spec;
-    // Output 0 only: bloom as a wet-path slot host builds outputs 1 and 2 (`BLOOM_SLOT`).
-    const processor = new AudioWorkletNode(context, BLOOM_NAME, {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-      channelCount: 2,
-      channelCountMode: 'explicit',
-      parameterData: bloomValues(spec),
-    });
-    const input = context.createGain();
-    const output = context.createGain();
-    input.connect(processor);
-    processor.connect(output, BLOOM_SLOT.mixOutput);
+    const { processor, input, output, ret } = bloomGraph(context, spec);
     const params = workletFieldParams(
       processor,
       (name) => bloomValues(current)[name]!,
@@ -63,6 +105,7 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
       input,
       output,
       processor,
+      wetPath: bloomWetPath(context, processor, ret),
       set(next): void {
         current = next;
         params.write(bloomValues(next));
@@ -71,6 +114,7 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
       dispose(): void {
         input.disconnect();
         processor.disconnect();
+        ret.disconnect();
         processor.port.postMessage({ type: 'stop' });
         processor.port.close();
       },
