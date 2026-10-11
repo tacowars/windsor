@@ -36,7 +36,11 @@ export interface BloomSpec {
   readonly octave: number;
   /** Scale's root: one of Windsor's note names (`BLOOM_KEY_CHOICES`), `C` … `B`. */
   readonly key: BloomKey;
-  /** `chromatic` (off), or one of Windsor's `SCALE_NAMES` (`BLOOM_SCALE_CHOICES`). */
+  /**
+   * `chromatic` (off), `song` (the song's key, resolved in the stage; `key`
+   * stays as it was underneath), or one of Windsor's `SCALE_NAMES`
+   * (`BLOOM_SCALE_CHOICES`).
+   */
   readonly scale: BloomScale;
   /** The lowest and highest band, as MIDI notes. */
   readonly low: number;

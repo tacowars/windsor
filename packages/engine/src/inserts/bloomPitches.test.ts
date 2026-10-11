@@ -5,7 +5,8 @@
  * from the shipped bundle) are the old per-scale table's for Bloom's
  * original seven scales, so a song on one of them sounds as it did. The
  * corners: every class, the empty set, one class (±6, the tie down), two
- * adjacent classes.
+ * adjacent classes. Scale's `song` (windsor#717) takes the song's key over
+ * Key, a custom scale folded, and plays every class until there is one.
  */
 // reads-by-path: packages/engine/src/worklet/generated/**, packages/engine/src/__fixtures__/**
 import { describe, expect, it } from 'vitest';
@@ -43,8 +44,8 @@ const OLD_TABLE: [BloomScale, number[]][] = [
 ];
 
 describe("bloom's lists are Windsor's", () => {
-  it('Scale is chromatic, then SCALE_NAMES in order; Key is CHORD_NOTE_NAMES itself', () => {
-    expect(BLOOM_SCALE_CHOICES).toEqual(['chromatic', ...SCALE_NAMES]);
+  it('Scale is chromatic, song, then SCALE_NAMES in order; Key is CHORD_NOTE_NAMES itself', () => {
+    expect(BLOOM_SCALE_CHOICES).toEqual(['chromatic', 'song', ...SCALE_NAMES]);
     expect(BLOOM_KEY_CHOICES).toBe(CHORD_NOTE_NAMES);
   });
 });
@@ -68,6 +69,29 @@ describe('pitchMask', () => {
   it('folds offsets past an octave either way, and no offsets is the empty set', () => {
     expect(pitchMask(11, [0, 13, -1, 24])).toBe(pitchMask(11, [0, 1, 11]));
     expect(pitchMask(3, [])).toBe(0);
+  });
+});
+
+describe("Scale's song key", () => {
+  it("is the song's root and scale, whatever Key holds", () => {
+    // D dorian: D E F G A B C, pitch classes 2 4 5 7 9 11 0.
+    const dDorian = 0b101010110101;
+    expect(pitchMask(2, SCALES.dorian)).toBe(dDorian);
+    for (const key of CHORD_NOTE_NAMES)
+      expect(bloomPitches({ key, scale: 'song' }, { root: 2, scale: 'dorian' })).toBe(dDorian);
+  });
+
+  it("folds a custom scale's offsets, and plays every class with no song key", () => {
+    const custom = { root: 4, scale: [0, 3, 7, 14, -2] };
+    // E G B, F♯ (14 folds to 2 above E), D (−2): pitch classes 4 7 11 6 2.
+    expect(bloomPitches({ key: 'C', scale: 'song' }, custom)).toBe(0b100011010100);
+    expect(bloomPitches({ key: 'C', scale: 'song' })).toBe(BLOOM_PITCHES_ALL);
+  });
+
+  it('leaves chromatic and a fixed scale on their own key', () => {
+    const songKey = { root: 2, scale: 'dorian' } as const;
+    expect(bloomPitches({ key: 'F', scale: 'chromatic' }, songKey)).toBe(BLOOM_PITCHES_ALL);
+    expect(bloomPitches({ key: 'F', scale: 'major' }, songKey)).toBe(pitchMask(5, SCALES.major));
   });
 });
 

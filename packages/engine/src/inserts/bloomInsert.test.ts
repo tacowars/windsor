@@ -8,6 +8,8 @@ import type { FakeGain, FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { installParamWorklet, type ParamWorkletNode } from '../__fixtures__/insertParamRig';
 import { BLOOM_NAME, BLOOM_SLOT } from './bloomConstants';
 import { BLOOM_INSERT, bloomValues } from './bloomInsert';
+import { pitchMask } from './bloomPitches';
+import { SCALES } from '../sequencing/scaleSampler';
 import { DEFAULT_BLOOM } from './bloomSpec';
 import type { BloomSpec } from './bloomSpec';
 
@@ -77,6 +79,24 @@ describe('the bloom stage', () => {
     expect(bloomValues(next)).toMatchObject({ freeze: 1, pitches: 0b010101101011, enabled: 0 });
     expect(bloomValues(next)).not.toHaveProperty('key');
     expect(bloomValues(DEFAULT_BLOOM).pitches).toBe(4095);
+  });
+
+  it("retunes on the song's key only while Scale is on song, and keeps its own key underneath", () => {
+    const { stage, node } = create({ ...DEFAULT_BLOOM, key: 'F', scale: 'major' });
+    const pitches = (): number => node.parameters.get('pitches').value;
+    const fMajor = pitchMask(5, SCALES.major);
+    // A fixed scale ignores the song's key.
+    stage.setHarmony!(2, 'dorian');
+    expect(pitches()).toBe(fMajor);
+    // On song, the song's key, Key aside, and the stage keeps following it.
+    const onSong: BloomSpec = { ...DEFAULT_BLOOM, key: 'F', scale: 'song' };
+    stage.set(onSong);
+    expect(pitches()).toBe(pitchMask(2, SCALES.dorian));
+    stage.setHarmony!(7, [0, 4, 7]);
+    expect(pitches()).toBe(pitchMask(7, [0, 4, 7]));
+    // Back to a fixed scale: the bloom's own F.
+    stage.set({ ...onSong, scale: 'major' });
+    expect(pitches()).toBe(fMajor);
   });
 
   it('hands out lanes for the numbers, enabled and freeze only', () => {
