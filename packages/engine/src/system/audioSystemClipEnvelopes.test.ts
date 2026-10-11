@@ -3,7 +3,7 @@
  * document at `initMusic`, heard on a held note through the part's voice
  * slot as the transport plays, and dropped by a live edit. A song with no
  * envelopes takes no slot. A part added live finds its targets again on a
- * patch edit. The player's own rules are
+ * patch edit, and a part on a preset switch. The player's own rules are
  * `automation/clipEnvelopePlayer.test.ts`.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -147,5 +147,51 @@ describe('clip envelopes on the live system', () => {
     const tick = Math.ceil((context.currentTime - tickTime(0)) / TICK) - 4;
     expect(slot.valueAt(tickTime(tick))).toBeCloseTo(envelopeOffsetAt(RISE, tick % LOOP, LOOP), 9);
     expect(slot.valueAt(tickTime(tick))).not.toBe(0);
+  });
+
+  describe('a preset switch finds the envelope’s target again', () => {
+    /** A patch whose macro maps Cutoff, so an envelope on it is refused (windsor#560). */
+    const MAPPED = {
+      ...makePatch({ name: 'mapped' }),
+      macros: [makeMacro({ mappings: [{ target: 'filter.cutoff' }] })],
+    };
+    const PLAIN = FULL_DOCUMENT.parts.find((part) => part.slot === FULL_SLOT.drone)!.preset;
+    const onPreset = (preset: string): ArrangementDocument => {
+      const document = withDocumentPart(droneRoll([RISE]), 'drone', { preset });
+      return { ...document, patches: { ...document.patches, mapped: MAPPED } };
+    };
+    const switchTo = (sys: AudioSystem, preset: string): void => {
+      expect(sys.apply({ parts: { [FULL_SLOT.drone]: { preset } } })).toEqual({
+        ok: true,
+        ignored: [],
+      });
+    };
+
+    it('plays once the part switches from a preset mapping it to one that does not', async () => {
+      const { sys, context, drone, play } = await rig(onPreset('mapped'));
+      sys.startMusic();
+      play(1);
+      expect(drone.voiceSlotOf('filter.cutoff')).toBeUndefined();
+      switchTo(sys, PLAIN);
+      play(2);
+      const slot = slotParam(drone, 'filter.cutoff');
+      const tick = Math.ceil((context.currentTime - tickTime(0)) / TICK) - 4;
+      expect(slot.valueAt(tickTime(tick))).toBeCloseTo(
+        envelopeOffsetAt(RISE, tick % LOOP, LOOP),
+        9,
+      );
+      expect(slot.valueAt(tickTime(tick))).not.toBe(0);
+    });
+
+    it('goes silent and gives the slot back once the part switches to a preset mapping it', async () => {
+      const { sys, context, drone, play } = await rig(onPreset(PLAIN));
+      sys.startMusic();
+      play(1);
+      const slot = slotParam(drone, 'filter.cutoff');
+      switchTo(sys, 'mapped');
+      play(context.currentTime + 0.5);
+      expect(slot.valueAt(context.currentTime)).toBe(0);
+      expect(drone.voiceSlotOf('filter.cutoff')).toBeUndefined();
+    });
   });
 });

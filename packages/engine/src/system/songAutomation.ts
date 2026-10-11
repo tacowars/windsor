@@ -15,11 +15,12 @@
  *   forgotten; a length edit (bars or meter) first refits every owner's held
  *   lanes with the document's own fit, so the engine's lanes stay the
  *   document's; a transport edit (tempo, meter, swing, loop, length) or a
- *   patch edit restarts every lane from now; a part's `automation` replaces
- *   its lanes, normalised as the document normaliser would; a part's insert
- *   list changing drops the lanes of an insert it no longer holds and
- *   restarts the rest, so an insert lane plays or goes inert as its field is
- *   read or not (windsor#345).
+ *   patch edit restarts every lane from now, and a part's preset switch
+ *   that part's, since the switch replaced its patch; a part's `automation`
+ *   replaces its lanes, normalised as the document normaliser would; a
+ *   part's insert list changing drops the lanes of an insert it no longer
+ *   holds and restarts the rest, so an insert lane plays or goes inert as
+ *   its field is read or not (windsor#345).
  * - **Which inserts.** A part's lanes are normalised against its inserts as
  *   this partial leaves them (`PartStrip.nextInsertSpecs`), never against
  *   the chain still waiting out its fade: an undo that restores an insert and
@@ -48,7 +49,9 @@
  *   every part at `load`, and after a partial each part whose regions or
  *   sequencer it carries (a part added among them), or every part when the
  *   song's length changed. A part none of whose regions plays an envelope
- *   hands the player null, and nothing of its playback changes.
+ *   hands the player null, and nothing of its playback changes. Whatever
+ *   restarts a part's lanes (a patch edit, a preset switch, its lanes or
+ *   inserts) finds its envelopes' targets again with them.
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
@@ -158,6 +161,9 @@ export class SongAutomation {
       ) {
         // A kind change drops the sequencer lanes the new kind does not offer, as the document does.
         this.reinsert(player, owner, kind(slot));
+      } else if ('preset' in part) {
+        // A preset switch replaced the part's patch: its lanes and envelopes find their targets again.
+        player.resync(owner);
       }
     }
     for (const [id, group] of groups) if (isRecord(group)) this.applyGroup(player, id, group);

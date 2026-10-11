@@ -155,6 +155,31 @@ describe('the region’s end and the transport’s stop', () => {
     expect(rig.holds('filter.cutoff')).toBe(false);
   });
 
+  it.each([
+    ['before', 4],
+    ['inside', 12],
+  ])(
+    'cancels a short region the look-ahead queued whole at a stop %s it, and frees the slot',
+    async (_, at) => {
+      const short = envelope('filter.cutoff', [envPoint(0, 1), envPoint(7, 0.5)]);
+      const part = rollPart([{ start: 8, duration: 8, pattern: rollPattern(8, [short]) }]);
+      const rig = await clipEnvelopeRig(part);
+      // Queued past the region's end: its track reads not live, though the region is ahead.
+      const times = rig.run(24);
+      const slot = rig.slot('filter.cutoff');
+      rig.now = times[at]!;
+      rig.player.stop();
+      const log = slot.automation;
+      const cancel = log.map((event) => event.call).lastIndexOf('cancelScheduledValues');
+      expect(log[cancel]!.time).toBe(rig.now);
+      expect(log.slice(cancel + 1).every((event) => event.time! <= rig.now + STEP)).toBe(true);
+      for (let tick = at + 1; tick < 24; tick++) expect(slot.valueAt(times[tick]!)).toBe(0);
+      rig.now += STEP;
+      for (const run of rig.deferred) run();
+      expect(rig.holds('filter.cutoff')).toBe(false);
+    },
+  );
+
   it('plays each back-to-back region’s own envelopes, from each region’s tick 0', async () => {
     const fall = envelope('filter.cutoff', [envPoint(0, 0.5), envPoint(BAR - 1, -1)]);
     const wobble = envelope('lfo.amount', [envPoint(0, 0.5), envPoint(BAR / 2, -0.5)]);

@@ -19,8 +19,9 @@
  *   starting and the envelope ending are steps: a ramp to the value before,
  *   then over the player's step de-click to the value after, which a held
  *   note hears. A tick the transport jumped to (a start, a seek, the
- *   transport loop) holds the sum there, as lanes do. A stop ramps a
- *   playing envelope's offset out from the playhead over the same de-click.
+ *   transport loop) holds the sum there, as lanes do. A stop cancels what
+ *   every track has queued, however far the look-ahead ran, and ramps an
+ *   envelope sounding at the playhead out from there over the same de-click.
  * - **Slots.** A track takes its target's slot when its envelope first
  *   plays and keeps it while it plays. Once it ends, its offset ramps to 0,
  *   or to the lane's, and the slot is given back once that ramp is over
@@ -148,9 +149,12 @@ export class ClipEnvelopeTracks {
 
   /**
    * Restart every track from `now`, after the lanes have held there: the
-   * sum at the playhead, the envelope read at its transport position. A
-   * track playing that no longer plays there, or a stop, ends: from the
-   * sum, its offset ramps to the lane's or to 0.
+   * sum at the playhead, the envelope read at its transport position. Any
+   * other track, or every track at a stop, ends: from the sum, its offset
+   * ramps to the lane's or to 0, and its slot is given back after. That is
+   * every track, `live` or not: the look-ahead may have queued a short
+   * region's whole pass and its end past `now`, so `live` reads the last
+   * queued tick, not what sounds, and the hold is what cancels those events.
    */
   rewind(now: number, at: RewindAt, lanes: readonly PlayingLane[]): void {
     for (const track of this.tracks) {
@@ -166,14 +170,14 @@ export class ClipEnvelopeTracks {
         track.handle.holdOffset(laneOffset + offset, now);
         this.window.on(track).settle(envelope, this.frame, now);
         if (lane) lane.last = now;
-      } else if (track.live) {
+      } else {
         track.handle.holdOffset(laneOffset + offset, now);
         const end = offset === 0 ? now : now + this.options.stepSeconds;
         if (end > now) track.handle.scheduleOffset(laneOffset, end, 'ramp');
         track.live = false;
         track.last = end;
+        track.drainAt = end;
         if (lane) lane.last = end;
-        else track.drainAt = end;
       }
     }
   }
