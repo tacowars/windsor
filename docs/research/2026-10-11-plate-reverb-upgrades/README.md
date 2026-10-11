@@ -198,6 +198,24 @@ is a measured claim.
 
   These are aims for the ear, and each converts to fields once items 1, 2
   and 7 fix the units.
+- **Switching voicing mid-tail can't click.** Picking a preset applies it
+  live (`plateReverbCard.ts`). A change of voicing swaps the input diffuser
+  lengths, the Build table and the signed tap table, so reading the same
+  tank through them on the next quantum would step. The processor ducks
+  instead:
+  - the wet output fades to zero over the insert switch's fade
+    (`INSERT_SWITCH_FADE_S`, 5 ms);
+  - while it's silent, the tables swap and the input diffusers and the
+    Build delay are cleared, since their contents were written for the old
+    lengths;
+  - the wet output fades back in over the same time.
+
+  The tank's loop isn't cleared, so the tail carries on in the new
+  voicing's taps. Every other field keeps its own smoothing.
+- **Test it:** with a charged tail, switch plate → room and room → plate.
+  The largest sample-to-sample step across the switch must stay within the
+  tail's own slew, measured as the Size-sweep test measures it
+  (`docs/log/2026-08-31-dattorro-reverb-not-plateau.md` §3).
 - **Format:** the field is new, but the plate row's shorter diffusers change
   how every song saved before item 7 sounds: an absent `voicing` reads as
   `plate`, and the plate row is no longer the plate it was saved with. So
