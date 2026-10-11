@@ -1,8 +1,8 @@
-# The bloom insert: a harmonic pad generator
+# The Bloom insert: a harmonic pad generator
 
 - **Date:** 2026-10-11
-- **Status:** proposed (tacowars's design decisions of 2026-10-11; the card
-  waits on a mockup tacowars approves)
+- **Status:** proposed (tacowars's design decisions of 2026-10-11; the
+  card's mockup approved the same day, decision 15)
 - **Links:** windsor#712 (the insert, epic windsor#710) · the wet-path slot record
   `2026-10-11-wet-path-slot` (epic windsor#686) · the switch lanes record
   `2026-10-06-insert-switch-lanes`, which decision 13 amends · the cost note
@@ -15,7 +15,7 @@ a sustained harmonic layer of its own. The main use asked for is ambient
 work: feeding a voice, a pluck or a field recording through an insert that
 answers every note it hears with a held, string-machine-like pad.
 
-bloom is that insert. It follows the pitch of whatever goes through it in a
+Bloom is that insert. It follows the pitch of whatever goes through it in a
 four-octave window, builds a band-limited waveform on every note it finds
 and mixes the result back with the dry signal. Its behaviour at the
 defaults is set by the design's target curves; the fitted constants live in
@@ -23,13 +23,13 @@ the kind's constants files, one file a module.
 
 ## Decisions
 
-1. **A new insert kind, bloom (`bloom`),** usable on any part strip, group,
+1. **A new insert kind, Bloom (`bloom`),** usable on any part strip, group,
    send bus and the master. It is a worklet insert, stereo in and out, with
    the generator mono in. It holds no reverb and no chorus: put a reverb
    after it, and a chorus in its slot (decision 10). Each stays a separate,
    reusable effect.
 2. **One knob a function.** Each control does one thing and nothing is
-   ganged into a macro. bloom runs in a DAW with a screen and lanes, so the
+   ganged into a macro. Bloom runs in a DAW with a screen and lanes, so the
    cost of more knobs is small and every continuous one can be automated.
 3. **Default-neutral levers.** Swell, Sustain, Freeze, Spread, Shape,
    Bright, Octave, Scale, Low, High, Focus and Density each leave the core's
@@ -101,7 +101,7 @@ the kind's constants files, one file a module.
      count a band can need, up to 0.45 × the rate or 24 kHz (about 270
      partials at F2). About 0.5 MB a sample rate, built once when the
      worklet loads by an FFT on the portable sine and cosine, and shared by
-     every bloom. Square and pulse are two saw reads; Shape crossfades two
+     every Bloom. Square and pulse are two saw reads; Shape crossfades two
      reads, keeping the saw's power within 0.05 dB.
    - **Segments.** The synthesis renders segments of about 1/6000 s (8 host
      samples at 44.1/48 kHz, 16 at 88.2/96 kHz). Each band's level ramps
@@ -126,9 +126,9 @@ the kind's constants files, one file a module.
 10. **Timing and latency.** The dry path is stereo and undelayed. The layer
     is late by the bands' group delay, which is part of the sound (about
     50 ms at 220 Hz, 12 ms at 1175 Hz), plus 0.4 ms of its own: the
-    decimator, one segment and the FIR. bloom reports no latency.
+    decimator, one segment and the FIR. Bloom reports no latency.
 11. **Rest and switch.** Off is the input to the bit, and switching on starts
-    from rest. bloom sleeps once its input has been silent for 300 ms and a
+    from rest. Bloom sleeps once its input has been silent for 300 ms and a
     whole block of the layer stays under its floor; it clears every state,
     so waking is bit-identical to a fresh insert. Nothing allocates after
     construction, and no transcendental `Math` (nor `**`) runs anywhere the
@@ -155,17 +155,24 @@ the kind's constants files, one file a module.
     scale `switch`, and it behaves as the `enabled` lane does (decisions 1,
     2 and 5 there). `enabled` still comes from `insertKindFields`.
 14. **The slot comes in a second PR,** on Windsor's built wet-path contract
-    (`2026-10-11-wet-path-slot`). The first PR ships bloom without `slot`.
-    The second makes bloom a host: `slot` in its fields, its `normalise`
+    (`2026-10-11-wet-path-slot`). The first PR ships Bloom without `slot`.
+    The second makes Bloom a host: `slot` in its fields, its `normalise`
     returning `slot: null`, and a `wetPath` whose `send` is the processor's
     second output (the stereo layer after Amount, before Mix) and whose
     `ret` is a native gain driven by the third output (Mix's wet share × the
-    switch). bloom's table entry becomes its own rows and then
+    switch). Bloom's table entry becomes its own rows and then
     `slotRows('bloom')`. With an empty slot the output stays bit for bit.
     The field is additive, so neither PR moves `ARRANGEMENT_VERSION`.
 15. **The card is drawn fresh in Windsor** as a mockup at the rack's height,
     and tacowars approves it before the card ticket is written (guide §4.7).
-    The kind's `INSERT_GROUPS` group is settled with it.
+    tacowars approved `docs/design/bloom-card-mockup.html` on 2026-10-11
+    (windsor#711), and the card is built to it: rules between the five
+    groups and no captions, Octave a six-step knob, Freeze a latching button
+    under Swell and Sustain, and Low and High never crossing. The kind is
+    named **Bloom**, capitalised as the other kinds are, in pickers and
+    tooltips. Its `INSERT_GROUPS` group is a new one, **Generate**, last
+    after Space, holding Bloom alone: Bloom adds a layer rather than
+    processing the sound.
 16. **The song format gains one kind,**
     `{ kind: 'bloom', enabled, amount, mix, swell, sustain, freeze, spread,
     shape, bright, octave, key, scale, low, high, focus, density }`. It is
@@ -214,7 +221,7 @@ runs at about 12 kHz at both.
 
 ## Known limits and open items
 
-- **CPU is above the first target,** which was four worst-case blooms within
+- **CPU is above the first target,** which was four worst-case Blooms within
   about 9 % of the 48 kHz quantum. tacowars accepted the current cost on
   2026-10-11. Ranked savings remain for later tickets: the darkening as a
   pre-pass, the bank's state packed into one array, and skipping idle bands
@@ -233,14 +240,14 @@ runs at about 12 kHz at both.
 
 - One more worklet bundle, `generated/bloom-processor.js`, loaded with the
   others. The wavetables add about 0.5 MB a sample rate in use, once.
-- bloom's per-sample `log2` and `2^x` are `worklet/fm/portablePowers.ts`'s,
-  imported; `bloomPortable.ts` keeps only bloom's own `bloomExp` and
+- Bloom's per-sample `log2` and `2^x` are `worklet/fm/portablePowers.ts`'s,
+  imported; `bloomPortable.ts` keeps only Bloom's own `bloomExp` and
   `bloomOnePoleStep`. An edit to `fm/portablePowers.ts` rebuilds both
   `fm-processor.js` and `bloom-processor.js`.
 - **Amends** `2026-10-06-insert-switch-lanes` decision 3: a kind's own
   boolean field may be a switch target. Other switches, enums and stepped
   fields stay out.
-- Once bloom is in the registry, `slotRows` offers it as a child of every
+- Once Bloom is in the registry, `slotRows` offers it as a child of every
   host, Echo included, with its own slot forced to none.
 - The PR is `reviewed`: a new insert and a new worklet. tacowars listens to
   each lever before it merges.

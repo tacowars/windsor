@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BLOOM_BOUNDS,
+  BLOOM_OCTAVES,
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
   CHORUS_RATE_MAX_HZ,
@@ -51,6 +52,7 @@ import {
   INSERT_LABELS,
   PLATE_REVERB_KNOBS,
   fmtBloomDensity,
+  bloomBandLimit,
   fmtBloomShape,
 } from './insertKnobTables';
 
@@ -77,7 +79,7 @@ describe('INSERT_CARDS', () => {
     expect(addPickerGroups('eq').map((group) => group.label)[0]).toBe('Filter');
   });
 
-  it('groups the Add slot as decided: EQ, Filter, Drive, Dynamics, Modulation, Time, Space', () => {
+  it('groups the Add slot as decided: EQ, Filter, Drive, Dynamics, Modulation, Time, Space, Generate', () => {
     expect(INSERT_GROUPS.map((group) => group.label)).toEqual([
       'EQ',
       'Filter',
@@ -86,6 +88,7 @@ describe('INSERT_CARDS', () => {
       'Modulation',
       'Time',
       'Space',
+      'Generate',
     ]);
   });
 
@@ -223,9 +226,9 @@ describe('FILTER_INSERT_KNOBS (windsor#622)', () => {
 });
 
 describe('BLOOM_KNOBS (windsor#712)', () => {
-  it("covers every bloom number but Octave from DEFAULT_BLOOM, on bloom's bounds", () => {
-    // Octave is a picker of its steps, and Freeze, Key and Scale are not numbers.
-    const notKnobs = ['kind', 'enabled', 'freeze', 'key', 'scale', 'octave'];
+  it("covers every Bloom number from DEFAULT_BLOOM, on Bloom's bounds", () => {
+    // Freeze, Key and Scale are not numbers.
+    const notKnobs = ['kind', 'enabled', 'freeze', 'key', 'scale'];
     const fields = INSERT_KINDS.bloom.fields.filter((f) => !notKnobs.includes(f));
     expect(BLOOM_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of BLOOM_KNOBS) {
@@ -243,13 +246,39 @@ describe('BLOOM_KNOBS (windsor#712)', () => {
     }
     expect(byField.swell?.logFloor).toBeGreaterThan(0);
     expect([byField.low?.step, byField.high?.step]).toEqual([1, 1]);
+    expect(byField.octave?.steps).toEqual([...BLOOM_OCTAVES]);
   });
 
-  it('reads Shape by its corners and Density as a ratio', () => {
-    expect([0, 2, 4].map(fmtBloomShape)).toEqual(['sine', 'saw', 'pulse']);
-    expect(fmtBloomShape(2.4)).toBe('saw→square 40%');
-    expect(fmtBloomDensity(DEFAULT_BLOOM.density)).toBe('1.8:1');
-    expect(fmtBloomDensity(0)).toBe('1.0:1');
-    expect(fmtBloomDensity(1)).toBe('∞:1');
+  it('reads as the approved mockup does (windsor#711)', () => {
+    const fmt = Object.fromEntries(BLOOM_KNOBS.map((k) => [k.f, k.o.fmt!]));
+    expect([0, 2, 2.4, 3.996, 4].map(fmtBloomShape)).toEqual([
+      'sine',
+      'saw',
+      'saw→square',
+      'pulse',
+      'pulse',
+    ]);
+    expect(fmt.bright!(0)).toBe('+0.0dB/oct');
+    expect([-12, 0, 12].map(fmt.octave!)).toEqual(['-12st', '0st', '+12st']);
+    expect([0, DEFAULT_BLOOM.density, 1 - 1 / 12, 1].map(fmtBloomDensity)).toEqual([
+      '1.0:1',
+      '1.8:1',
+      '12:1',
+      '∞:1',
+    ]);
+    expect([fmt.amount!(1), fmt.spread!(0), fmt.mix!(0.5)]).toEqual(['1.00', '0.00', '0.50']);
+  });
+
+  it('stops Low and High at each other', () => {
+    const spec = { ...DEFAULT_BLOOM, low: 50, high: 60 };
+    expect([bloomBandLimit('low', 70, spec), bloomBandLimit('low', 45, spec)]).toEqual([60, 45]);
+    expect([bloomBandLimit('high', 40, spec), bloomBandLimit('high', 80, spec)]).toEqual([50, 80]);
+    const limited = Object.fromEntries(BLOOM_KNOBS.map((k) => [k.f, k.limit?.(70, spec)]));
+    expect([limited.low, limited.high, limited.mix]).toEqual([60, 70, undefined]);
+  });
+
+  it('is called Bloom, alone in a Generate group after Space', () => {
+    expect(INSERT_LABELS.bloom).toBe('Bloom');
+    expect(INSERT_GROUPS.at(-1)).toEqual({ label: 'Generate', kinds: ['bloom'] });
   });
 });

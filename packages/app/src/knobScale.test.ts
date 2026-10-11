@@ -119,3 +119,19 @@ describe('a log knob with a zero end', () => {
     expect(FIXED_HZ_KNOB.o.fmt?.(1)).toBe('1');
   });
 });
+
+describe('a stepped knob (windsor#712)', () => {
+  const octave: KnobScaleSpec = { min: -12, max: 24, steps: [-12, 0, 7, 12, 19, 24] };
+
+  it('spaces its steps evenly round the dial and lands only on them', () => {
+    const { toNorm, fromNorm } = scaleFor(octave);
+    expect([-12, 0, 24].map(toNorm)).toEqual([0, 0.2, 1]);
+    expect([0.05, 0.25, 0.5, 2].map(fromNorm)).toEqual([-12, 0, 12, 24]);
+  });
+
+  it('moves one step a key press, held at either end', () => {
+    expect(keyTarget(octave, 0, 1, false)).toBe(7);
+    expect(keyTarget(octave, 7, -1, true)).toBe(0);
+    expect(keyTarget(octave, 24, 1, false)).toBe(24);
+  });
+});
