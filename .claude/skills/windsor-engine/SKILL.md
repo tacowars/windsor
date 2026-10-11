@@ -118,6 +118,33 @@ frames, the cutoff gliding geometrically and the Reso linearly across a
 quantum. The console card is `app/src/filterCard.ts`. Cost:
 `docs/research/2026-10-06-filter-insert/README.md`.
 
+The wet-path slot (epic windsor#686, record `2026-10-11-wet-path-slot`): a
+**host** insert carries one child insert of another kind on its wet path,
+before its Mix. Echo is the only host so far. To make a kind a host:
+
+- add `slot` to its `fields`, and `slot: null` to its defaults; the registry's
+  `normaliseInsertEntry` reads the slot, and the kind's own normaliser never
+  does;
+- give its stage a `wetPath` (`send`, `ret`, `route`; `inserts/insertKind.ts`),
+  where `route` crosses only the host's own internal wet edge;
+- append `...slotRows('<kind>')` to its `INSERT_AUTOMATION_FIELDS` entry.
+
+The rest comes free. The slot module `mixer/insertSlot.ts` wraps the stage
+in `createInsertChain`, so the child is built from the chain's registry,
+metered and tempo-fed. The `insert.<hostId>.slot.<field>` lanes follow from
+the rows. The card is `app/src/insertSlotArea.ts` and `insertChildBox.ts` over
+a `child` target in `insertTarget.ts`. In app code that address is a
+`child`, never a "slot", which already means a part's slot. A worklet host
+(Delay, Plate, Retro Reverb, bloom) first needs extra worklet outputs for
+its wet layer before its Mix, with its golden unchanged while the slot is
+empty. The card's spec is `docs/design/echo-slot-mockup.html`.
+
+A gain that cancels a ramp and starts another goes through `holdAt`
+(`mixer/audibleGate.ts`) or `fadeRamp` (`inserts/fadeRamp.ts`), never a bare
+`cancelScheduledValues`. Chrome steps the gain otherwise, and Firefox reads 0
+after a cancel (windsor#694,
+`docs/research/2026-10-11-param-hold-on-a-finished-ramp/`).
+
 The ensemble (#695) is `inserts/ensembleSpec.ts`, `ensembleConstants.ts`,
 `ensembleInsert.ts` and `ensemblePresets.ts` / `ensemblePresetTables.ts`:
 native nodes, no worklet. Three delay lines 120° apart, each swept by a slow
