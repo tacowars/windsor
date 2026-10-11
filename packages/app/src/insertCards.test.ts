@@ -8,10 +8,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BLOOM_BOUNDS,
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
   CHORUS_RATE_MAX_HZ,
   CHORUS_RATE_MIN_HZ,
+  DEFAULT_BLOOM,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
@@ -26,6 +28,7 @@ import {
   ECHO_BOUNDS,
   ENSEMBLE_BOUNDS,
   FILTER_BOUNDS,
+  INSERT_AUTOMATION_FIELDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   RETURN_NAMES,
@@ -38,6 +41,7 @@ import { addPickerGroups } from './insertAddPicker';
 import { addInsert } from './insertEdits';
 import { INSERT_CARDS } from './insertCards';
 import {
+  BLOOM_KNOBS,
   CHORUS_KNOBS,
   DRIVE_KNOBS,
   ECHO_KNOBS,
@@ -46,6 +50,8 @@ import {
   INSERT_GROUPS,
   INSERT_LABELS,
   PLATE_REVERB_KNOBS,
+  fmtBloomDensity,
+  fmtBloomShape,
 } from './insertKnobTables';
 
 describe('INSERT_CARDS', () => {
@@ -213,5 +219,37 @@ describe('FILTER_INSERT_KNOBS (windsor#622)', () => {
     }
     expect(FILTER_INSERT_KNOBS[0]!.o.curve).toBe('log');
     expect(FILTER_INSERT_KNOBS[0]!.o.fmt).toBe(fmtHz);
+  });
+});
+
+describe('BLOOM_KNOBS (windsor#712)', () => {
+  it("covers every bloom number but Octave from DEFAULT_BLOOM, on bloom's bounds", () => {
+    // Octave is a picker of its steps, and Freeze, Key and Scale are not numbers.
+    const notKnobs = ['kind', 'enabled', 'freeze', 'key', 'scale', 'octave'];
+    const fields = INSERT_KINDS.bloom.fields.filter((f) => !notKnobs.includes(f));
+    expect(BLOOM_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of BLOOM_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_BLOOM[f]);
+      expect([o.min, o.max], f).toEqual([...BLOOM_BOUNDS[f as keyof typeof BLOOM_BOUNDS]]);
+    }
+  });
+
+  it("takes a lane's field's scale and floor from its automation row", () => {
+    const byField = Object.fromEntries(BLOOM_KNOBS.map((k) => [k.f, k.o]));
+    for (const row of INSERT_AUTOMATION_FIELDS.bloom.filter((r) => r.scale !== 'switch')) {
+      const o = byField[row.target]!;
+      expect(o.curve, row.target).toBe(row.scale === 'log' ? 'log' : undefined);
+      expect(o.logFloor, row.target).toBe(row.floor);
+    }
+    expect(byField.swell?.logFloor).toBeGreaterThan(0);
+    expect([byField.low?.step, byField.high?.step]).toEqual([1, 1]);
+  });
+
+  it('reads Shape by its corners and Density as a ratio', () => {
+    expect([0, 2, 4].map(fmtBloomShape)).toEqual(['sine', 'saw', 'pulse']);
+    expect(fmtBloomShape(2.4)).toBe('saw→square 40%');
+    expect(fmtBloomDensity(DEFAULT_BLOOM.density)).toBe('1.8:1');
+    expect(fmtBloomDensity(0)).toBe('1.0:1');
+    expect(fmtBloomDensity(1)).toBe('∞:1');
   });
 });

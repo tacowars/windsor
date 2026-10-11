@@ -241,3 +241,9 @@ export const FILTER_WORKLET_URL = new URL(
   '../worklet/generated/filter-processor.js',
   import.meta.url,
 );
+
+/** bloom, the harmonic pad generator (windsor#712). */
+export const BLOOM_WORKLET_URL = new URL(
+  '../worklet/generated/bloom-processor.js',
+  import.meta.url,
+);

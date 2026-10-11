@@ -38,6 +38,7 @@
     "src/worklet/delay/**",
     "src/worklet/eq/**",
     "src/worklet/filter/**",
+    "src/worklet/bloom/**",
     "src/**/*.test.ts",
     "src/**/__fixtures__/**",
     "src/worklet/fm/**",

@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8" /><title>bloom cost</title></head><body>
+<!-- bloom micro-kernels in a real-time AudioContext, one node per cell, a fresh context per cell.
+ ?rates=48000,96000&seconds=2.5&set=all|quick . Results in window.__res (array), window.__done. -->
+<pre id="o">RUNNING</pre>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const RATES = (q.get('rates') || '48000,96000').split(',').map(Number);
+const SECONDS = Number(q.get('seconds') || 2.5), SET = q.get('set') || 'all';
+const Ns = [1, 4, 12, 48];
+function cells(rate) {
+  const D = rate > 50000 ? 8 : 4, c = [];
+  c.push({ name: 'empty', ana: 'none', syn: 'none', N: 0 });
+  c.push({ name: 'rebuild', ana: 'none', syn: 'none', N: 0, rebuild: true });
+  c.push({ name: 'ana-full', ana: 'full', syn: 'none', N: 0 });
+  c.push({ name: 'ana-dec4', ana: 'dec', D: 4, syn: 'none', N: 0 });
+  c.push({ name: 'ana-dec8', ana: 'dec', D: 8, syn: 'none', N: 0 });
+  if (SET === 'quick') return c;
+  for (const syn of ['clen', 'pow']) for (const N of Ns) c.push({ name: `full-${syn}`, ana: 'full', syn, N });
+  for (const syn of ['pow', 'cheb', 'clen', 'table', 'blep', 'mathsin']) for (const N of Ns) c.push({ name: `dec${D}-${syn}`, ana: 'dec', D, syn, N });
+  return c;
+}
+window.__res = []; window.__done = false;
+const o = document.getElementById('o');
+for (const rate of RATES) for (const cell of cells(rate)) {
+  const ctx = new AudioContext({ sampleRate: rate, latencyHint: 'playback' });
+  await ctx.audioWorklet.addModule('./bench-worklet.js');
+  const calls = Math.round((SECONDS * rate) / 128);
+  const node = new AudioWorkletNode(ctx, 'bloom-bench', { numberOfInputs: 0, outputChannelCount: [1], processorOptions: { ...cell, warm: 300, calls } });
+  node.connect(ctx.destination);
+  const got = new Promise((ok) => (node.port.onmessage = (e) => ok(e.data)));
+  await ctx.resume();
+  const r = await Promise.race([got, new Promise((ok) => setTimeout(() => ok({ timeout: true, state: ctx.state }), 60000))]);
+  const res = { rate: ctx.sampleRate, ...cell, ...r, qms: 128000 / ctx.sampleRate, baseLatency: ctx.baseLatency };
+  await ctx.close();
+  window.__res.push(res);
+  o.textContent = 'PARTIAL ' + window.__res.length;
+}
+window.__done = true; o.textContent = 'DONE ' + window.__res.length;
+</script></body></html>

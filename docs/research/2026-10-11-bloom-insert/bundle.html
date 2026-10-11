@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8" /><title>bloom bundle cost</title></head><body>
+<!-- The generated bloom bundle in a real-time AudioContext: four instances at defaults on a looping
+ 4 s input, metered by the bundle's own load sampler (packages/engine/src/worklet/loadSampler.ts,
+ a report a second) after 3 s unmetered. Serve the repository root and open
+ /docs/research/2026-10-11-bloom-insert/bundle.html?seconds=16&rates=48000,96000 .
+ Results in window.__res, window.__done. -->
+<pre id="o">RUNNING</pre>
+<script type="module">
+import { makeInput } from './inputs.js';
+const BUNDLE = '../../../packages/engine/src/worklet/generated/bloom-processor.js';
+const q = new URLSearchParams(location.search);
+const SECONDS = Number(q.get('seconds') || 16), RATES = (q.get('rates') || '48000,96000').split(',').map(Number);
+const CELLS = (q.get('cells') || 'sines48,chord4').split(',');
+window.__res = []; window.__done = false;
+const o = document.getElementById('o');
+for (const rate of RATES) for (const cell of CELLS) {
+  const ctx = new AudioContext({ sampleRate: rate, latencyHint: 'playback' });
+  await ctx.audioWorklet.addModule(BUNDLE);
+  const src = ctx.createBufferSource();
+  const data = makeInput(cell, ctx.sampleRate, 4);
+  src.buffer = ctx.createBuffer(2, data.length, ctx.sampleRate);
+  src.buffer.copyToChannel(data, 0); src.buffer.copyToChannel(data, 1);
+  src.loop = true;
+  const reports = [], nodes = [];
+  for (let k = 0; k < 4; k++) {
+    const n = new AudioWorkletNode(ctx, 'bloom', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: 'explicit' });
+    n.port.onmessage = ({ data: d }) => d.type === 'load' && reports.push(d);
+    src.connect(n); n.connect(ctx.destination); nodes.push(n);
+  }
+  src.start(); await ctx.resume();
+  await new Promise((ok) => setTimeout(ok, 3000));
+  for (const n of nodes) n.port.postMessage({ type: 'reportLoad', quanta: Math.round(ctx.sampleRate / 128) });
+  await new Promise((ok) => setTimeout(ok, SECONDS * 1000));
+  const state = ctx.state; await ctx.close();
+  const busy = reports.reduce((a, r) => a + r.busyMs, 0), quanta = reports.reduce((a, r) => a + r.quanta, 0);
+  const qms = 128000 / ctx.sampleRate;
+  window.__res.push({ rate: ctx.sampleRate, cell, state, reports: reports.length, perInstanceMs: +(busy / quanta).toFixed(4),
+    perInstanceShare: +(busy / quanta / qms).toFixed(4), peakMs: Math.max(...reports.map((r) => r.peakMs)), underruns: Math.max(...reports.map((r) => r.underruns)) });
+  o.textContent = 'PARTIAL ' + window.__res.length;
+}
+window.__done = true; o.textContent = 'DONE';
+</script></body></html>

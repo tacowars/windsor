@@ -4,6 +4,7 @@
  * (`DEFAULT_DRIVE`, `DEFAULT_CHORUS`), so the console states neither again.
  */
 import type {
+  BloomSpec,
   ChorusSpec,
   DriveSpec,
   EchoSpec,
@@ -13,10 +14,13 @@ import type {
   PlateReverbSpec,
 } from '@windsor/engine';
 import {
+  BLOOM_BOUNDS,
+  BLOOM_SHAPES,
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
   CHORUS_RATE_MAX_HZ,
   CHORUS_RATE_MIN_HZ,
+  DEFAULT_BLOOM,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
@@ -29,9 +33,12 @@ import {
   DRIVE_TONE_MIN_HZ,
   ENSEMBLE_BOUNDS,
   FILTER_BOUNDS,
+  INSERT_AUTOMATION_FIELDS,
   REVERB_SPACE_RANGES,
 } from '@windsor/engine';
-import { fmt2, fmtDb, fmtHz } from './consoleFormat';
+import { fmt2, fmtDb, fmtHz, fmtMs, noteName } from './consoleFormat';
+import type { KnobSpec } from './knob';
+import { knobRangeOf } from './patchKnobRange';
 import { DELAY_LINE_KNOBS, SPACE_KNOBS } from './returnControls';
 import type { SeqKnobOpts } from './sequencerKnobTables';
 
@@ -50,6 +57,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   echo: 'Echo',
   eq: 'Parametric EQ',
   filter: 'Filter',
+  bloom: 'bloom',
 };
 
 /**
@@ -67,13 +75,14 @@ export const INSERT_GROUPS: readonly {
   { label: 'Dynamics', kinds: ['compressor'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
   { label: 'Time', kinds: ['echo', 'delay'] },
-  { label: 'Space', kinds: ['plate', 'retro-reverb'] },
+  // bloom's group is settled with its card's mockup (windsor#711); Space stands in.
+  { label: 'Space', kinds: ['plate', 'retro-reverb', 'bloom'] },
 ];
 
 export interface InsertKnobEntry<S> {
   readonly f: Exclude<keyof S, 'kind'> & string;
   readonly label: string;
-  readonly o: SeqKnobOpts;
+  readonly o: SeqKnobOpts & Pick<KnobSpec, 'logFloor'>;
 }
 
 export const DRIVE_KNOBS: readonly InsertKnobEntry<DriveSpec>[] = [
@@ -189,4 +198,75 @@ export const FILTER_INSERT_KNOBS: readonly InsertKnobEntry<FilterSpec>[] = [
     },
   },
   { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_FILTER.mix, fmt: fmt2 } },
+];
+
+const PERCENT = 100;
+/** A 0..1 share as a whole percent. */
+const fmtPercent = (v: number): string => `${Math.round(v * PERCENT)}%`;
+
+/**
+ * bloom's Shape (windsor#712): the corner's name on an integer, and between
+ * two the pair it sweeps across with how far along, `saw→square 40%`, as the
+ * Formant vowel reads.
+ */
+export function fmtBloomShape(v: number): string {
+  const last = BLOOM_SHAPES.length - 1;
+  const clamped = Math.min(Math.max(v, 0), last);
+  const lower = Math.min(Math.floor(clamped), last - 1);
+  const pct = Math.round((clamped - lower) * PERCENT);
+  if (pct === 0) return BLOOM_SHAPES[lower]!;
+  if (pct === PERCENT) return BLOOM_SHAPES[lower + 1]!;
+  return `${BLOOM_SHAPES[lower]}→${BLOOM_SHAPES[lower + 1]} ${pct}%`;
+}
+
+/** bloom's Density as the shared compressor's ratio, 1/(1 − Density): `1.8:1` at the default. */
+export const fmtBloomDensity = (v: number): string =>
+  v >= 1 ? '∞:1' : `${(1 / (1 - v)).toFixed(1)}:1`;
+
+/** bloom's Focus, a factor on every band's width. */
+const fmtFocus = (v: number): string => `×${v.toFixed(2)}`;
+
+/** bloom's Octave step in semitones, signed: `−12`, `0`, `+7`. */
+export const fmtBloomOctave = (v: number): string =>
+  v > 0 ? `+${v} st` : v < 0 ? `−${-v} st` : '0 st';
+
+/** bloom's Scale choices as the card names them: `pentatonic-major` reads `Pentatonic major`. */
+export const bloomScaleLabel = (scale: string): string =>
+  scale.charAt(0).toUpperCase() + scale.slice(1).replace('-', ' ');
+
+/**
+ * A bloom knob's range: a lane's field takes its bounds, scale and floor from
+ * its automation row (`knobRangeOf`), so the knob and the lane that locks it
+ * agree; Low and High, no lane's, step a whole note over the band range.
+ */
+function bloomRange(field: keyof typeof BLOOM_BOUNDS): InsertKnobEntry<BloomSpec>['o'] {
+  const row = INSERT_AUTOMATION_FIELDS.bloom.find((r) => r.target === field);
+  const [min, max] = BLOOM_BOUNDS[field];
+  return { ...(row ? knobRangeOf(row) : { min, max, step: 1 }), def: DEFAULT_BLOOM[field] };
+}
+
+/** One bloom knob: its field, label and readout over `bloomRange`. */
+const bloomKnob = (
+  f: keyof typeof BLOOM_BOUNDS,
+  label: string,
+  fmt: (v: number) => string,
+): InsertKnobEntry<BloomSpec> => ({ f, label, o: { ...bloomRange(f), fmt } });
+
+/**
+ * bloom's knobs (windsor#712), in #711's groups: Envelope, Generator, Bands,
+ * Dynamics, Output. Octave, Key and Scale are pickers and Freeze a switch,
+ * on the card (`bloomCard.ts`).
+ */
+export const BLOOM_KNOBS: readonly InsertKnobEntry<BloomSpec>[] = [
+  bloomKnob('swell', 'Swell', fmtMs),
+  bloomKnob('sustain', 'Sustain', fmtMs),
+  bloomKnob('shape', 'Shape', fmtBloomShape),
+  bloomKnob('bright', 'Bright', fmtDb),
+  bloomKnob('low', 'Low', noteName),
+  bloomKnob('high', 'High', noteName),
+  bloomKnob('focus', 'Focus', fmtFocus),
+  bloomKnob('density', 'Density', fmtBloomDensity),
+  bloomKnob('amount', 'Amount', fmtPercent),
+  bloomKnob('spread', 'Spread', fmtPercent),
+  bloomKnob('mix', 'Mix', fmtPercent),
 ];

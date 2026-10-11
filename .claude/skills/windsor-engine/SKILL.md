@@ -118,6 +118,28 @@ frames, the cutoff gliding geometrically and the Reso linearly across a
 quantum. The console card is `app/src/filterCard.ts`. Cost:
 `docs/research/2026-10-06-filter-insert/README.md`.
 
+bloom (windsor#712, record `2026-10-11-bloom-insert`) is the kind `bloom`, a
+harmonic pad generator: it hears its input in 48 semitone bands (F2–E6) and
+plays a band-limited waveform at each band that sounds, levelled by a shared
+compressor, then mixes the layer with the dry signal. `inserts/bloomSpec.ts`
+(Amount, Mix, Swell, Sustain, Freeze, Spread, Shape, Bright, Octave, Key,
+Scale, Low, High, Focus, Density, enabled; no presets), `bloomConstants.ts`
+(the ranges, defaults and lists, and the route's tunables) and
+`bloomInsert.ts`; every lever is bit-neutral at its default, which
+`bloomGolden.test.ts` pins. The DSP is `worklet/bloom/`, one module a seam,
+each with its tunables in its own constants file under `inserts/`: the
+analysis is `bloomDecimator.ts` → `bloomBands.ts` (`bloomBandsConstants.ts`),
+then `bloomDynamics.ts` (`bloomDynamicsConstants.ts`), `bloomEnvelope.ts`
+(`bloomEnvelopeConstants.ts`), `bloomGenerator.ts` and
+`bloomGeneratorPitch.ts` (`bloomGeneratorConstants.ts`), `bloomSynth.ts` with
+`bloomTables.ts`, `bloomTone.ts`, and `bloomOutput.ts`
+(`bloomOutputConstants.ts`). Its per-sample log2 and 2^x are
+`fm/portablePowers.ts`'s, so an edit there rebuilds both bundles. Amount,
+Mix, Spread, Shape, Bright, Focus and Density are lanes, Swell and Sustain
+log lanes with a floor, and Freeze a switch lane; Octave, Low, High, Key and
+Scale are not targets. The console card is `app/src/bloomCard.ts`. Cost:
+`docs/research/2026-10-11-bloom-insert/README.md`.
+
 The ensemble (#695) is `inserts/ensembleSpec.ts`, `ensembleConstants.ts`,
 `ensembleInsert.ts` and `ensemblePresets.ts` / `ensemblePresetTables.ts`:
 native nodes, no worklet. Three delay lines 120° apart, each swept by a slow

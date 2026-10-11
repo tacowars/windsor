@@ -33,6 +33,8 @@ import { EQ_INSERT } from './eqInsert';
 import type { EqSpec } from './eqSpec';
 import { FILTER_INSERT } from './filterInsert';
 import type { FilterSpec } from './filterSpec';
+import { BLOOM_INSERT } from './bloomInsert';
+import type { BloomSpec } from './bloomSpec';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { IdClaim } from './insertIds';
 import { chainIds } from './insertIds';
@@ -61,6 +63,7 @@ export type InsertSpec = (
   | EchoSpec
   | EqSpec
   | FilterSpec
+  | BloomSpec
 ) &
   InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
@@ -82,6 +85,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   echo: ECHO_INSERT,
   eq: EQ_INSERT,
   filter: FILTER_INSERT,
+  bloom: BLOOM_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];
