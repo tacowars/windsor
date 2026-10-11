@@ -152,9 +152,11 @@ is a measured claim.
   a row of data, not a second processor. The row holds:
   - the input diffuser lengths, and whether they follow Size;
   - the default input and tank diffusion;
-  - the Size range;
   - the Build table;
   - the output tap table.
+
+  Both voicings keep today's Size range, 0.05 to 4
+  (`REVERB_SPACE_RANGES.size`), so "full Size" is 4 in either.
 - **Plate:** much shorter input diffusers than today's (well under 2 ms),
   so the onset is instant and dense.
 - **Room:** input diffusers around today's lengths, scaled with Size, with
