@@ -64,7 +64,7 @@ build tickets, written then.
      straight tick whose swung time is nearest the hit's onset time plus
      its hold: `unswingTicks(swingTicks(onset) + hold ÷ secondsPerTick)`,
      the inverse of the clock's warp, then whichever of the two whole ticks
-     around it sounds nearer that time. Straight, that is the hold at the
+     around it sounds nearer that time, the later on a tie. Straight, that is the hold at the
      tempo. A release that is not already a whole tick is rounded, and
      counted with the ratchet roundings ("ticks rounded", decision 8).
      Worked below.
@@ -99,17 +99,35 @@ build tickets, written then.
      into a later onset of its own pitch is trimmed to end there, the
      normaliser's rule, and counted (decision 8). On a poly patch the
      engine let both sound.
-   - **Ratchet.** Hit `i` of `N` across a step of `T` ticks starts at the
-     step's onset + round(i × T ÷ N). A hit held to the next hit (every
-     hit but an open last one) is held max(1, round(g × T ÷ N)) ticks,
-     with `g` the roll's gate (`NoteRoll.gate`). That is 1 for a Grid step
-     and the part's Gate for an Arp, Basslead or Figure step
-     (`rollOutcome`). A Euclid hit is held the lesser of its hold and its
-     slice. A hit still running at the next hit's onset is trimmed to end
-     there, as above. An open last hit runs to its release, as a plain note
-     does: a Grid's always, and an Arp's, Basslead's or Figure's when a tie
-     or slide follows or its gate covers the step (`NoteRoll.open`). A hit whose onset is not a whole tick at 24 PPQ
-     is rounded and counted (decision 8). Worked below.
+   - **Ratchet.** The engine spaces a ratchet's `N` hits evenly across the
+     step's swung span (`rollHits` in `song/rollSpan.ts`), in straight
+     time, so the bounce places them through the inverse warp, as it does
+     a Euclid release. For a step of `T` ticks starting on tick `s`, the
+     span is `S = swingTicks(s + T) − swingTicks(s)` straight ticks, and
+     hit `i` sounds at `swingTicks(s) + i × S ÷ N`. Its written onset is
+     `unswingTicks` of that time, and its release is `unswingTicks` of
+     that time plus the hit's held time. A closed hit (every hit but an
+     open last one) is held `g × S ÷ N`, with `g` the roll's gate
+     (`NoteRoll.gate`): 1 for a Grid step and the part's Gate for an Arp,
+     Basslead or Figure step (`rollOutcome`). A Euclid hit is held the
+     lesser of its hold and that slice. An open last hit runs to its
+     release, as a plain note does: a Grid's always, and an Arp's,
+     Basslead's or Figure's when a tie or slide follows or its gate covers
+     the step (`NoteRoll.open`). Each onset or release that is not a whole
+     tick is rounded as a Euclid release is, to whichever of the two whole
+     ticks around it sounds nearer its time (a tie goes to the later
+     tick), and counted (decision 8). A release is at least one tick after
+     its onset. Straight, the warp is the identity and this is
+     round(i × T ÷ N). A hit still running at the next hit's onset is
+     trimmed to end there, as above.
+   - **Ratchet hits on one tick.** At 24 PPQ a fast ratchet can round two
+     hits of one pitch onto the same tick, and a Roll holds one note per
+     pitch per tick (the normaliser drops the second). The bounce writes
+     what the grid can hold: a hit whose onset rounds onto the tick of an
+     earlier hit of its pitch is merged into that hit's note, which runs to
+     the later of their two releases. The merged hit is not heard, and the
+     toast counts it ("2 ratchet hits lost", decision 8). A grid finer than
+     24 PPQ (windsor#736) is the real fix. Ratchets straight, swung and on one tick are worked below.
    - **Step-mod lanes** become clip envelopes on the same voice targets
      (`2026-10-11-roll-envelope-format`). A part has at most
      `STEP_MOD_LANES_MAX` (4) lanes and a roll at most `ROLL_ENVELOPES_MAX`
@@ -168,8 +186,10 @@ build tickets, written then.
    region whose loop would be longer than `ROLL_LOOP_TICKS_MAX` (24576
    ticks, 256 bars of 4/4). Only an unrolled region in a long song in
    5/4, 6/8 or 12/8 can reach it: "Region 1 needs a 300-bar loop; a Roll
-   loops at most 256 bars of 4/4. Split it first." The bounce never writes
-   a roll the normaliser would trim.
+   loops at most 256 bars of 4/4. Split it first." The bounce does not
+   leave the normaliser anything to trim: it refuses a region over these
+   caps, and it resolves the same-pitch overlaps and the ratchet hits that
+   round onto one tick itself (decision 4), counting what that loses.
 7. **Slide by overlap in the Roll.** When the Roll's performer starts a
    note while a note of another pitch is still held, the note-on carries
    `slide`. "Still held" means a note started on an earlier tick whose
@@ -184,31 +204,40 @@ build tickets, written then.
    it ends. The voice is bound to the new handle by then, so the note-off
    releases nothing. This applies to every Roll note, drawn, recorded or
    bounced. A song whose Roll notes already overlap on a mono patch starts
-   sliding there; that is accepted.
+   sliding there (decision 9).
 8. **The summary.** A successful bounce shows an `info` toast:
    "Bounced to Roll: 214 notes in 3 regions", followed by only the
-   approximations that are not zero, for example "12 ticks rounded · 6
-   accents lost their mod · 4 repeats trimmed · 3 Euclid tails cut at a
-   region's end · Skip and Gate lanes baked". The counts are over the notes
-   written (each region's loop), as the note count is. "Ticks rounded"
-   counts the ratchet hits and the swung Euclid releases that fell between
-   ticks. "Repeats trimmed" counts the same-pitch overlaps of decision 4.
+   approximations that are not zero, for example "12 ticks rounded · 2
+   ratchet hits lost · 6 accents lost their mod · 4 repeats trimmed · 3
+   Euclid tails cut at a region's end · Skip and Gate lanes baked". The
+   counts are over the notes written (each region's loop), as the note
+   count is. "Ticks rounded" counts each written ratchet onset or release
+   and each swung Euclid release that fell between ticks. "Ratchet hits
+   lost" counts the hits merged into an earlier hit on the same tick
+   (decision 4); a lost hit's own roundings are not counted. "Repeats
+   trimmed" counts the same-pitch overlaps of decision 4.
    "Euclid tails cut" counts the written notes whose hold the render cut at
    their region's end (decision 4); a region cuts at most one pass's worth,
    its last. A Figure part that another part's canon follows is a
    leader no longer, and the normaliser drops that canon's source, as it
    does at any kind change of the leader. The toast then names the
    follower: "Pad's canon lost its leader". Undo brings both back.
-9. **No format change.** A bounce writes ordinary Roll patterns and
-   envelopes, and the overlap rule adds no field, so `ARRANGEMENT_VERSION`
-   stays where it is (`2026-09-28-format-versions-refuse-never-destroy`).
-   Old-song parity is not required: a saved Roll whose notes overlap on a
-   mono patch slides from this build on (decision 7).
+9. **No format change, by tacowars's decision.** A bounce writes ordinary
+   Roll patterns and envelopes, and the overlap rule adds no field. The
+   overlap rule does change what existing data means: a saved Roll whose
+   notes of different pitches overlap on a mono patch retriggered there,
+   and from this build on it slides (decision 7).
+   `2026-09-28-format-versions-refuse-never-destroy` bumps the version for
+   a changed meaning. tacowars decided on 2026-10-11 to depart from that
+   rule here and leave `ARRANGEMENT_VERSION` where it is: old-song parity
+   is not required, and the version is not bumped only to protect older
+   songs. Old songs still load, play and round-trip; only their mono
+   overlaps now slide. No upgrade is provided.
 10. **Later**:
     - MIDI lanes for the mod wheel and pitch bend, where an accent's mod
       would go.
-    - A grid finer than 24 PPQ, for exact ratchets. That is a format
-      change.
+    - A grid finer than 24 PPQ (windsor#736), for exact ratchets with no
+      hit lost. That is a format change.
     - Duplicate track: a bounce that keeps the original.
     - Accent-mod or slide marks drawn on Roll notes.
 
@@ -296,20 +325,47 @@ bar 2's, so `L` = 1 bar fails, and so do `L` = 2 bars (bars 1–2 against
 loop is 4 bars holding the 49 notes, exactly that take. A skip-chance lane
 on the part would be read as the gate reads it, then removed.
 
-### A ratchet
+### A ratchet (decision 4)
 
-A Grid step at 1/16 (6 ticks) with a ratchet of 4: the engine spaces the
-hits 1.5 ticks apart. The bounce places them at 0, round(1.5) = 2, 3 and
-round(4.5) = 5 (`Math.round`, halves up), so 2 hits are rounded. Each
-closed hit is held max(1, round(1 × 1.5)) = 2 ticks. The hit at 2 then
-runs into the hit at 3, so it is trimmed to 1. The open last hit runs
-from 5 to the step's end, where the next note or rest releases it. So
-the hits are 0–2, 2–3, 3–5 and 5–6. A ratchet of 3, or of 4 at 1/8,
-divides evenly and rounds nothing. Under swing the engine spaces the hits
-evenly across the swung span, while the Roll's hits fall on the clock's
-swung ticks. Within one half of a swing pair the warp is linear, so the
-two agree up to the rounding; a step that spans a pair's midpoint does
-not.
+A Grid step at 1/16 (6 ticks) with a ratchet of 4, straight: the engine
+spaces the hits 1.5 ticks apart and holds each closed hit 1.5 ticks
+(gate 1). The onsets fall at 0, 1.5, 3 and 4.5, and the closed hits'
+releases at 1.5, 3 and 4.5. A half is a tie, which goes to the later
+tick, so the hits are written 0–2, 2–3, 3–5 and 5–6: the open last hit
+runs from 5 to the step's end, where the next note or rest releases it.
+Four positions fell between ticks (hit 1's release, hit 2's onset, hit
+3's release and hit 4's onset): "4 ticks rounded". A ratchet of 3, or of
+4 at 1/8, divides evenly and rounds nothing.
+
+### A ratchet across the swing's off-beat (decision 4)
+
+At 75% sixteenth swing a pair is 12 ticks, a tick in its first half lasts
+1.5 straight ticks and one in its second half 0.5. A Grid step at 1/8
+(12 ticks) on the downbeat, tick 0, with a ratchet of 4, spans the whole
+pair: `S` = `swingTicks(12)` − `swingTicks(0)` = 12 straight ticks. The
+engine plays its hits at straight times 0, 3, 6 and 9, each closed hit
+held 3. Through `unswingTicks` the onsets are ticks 0, 2, 4 and 6 (9 is
+the off-beat, `unswingTicks(9)` = 6), and the closed hits' releases at 3,
+6 and 9 are ticks 2, 4 and 6. The open last hit runs to the step's end,
+tick 12. So the hits are written 0–2, 2–4, 4–6 and 6–12, all whole ticks,
+and nothing is rounded. Played back they sound at `swingTicks` 0, 3, 6
+and 9, the engine's times. Spacing the hits evenly in ticks (0, 3, 6 and
+9) would play them at 0, 4.5, 9 and 10.5.
+
+### A ratchet whose hits round onto one tick (decision 4)
+
+A Grid step at 1/32 (`T` = 3) with a ratchet of 4, straight: the hits
+start at 0, 0.75, 1.5 and 2.25, each closed hit held 0.75. Rounded to the
+nearer tick, the onsets are 0, 1, 2 and 2. Hit 1 is written 0–1 and hit 2
+1–2 (its release, 1.5, is a tie and goes to 2). Hit 3 starts on tick 2,
+and its release, 2.25, rounds to 2, so the one-tick minimum makes it 2–3.
+Hit 4, the open last hit, also rounds onto tick 2: it is merged into hit
+3's note, which runs to the later release, the step's end at tick 3. The
+bounce writes three notes, 0–1, 1–2 and 2–3, where the engine played
+four hits, and the toast says "5 ticks rounded · 1 ratchet hit lost" (hit
+1's release, hit 2's onset and release, hit 3's onset and release). At
+24 PPQ a 1/32 step has three ticks for four hits, so one is always lost;
+windsor#736 would give them a tick each.
 
 ### A Euclid hold under swing (decision 4)
 
@@ -431,10 +487,13 @@ build's markup and styles. It proposes:
 
 - The build tickets, written once the mockup is approved, cover:
   - the render and the loop search: the engine function and its tests,
-    with these examples as fixtures, and two parity tests against the
+    with these examples as fixtures, and parity tests against the
     played part: a last-step Euclid hit whose hold crosses the region's
-    end (written cut at the end, and counted), and a swung Euclid hit
-    (its written release sounds at the hold's end, to the nearest tick);
+    end (written cut at the end, and counted); a swung Euclid hit (its
+    written release sounds at the hold's end, to the nearest tick); a
+    swung eighth-note ×4 ratchet across the off-beat (its hits sound at
+    the engine's times, as worked above); and a 1/32 ×4 ratchet (three
+    notes written, one hit counted lost);
   - the overlap slide in `RollSequencer`;
   - the command, its toasts and its undo label.
 - `2026-10-04-roll-sequencer` listed per-note slide as not in v1, and its
