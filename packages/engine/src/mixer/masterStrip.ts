@@ -29,7 +29,16 @@ export function createMasterStrip(
   const output = context.createGain();
   const fade = context.createGain();
   fade.connect(output);
-  const chain = createInsertChain(context, input, [], options.registry ?? INSERT_KINDS, 'master');
+  const later =
+    options.defer ??
+    ((run: () => void, seconds: number): void => {
+      setTimeout(run, seconds * MS_PER_SECOND);
+    });
+  const chain = createInsertChain(context, input, [], {
+    registry: options.registry ?? INSERT_KINDS,
+    owner: 'master',
+    later,
+  });
   let tail = chain.tail;
   tail.connect(fade);
   const tap = {
@@ -45,11 +54,6 @@ export function createMasterStrip(
       fade.gain.linearRampToValueAtTime(level, now + seconds);
     },
   };
-  const later =
-    options.defer ??
-    ((run: () => void, seconds: number): void => {
-      setTimeout(run, seconds * MS_PER_SECOND);
-    });
   const updates = createInsertUpdater(chain, tap, later, options.changed);
   let spec = DEFAULT_MASTER;
   return {

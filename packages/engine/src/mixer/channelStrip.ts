@@ -225,7 +225,11 @@ export function routePart(
 
   const lowCut = createLowCutStage(context, strip.lowCut);
   part.output.connect(lowCut.input);
-  const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
+  const inserts = createInsertChain(context, lowCut.output, strip.inserts, {
+    registry,
+    owner: part.name,
+    later,
+  });
   const targets: DryTargets = 'master' in dry ? dry : { master: dry, group: NO_GROUPS };
   const first = destinationOf(targets, strip.output);
   let output = first.output;

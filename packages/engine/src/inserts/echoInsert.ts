@@ -2,8 +2,14 @@
  * The Echo insert (windsor#171): the `echo` return's delay line, on a strip
  * or a send bus, with a Mix knob and an on/off switch. Native nodes only.
  *
- *   input ─┬─▶ send ─▶ [delay loop, soft clip] ─▶ wet (mix) ─┬─▶ output
- *          └─▶ dry (1 − mix) ───────────────────────────────┘
+ *   input ─┬─▶ send ─▶ [delay loop, soft clip] ─▶ direct ─▶ wet (mix) ─┬─▶ output
+ *          └─▶ dry (1 − mix) ─────────────────────────────────────────┘
+ *
+ * Echo is a host (windsor#688, record `2026-10-11-wet-path-slot`): a slot
+ * child takes the loop's output and returns into `wet`, beside `direct`,
+ * which is unity until a child arrives and crosses to 0 while it is there
+ * (`wetPath`, wired by `mixer/insertSlot.ts`). The child is outside the
+ * feedback, and `wet`'s Mix and switch act after it.
  *
  * The loop is `mixer/returnEffects.ts`'s `attachDelay`, the return's own
  * builder, so Mix 1 (dry 0, wet 1) is the return's line exactly. Off closes
@@ -32,7 +38,8 @@ import type { FieldNormaliser } from '../song/arrangementFields';
 import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
 import { loopSettlesIn } from './echoSwitchSettle';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
-import type { InsertKind, InsertStage } from './insertKind';
+import { INSERT_FADE_SECONDS } from './insertConstants';
+import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { InsertSpec } from './insertRegistry';
 import type { FieldReader } from './switchTimeline';
 
@@ -109,18 +116,51 @@ function echoTarget(field: string, line: DelayLine, spec: () => EchoSpec): KnobT
   return { params: [param], write: (v) => [value(v)], resting: () => spec()[field] };
 }
 
-function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
+/**
+ * Echo's wet path (windsor#688): its slot's child takes the loop's output,
+ * after the loop and outside the feedback, and comes back into `wet`, so Mix
+ * and the switch act after it. `route` crosses `direct`, the loop's own edge
+ * into `wet`, over one insert fade from now.
+ */
+function echoWetPath(
+  context: BaseAudioContext,
+  line: DelayLine,
+  direct: GainNode,
+  wet: GainNode,
+): WetPath {
+  return {
+    send: { node: line.damp, output: 0 },
+    ret: wet,
+    route(on: boolean): void {
+      const now = context.currentTime;
+      direct.gain.cancelScheduledValues(now);
+      direct.gain.setValueAtTime(direct.gain.value, now);
+      direct.gain.linearRampToValueAtTime(on ? 0 : 1, now + INSERT_FADE_SECONDS);
+    },
+  };
+}
+
+/** Echo's nodes, wired as the diagram at the top has them. */
+function echoGraph(context: BaseAudioContext, spec: EchoSpec) {
   const input = context.createGain();
   const send = context.createGain();
+  // Unity unless a slot child takes the repeats: built either way, so the stage stays the same object.
+  const direct = context.createGain();
   const wet = context.createGain();
   const dry = context.createGain();
   const output = context.createGain();
-  const line = attachDelay(context, send, wet, spec);
+  const line = attachDelay(context, send, direct, spec);
 
   input.connect(send);
+  direct.connect(wet);
   wet.connect(output);
   input.connect(dry);
   dry.connect(output);
+  return { input, send, direct, wet, dry, output, line };
+}
+
+function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
+  const { input, send, direct, wet, dry, output, line } = echoGraph(context, spec);
 
   let current = spec;
   // Each lane (windsor#345, windsor#628, windsor#629): a loop field on its own
@@ -169,11 +209,12 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     kind: 'echo',
     input,
     output,
+    wetPath: echoWetPath(context, line, direct, wet),
     set,
     param: (field) => knobs.param(field),
     // The loop's own nodes too, as the return's `dispose` does; never the edge out of `output`.
     dispose(): void {
-      for (const node of [input, send, wet, dry]) node.disconnect();
+      for (const node of [input, send, direct, wet, dry]) node.disconnect();
       disconnectDelay(line);
     },
   };
