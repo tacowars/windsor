@@ -455,6 +455,17 @@ export class AudioSystem {
     return this.automation.lanesOf(groupOwner(id));
   }
 
+  /**
+   * The voice paths the clip envelopes of the part on `slot` hold a voice
+   * slot for now, written into the caller's `out` (windsor#725): what the
+   * engine has admitted, which the console's env ring reads each frame
+   * instead of working admission out again. Allocation-free; none before
+   * `initMusic`, or for a part whose regions play no envelope.
+   */
+  envelopeTargets(slot: number, out: string[]): string[] {
+    return this.automation.envelopeTargets(slot, out);
+  }
+
   /** A return by name, once `init()` has built them. */
   returnBus(name: string): ReturnBus | undefined {
     return this.graph.returnBus(name);

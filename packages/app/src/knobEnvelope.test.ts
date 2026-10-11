@@ -61,6 +61,8 @@ const query = (
   base: 1000,
   tick: 2 * BAR + LOOP / 4,
   running: true,
+  // The engine holds the knob's slot unless a test says otherwise.
+  admitted: [path],
   songTicks: SONG,
   ...at,
 });
@@ -192,8 +194,10 @@ describe('a knob an envelope moves', () => {
   });
 });
 
-describe('the voice slots the engine admits envelopes to', () => {
-  const lanePaths = [
+describe('the voice slots the engine holds, handed in as `admitted`', () => {
+  // Seven song lanes leave one slot: a fresh start would give it to Cutoff,
+  // first in the roll's order, but the engine may already hold Env Amount's.
+  const lanes = [
     'ops.0.level',
     'ops.1.level',
     'ops.2.level',
@@ -201,21 +205,32 @@ describe('the voice slots the engine admits envelopes to', () => {
     'lfo.amount',
     'lfo2.amount',
     'filter.resonance',
-  ];
-  const lanes = (paths: readonly string[]): AutomationLane[] =>
-    paths.map((path) => ({
-      target: `voice.${path}`,
-      on: true,
-      points: [{ tick: 0, value: 0.5, bend: 0 }],
-    }));
-  const envelopes = [sweep('filter.cutoff'), sweep('filter.envAmount')];
+  ].map((path): AutomationLane => ({
+    target: `voice.${path}`,
+    on: true,
+    points: [{ tick: 0, value: 0.5, bend: 0 }],
+  }));
+  const part = rollPart([sweep('filter.cutoff'), sweep('filter.envAmount')], lanes);
+  const held = { admitted: ['filter.envAmount'] };
 
-  it('rings only the first envelope when the song lanes leave one slot', () => {
-    const part = rollPart(envelopes, lanes(lanePaths));
-    expect(knobEnvelopeAt(query(part, 'filter.cutoff'))).not.toBeNull();
-    expect(knobEnvelopeAt(query(part, 'filter.envAmount'))).toBeNull();
-    const roomy = rollPart(envelopes, lanes(lanePaths.slice(1)));
-    expect(knobEnvelopeAt(query(roomy, 'filter.envAmount'))).not.toBeNull();
+  it('moves only the target the engine holds, whatever the roll’s order', () => {
+    const tick = 2 * BAR + LOOP / 2;
+    const value = envelopeValueAt(sweep('filter.envAmount'), LOOP / 2, LOOP);
+    const envAmount = knobEnvelopeAt(query(part, 'filter.envAmount', { base: 0.5, tick, ...held }));
+    expect(envAmount?.playing).toBeCloseTo(
+      stepModValue(voiceTargetRow('filter.envAmount')!, 0.5, value),
+      9,
+    );
+    expect(envAmount?.playing).not.toBe(0.5);
+    expect(knobEnvelopeAt(query(part, 'filter.cutoff', { tick, ...held }))).toEqual({
+      base: 1000,
+      playing: 1000,
+    });
+  });
+
+  it('keeps the label on a target the engine holds no slot for, resting at the centre', () => {
+    expect(knobEnvelopeAt(query(part, 'filter.cutoff', { admitted: [] }))).not.toBeNull();
+    expect(knobEnvelopeAt(query(part, 'filter.envAmount', { admitted: [] }))).not.toBeNull();
   });
 });
 

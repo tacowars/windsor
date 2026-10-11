@@ -3,7 +3,8 @@
  * (windsor#718): only an envelope that can change the sound takes one (a
  * macro past the patch's count cannot), the rule runs again at a preset
  * switch and a patch edit, and an envelope with no song lane on its target
- * marks its slot `relative`, which a lane on the target takes back.
+ * marks its slot `relative`, which a lane on the target takes back. What
+ * the tracks hold is what `envelopeTargets` reads back to the app.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -23,6 +24,7 @@ import { makeMacro, makePatch } from '../patch/patch';
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
 import { FM_LANES_MAX } from './automationTargetTables';
 import { voiceTargetId } from './automationTargets';
+import { admittedEnvelopes } from './clipEnvelopeAdmission';
 
 let restore: () => void = () => {};
 beforeAll(() => {
@@ -73,6 +75,59 @@ describe('an envelope takes a slot only when it can change the sound', () => {
     expect(rig.holds('macros.1.value')).toBe(false);
     expect(rig.holds('lfo2.amount')).toBe(true);
     expect(lanePaths.every((path) => rig.holds(path))).toBe(true);
+  });
+});
+
+describe('the held set the app reads (windsor#725)', () => {
+  it('keeps the envelope already holding the last slot when the next region orders another first', async () => {
+    const lanePaths = [
+      'ops.0.level',
+      'ops.1.level',
+      'ops.2.level',
+      'ops.3.level',
+      'lfo.amount',
+      'lfo2.amount',
+      'filter.resonance',
+    ];
+    expect(lanePaths.length).toBe(FM_LANES_MAX - 1);
+    const lanes = lanePaths.map((path) => lane(voiceTargetId(path), [point(0, 0.5)]));
+    const a = rise('filter.cutoff');
+    const b = rise('filter.envAmount');
+    const part = rollPart([
+      { start: 0, duration: BAR, pattern: rollPattern(BAR, [a]) },
+      { start: BAR, duration: BAR, pattern: rollPattern(BAR, [b, a]) },
+    ]);
+    const rig = await clipEnvelopeRig(part, { lanes });
+    const out: string[] = [];
+    /** The live read, and the envelope targets holding a voice slot, which it must match. */
+    const read = (): string[] => [...rig.player.envelopeTargets(ENVELOPE_OWNER.part, out)];
+    const holding = (): string[] => [a.target, b.target].filter((path) => rig.holds(path));
+
+    expect(read()).toEqual([]);
+    rig.run(BAR / 2);
+    expect(read()).toEqual(['filter.cutoff']);
+    expect(holding()).toEqual(['filter.cutoff']);
+
+    // Into the second region: from a fresh start B would win the last slot, but A holds it.
+    rig.run(BAR);
+    const fresh = admittedEnvelopes({
+      lanes,
+      held: [],
+      envelopes: [b, a],
+      loopTicks: BAR,
+      slots: FM_LANES_MAX,
+      sounds: () => true,
+    });
+    expect(fresh).toEqual(['filter.envAmount']);
+    expect(read()).toEqual(['filter.cutoff']);
+    expect(holding()).toEqual(['filter.cutoff']);
+    expect(rig.player.envelopeTargets(ENVELOPE_OWNER.part, out)).toBe(out);
+  });
+
+  it('reads none for a part with no tracks', async () => {
+    const rig = await clipEnvelopeRig(rollPart([{ ...WHOLE, pattern: rollPattern(BAR, []) }]));
+    rig.run(4);
+    expect(rig.player.envelopeTargets(ENVELOPE_OWNER.part, ['stale'])).toEqual([]);
   });
 });
 

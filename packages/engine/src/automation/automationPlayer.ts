@@ -48,7 +48,7 @@ import type { AutomationRamp } from './automationEvaluate';
 import { rampsBetween, valueAt } from './automationEvaluate';
 import type { AutomationHandle } from './automationHandles';
 import type { AutomationOwner } from './automationOwner';
-import { ownerKey } from './automationOwner';
+import { ownerKey, partOwner } from './automationOwner';
 import type {
   AutomationLane,
   AutomationPoint,
@@ -200,6 +200,24 @@ export class AutomationPlayer {
   owners(): readonly AutomationOwner[] {
     return [...this.lanes.values()].map((held) => held.owner);
   }
+
+  /**
+   * The voice paths the clip envelopes of the part on `slot` hold a slot
+   * for now, written into `out` (cleared first): the envelopes the player
+   * has admitted (`ClipEnvelopeTracks.heldPaths`), none for a part with no
+   * tracks. The app's env ring reads it each frame (windsor#725), so the
+   * part's key is built once per slot and the call allocates nothing.
+   */
+  envelopeTargets(slot: number, out: string[]): string[] {
+    const key = (this.partKeys[slot] ??= ownerKey(partOwner(slot)));
+    const tracks = this.envelopes.get(key);
+    if (tracks) return tracks.heldPaths(out);
+    out.length = 0;
+    return out;
+  }
+
+  /** Each part's `ownerKey` by slot, for `envelopeTargets`. */
+  private readonly partKeys: string[] = [];
 
   /** The lanes `owner` holds now; none for an owner without lanes. */
   lanesOf(owner: AutomationOwner): readonly AutomationLane[] {

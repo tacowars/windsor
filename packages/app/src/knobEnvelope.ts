@@ -7,20 +7,24 @@
  *
  * The ring shows exactly what the engine plays, by asking the engine's own
  * decisions, never restating them:
- * - an envelope plays when `envelopeHeard` says so, over its roll's loop;
- * - of a roll's envelopes, only those `admittedEnvelopes` gives a voice slot
- *   sound, in the roll's order, after the part's song lanes have theirs, and
- *   only on a target the patch lets an offset move (`voiceTargetSounds`: no
- *   macro maps it, and the patch has a value there);
+ * - an envelope plays when `envelopeHeard` says so, over its roll's loop,
+ *   and can sound only on a target the patch lets an offset move
+ *   (`voiceTargetSounds`: no macro maps it, and the patch has a value there);
+ * - which envelopes hold one of the part's voice slots is the engine's live
+ *   state, read while the transport plays (`AudioSystem.envelopeTargets`,
+ *   handed in as `admitted`), never worked out here: the slots an envelope
+ *   already holds decide what the next region's envelopes get;
  * - the transport tick is placed in a region, and at its local tick, by
  *   `regionState`, the rule the roll's performer and its envelopes play by.
  *
- * A knob shows the ring while any of its part's rolls (`part.sequencer`, or
- * a region's own `pattern` as `regionPattern` reads it) admits an envelope on
- * its target. While the transport runs inside a region whose roll admits it,
- * the playing value is the centre with the envelope's offset at the region's
- * loop tick worked through the target's row (`stepModValue`), as the
- * engine's voice applies it; otherwise it is the centre itself.
+ * A knob shows the ring, and its ENV label, while any of its part's rolls
+ * (`part.sequencer`, or a region's own `pattern` as `regionPattern` reads
+ * it) holds an envelope on its target that plays and can sound. While the
+ * transport runs inside a region whose roll plays it, and the engine holds
+ * a slot for it, the playing value is the centre with the envelope's offset
+ * at the region's loop tick worked through the target's row
+ * (`stepModValue`), as the engine's voice applies it; otherwise it is the
+ * centre itself.
  *
  * The centre is the patch's value, or, under a song lane on the same target
  * that is on, the lane's value at the song tick: the lane's lock wins the
@@ -28,9 +32,9 @@
  * (`clipEnvelopeWindow.ts`).
  *
  * The knob asks again on every frame of the playhead's loop. What a part's
- * rolls hold on each target is worked out once per part object, and what
- * they admit once per part and patch (a patch edit commits a new document,
- * so a new part); the answer is written into the caller's `out`.
+ * rolls hold on each target is worked out once per part object, and which
+ * of those can sound once per part and patch (a patch edit commits a new
+ * document, so a new part); the answer is written into the caller's `out`.
  */
 import type {
   AutomationLane,
@@ -42,17 +46,13 @@ import type {
   VoiceTargetRow,
 } from '@windsor/engine';
 import {
-  FM_LANES_MAX,
-  admittedEnvelopes,
   catalogRow,
   envelopeHeard,
   envelopeValueAt,
-  macroMapsTarget,
   regionPattern,
   regionState,
   stepModValue,
   valueAt,
-  voicePathOf,
   voiceTargetId,
   voiceTargetRow,
   voiceTargetSounds,
@@ -82,6 +82,11 @@ export interface KnobEnvelopeQuery {
   tick: number;
   /** Whether the transport runs: stopped or paused, the ring rests at the centre. */
   running: boolean;
+  /**
+   * The voice paths the engine holds a slot for on the part's envelopes now
+   * (`AudioSystem.envelopeTargets`), read while `running`: only these move.
+   */
+  admitted: readonly string[];
   /** The song's length in ticks (`songTicksOf`). */
   songTicks: number;
 }
@@ -106,10 +111,6 @@ interface TargetEnvelopes {
 export interface PartEnvelopes {
   /** Per region, the roll it plays when that roll has an envelope that plays; null otherwise. */
   readonly rolls: readonly (Roll | null)[];
-  /** The part's own roll, which no region may play. */
-  readonly own: Roll | null;
-  /** The part's song lanes on voice targets that are on: the slots they hold. */
-  readonly lanes: readonly AutomationLane[];
   /** Only the targets a roll's envelope plays on. */
   readonly targets: ReadonlyMap<string, TargetEnvelopes>;
 }
@@ -134,9 +135,7 @@ const laneOn = (lane: AutomationLane): boolean => lane.on && lane.points.length 
 export function partEnvelopeTargets(part: DocumentPart): PartEnvelopes {
   const rolls = part.regions.map((_, i) => heardRoll(regionPattern(part, i)));
   const own = heardRoll(part.sequencer);
-  const lanes = (part.automation ?? []).filter(
-    (lane) => laneOn(lane) && voicePathOf(lane.target) !== undefined,
-  );
+  const lanes = (part.automation ?? []).filter(laneOn);
   const paths = new Set<string>();
   for (const roll of [own, ...rolls]) {
     for (const e of roll?.envelopes ?? []) if (playedOn(roll, e.target)) paths.add(e.target);
@@ -153,65 +152,46 @@ export function partEnvelopeTargets(part: DocumentPart): PartEnvelopes {
       laneRow: lane ? catalogRow(lane.target) : undefined,
     });
   }
-  return { rolls, own, lanes, targets };
+  return { rolls, targets };
 }
 
-/** What `patch` lets a part's rolls play: per region, and anywhere. */
-interface Admitted {
+/** The targets of `held` an envelope can sound on under `patch`. */
+interface Sounding {
   readonly patch: Patch;
-  /** Per region, the targets its roll's envelopes take a voice slot on. */
-  readonly regions: readonly (readonly string[])[];
-  /** The targets any of the part's rolls takes a slot on. */
-  readonly shown: ReadonlySet<string>;
+  readonly paths: ReadonlySet<string>;
 }
 
-/** The targets `roll`'s envelopes take a voice slot on under `patch`, from a fresh start. */
-function admittedIn(roll: Roll | null, lanes: readonly AutomationLane[], patch: Patch): string[] {
-  if (!roll) return [];
-  return admittedEnvelopes({
-    lanes,
-    held: [],
-    envelopes: roll.envelopes,
-    loopTicks: roll.loopTicks,
-    slots: FM_LANES_MAX,
-    sounds: (path) => voiceTargetSounds(patch, path),
-  });
-}
-
-/** What the part's rolls admit under `patch`. */
-function admittedBy(held: PartEnvelopes, patch: Patch): Admitted {
-  // A lane on a target a macro maps has no handle, and holds no slot.
-  const lanes = held.lanes.filter((lane) => !macroMapsTarget(patch, voicePathOf(lane.target)!));
-  const regions = held.rolls.map((roll) => admittedIn(roll, lanes, patch));
-  const shown = new Set([...regions.flat(), ...admittedIn(held.own, lanes, patch)]);
-  return { patch, regions, shown };
-}
+const soundingUnder = (held: PartEnvelopes, patch: Patch): Sounding => ({
+  patch,
+  paths: new Set([...held.targets.keys()].filter((path) => voiceTargetSounds(patch, path))),
+});
 
 interface Cached {
   readonly held: PartEnvelopes;
-  admitted: Admitted | null;
+  sounding: Sounding | null;
 }
 
 const CACHE = new WeakMap<DocumentPart, Cached>();
 
-/** `partEnvelopeTargets` once per part object, and what it admits once per patch. */
+/** `partEnvelopeTargets` once per part object, and what can sound once per patch. */
 function cachedFor(part: DocumentPart, patch: Patch, build: typeof partEnvelopeTargets): Cached {
   let cached = CACHE.get(part);
-  if (!cached) CACHE.set(part, (cached = { held: build(part), admitted: null }));
-  if (cached.admitted?.patch !== patch) cached.admitted = admittedBy(cached.held, patch);
+  if (!cached) CACHE.set(part, (cached = { held: build(part), sounding: null }));
+  if (cached.sounding?.patch !== patch) cached.sounding = soundingUnder(cached.held, patch);
   return cached;
 }
 
 /**
  * The envelope's value (−1..1) the part plays on `path` at transport tick
- * `tick`: in the region `regionState` places the tick in, at its local tick
- * mod its roll's loop, when that roll's envelope there takes a slot; 0
- * otherwise.
+ * `tick`: when the engine holds a slot for it, in the region `regionState`
+ * places the tick in, at its local tick mod its roll's loop; 0 otherwise.
  */
 function envelopeValueNow(query: KnobEnvelopeQuery, cached: Cached, held: TargetEnvelopes): number {
-  const { part, path, songTicks, tick } = query;
+  const { part, path, songTicks, tick, admitted } = query;
+  if (!admitted.includes(path)) return 0;
+  // `regionState` answers a small object per call; the engine offers no variant that fills one.
   const state = regionState(part!.regions, songTicks, tick);
-  if (!state.live || !cached.admitted!.regions[state.index]!.includes(path)) return 0;
+  if (!state.live) return 0;
   const envelope = held.regions[state.index];
   const roll = cached.held.rolls[state.index];
   if (!envelope || !roll) return 0;
@@ -220,7 +200,7 @@ function envelopeValueNow(query: KnobEnvelopeQuery, cached: Cached, held: Target
 
 /**
  * The env ring of the knob `query` names, written into `out`: null when no
- * roll of the part takes a voice slot on its target.
+ * roll of the part plays an envelope on its target that can sound.
  */
 export function knobEnvelopeAt(
   query: KnobEnvelopeQuery,
@@ -231,7 +211,7 @@ export function knobEnvelopeAt(
   if (!part) return null;
   const cached = cachedFor(part, query.patch, build);
   const held = cached.held.targets.get(path);
-  if (!held || !cached.admitted!.shown.has(path)) return null;
+  if (!held || !cached.sounding!.paths.has(path)) return null;
   const { lane, laneRow } = held;
   const base =
     lane && laneRow ? valueAt(laneRow, lane.points, songTickOf(tick, songTicks)) : query.base;

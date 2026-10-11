@@ -143,10 +143,12 @@ function patchEditor(ctx: AppCtx): PatchEditor {
 
 /**
  * The editor's env ring read (windsor#725): the selected part's clip
- * envelope on a knob's path at the audible tick. One query, refilled per
- * read, so a knob's frame allocates nothing.
+ * envelope on a knob's path at the audible tick, moving only on the targets
+ * the engine holds a slot for. One query and one admitted list, refilled
+ * per read, so a knob's frame allocates nothing of its own.
  */
 function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
+  const admitted: string[] = [];
   const query: KnobEnvelopeQuery = {
     part: undefined,
     patch: ctx.parts.patch,
@@ -154,6 +156,7 @@ function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
     base: 0,
     tick: 0,
     running: false,
+    admitted,
     songTicks: 0,
   };
   return (path, out) => {
@@ -164,6 +167,9 @@ function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
     query.base = Number(getPath(ctx.parts.patch, path) ?? 0);
     query.tick = ctx.transport.position();
     query.running = ctx.transport.running;
+    // The engine's own admitted set while it plays; stopped, nothing moves.
+    if (query.running) ctx.host.envelopeTargets(ctx.parts.selected, admitted);
+    else admitted.length = 0;
     query.songTicks = songTicksOf(doc);
     return knobEnvelopeAt(query, out);
   };

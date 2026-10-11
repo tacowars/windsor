@@ -87,7 +87,7 @@ const patchDefines = (patch: Patch, path: string): boolean =>
  * plays (windsor#718, windsor#725): no macro of the patch maps the target,
  * so the part has a handle on it, and the patch has a value there. The
  * patch-side reading of `targetSounds` (`automation/clipEnvelopeSource.ts`),
- * which the app's env ring hands `admittedEnvelopes`.
+ * by which the app's env ring shows its label only where an envelope can sound.
  */
 export const voiceTargetSounds = (patch: Patch, path: string): boolean =>
   !macroMapsTarget(patch, path) && patchDefines(patch, path);

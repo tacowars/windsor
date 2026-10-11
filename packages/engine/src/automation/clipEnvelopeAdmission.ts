@@ -1,8 +1,9 @@
 /**
  * Which of a roll's clip envelopes get one of the part's voice slots
- * (windsor#702, windsor#718, windsor#725): the one admission order, which
- * `ClipEnvelopeTracks.admit` runs at an envelope's first tick and the app's
- * env ring runs to show only what plays.
+ * (windsor#702, windsor#718): the one admission order, which
+ * `ClipEnvelopeTracks.admit` runs at an envelope's first tick, over the
+ * tracks it already holds. The app's env ring never runs it: it reads what
+ * the tracks hold (`ClipEnvelopeTracks.heldPaths`, windsor#725).
  *
  * In the roll's order, an envelope that plays (`envelopeHeard`) is admitted
  * - when it already holds a slot (a track on its target);
@@ -13,8 +14,7 @@
  * The slots in use are one per song lane on a voice target, and one per
  * target already held that no lane holds. Whether a target sounds is asked
  * only once a slot is there for it: no macro of the patch maps it, and the
- * patch has a value there (`targetSounds` of the part's handle on the
- * engine's side, `voiceTargetSounds` of the patch on the app's).
+ * patch has a value there (`targetSounds` of the part's handle).
  *
  * Pure, and with the caller's `out` allocates nothing.
  * `clipEnvelopeAdmission.test.ts`, and `clipEnvelopePlayer.test.ts` for

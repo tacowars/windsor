@@ -28,8 +28,9 @@
  *   (`sweep`), unless a lane holds the target. A new target is admitted only
  *   while the part's voice lanes and its other tracks leave a slot free; a
  *   song lane's target is always admitted and shares its slot, in the
- *   roll's order (`admittedEnvelopes`, `clipEnvelopeAdmission.ts`, which
- *   the app's env ring runs too). One not admitted is skipped, and asked
+ *   roll's order (`admittedEnvelopes`, `clipEnvelopeAdmission.ts`). What
+ *   the tracks hold is read back by `heldPaths`, for the app's env ring.
+ *   One not admitted is skipped, and asked
  *   about again next tick; nothing throws.
  * - **Only what can sound** (windsor#718). An envelope is admitted only
  *   when it can change the sound (`envelopeSounds`): it plays, and its
@@ -136,6 +137,19 @@ export class ClipEnvelopeTracks {
       if (tracks[i]!.covered && tracks[i]!.target === target) return true;
     }
     return false;
+  }
+
+  /**
+   * The voice paths this part's tracks hold a slot for now, written into
+   * `out` (cleared first): the envelopes the engine has admitted, which the
+   * app's env ring reads while the transport plays (windsor#725), so it
+   * never works admission out again. Allocates nothing past `out`'s growth.
+   */
+  heldPaths(out: string[]): string[] {
+    const { tracks } = this;
+    out.length = 0;
+    for (let i = 0; i < tracks.length; i++) out.push(tracks[i]!.path);
+    return out;
   }
 
   /**
