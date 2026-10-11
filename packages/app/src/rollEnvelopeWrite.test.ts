@@ -12,7 +12,11 @@ import { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { sequencerKindChange } from './partEdits';
 import { switchedEnvelope, withEnvelope, withoutEnvelope } from './rollEnvelopePicker';
-import { ROLL_ENVELOPE_UNDO as UNDO } from './rollEnvelopeTables';
+import { withEnvelopePoints } from './rollEnvelopeSettle';
+import {
+  ROLL_ENVELOPE_TOOL_UNDO as TOOL_UNDO,
+  ROLL_ENVELOPE_UNDO as UNDO,
+} from './rollEnvelopeTables';
 import { envelopesOf, writeEnvelopes } from './rollEnvelopeWrite';
 import { newSong } from './songParts';
 
@@ -78,6 +82,21 @@ describe("the Envelopes tab's writes (windsor#707)", () => {
     expect(ctx.undoLabel).toBe('Delete Cutoff envelope');
     expect(ctx.undo()).toBe(true);
     expect(envelopes(model)).toEqual([CUTOFF]);
+  });
+
+  it("writes a tool's gesture as one undo step, and the redo restores it (windsor#708)", () => {
+    const { ctx, model } = rollConsole();
+    const drawn = [
+      { tick: 0, value: 0.25, bend: 0 },
+      { tick: BAR / 2, value: 0.75, bend: 0 },
+    ];
+    const next = withEnvelopePoints(envelopes(model), CUTOFF.target, drawn);
+    expect(writeEnvelopes(ctx, PLACE, next, TOOL_UNDO.draw('Cutoff'))).toBe(true);
+    expect(ctx.undoLabel).toBe('Draw Cutoff envelope');
+    expect(ctx.undo()).toBe(true);
+    expect(envelopes(model)).toEqual([CUTOFF]);
+    expect(ctx.redo()).toBe(true);
+    expect(envelopes(model)).toEqual([{ ...CUTOFF, points: drawn }]);
   });
 
   it('adds an empty envelope after the others and leaves the notes and the loop alone', () => {

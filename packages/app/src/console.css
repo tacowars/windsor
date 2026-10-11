@@ -3995,6 +3995,19 @@ body.chord-dragging {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* The shown envelope's value under the pointer (windsor#708), as the mockup's state 3. */
+.renv-val {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lane-c);
+  font-family: var(--f-num);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.renv-val.off {
+  color: var(--ink-faint);
+}
 .renv-layer {
   grid-area: 2 / 2;
   position: relative;
@@ -4035,6 +4048,20 @@ body.chord-dragging {
 }
 .renv-off {
   opacity: 0.32;
+}
+/* The loop's stretch Edit, Draw and Shape act on (windsor#708), over the live pass and on the
+   notes' scroll; the Shape tool's range and preview and the drag readout sit in it. */
+.renv-lane {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.renv-lane > svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  overflow: visible;
 }
 /* The picker's list, on the page under its button: the marked targets first, then the voice sections. */
 .renv-list {

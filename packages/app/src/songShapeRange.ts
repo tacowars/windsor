@@ -48,6 +48,7 @@ import {
   stampedPoints,
   type ShapeRange,
 } from './songShapeModel';
+import { type ShapeLifeHooks, shapeLife } from './songShapeLife';
 import { shapePlacer } from './songShapePlacer';
 import { shapePopover } from './songShapePopover';
 import { type ShapeRate, shapeRates } from './songShapeTables';
@@ -65,7 +66,21 @@ export interface ShapeLane {
   points(): readonly AutomationPoint[];
   /** Commit `points` as the lane's whole list, one undo step named `label`. */
   commit(label: string, points: readonly AutomationPoint[]): void;
+  /** How Top and Bottom read in the popover; the row's own readout when absent (a roll's offsets, windsor#708). */
+  readonly valueText?: (value: number) => string;
+  /** The shaped points as the lane keeps them, for the preview and Apply alike; as shaped when absent (a roll's envelope, windsor#708). */
+  readonly settle?: (points: readonly AutomationPoint[]) => AutomationPoint[];
 }
+
+/** The lane's points with the range shaped, as the lane keeps them: what the preview draws and Apply commits. */
+export const shapeLanePoints = (
+  lane: Pick<ShapeLane, 'points' | 'row' | 'settle'>,
+  range: ShapeRange,
+  draft: AutomationShapeSpec,
+): AutomationPoint[] => {
+  const shaped = shapedPoints(lane.points(), range, stampedPoints(lane.row, range, draft));
+  return lane.settle ? lane.settle(shaped) : shaped;
+};
 
 export interface ShapeTool {
   /** Wire the range gesture onto a lane; `refresh` shows the selection on it when it is this lane's. */
@@ -75,6 +90,8 @@ export interface ShapeTool {
   /** The toolbar's tool changed: anything but Shape closes the popover. */
   toolChanged(): void;
   close(): void;
+  /** Whether a selection is open, its popover and window listeners with it. */
+  isOpen(): boolean;
 }
 
 interface Selection {
@@ -132,6 +149,8 @@ export interface ShapeToolMount {
   /** The lanes' scrolling viewport, whose visible edges keep the popover in. */
   viewport(): Element | null;
   readonly tools: AutomationToolState;
+  /** The tool's owner, told when a selection opens and closes, so it can close the tool with its card. */
+  readonly life?: ShapeLifeHooks;
 }
 
 /** The Shape tool for one render of the lanes. */
@@ -182,10 +201,11 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     if (!selection || !lane) return;
     const { range, draft } = selection;
     const stamp = stampedPoints(lane.row, range, draft);
-    decorate(lane, range, shapedPoints(lane.points(), range, stamp));
+    decorate(lane, range, shapeLanePoints(lane, range, draft));
     const meter = lane.host.meter();
     const readout = shapeReadout(range, draft, stamp.length, meter);
-    popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane) });
+    const text = lane.valueText ? { valueText: lane.valueText } : {};
+    popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane), ...text });
     place();
   };
 
@@ -198,22 +218,12 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     if (drag) endDrag();
     else close();
   };
-  const listen = (on: boolean): void => {
-    if (on) {
-      window.addEventListener('keydown', onKey, true);
-      window.addEventListener('scroll', place, { capture: true, passive: true });
-      window.addEventListener('resize', place);
-      return;
-    }
-    window.removeEventListener('keydown', onKey, true);
-    window.removeEventListener('scroll', place, true);
-    window.removeEventListener('resize', place);
-  };
+  const life = shapeLife(window, { onKey, place }, mount.life);
 
   function close(): void {
     const lane = selectedLane();
     if (lane) undecorate(lane);
-    if (selection) listen(false);
+    life.close();
     placer.stop();
     selection = null;
     popover.element.remove();
@@ -230,7 +240,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       const lane = selectedLane();
       if (!selection || !lane) return close();
       const { range, draft } = selection;
-      const next = shapedPoints(lane.points(), range, stampedPoints(lane.row, range, draft));
+      const next = shapeLanePoints(lane, range, draft);
       close();
       lane.commit(`${shapeLabel(draft.kind)} on ${lane.name}`, next);
     },
@@ -244,7 +254,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       draft: shapeDraft(lane.row, lane.points(), range, state.shape, ratesOf(lane)),
     };
     container.appendChild(popover.element);
-    listen(true);
+    life.open(api.close);
     show();
     popover.focus();
   };
@@ -253,7 +263,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     const ended = drag;
     drag = null;
     if (!ended) return null;
-    if (!selection) window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('keydown', onKey, true);
     if (ended.lane.timeline.hasPointerCapture(ended.pointerId)) {
       ended.lane.timeline.releasePointerCapture(ended.pointerId);
     }
@@ -322,7 +332,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
     }
   };
 
-  return {
+  const api: ShapeTool = {
     attach(lane) {
       lanes.set(lane.key, lane);
       wire(lane);
@@ -343,5 +353,7 @@ export function shapeTool(mount: ShapeToolMount): ShapeTool {
       endDrag();
       close();
     },
+    isOpen: () => life.isOpen(),
   };
+  return api;
 }

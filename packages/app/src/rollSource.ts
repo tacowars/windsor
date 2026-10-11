@@ -4,11 +4,17 @@
  * the song's length, and a key that changes only when one of those does,
  * so the card's loop repaints when the document moved under it and not on
  * every edit elsewhere in the song.
+ *
+ * The part's voice slots are among what it watches (windsor#708 decision
+ * 9): a song voice lane added or deleted on the Song timeline, or another
+ * region's envelope, changes the Envelopes tab's `Voice n/8` and which
+ * targets its picker leaves open, though this roll is untouched.
  */
 import type { ArrangementDocument, Harmony, RollNote, RollSequencerConfig } from '@windsor/engine';
 import { partAt, songTicksOf, ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { patternOf } from './partEdits';
+import { type VoiceSlotPart, laneVoicePaths, voiceSlotTargets } from './partVoiceSlots';
 import { regionReadAt } from './regionPlayhead';
 import type { RollClock } from './rollGuide';
 
@@ -27,6 +33,12 @@ export interface RollSource {
   /** The objects read, compared by identity before the key is. */
   readonly inputs: readonly unknown[];
 }
+
+/** The part's voice slots and which of them its song lanes hold, as one string: what the picker reads. */
+export const voiceSlotKey = (part: VoiceSlotPart | undefined): string =>
+  part
+    ? JSON.stringify([[...laneVoicePaths(part)].sort(), [...voiceSlotTargets(part)].sort()])
+    : '';
 
 /** Region `region`'s roll on `slot` (the first region's with none named), from `doc`. */
 export function readRollSource(
@@ -54,7 +66,7 @@ export function readRollSource(
     barTicks,
     harmony: doc.harmony,
     songTicks,
-    inputs: [spec, target, doc.harmony, doc.transport.meter, songTicks],
+    inputs: [spec, target, doc.harmony, doc.transport.meter, songTicks, voiceSlotKey(part)],
   };
 }
 

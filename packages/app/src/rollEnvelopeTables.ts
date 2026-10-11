@@ -76,3 +76,28 @@ export const ROLL_ENVELOPE_DRAW = {
 
 /** The picker's list: its width, its tallest, and its gap from the button and the window's edge. */
 export const ROLL_ENVELOPE_LIST_PX = { width: 214, maxHeight: 300, gap: 4, edge: 8 } as const;
+
+/**
+ * How an envelope's offset reads (windsor#708 decision 4): two decimals, one
+ * once the offset reaches `wideFrom` in its units (a pitch envelope's
+ * semitones), and a ratio row's unit.
+ */
+export const ROLL_ENVELOPE_READOUT = {
+  decimals: 2,
+  wideDecimals: 1,
+  wideFrom: 10,
+  octaves: 'oct',
+} as const;
+
+/** The drag readout's place: its lift above the point it reads, and the least gap from the pane's top. */
+export const ROLL_ENVELOPE_READOUT_PX = { liftPx: 30, topPx: 2 } as const;
+
+/**
+ * The undo steps the tools write (windsor#708 decision 7). Move, Bend, Add,
+ * Straighten and Delete keep the Song tab's words ("Move Cutoff point");
+ * Draw and Shape name the envelope.
+ */
+export const ROLL_ENVELOPE_TOOL_UNDO = {
+  draw: (name: string): string => `Draw ${name} envelope`,
+  shape: (name: string): string => `Shape ${name} envelope`,
+} as const;
