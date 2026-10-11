@@ -1,7 +1,8 @@
 /**
  * The Roll's view settings (windsor#602 decision 2), without the DOM: Snap,
- * Keys, Fold, the two zooms, and the last length a note was drawn or
- * resized to (windsor#603). They are console state, kept per part by slot
+ * Keys, Fold, the two zooms, the last length a note was drawn or resized
+ * to (windsor#603), and the Envelopes tab's: the page shown, the tool and
+ * the envelope shown (windsor#707 decision 2). They are console state, kept per part by slot
  * for the session and never written to the song. The device and the
  * Expanded view keep separate zooms. The Audition switch is the console's,
  * not a part's (`rollAudition.ts`).
@@ -12,7 +13,9 @@
  * heights.
  */
 import { PPQ } from '@windsor/engine';
+import { type RollPage, ROLL_ENVELOPE_TOOL_DEFAULT } from './rollEnvelopeTables';
 import type { RollKeys } from './rollRows';
+import type { AutomationTool } from './songAutomationTables';
 import {
   ROLL_ROW_DEFAULT,
   ROLL_ROW_PX,
@@ -31,8 +34,17 @@ export interface RollZoom {
 /** Which of the two views: the device in the pane, or Expanded. */
 export type RollViewKind = 'device' | 'wide';
 
+/** The Envelopes tab's own settings: the tool picked, and the target whose envelope is shown. */
+export interface RollEnvelopeView {
+  tool: AutomationTool;
+  shown: string | null;
+}
+
 /** A part's view settings. */
 export interface RollViewState {
+  /** The tab shown: Notes or Envelopes. */
+  page: RollPage;
+  envelope: RollEnvelopeView;
   snap: number;
   keys: RollKeys;
   fold: boolean;
@@ -41,8 +53,14 @@ export interface RollViewState {
   zoom: Record<RollViewKind, RollZoom>;
 }
 
-/** A roll as it first opens: 1/16, 12 keys, unfolded, a note a sixteenth long, both zooms at Fit. */
+/**
+ * A roll as it first opens: on Notes, 1/16, 12 keys, unfolded, a note a
+ * sixteenth long, both zooms at Fit; Envelopes on its default tool, showing
+ * the roll's first envelope.
+ */
 export const defaultRollView = (): RollViewState => ({
+  page: 'notes',
+  envelope: { tool: ROLL_ENVELOPE_TOOL_DEFAULT, shown: null },
   snap: ROLL_SNAP_DEFAULT,
   keys: '12',
   fold: false,

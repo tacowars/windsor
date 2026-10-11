@@ -39,6 +39,7 @@ import { valueAt } from '@windsor/engine';
 import { hostCurveFrame, type AutomationEditHost } from './automationEditHost';
 import { readout } from './automationReadout';
 import { el } from './dom';
+import { voiceSlotsUsed } from './partVoiceSlots';
 import { withGesture } from './gestureHooks';
 import { curveShape } from './songAutomationCurve';
 import { withPoints } from './songAutomationEdit';
@@ -297,7 +298,7 @@ function addRowCells(view: SongView, owner: LaneOwner): LaneRowCells {
   const label = el('div', 'lane-add');
   label.append(lanePicker(view, owner));
   if (!isGroupLaneOwner(owner)) {
-    label.append(el('span', 'auto-count', voiceCountLabel(lanesOf(owner))));
+    label.append(el('span', 'auto-count', voiceCountLabel(voiceSlotsUsed(owner))));
   }
   return { label, timeline: el('div', 'auto-add-lane') };
 }
