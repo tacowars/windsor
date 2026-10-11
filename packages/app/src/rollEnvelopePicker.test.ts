@@ -6,14 +6,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { RollEnvelope, VoiceTargetPath } from '@windsor/engine';
-import { partAt } from '@windsor/engine';
+import type { AutomationTargetId, RollEnvelope, VoiceTargetPath } from '@windsor/engine';
+import { DEFAULT_ROLL_CONFIG, FM_LANES_MAX, partAt } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
+import type { VoiceSlotPart } from './partVoiceSlots';
 import { newSong } from './songParts';
 import {
   type EnvelopeTargetGroup,
   envelopePicker,
-  laneVoicePaths,
   shownEnvelope,
   voiceTargetGroups,
 } from './rollEnvelopePicker';
@@ -37,7 +37,16 @@ const GROUPS: EnvelopeTargetGroup[] = [
 ];
 
 const env = (target: VoiceTargetPath, on = true): RollEnvelope => ({ target, on, points: [] });
-const none = new Set<string>();
+/** A part with song voice lanes on `lanes` and a roll holding `envelopes`. */
+const partOf = (lanes: readonly string[], envelopes: readonly RollEnvelope[]): VoiceSlotPart => ({
+  automation: lanes.map((path) => ({
+    target: `voice.${path}` as AutomationTargetId,
+    on: true,
+    points: [],
+  })),
+  sequencer: { kind: 'roll', ...DEFAULT_ROLL_CONFIG, envelopes },
+  regions: [],
+});
 const paths = (picker: ReturnType<typeof envelopePicker>): string[][] =>
   picker.groups.map((group) => group.targets.map((t) => t.path));
 
@@ -59,7 +68,7 @@ describe('the envelope picker (windsor#707)', () => {
     const picker = envelopePicker({
       groups: GROUPS,
       envelopes,
-      lanes: none,
+      part: partOf([], envelopes),
       shown: 'filter.cutoff',
     });
     expect(picker.marked).toEqual([
@@ -71,12 +80,12 @@ describe('the envelope picker (windsor#707)', () => {
   });
 
   it('marks an added target and lists it first', () => {
-    const before = envelopePicker({ groups: GROUPS, envelopes: [], lanes: none, shown: null });
+    const before = envelopePicker({ groups: GROUPS, envelopes: [], part: undefined, shown: null });
     expect(before.marked).toEqual([]);
     const after = envelopePicker({
       groups: GROUPS,
       envelopes: [env('filter.resonance')],
-      lanes: none,
+      part: partOf([], [env('filter.resonance')]),
       shown: 'filter.resonance',
     });
     expect(after.marked.map((t) => t.path)).toEqual(['filter.resonance']);
@@ -90,7 +99,8 @@ describe('the envelope picker (windsor#707)', () => {
       env('ops.0.level'),
       env('ops.0.ratio'),
     ];
-    const picker = envelopePicker({ groups: GROUPS, envelopes, lanes: none, shown: null });
+    const part = partOf([], envelopes);
+    const picker = envelopePicker({ groups: GROUPS, envelopes, part, shown: null });
     expect(picker.envFull).toBe(true);
     expect(picker.groups.flatMap((g) => g.targets)).toEqual([
       { path: 'filter.envAmount', label: 'Filt Env Amt', lane: false, refused: 'envFull' },
@@ -99,16 +109,17 @@ describe('the envelope picker (windsor#707)', () => {
 
   it('disables a ninth distinct voice target, counting the part’s song voice lanes', () => {
     // Six song lanes, one of them on Resonance, and two envelopes: 8 of 8.
-    const lanes = new Set([
+    const lanes = [
       'filter.resonance',
       'filter.vowel',
       'ops.1.level',
       'ops.1.ratio',
       'ops.2.level',
       'pitchEnvAmount',
-    ]);
+    ];
     const envelopes = [env('filter.cutoff'), env('ops.0.level')];
-    const picker = envelopePicker({ groups: GROUPS, envelopes, lanes, shown: null });
+    const part = partOf(lanes, envelopes);
+    const picker = envelopePicker({ groups: GROUPS, envelopes, part, shown: null });
     expect(picker.slots).toBe(8);
     expect(picker.slotsFull).toBe(true);
     expect(picker.envFull).toBe(false);
@@ -123,13 +134,9 @@ describe('the envelope picker (windsor#707)', () => {
   });
 
   it('counts a target held by both a lane and an envelope once', () => {
-    const lanes = new Set(['filter.cutoff']);
-    const picker = envelopePicker({
-      groups: GROUPS,
-      envelopes: [env('filter.cutoff')],
-      lanes,
-      shown: null,
-    });
+    const envelopes = [env('filter.cutoff')];
+    const part = partOf(['filter.cutoff'], envelopes);
+    const picker = envelopePicker({ groups: GROUPS, envelopes, part, shown: null });
     expect(picker.slots).toBe(1);
   });
 
@@ -140,13 +147,31 @@ describe('the envelope picker (windsor#707)', () => {
     expect(shownEnvelope([], 'filter.cutoff')).toBeNull();
   });
 
-  it('reads the part’s song voice lanes as paths, leaving strip lanes out', () => {
-    const part = partAt(new DocumentModel(newSong()).doc, 0);
-    if (!part) throw new Error('no part');
-    const automation = [
-      { target: 'voice.filter.cutoff', on: true, points: [] },
-      { target: 'strip.level', on: true, points: [] },
-    ];
-    expect([...laneVoicePaths({ ...part, automation } as typeof part)]).toEqual(['filter.cutoff']);
+  it('counts another region’s envelopes: 7 lanes and 1 envelope elsewhere fill the slots', () => {
+    // Seven song lanes, none on the picker's targets, and Op A Level's envelope in a region's
+    // pattern; this roll holds none. Only a target already in the part's slots stays open.
+    const lanes = ['filter.vowel', 'ops.1.level', 'ops.1.ratio', 'ops.2.level', 'ops.2.ratio'];
+    const part: VoiceSlotPart = {
+      ...partOf([...lanes, 'pitchEnvAmount', 'filter.resonance'], []),
+      regions: [
+        {
+          start: 0,
+          duration: 96,
+          pattern: { kind: 'roll', ...DEFAULT_ROLL_CONFIG, envelopes: [env('ops.0.level')] },
+        },
+      ],
+    };
+    const picker = envelopePicker({ groups: GROUPS, envelopes: [], part, shown: null });
+    expect(picker.slots).toBe(FM_LANES_MAX);
+    const refused = Object.fromEntries(
+      picker.groups.flatMap((g) => g.targets).map((t) => [t.path, t.refused]),
+    );
+    expect(refused).toEqual({
+      'filter.cutoff': 'slotsFull',
+      'filter.resonance': null,
+      'filter.envAmount': 'slotsFull',
+      'ops.0.level': null,
+      'ops.0.ratio': 'slotsFull',
+    });
   });
 });

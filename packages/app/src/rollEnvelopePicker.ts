@@ -8,10 +8,12 @@
  * The limits:
  * - at most `ROLL_ENVELOPES_MAX` envelopes; once at the cap every target
  *   without one is disabled;
- * - the distinct voice targets across the part's song voice lanes and this
- *   roll's envelopes stay within `FM_LANES_MAX`. A target with a song lane
- *   already holds its slot, which an envelope on it shares, so it stays
- *   open when the slots are full; any other is disabled.
+ * - the part's voice slots stay within `FM_LANES_MAX`: the distinct voice
+ *   targets across its song voice lanes and the envelopes of every roll
+ *   pattern it holds (`partVoiceSlots.ts`, the count the Song tab's picker
+ *   reads too). A target already in that set holds its slot, which an
+ *   envelope on it shares, so it stays open when the slots are full; any
+ *   other is disabled.
  *
  * Every edit returns the roll's whole new list, since a merge replaces an
  * array wholesale.
@@ -25,6 +27,8 @@ import {
   voicePathOf,
 } from '@windsor/engine';
 import { pickerGroups } from './songAutomationModel';
+import type { VoiceSlotPart } from './partVoiceSlots';
+import { laneVoicePaths, voiceSlotTargets } from './partVoiceSlots';
 
 /** One voice target the picker can list. */
 export interface EnvelopeTarget {
@@ -59,7 +63,7 @@ export interface OpenTarget extends EnvelopeTarget {
 export interface EnvelopePicker {
   readonly envelopes: number;
   readonly envelopesMax: number;
-  /** Distinct voice targets across the song voice lanes and the envelopes. */
+  /** The part's voice slots: its song voice lanes' and every roll pattern's envelopes' targets. */
   readonly slots: number;
   readonly slotsMax: number;
   readonly envFull: boolean;
@@ -71,9 +75,10 @@ export interface EnvelopePicker {
 /** What the picker is worked out from. */
 export interface PickerInput {
   readonly groups: readonly EnvelopeTargetGroup[];
+  /** This roll's envelopes, as the document holds them. */
   readonly envelopes: readonly RollEnvelope[];
-  /** The voice targets the part's song lanes name. */
-  readonly lanes: ReadonlySet<string>;
+  /** The part, whose song lanes and roll patterns hold its voice slots; none holds none. */
+  readonly part: VoiceSlotPart | undefined;
   /** The target whose envelope is shown, if any. */
   readonly shown: string | null;
   readonly envelopesMax?: number;
@@ -92,14 +97,6 @@ export function voiceTargetGroups(part: DocumentPart, patch?: Patch): EnvelopeTa
   });
 }
 
-/** The voice targets `part`'s song lanes name, as paths. */
-export function laneVoicePaths(part: DocumentPart): Set<string> {
-  const paths = (part.automation ?? []).flatMap((lane) =>
-    targetKind(lane.target) === 'voice' ? [voicePathOf(lane.target) ?? ''] : [],
-  );
-  return new Set(paths.filter((path) => path !== ''));
-}
-
 /** The name the picker gives `path`: its label in `groups`, else the path itself. */
 export function targetName(groups: readonly EnvelopeTargetGroup[], path: string): string {
   for (const group of groups) {
@@ -114,16 +111,14 @@ export function targetSection(groups: readonly EnvelopeTargetGroup[], path: stri
   return groups.find((group) => group.targets.some((t) => t.path === path))?.label ?? '';
 }
 
-/** The distinct voice targets the song lanes and the envelopes hold between them. */
-export const slotsUsed = (lanes: ReadonlySet<string>, envelopes: readonly RollEnvelope[]): number =>
-  new Set([...lanes, ...envelopes.map((envelope) => envelope.target)]).size;
-
 /** The picker over `input`: the marked targets first, then each section's other targets. */
 export function envelopePicker(input: PickerInput): EnvelopePicker {
-  const { groups, envelopes, lanes, shown } = input;
+  const { groups, envelopes, part, shown } = input;
   const envelopesMax = input.envelopesMax ?? ROLL_ENVELOPES_MAX;
   const slotsMax = input.slotsMax ?? FM_LANES_MAX;
-  const slots = slotsUsed(lanes, envelopes);
+  const lanes = part ? laneVoicePaths(part) : new Set<string>();
+  const slotted = part ? voiceSlotTargets(part) : new Set<string>();
+  const slots = slotted.size;
   const envFull = envelopes.length >= envelopesMax;
   const slotsFull = slots >= slotsMax;
   const held = new Set<string>(envelopes.map((envelope) => envelope.target));
@@ -133,14 +128,13 @@ export function envelopePicker(input: PickerInput): EnvelopePicker {
     on: envelope.on,
     shown: envelope.target === shown,
   }));
-  const refusal = (lane: boolean): PickerRefusal | null =>
-    envFull ? 'envFull' : slotsFull && !lane ? 'slotsFull' : null;
+  const refusal = (path: string): PickerRefusal | null =>
+    envFull ? 'envFull' : slotsFull && !slotted.has(path) ? 'slotsFull' : null;
   const open = groups.flatMap((group) => {
     const targets = group.targets
       .filter((target) => !held.has(target.path))
       .map((target) => {
-        const lane = lanes.has(target.path);
-        return { ...target, lane, refused: refusal(lane) };
+        return { ...target, lane: lanes.has(target.path), refused: refusal(target.path) };
       });
     return targets.length > 0 ? [{ label: group.label, targets }] : [];
   });

@@ -32,7 +32,6 @@ import { envelopeLayer } from './rollEnvelopeOverlay';
 import {
   type EnvelopeTargetGroup,
   envelopePicker,
-  laneVoicePaths,
   shownEnvelope,
   switchedEnvelope,
   targetName,
@@ -145,8 +144,12 @@ export class RollEnvelopeMode {
     const groups = part ? voiceTargetGroups(part, doc.patches?.[part.preset]) : [];
     const envelopes = envelopesOf(doc, slot, region);
     const shown = shownEnvelope(envelopes, view.envelope.shown);
-    const lanes = part ? laneVoicePaths(part) : new Set<string>();
-    const picker = envelopePicker({ groups, envelopes, lanes, shown: shown?.target ?? null });
+    const picker = envelopePicker({
+      groups,
+      envelopes,
+      part,
+      shown: shown?.target ?? null,
+    });
     const state: EnvelopeColumnState = {
       picker,
       shown,
