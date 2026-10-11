@@ -38,7 +38,7 @@ import type { FieldNormaliser } from '../song/arrangementFields';
 import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
 import { loopSettlesIn } from './echoSwitchSettle';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
-import { INSERT_FADE_SECONDS } from './insertConstants';
+import { fadeRamp } from './fadeRamp';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { InsertSpec } from './insertRegistry';
 import type { FieldReader } from './switchTimeline';
@@ -128,15 +128,12 @@ function echoWetPath(
   direct: GainNode,
   wet: GainNode,
 ): WetPath {
+  // From where `direct` has reached now, so a route reversed mid-window turns round with no step.
+  const ramp = fadeRamp(context, direct.gain);
   return {
     send: { node: line.damp, output: 0 },
     ret: wet,
-    route(on: boolean): void {
-      const now = context.currentTime;
-      direct.gain.cancelScheduledValues(now);
-      direct.gain.setValueAtTime(direct.gain.value, now);
-      direct.gain.linearRampToValueAtTime(on ? 0 : 1, now + INSERT_FADE_SECONDS);
-    },
+    route: (on: boolean): void => ramp.to(on ? 0 : 1),
   };
 }
 

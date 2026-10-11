@@ -48,11 +48,15 @@ const fadeOf = (child: FakeChild): FakeGain => targets(child.output)[0] as unkno
 /** The children the host's send feeds now. */
 const wired = (r: ReturnType<typeof rig>): FakeChild[] =>
   children.filter((c) => targets(r.host.send).includes(fake(c.input)));
-const ramp = (from: number, to: number) => [
-  { call: 'cancelScheduledValues', value: from, time: NOW },
-  { call: 'setValueAtTime', value: from, time: NOW },
-  { call: 'linearRampToValueAtTime', value: to, time: NOW + INSERT_FADE_SECONDS },
+const ramp = (from: number, to: number, at = NOW) => [
+  { call: 'cancelScheduledValues', value: from, time: at },
+  { call: 'setValueAtTime', value: from, time: at },
+  { call: 'linearRampToValueAtTime', value: to, time: at + INSERT_FADE_SECONDS },
 ];
+/** A change once every fade so far has run its course. */
+const LATER = NOW + 1;
+/** A change 6 ms into a 12 ms window: each fade is half way. */
+const MID = NOW + INSERT_FADE_SECONDS / 2;
 const clearFades = (...list: FakeChild[]) =>
   list.forEach((c) => (fadeOf(c).gain.automation.length = 0));
 
@@ -87,13 +91,14 @@ describe('a swap', () => {
     const r = rig(host({ kind: 'tint' }));
     const tint = children.at(-1)!;
     clearFades(tint);
+    r.context.currentTime = LATER;
     r.stage().set(host({ kind: 'tone' }));
     const tone = children.at(-1)!;
     expect(tone.kind).toBe('tone');
     expect((r.stage().param!('slot.rate') as FakeHandle).owner).toBe(tone);
     expect(wired(r)).toEqual([tint, tone]);
-    expect(fadeOf(tint).gain.automation).toEqual(ramp(1, 0));
-    expect(fadeOf(tone).gain.automation).toEqual(ramp(0, 1));
+    expect(fadeOf(tint).gain.automation).toEqual(ramp(1, 0, LATER));
+    expect(fadeOf(tone).gain.automation).toEqual(ramp(0, 1, LATER));
     expect(r.waiting).toHaveLength(1);
     expect(tint.disposed).toBe(0);
 
@@ -113,9 +118,10 @@ describe('a swap', () => {
     expect(r.host.routes).toEqual([true]);
     expect(fadeOf(tint).gain.automation).toEqual(ramp(0, 1));
     clearFades(tint);
+    r.context.currentTime = LATER;
     r.stage().set(host(null));
     expect(r.host.routes).toEqual([true, false]);
-    expect(fadeOf(tint).gain.automation).toEqual(ramp(1, 0));
+    expect(fadeOf(tint).gain.automation).toEqual(ramp(1, 0, LATER));
     r.settle();
     expect(tint.disposed).toBe(1);
     expect(targets(r.host.send)).toEqual([fake(r.host.direct)]);
@@ -126,12 +132,14 @@ describe('a swap', () => {
     const first = children.at(-1)!;
     r.stage().set(host({ kind: 'tone' }));
     const second = children.at(-1)!;
-    clearFades(second);
+    r.context.currentTime = MID;
     r.stage().set(host({ kind: 'tint' }));
     const third = children.at(-1)!;
     expect(third).not.toBe(first);
-    expect(fadeOf(second).gain.automation).toEqual(ramp(1, 0));
-    expect(fadeOf(third).gain.automation).toEqual(ramp(0, 1));
+    // The second leaves from half way in, where its fade had reached.
+    expect(fadeOf(second).gain.valueAt(MID)).toBeCloseTo(0.5, 9);
+    expect(fadeOf(second).gain.automation.at(-1)).toEqual(ramp(0, 0, MID)[2]);
+    expect(fadeOf(third).gain.automation).toEqual(ramp(0, 1, MID));
     expect(wired(r)).toEqual([first, second, third]);
     r.settle();
     expect([first.disposed, second.disposed, third.disposed]).toEqual([1, 1, 0]);
@@ -151,6 +159,39 @@ describe('a swap', () => {
     expect([first.disposed, second.disposed]).toEqual([1, 0]);
     expect(wired(r)).toEqual([second]);
     expect((r.stage().param!('slot.level') as FakeHandle).owner).toBe(second);
+  });
+});
+
+/** Each fade's value at `time` as scheduled now, to compare with after a change there. */
+const valuesAt = (gains: FakeGain[], time: number) => gains.map((g) => g.gain.valueAt(time));
+
+describe('a change inside a window', () => {
+  it('ramps a leaving child down from the value its fade has reached', () => {
+    const r = rig();
+    r.stage().set(host({ kind: 'tint' }));
+    const fade = fadeOf(children.at(-1)!);
+    r.context.currentTime = MID;
+    r.stage().set(host(null));
+    expect(fade.gain.automation.at(-2)!.value).toBeCloseTo(0.5, 9);
+    expect(fade.gain.valueAt(MID + INSERT_FADE_SECONDS / 2)).toBeCloseTo(0.25, 9);
+    expect(fade.gain.valueAt(MID + INSERT_FADE_SECONDS)).toBe(0);
+  });
+
+  it('turns every fade round with no step for child → none → child', () => {
+    const r = rig(host({ kind: 'tint' }));
+    const first = fadeOf(children.at(-1)!);
+    const out = NOW + INSERT_FADE_SECONDS / 3;
+    const back = NOW + (2 * INSERT_FADE_SECONDS) / 3;
+    const heading = valuesAt([first], out);
+    r.context.currentTime = out;
+    r.stage().set(host(null));
+    expect(valuesAt([first], out)).toEqual(heading);
+    expect(heading[0]).toBeCloseTo(1 / 3, 9);
+    const leaving = valuesAt([first], back);
+    r.context.currentTime = back;
+    r.stage().set(host({ kind: 'tint' }));
+    const second = fadeOf(children.at(-1)!);
+    expect(valuesAt([first, second], back)).toEqual([...leaving, 0]);
   });
 });
 

@@ -14,12 +14,15 @@
  * `INSERT_FADE_SECONDS` window from now: each child has its own fade, the
  * leaving one ramps to 0 while the arriving one ramps from 0 to 1, and into or
  * out of empty the host's own wet edge crosses in the same window
- * (`wetPath.route`). A leaving child is disconnected and disposed once its
+ * (`wetPath.route`). Every fade starts from the value it has reached now
+ * (`fadeRamp`), so a change inside a window turns round with no step. A leaving child is disconnected and disposed once its
  * window has passed. Any number may be leaving at once; a change always
  * lands on the newest child. The same kind, or an id-only change, is the
  * child's own `set`, with no re-wire and no fade.
  */
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
+import { fadeRamp } from '../inserts/fadeRamp';
+import type { FadeRamp } from '../inserts/fadeRamp';
 import type { WetPath } from '../inserts/insertKind';
 import type { InsertRegistry, InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { insertKind, insertSlot, SLOT_FIELD } from '../inserts/insertRegistry';
@@ -54,14 +57,8 @@ export function checkInsert(registry: InsertRegistry, spec: InsertSpec, owner: s
 interface Child {
   readonly stage: InsertStage<InsertSpec>;
   readonly fade: GainNode;
-}
-
-/** `param` from where it is now to `to`, over one fade window from now. */
-function rampFromNow(context: BaseAudioContext, param: AudioParam, to: number): void {
-  const now = context.currentTime;
-  param.cancelScheduledValues(now);
-  param.setValueAtTime(param.value, now);
-  param.linearRampToValueAtTime(to, now + INSERT_FADE_SECONDS);
+  /** The fade's ramps, each from where the last has reached: a reversal mid-window has no step. */
+  readonly ramp: FadeRamp;
 }
 
 interface Slot {
@@ -89,8 +86,9 @@ function createSlot(path: WetPath, deps: SlotDeps): Slot {
     path.send.node.connect(stage.input, path.send.output);
     stage.output.connect(fade);
     fade.connect(path.ret);
-    rampFromNow(context, fade.gain, 1);
-    return { stage, fade };
+    const ramp = fadeRamp(context, fade.gain);
+    ramp.to(1);
+    return { stage, fade, ramp };
   };
   // A child the slot's own disposal already took is not in `leaving`: its late landing does nothing.
   const drop = (child: Child): void => {
@@ -99,7 +97,7 @@ function createSlot(path: WetPath, deps: SlotDeps): Slot {
     child.stage.dispose();
   };
   const leave = (child: Child): void => {
-    rampFromNow(context, child.fade.gain, 0);
+    child.ramp.to(0);
     leaving.add(child);
     later(() => drop(child), INSERT_FADE_SECONDS);
   };

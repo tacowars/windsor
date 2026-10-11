@@ -138,6 +138,28 @@ describe('a child on Echo', () => {
   });
 });
 
+describe('the direct edge', () => {
+  it('turns round from the value it has reached when route reverses inside a window', () => {
+    const context = new FakeContext();
+    context.currentTime = 1;
+    const stage = INSERT_KINDS.echo.create(context.asAudioContext(), DEFAULT_ECHO as InsertSpec);
+    const { send, ret } = stage.wetPath!;
+    const direct = targets(send.node).find((n) =>
+      n.outbound.some((c) => c.to === fake(ret)),
+    ) as unknown as FakeGain;
+    stage.wetPath!.route(true);
+    const mid = 1 + INSERT_FADE_SECONDS / 2;
+    const heading = direct.gain.valueAt(mid);
+    context.currentTime = mid;
+    stage.wetPath!.route(false);
+    expect(heading).toBeCloseTo(0.5, 9);
+    expect(direct.gain.valueAt(mid)).toBe(heading);
+    expect(direct.gain.valueAt(mid + INSERT_FADE_SECONDS / 2)).toBeCloseTo(0.75, 9);
+    expect(direct.gain.valueAt(mid + INSERT_FADE_SECONDS)).toBe(1);
+    stage.dispose();
+  });
+});
+
 /** Every automation call a param of `context` logged, in build order, skipping the silent ones. */
 const logged = (context: FakeContext) =>
   graphParams(context)
