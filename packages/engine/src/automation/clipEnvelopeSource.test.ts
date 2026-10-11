@@ -60,6 +60,8 @@ describe('clipEnvelopeSource', () => {
     const silent = [
       envelope('filter.cutoff', [], true),
       envelope('lfo.amount', [envPoint(0, 1)], false),
+      // Its only point at the loop's end: never read, so it reads 0 (rollEnvelopeValue.ts).
+      envelope('filter.envAmount', [envPoint(96, 1)]),
     ];
     const part = rollPart([{ start: 0, duration: 96, pattern: rollPattern(96, silent) }]);
     expect(clipEnvelopeSource(part, ENVELOPE_SONG_TICKS)).toBeNull();

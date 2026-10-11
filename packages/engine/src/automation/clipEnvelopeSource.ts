@@ -11,14 +11,16 @@
  * the song's wrap all land where the notes do, and a region entered again
  * starts at its own tick 0.
  *
- * An envelope plays while it is on and has a point; one with neither takes
- * no slot. A part none of whose regions plays such an envelope has no
+ * An envelope plays while it is on and has a point inside its roll's loop
+ * (`envelopeHeard`, the rule `envelopeValueAt` reads by); any other reads 0
+ * throughout and takes no slot. A part none of whose regions plays such an envelope has no
  * source at all (`clipEnvelopeSource` is null), so the automation player
  * does nothing new for it (decision 8). `frameAt` fills a frame the caller
  * owns and allocates nothing. `clipEnvelopeSource.test.ts`.
  */
 import { isInfiniteRegion } from '../sequencing/regionClock';
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
+import { envelopeHeard } from '../sequencing/rollEnvelopeValue';
 import type { RollSequencerConfig } from '../sequencing/rollSequencer';
 import type { MusicPart } from '../song/arrangement';
 import { regionPattern } from '../song/regionPattern';
@@ -46,9 +48,9 @@ export const emptyClipEnvelopeFrame = (): ClipEnvelopeFrame => ({
   loopTick: 0,
 });
 
-/** Whether `envelope` plays: on, with a point. */
-export const envelopePlays = (envelope: RollEnvelope): boolean =>
-  envelope.on && envelope.points.length > 0;
+/** Whether `envelope` plays over a loop of `loopTicks`: on, with a point inside the loop. */
+export const envelopePlays = (envelope: RollEnvelope, loopTicks: number): boolean =>
+  envelopeHeard(envelope, loopTicks);
 
 /** The roll `pattern` plays when it carries an envelope that plays; null otherwise. */
 function rollWithEnvelopes(
@@ -57,7 +59,7 @@ function rollWithEnvelopes(
 ): RollSequencerConfig | null {
   const spec = regionPattern(part, index);
   if (spec.kind !== 'roll') return null;
-  return spec.envelopes?.some(envelopePlays) ? spec : null;
+  return spec.envelopes?.some((envelope) => envelopePlays(envelope, spec.loopTicks)) ? spec : null;
 }
 
 /** A part's regions and the rolls they play, read at transport ticks. */

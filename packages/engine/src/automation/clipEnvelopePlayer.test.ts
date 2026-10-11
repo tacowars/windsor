@@ -266,6 +266,26 @@ describe('with the song’s lanes', () => {
     expect(rig.holds('filter.cutoff')).toBe(true);
   });
 
+  it('gives no slot to an envelope whose points all sit past the loop, so the audible ones fit', async () => {
+    const lanePaths = ['ops.0.level', 'ops.1.level', 'ops.2.level', 'ops.3.level', 'lfo.amount'];
+    const lanes = lanePaths.map((path) => lane(voiceTargetId(path), [point(0, 0.5)]));
+    // Its only point at `loopTicks`: never read, so it reads 0 throughout.
+    const silent = envelope('filter.resonance', [envPoint(BAR, 1)]);
+    const audible = ['filter.cutoff', 'filter.envAmount', 'lfo2.amount'].map((path) =>
+      envelope(path as typeof RISE.target, [envPoint(0, -1), envPoint(BAR - 1, 1)]),
+    );
+    const part = rollPart([{ ...WHOLE, pattern: rollPattern(BAR, [silent, ...audible]) }]);
+    const rig = await clipEnvelopeRig(part, { lanes });
+    expect(FM_LANES_MAX - lanePaths.length).toBe(audible.length);
+    const times = rig.run(BAR);
+    expect(rig.holds('filter.resonance')).toBe(false);
+    for (const env of audible) {
+      const slot = rig.slot(env.target);
+      expect(slot.valueAt(times[48]!)).toBeCloseTo(envelopeOffsetAt(env, 48, BAR), 9);
+      expect(slot.valueAt(times[80]!)).toBeGreaterThan(slot.valueAt(times[16]!));
+    }
+  });
+
   it('skips an envelope past the part’s slots without throwing, and the lanes keep theirs', async () => {
     const lanePaths = [
       'ops.0.level',

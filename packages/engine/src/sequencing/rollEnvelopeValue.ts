@@ -19,6 +19,23 @@ import type { RollEnvelope } from './rollEnvelope';
 import { ROLL_ENVELOPE_ROW } from './rollEnvelopeTables';
 
 /**
+ * How many of the envelope's points the loop hears: those before
+ * `loopTicks`; 0 when it is off. The one rule for "inside the loop", which
+ * `envelopeValueAt` reads by and `envelopeHeard` admits by.
+ */
+function pointsHeard(envelope: RollEnvelope, loopTicks: number): number {
+  return envelope.on ? firstPointPast(envelope.points, loopTicks, false) : 0;
+}
+
+/**
+ * Whether `envelopeValueAt` can read anything but 0 over a loop of
+ * `loopTicks`: the envelope is on and has a point inside the loop
+ * (windsor#702: only such an envelope takes a voice slot).
+ */
+export const envelopeHeard = (envelope: RollEnvelope, loopTicks = Infinity): boolean =>
+  pointsHeard(envelope, loopTicks) > 0;
+
+/**
  * The envelope's value, −1..1, at loop tick `loopTick`
  * (0..`loopTicks` − 1, the region's local tick mod the loop). With
  * `loopTicks`, the points at or past it are not read: past the last point
@@ -30,8 +47,7 @@ export function envelopeValueAt(
   loopTicks = Infinity,
 ): number {
   const { points } = envelope;
-  if (!envelope.on) return 0;
-  const heard = firstPointPast(points, loopTicks, false);
+  const heard = pointsHeard(envelope, loopTicks);
   if (heard === 0) return 0;
   const last = points[heard - 1]!;
   // Before the last point heard, the segment around `loopTick` is all inside the loop.

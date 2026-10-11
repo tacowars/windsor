@@ -130,7 +130,7 @@ export class ClipEnvelopeTracks {
       const { envelopes } = frame;
       for (let i = 0; i < envelopes.length; i++) {
         const envelope = envelopes[i]!;
-        if (!envelopePlays(envelope)) continue;
+        if (!envelopePlays(envelope, frame.loopTicks)) continue;
         const track = this.find(envelope.target) ?? this.admit(envelope.target, lanes);
         if (!track) continue;
         this.window.write(track, envelope, frame, issued, laneOn(lanes, track.target));
@@ -218,7 +218,9 @@ export class ClipEnvelopeTracks {
   private envelopeAt(track: Track, tick: number): RollEnvelope | null {
     if (!this.source?.frameAt(tick, this.frame)) return null;
     for (const envelope of this.frame.envelopes) {
-      if (envelope.target === track.path && envelopePlays(envelope)) return envelope;
+      if (envelope.target === track.path && envelopePlays(envelope, this.frame.loopTicks)) {
+        return envelope;
+      }
     }
     return null;
   }

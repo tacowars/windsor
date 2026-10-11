@@ -108,6 +108,28 @@ describe('clip envelopes on the live system', () => {
     });
   });
 
+  it('re-reads a live loop length: shrunk past every point it frees the slot, grown back it plays', async () => {
+    const LATE = envelope('filter.cutoff', [envPoint(LOOP / 2, 1)]);
+    const { sys, context, drone, play } = await rig(droneRoll([LATE]));
+    const loop = (loopTicks: number): void => {
+      expect(sys.apply({ parts: { [FULL_SLOT.drone]: { sequencer: { loopTicks } } } }).ok).toBe(
+        true,
+      );
+    };
+    sys.startMusic();
+    play(1);
+    expect(drone.voiceSlotOf('filter.cutoff')).toBeDefined();
+    loop(LOOP / 2);
+    play(context.currentTime + 0.5);
+    expect(drone.voiceSlotOf('filter.cutoff')).toBeUndefined();
+    loop(LOOP);
+    play(context.currentTime + 0.5);
+    expect(slotParam(drone, 'filter.cutoff').valueAt(context.currentTime)).toBeCloseTo(
+      envelopeOffsetAt(LATE, 0, LOOP),
+      9,
+    );
+  });
+
   it('takes no slot and posts no slot map for a roll with no envelopes', async () => {
     const { sys, drone, play } = await rig(droneRoll(undefined));
     sys.startMusic();
