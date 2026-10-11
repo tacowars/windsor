@@ -88,8 +88,11 @@ is a measured claim.
 - **Higher up:** the reverb swells in, for pads and vocals.
 - **The tables are ours:** tap times, gains and the direct level are tuned
   by ear and kept in `reverbConstants.ts`.
-- **Format:** an additive field. Its default must reproduce today's onset,
-  or this item joins item 1's version bump.
+- **Format:** an additive field. If its default renders a song saved
+  without `build` bit for bit as before, which a missing-field render test
+  pins, it bumps nothing. Otherwise item 2 bumps `ARRANGEMENT_VERSION` on
+  its own, with no upgrade: item 1's bump has landed by then, so it can't
+  share it.
 - **Measure:** first arrival and energy in the first 100 ms against Build,
   and the CPU cost per quantum.
 
