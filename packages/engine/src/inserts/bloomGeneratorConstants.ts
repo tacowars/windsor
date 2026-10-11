@@ -5,8 +5,9 @@
  * band's level, and the layer is rolled off by a fixed pole. By design: the
  * sawtooth runs to an internal 24 kHz Nyquist, the fixed pole sits at
  * 10.7 kHz, the darkening is a one-pole in Hz per band.
- * Shape, Bright, Octave and Scale act here; Scale's intervals and Octave's
- * ratios are this file's.
+ * Shape, Bright, Octave and Scale act here; Octave's ratios are this
+ * file's. Scale's pitch classes come from the main thread as one pitch set
+ * (`bloomPitches.ts`), so no scale is listed here.
  */
 export const BLOOM_GENERATOR = {
   /** No partial is generated above this, Hz, nor above `nyquistShare` of the rate (at the band's centre × its ratio). */
@@ -67,6 +68,12 @@ export const BLOOM_GENERATOR = {
   tiltLowHz: 8,
   tiltSpacing: 0.5,
   tiltPivotHz: 1000,
+  /**
+   * The most semitones a pitch set can move a band: a set of one pitch
+   * class moves the class opposite it by 6 (down, on the tie). The pitch
+   * tables are sized by it, so every set reads inside them.
+   */
+  pitchReach: 6,
   /** Octave, Key and Scale retune behind a dip: the layer fades out over this, retunes, fades back in. Seconds each way. */
   switchSeconds: 0.005,
   /**
@@ -86,8 +93,10 @@ export const BLOOM_GENERATOR = {
   deviationGuard: 0.05,
   /**
    * Series terms for atan (|x| ≤ `deviationGuard`: error under x^13/13,
-   * 1e-18) and for sin/cos of R·ε (|R·ε| ≤ 0.43: under 1e-17); the pulse's
-   * sin/cos of πw (≤ π/2) take `pulseTerms`.
+   * 1e-18) and for sin/cos of R·ε (|R·ε| ≤ 0.43 at the original scales'
+   * ratios: under 1e-16; ≤ 0.54 at any pitch set's, R up to 4·2^(5/12):
+   * under 2e-15, far below a float's step); the pulse's sin/cos of πw
+   * (≤ π/2) take `pulseTerms`.
    */
   atanTerms: 6,
   rotationTerms: 7,
@@ -109,18 +118,3 @@ export const BLOOM_OCTAVE_RATIOS: readonly (readonly [number, number])[] = [
   [3, 1],
   [4, 1],
 ];
-
-/**
- * Each scale's pitch classes above the key, by `BLOOM_SCALES` name. A band
- * whose note is outside its scale is re-pitched to the nearest scale note;
- * a tie (a note halfway between two, as C♯ in C major) goes down.
- */
-export const BLOOM_SCALE_STEPS: Readonly<Record<string, readonly number[]>> = {
-  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  'pentatonic-major': [0, 2, 4, 7, 9],
-  'pentatonic-minor': [0, 3, 5, 7, 10],
-};

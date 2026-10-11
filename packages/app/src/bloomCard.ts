@@ -8,7 +8,9 @@
  *   with a lamp, filled in the chain's accent while it holds (the insert's
  *   on/off switch is the rail's ⏻).
  * - Generator: Shape and Bright, Octave (six steps), then the Key and Scale
- *   pickers in one wide column.
+ *   pickers in one wide column. They read as the transport's do (windsor#728):
+ *   Key its note names, Scale `chromatic` first, then Windsor's scales under
+ *   the transport's groups and names.
  * - Bands: Low and High (note names; they never cross), then Focus.
  * - Dynamics: Density, read as the compressor's ratio.
  * - Output: Amount and Spread, then Mix at the big dial, last.
@@ -17,16 +19,22 @@
  * control commits the whole insert through `ctx.change`. A knob, and
  * Freeze, locks while a lane on its field is on.
  */
-import { BLOOM_KEYS, BLOOM_SCALES, DEFAULT_BLOOM } from '@windsor/engine';
+import { DEFAULT_BLOOM } from '@windsor/engine';
 import type { BloomSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { InsertCard } from './insertCards';
-import { BLOOM_KNOBS, bloomScaleLabel, INSERT_LABELS } from './insertKnobTables';
+import {
+  BLOOM_KEY_ITEMS,
+  BLOOM_KNOBS,
+  BLOOM_SCALE_OFF_ITEMS,
+  INSERT_LABELS,
+} from './insertKnobTables';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { bigInsertKnobs, insertFieldLock, insertKnob, insertsOf, pickKnobs } from './insertKnobs';
 import { insertColumn, insertPage, insertRule, insertSelect, wideColumn } from './insertLayout';
 import { targetChange } from './insertTarget';
+import { SCALE_OPTION_GROUPS } from './transportTables';
 import type { InsertTarget } from './insertTarget';
 import { lockNotice, type KnobAutomation } from './knobAutomation';
 import { followAutomation, paintLock, switchShowsOn } from './knobLock';
@@ -85,13 +93,14 @@ function keyAndScale(view: BloomView): HTMLElement {
   return wideColumn(
     insertSelect({
       label: 'Key',
-      options: BLOOM_KEYS.map((key) => [key, key] as const),
+      options: BLOOM_KEY_ITEMS,
       value: spec.key,
       change: (key) => view.commit({ ...view.current(), key: key as BloomSpec['key'] }),
     }),
     insertSelect({
       label: 'Scale',
-      options: BLOOM_SCALES.map((scale) => [scale, bloomScaleLabel(scale)] as const),
+      options: BLOOM_SCALE_OFF_ITEMS,
+      groups: SCALE_OPTION_GROUPS,
       value: spec.scale,
       change: (scale) => view.commit({ ...view.current(), scale: scale as BloomSpec['scale'] }),
     }),

@@ -46,8 +46,9 @@ const TOGGLES: [string, number][] = [
   ['octave', 12],
   ['octave', -12],
   ['octave', 7],
-  ['key', 5],
-  ['scale', 2],
+  // The pitch set: F natural minor, then one pitch class (every band moved, up to ±6).
+  ['pitches', 0b010110101011],
+  ['pitches', 0b000001000000],
   ['low', 55],
   ['high', 70],
   ['focus', 1.8],

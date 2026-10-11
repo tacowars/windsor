@@ -13,17 +13,16 @@
  * - `bloomMixWeight`: partial k's weight in that mix (its magnitude for the
  *   pulse, whose partials are not all in sine phase), for the level the
  *   generator keeps every shape at.
- * - `bloomScaleCorrections`: per scale and degree above the key, the
- *   semitones to the nearest scale note (ties down).
+ * - `bloomMaskCorrections`: per pitch class, the semitones to the nearest
+ *   pitch class of the processor's pitch set, round the circle (ties down).
  * - The series terms the fractional-ratio phasor runs: atan, sin, cos.
  *
  * Everything reads and writes `Float64Array` slots, so no double crosses a
  * call; nothing allocates.
  */
-import { BLOOM_SCALES } from '../../inserts/bloomConstants';
-import { BLOOM_GENERATOR as C, BLOOM_SCALE_STEPS } from '../../inserts/bloomGeneratorConstants';
+import { BLOOM_PITCH_CLASSES, BLOOM_PITCHES_ALL } from '../../inserts/bloomConstants';
+import { BLOOM_GENERATOR as C } from '../../inserts/bloomGeneratorConstants';
 
-const BLOOM_GENERATOR_DEGREES = 12;
 /** Shape's corners: sine, triangle, saw, square; then the pulse's narrowing. */
 const BLOOM_GENERATOR_SQUARE = 3;
 /** `mix`'s slots: region (0 … 3), t, A's and B's gains, B's offset in cycles, and for the pulse cos πw. */
@@ -126,32 +125,31 @@ function bloomMixWeight(mix: Float64Array, k: number): void {
 }
 
 /**
- * Per scale (`BLOOM_SCALES` order) and degree above the key, the semitones to
- * the nearest note of the scale: 0 in it, −d or +d out of it, a tie down.
- * Index scale·12 + degree. Constructor only.
+ * Per pitch class p (C = 0), the semitones to the nearest pitch class in
+ * `mask` (bit p set when p is allowed), measured round the circle: 0 in it,
+ * −d or +d out of it, a tie down. An empty set (0) is every class. Written
+ * into `out` (12 entries), so a retune allocates nothing. A single class
+ * needs ±6 at most (−6 on the tie), `BLOOM_GENERATOR.pitchReach`.
  */
-function bloomScaleCorrections(): Int32Array {
-  const table = new Int32Array(BLOOM_SCALES.length * BLOOM_GENERATOR_DEGREES);
-  BLOOM_SCALES.forEach((name, s) => {
-    const steps = BLOOM_SCALE_STEPS[name] ?? BLOOM_SCALE_STEPS['chromatic']!;
-    const inScale = (d: number): boolean =>
-      steps.includes((d + BLOOM_GENERATOR_DEGREES) % BLOOM_GENERATOR_DEGREES);
-    for (let d = 0; d < BLOOM_GENERATOR_DEGREES; d++) {
-      if (inScale(d)) continue;
-      let down = 1,
-        up = 1;
-      while (!inScale(d - down)) down++;
-      while (!inScale(d + up)) up++;
-      table[s * BLOOM_GENERATOR_DEGREES + d] = down <= up ? -down : up;
+function bloomMaskCorrections(mask: number, out: Int32Array): void {
+  const set = mask & BLOOM_PITCHES_ALL || BLOOM_PITCHES_ALL,
+    n = BLOOM_PITCH_CLASSES;
+  for (let p = 0; p < n; p++) {
+    if ((set >> p) & 1) {
+      out[p] = 0;
+      continue;
     }
-  });
-  return table;
+    let down = 1,
+      up = 1;
+    while (!((set >> ((p - down + n) % n)) & 1)) down++;
+    while (!((set >> ((p + up) % n)) & 1)) up++;
+    out[p] = down <= up ? -down : up;
+  }
 }
 
 export {
   BLOOM_GENERATOR_ATAN,
   BLOOM_GENERATOR_COSINE,
-  BLOOM_GENERATOR_DEGREES,
   BLOOM_GENERATOR_SINE,
   MIX_COS,
   MIX_GAIN_A,
@@ -164,8 +162,8 @@ export {
   MIX_T,
   MIX_TRIANGLE,
   MIX_WEIGHT,
+  bloomMaskCorrections,
   bloomMixWeight,
   bloomPulseSine,
-  bloomScaleCorrections,
   bloomShapeMix,
 };

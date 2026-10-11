@@ -5,15 +5,14 @@ import {
   BLOOM_BOUNDS,
   BLOOM_DEFAULTS,
   BLOOM_KEY_DEFAULT,
-  BLOOM_KEYS,
   BLOOM_OCTAVES,
   BLOOM_SCALE_DEFAULT,
-  BLOOM_SCALES,
 } from './bloomConstants';
 import type { BloomNumber } from './bloomConstants';
+import { BLOOM_KEY_CHOICES, BLOOM_SCALE_CHOICES } from './bloomPitches';
+import type { BloomKey, BloomScale } from './bloomPitches';
 
-export type BloomKey = (typeof BLOOM_KEYS)[number];
-export type BloomScale = (typeof BLOOM_SCALES)[number];
+export type { BloomKey, BloomScale };
 
 export interface BloomSpec {
   readonly kind: 'bloom';
@@ -35,7 +34,9 @@ export interface BloomSpec {
   readonly bright: number;
   /** Semitones: one of `BLOOM_OCTAVES`. */
   readonly octave: number;
+  /** Scale's root: one of Windsor's note names (`BLOOM_KEY_CHOICES`), `C` … `B`. */
   readonly key: BloomKey;
+  /** `chromatic` (off), or one of Windsor's `SCALE_NAMES` (`BLOOM_SCALE_CHOICES`). */
   readonly scale: BloomScale;
   /** The lowest and highest band, as MIDI notes. */
   readonly low: number;
@@ -95,8 +96,8 @@ export function normaliseBloom(
   return {
     kind: 'bloom',
     ...values,
-    key: n.pick(raw.key, BLOOM_KEYS, BLOOM_KEY_DEFAULT, `${path}.key`),
-    scale: n.pick(raw.scale, BLOOM_SCALES, BLOOM_SCALE_DEFAULT, `${path}.scale`),
+    key: n.pick(raw.key, BLOOM_KEY_CHOICES, BLOOM_KEY_DEFAULT, `${path}.key`),
+    scale: n.pick(raw.scale, BLOOM_SCALE_CHOICES, BLOOM_SCALE_DEFAULT, `${path}.scale`),
     slot: null,
   };
 }

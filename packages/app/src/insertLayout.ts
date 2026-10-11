@@ -6,6 +6,7 @@
  * a plot or a meter takes a column of its own. `console.css` sizes them.
  */
 import { el } from './dom';
+import type { SelectGroup } from './dom';
 import { KNOBS_PER_COLUMN } from './insertRackTables';
 
 /** One page's body: its columns, left to right. */
@@ -77,10 +78,14 @@ export function insertSwitch(
   return wrap;
 }
 
-/** A picker with its small label above it (the mockup's `.field`). */
+/**
+ * A picker with its small label above it (the mockup's `.field`): `options`
+ * first, then each of `groups` under its `<optgroup>`, in the order given.
+ */
 export function insertSelect(o: {
   readonly label: string;
   readonly options: readonly (readonly [value: string, text: string])[];
+  readonly groups?: readonly SelectGroup[];
   readonly value: string;
   change(value: string): void;
   /** What the picker is called to a screen reader, when not its label. */
@@ -91,6 +96,12 @@ export function insertSelect(o: {
   select.className = 'field';
   select.setAttribute('aria-label', o.ariaLabel ?? o.label);
   for (const [value, text] of o.options) select.add(new Option(text, value));
+  for (const { group, options } of o.groups ?? []) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = group;
+    for (const option of options) optgroup.append(new Option(option.label, option.value));
+    select.append(optgroup);
+  }
   select.value = o.value;
   select.onchange = (): void => o.change(select.value);
   wrap.append(select);

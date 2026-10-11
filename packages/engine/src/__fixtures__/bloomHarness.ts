@@ -87,6 +87,18 @@ export interface BloomProcessorLike {
   ): boolean;
 }
 
+/**
+ * The bundle's `bloomMaskCorrections` (windsor#728): per pitch class, the
+ * semitones to the nearest class of a pitch set, written into `out`.
+ */
+export function bloomMaskCorrections(): (mask: number, out: Int32Array) => void {
+  return generatedProcessor<unknown, { bloomMaskCorrections: (m: number, o: Int32Array) => void }>({
+    file: 'bloom-processor.js',
+    sampleRate: 48000,
+    epilogue: 'return { bloomMaskCorrections };',
+  }).exports.bloomMaskCorrections;
+}
+
 export function loadBloom(rate = 48000, params = bloomParams()): BloomProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => BloomProcessorLike>({
     file: 'bloom-processor.js',

@@ -20,20 +20,25 @@
  * - Shape (`SLOT_SHAPE`, 0 sine, 1 triangle, 2 saw, 3 square, 4 narrow
  *   pulse) and Bright (`SLOT_BRIGHT`, dB per octave, on top): the mix and
  *   the band levels, when either moves or a retune changes the bands.
- * - Octave (`SLOT_OCTAVE`, nearest step) and Scale (`SLOT_KEY`,
- *   `SLOT_SCALE`): a change fades the layer out over `switchSeconds`,
+ * - Octave (`SLOT_OCTAVE`, nearest step) and the pitch set (`SLOT_PITCHES`,
+ *   Key and Scale as a 12-bit mask; 0 or out of range is every pitch
+ *   class): a change fades the layer out over `switchSeconds`,
  *   retunes every band (ratio, mode, partial cap) and fades back in. With
  *   nothing sounding it retunes at once.
  *
  * No double crosses a call; every double field is born NaN. Pinned by
  * `inserts/bloomGenerator.test.ts`, `bloomDsp.test.ts` and `bloomGolden.test.ts`.
  */
-import { BLOOM_BOUNDS, BLOOM_DEFAULTS, BLOOM_OCTAVES } from '../../inserts/bloomConstants';
+import {
+  BLOOM_BOUNDS,
+  BLOOM_DEFAULTS,
+  BLOOM_OCTAVES,
+  BLOOM_PITCHES_ALL,
+} from '../../inserts/bloomConstants';
 import { BLOOM_BANDS } from '../../inserts/bloomBandsConstants';
 import { BLOOM_GENERATOR as C } from '../../inserts/bloomGeneratorConstants';
 import type { BloomEnvelope } from './bloomEnvelope';
 import {
-  BLOOM_GENERATOR_DEGREES,
   MIX_COS,
   MIX_REGION,
   MIX_SAW,
@@ -48,7 +53,7 @@ import {
 } from './bloomGeneratorMath';
 import { BloomGeneratorPitch } from './bloomGeneratorPitch';
 import { exp2InPlace, log2InPlace } from '../fm/portablePowers';
-import { SLOT_BRIGHT, SLOT_KEY, SLOT_OCTAVE, SLOT_SCALE, SLOT_SHAPE } from './bloomSlots';
+import { SLOT_BRIGHT, SLOT_OCTAVE, SLOT_PITCHES, SLOT_SHAPE } from './bloomSlots';
 import { bloomTables } from './bloomTables';
 import type { BloomTableSet } from './bloomTables';
 
@@ -83,13 +88,11 @@ class BloomGenerator {
   scratch: Float64Array;
   /** Partials each band generates (the pitch stage's): under the harmonic limit at its centre × ratio. */
   partials: Int32Array;
-  /** Octave (step index), Key and Scale as applied and as wanted; the retune's fade. */
+  /** Octave (step index) and the pitch set as applied and as wanted; the retune's fade. */
   octaveAt: number;
-  keyAt: number;
-  scaleAt: number;
+  pitchesAt: number;
   octaveWanted: number;
-  keyWanted: number;
-  scaleWanted: number;
+  pitchesWanted: number;
   switching: boolean;
   gain: number;
   gainStep: number;
@@ -127,25 +130,20 @@ class BloomGenerator {
     this.gain = 1;
     this.gainStep = 0;
     this.switching = false;
-    this.octaveAt = this.keyAt = this.scaleAt = -1;
+    this.octaveAt = this.pitchesAt = -1;
     this.octaveWanted = BLOOM_GENERATOR_UNISON;
-    this.keyWanted = this.scaleWanted = 0;
+    this.pitchesWanted = BLOOM_PITCHES_ALL;
     this.want();
     this.retune();
     this.reshape();
   }
 
-  /** Once a block: Shape and Bright reshape; Octave, Key and Scale retune behind a fade. */
+  /** Once a block: Shape and Bright reshape; Octave and the pitch set retune behind a fade. */
   configure(): void {
     this.reshape();
     if (this.levelsAt !== this.pitch.tuning) this.levels();
     this.want();
-    if (
-      this.octaveWanted === this.octaveAt &&
-      this.keyWanted === this.keyAt &&
-      this.scaleWanted === this.scaleAt
-    )
-      return;
+    if (this.octaveWanted === this.octaveAt && this.pitchesWanted === this.pitchesAt) return;
     if (this.envelope.soundingCount === 0) {
       this.retune();
       this.gain = 1;
@@ -243,7 +241,7 @@ class BloomGenerator {
     }
   }
 
-  /** Octave (nearest step), Key and Scale (whole, in range) from this block's controls. */
+  /** Octave (nearest step) and the pitch set (whole; 0 or out of range is every class) from this block's controls. */
   want(): void {
     const value = this.controls[SLOT_OCTAVE];
     let best = BLOOM_GENERATOR_UNISON,
@@ -256,18 +254,15 @@ class BloomGenerator {
       }
     }
     this.octaveWanted = best;
-    const key = Math.round(this.controls[SLOT_KEY]),
-      scale = Math.round(this.controls[SLOT_SCALE]);
-    this.keyWanted = key >= 0 && key < BLOOM_GENERATOR_DEGREES ? key : 0;
-    this.scaleWanted = scale >= 0 && scale < this.pitch.scales ? scale : 0;
+    const pitches = Math.round(this.controls[SLOT_PITCHES]);
+    this.pitchesWanted = pitches >= 1 && pitches <= BLOOM_PITCHES_ALL ? pitches : BLOOM_PITCHES_ALL;
   }
 
-  /** The wanted Octave, Key and Scale applied to every band. */
+  /** The wanted Octave and pitch set applied to every band. */
   retune(): void {
-    this.pitch.retune(this.octaveWanted, this.keyWanted, this.scaleWanted);
+    this.pitch.retune(this.octaveWanted, this.pitchesWanted);
     this.octaveAt = this.octaveWanted;
-    this.keyAt = this.keyWanted;
-    this.scaleAt = this.scaleWanted;
+    this.pitchesAt = this.pitchesWanted;
   }
 
   clear(): void {

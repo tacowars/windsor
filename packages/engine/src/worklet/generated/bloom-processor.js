@@ -4,29 +4,8 @@
 // packages/engine/src/inserts/bloomConstants.ts
 var BLOOM_NAME = "bloom";
 var BLOOM_OCTAVES = [-12, 0, 7, 12, 19, 24];
-var BLOOM_KEYS = [
-  "C",
-  "C#",
-  "D",
-  "D#",
-  "E",
-  "F",
-  "F#",
-  "G",
-  "G#",
-  "A",
-  "A#",
-  "B"
-];
-var BLOOM_SCALES = [
-  "chromatic",
-  "major",
-  "minor",
-  "dorian",
-  "mixolydian",
-  "pentatonic-major",
-  "pentatonic-minor"
-];
+var BLOOM_PITCH_CLASSES = 12;
+var BLOOM_PITCHES_ALL = (1 << BLOOM_PITCH_CLASSES) - 1;
 var BLOOM_SHAPES = ["sine", "triangle", "saw", "square", "pulse"];
 var BLOOM_LOWEST_NOTE = 41;
 var BLOOM_HIGHEST_NOTE = 88;
@@ -352,8 +331,7 @@ var BLOOM_SLOT_NAMES = [
   "low",
   "high",
   "octave",
-  "key",
-  "scale",
+  "pitches",
   "freeze",
   "enabled"
 ];
@@ -370,8 +348,7 @@ var SLOT_DENSITY = slotOf("density");
 var SLOT_LOW = slotOf("low");
 var SLOT_HIGH = slotOf("high");
 var SLOT_OCTAVE = slotOf("octave");
-var SLOT_KEY = slotOf("key");
-var SLOT_SCALE = slotOf("scale");
+var SLOT_PITCHES = slotOf("pitches");
 var SLOT_FREEZE = slotOf("freeze");
 var SLOT_ENABLED = slotOf("enabled");
 var BLOOM_SMOOTHED_MASK = Uint8Array.from(
@@ -388,13 +365,13 @@ function bloomSlotDescriptors() {
     defaultValue: BLOOM_DEFAULTS[name],
     automationRate: "k-rate"
   }));
-  const indexOf = (name, list, value) => ({
-    name,
+  const pitches = {
+    name: "pitches",
     minValue: 0,
-    maxValue: list.length - 1,
-    defaultValue: list.indexOf(value),
+    maxValue: BLOOM_PITCHES_ALL,
+    defaultValue: BLOOM_PITCHES_ALL,
     automationRate: "k-rate"
-  });
+  };
   const switchOf = (name) => ({
     name,
     minValue: 0,
@@ -402,13 +379,7 @@ function bloomSlotDescriptors() {
     defaultValue: Number(BLOOM_DEFAULTS[name]),
     automationRate: "k-rate"
   });
-  return [
-    ...numbers,
-    indexOf("key", BLOOM_KEYS, BLOOM_KEY_DEFAULT),
-    indexOf("scale", BLOOM_SCALES, BLOOM_SCALE_DEFAULT),
-    switchOf("freeze"),
-    switchOf("enabled")
-  ];
+  return [...numbers, pitches, switchOf("freeze"), switchOf("enabled")];
 }
 function bloomDescriptors() {
   return [
@@ -1433,6 +1404,12 @@ var BLOOM_GENERATOR = {
   tiltLowHz: 8,
   tiltSpacing: 0.5,
   tiltPivotHz: 1e3,
+  /**
+   * The most semitones a pitch set can move a band: a set of one pitch
+   * class moves the class opposite it by 6 (down, on the tie). The pitch
+   * tables are sized by it, so every set reads inside them.
+   */
+  pitchReach: 6,
   /** Octave, Key and Scale retune behind a dip: the layer fades out over this, retunes, fades back in. Seconds each way. */
   switchSeconds: 5e-3,
   /**
@@ -1452,8 +1429,10 @@ var BLOOM_GENERATOR = {
   deviationGuard: 0.05,
   /**
    * Series terms for atan (|x| ≤ `deviationGuard`: error under x^13/13,
-   * 1e-18) and for sin/cos of R·ε (|R·ε| ≤ 0.43: under 1e-17); the pulse's
-   * sin/cos of πw (≤ π/2) take `pulseTerms`.
+   * 1e-18) and for sin/cos of R·ε (|R·ε| ≤ 0.43 at the original scales'
+   * ratios: under 1e-16; ≤ 0.54 at any pitch set's, R up to 4·2^(5/12):
+   * under 2e-15, far below a float's step); the pulse's sin/cos of πw
+   * (≤ π/2) take `pulseTerms`.
    */
   atanTerms: 6,
   rotationTerms: 7,
@@ -1467,18 +1446,8 @@ var BLOOM_OCTAVE_RATIOS = [
   [3, 1],
   [4, 1]
 ];
-var BLOOM_SCALE_STEPS = {
-  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  "pentatonic-major": [0, 2, 4, 7, 9],
-  "pentatonic-minor": [0, 3, 5, 7, 10]
-};
 
 // packages/engine/src/worklet/bloom/bloomGeneratorMath.ts
-var BLOOM_GENERATOR_DEGREES = 12;
 var BLOOM_GENERATOR_SQUARE = 3;
 var MIX_REGION = 0;
 var MIX_T = 1;
@@ -1557,20 +1526,18 @@ function bloomMixWeight(mix, k) {
   else if (region === 1) mix[MIX_WEIGHT] = (1 - t) * triangle + t * saw;
   else mix[MIX_WEIGHT] = odd ? saw : (1 - t) * saw;
 }
-function bloomScaleCorrections() {
-  const table = new Int32Array(BLOOM_SCALES.length * BLOOM_GENERATOR_DEGREES);
-  BLOOM_SCALES.forEach((name, s) => {
-    const steps = BLOOM_SCALE_STEPS[name] ?? BLOOM_SCALE_STEPS["chromatic"];
-    const inScale = (d) => steps.includes((d + BLOOM_GENERATOR_DEGREES) % BLOOM_GENERATOR_DEGREES);
-    for (let d = 0; d < BLOOM_GENERATOR_DEGREES; d++) {
-      if (inScale(d)) continue;
-      let down = 1, up = 1;
-      while (!inScale(d - down)) down++;
-      while (!inScale(d + up)) up++;
-      table[s * BLOOM_GENERATOR_DEGREES + d] = down <= up ? -down : up;
+function bloomMaskCorrections(mask, out) {
+  const set = mask & BLOOM_PITCHES_ALL || BLOOM_PITCHES_ALL, n = BLOOM_PITCH_CLASSES;
+  for (let p = 0; p < n; p++) {
+    if (set >> p & 1) {
+      out[p] = 0;
+      continue;
     }
-  });
-  return table;
+    let down = 1, up = 1;
+    while (!(set >> (p - down + n) % n & 1)) down++;
+    while (!(set >> (p + up) % n & 1)) up++;
+    out[p] = down <= up ? -down : up;
+  }
 }
 
 // packages/engine/src/worklet/bloom/bloomGeneratorPitch.ts
@@ -1596,10 +1563,8 @@ var BloomGeneratorPitch = class {
     this.lastIm = new Float64Array(n);
     this.stamp = new Int32Array(n);
     this.clock = 2;
-    this.corrections = bloomScaleCorrections();
-    this.scales = this.corrections.length / BLOOM_GENERATOR_DEGREES;
-    let reach = 0;
-    for (const m of this.corrections) reach = Math.max(reach, Math.abs(m));
+    this.corrections = new Int32Array(BLOOM_PITCH_CLASSES);
+    const reach = BLOOM_GENERATOR.pitchReach;
     this.reach = reach;
     const perOctave = BLOOM_BANDS.semitonesPerOctave;
     this.semitone = Float64Array.from(
@@ -1617,12 +1582,12 @@ var BloomGeneratorPitch = class {
     this.centreCos = this.noteCos.slice(reach, reach + n);
     this.centreSin = this.noteSin.slice(reach, reach + n);
   }
-  /** Every band's mode, ratio, step and partial count for Octave step `octave`, `key` and `scale`. */
-  retune(octave, key, scale) {
-    const ratio = BLOOM_OCTAVE_RATIOS[octave], num = ratio[0], den = ratio[1], row = scale * BLOOM_GENERATOR_DEGREES, reach = this.reach, degrees = BLOOM_GENERATOR_DEGREES;
+  /** Every band's mode, ratio, step and partial count for Octave step `octave` and the pitch set `mask`. */
+  retune(octave, mask) {
+    bloomMaskCorrections(mask, this.corrections);
+    const ratio = BLOOM_OCTAVE_RATIOS[octave], num = ratio[0], den = ratio[1], reach = this.reach, classes = BLOOM_PITCH_CLASSES;
     for (let b = 0; b < BLOOM_BANDS.count; b++) {
-      const degree = ((BLOOM_LOWEST_NOTE + b - key) % degrees + degrees) % degrees;
-      const m = this.corrections[row + degree];
+      const m = this.corrections[(BLOOM_LOWEST_NOTE + b) % classes];
       const r = num / den * this.semitone[m + reach];
       this.ratio[b] = r;
       this.power[b] = num;
@@ -1856,20 +1821,19 @@ var BloomGenerator = class {
     this.gain = 1;
     this.gainStep = 0;
     this.switching = false;
-    this.octaveAt = this.keyAt = this.scaleAt = -1;
+    this.octaveAt = this.pitchesAt = -1;
     this.octaveWanted = BLOOM_GENERATOR_UNISON;
-    this.keyWanted = this.scaleWanted = 0;
+    this.pitchesWanted = BLOOM_PITCHES_ALL;
     this.want();
     this.retune();
     this.reshape();
   }
-  /** Once a block: Shape and Bright reshape; Octave, Key and Scale retune behind a fade. */
+  /** Once a block: Shape and Bright reshape; Octave and the pitch set retune behind a fade. */
   configure() {
     this.reshape();
     if (this.levelsAt !== this.pitch.tuning) this.levels();
     this.want();
-    if (this.octaveWanted === this.octaveAt && this.keyWanted === this.keyAt && this.scaleWanted === this.scaleAt)
-      return;
+    if (this.octaveWanted === this.octaveAt && this.pitchesWanted === this.pitchesAt) return;
     if (this.envelope.soundingCount === 0) {
       this.retune();
       this.gain = 1;
@@ -1947,7 +1911,7 @@ var BloomGenerator = class {
       gains[b] = heard > 0 ? Math.sqrt(saw / heard) * scratch[0] : 0;
     }
   }
-  /** Octave (nearest step), Key and Scale (whole, in range) from this block's controls. */
+  /** Octave (nearest step) and the pitch set (whole; 0 or out of range is every class) from this block's controls. */
   want() {
     const value = this.controls[SLOT_OCTAVE];
     let best = BLOOM_GENERATOR_UNISON, distance = Math.abs(value);
@@ -1959,16 +1923,14 @@ var BloomGenerator = class {
       }
     }
     this.octaveWanted = best;
-    const key = Math.round(this.controls[SLOT_KEY]), scale = Math.round(this.controls[SLOT_SCALE]);
-    this.keyWanted = key >= 0 && key < BLOOM_GENERATOR_DEGREES ? key : 0;
-    this.scaleWanted = scale >= 0 && scale < this.pitch.scales ? scale : 0;
+    const pitches = Math.round(this.controls[SLOT_PITCHES]);
+    this.pitchesWanted = pitches >= 1 && pitches <= BLOOM_PITCHES_ALL ? pitches : BLOOM_PITCHES_ALL;
   }
-  /** The wanted Octave, Key and Scale applied to every band. */
+  /** The wanted Octave and pitch set applied to every band. */
   retune() {
-    this.pitch.retune(this.octaveWanted, this.keyWanted, this.scaleWanted);
+    this.pitch.retune(this.octaveWanted, this.pitchesWanted);
     this.octaveAt = this.octaveWanted;
-    this.keyAt = this.keyWanted;
-    this.scaleAt = this.scaleWanted;
+    this.pitchesAt = this.pitchesWanted;
   }
   clear() {
     if (this.switching) this.retune();

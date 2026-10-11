@@ -1,7 +1,10 @@
 /**
  * bloom's controls as `Float64Array` slots in descriptor order (worklet
  * rule 3), and the descriptors themselves: the numbers of `BLOOM_BOUNDS`,
- * then Key and Scale as indices, then the Freeze and on/off switches. The
+ * then Key and Scale as one pitch set, `pitches` (a 12-bit mask, bit p
+ * pitch class p, worked out on the main thread; `BLOOM_PITCHES_ALL`, every
+ * class, is chromatic and the default), then the Freeze and on/off
+ * switches. The
  * processor copies each block's k-rate values in with `readBloomSlots`; the
  * route smooths the continuous ones into `controls` (`BLOOM_SMOOTHED_MASK`).
  *
@@ -15,10 +18,7 @@
 import {
   BLOOM_BOUNDS,
   BLOOM_DEFAULTS,
-  BLOOM_KEY_DEFAULT,
-  BLOOM_KEYS,
-  BLOOM_SCALE_DEFAULT,
-  BLOOM_SCALES,
+  BLOOM_PITCHES_ALL,
   BLOOM_SLOT,
 } from '../../inserts/bloomConstants';
 
@@ -35,8 +35,7 @@ const BLOOM_SLOT_NAMES = [
   'low',
   'high',
   'octave',
-  'key',
-  'scale',
+  'pitches',
   'freeze',
   'enabled',
 ] as const;
@@ -56,8 +55,7 @@ const SLOT_DENSITY = slotOf('density');
 const SLOT_LOW = slotOf('low');
 const SLOT_HIGH = slotOf('high');
 const SLOT_OCTAVE = slotOf('octave');
-const SLOT_KEY = slotOf('key');
-const SLOT_SCALE = slotOf('scale');
+const SLOT_PITCHES = slotOf('pitches');
 const SLOT_FREEZE = slotOf('freeze');
 const SLOT_ENABLED = slotOf('enabled');
 
@@ -81,13 +79,13 @@ function bloomSlotDescriptors(): AudioParamDescriptor[] {
     defaultValue: BLOOM_DEFAULTS[name as keyof typeof BLOOM_BOUNDS],
     automationRate: 'k-rate' as const,
   }));
-  const indexOf = (name: string, list: readonly string[], value: string): AudioParamDescriptor => ({
-    name,
+  const pitches: AudioParamDescriptor = {
+    name: 'pitches',
     minValue: 0,
-    maxValue: list.length - 1,
-    defaultValue: list.indexOf(value),
+    maxValue: BLOOM_PITCHES_ALL,
+    defaultValue: BLOOM_PITCHES_ALL,
     automationRate: 'k-rate',
-  });
+  };
   const switchOf = (name: 'freeze' | 'enabled'): AudioParamDescriptor => ({
     name,
     minValue: 0,
@@ -95,13 +93,7 @@ function bloomSlotDescriptors(): AudioParamDescriptor[] {
     defaultValue: Number(BLOOM_DEFAULTS[name]),
     automationRate: 'k-rate',
   });
-  return [
-    ...numbers,
-    indexOf('key', BLOOM_KEYS, BLOOM_KEY_DEFAULT),
-    indexOf('scale', BLOOM_SCALES, BLOOM_SCALE_DEFAULT),
-    switchOf('freeze'),
-    switchOf('enabled'),
-  ];
+  return [...numbers, pitches, switchOf('freeze'), switchOf('enabled')];
 }
 
 /**
@@ -143,11 +135,10 @@ export {
   SLOT_FOCUS,
   SLOT_FREEZE,
   SLOT_HIGH,
-  SLOT_KEY,
   SLOT_LOW,
   SLOT_MIX,
   SLOT_OCTAVE,
-  SLOT_SCALE,
+  SLOT_PITCHES,
   SLOT_SHAPE,
   SLOT_SPREAD,
   SLOT_SUSTAIN,
