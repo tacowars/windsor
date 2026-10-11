@@ -4,16 +4,20 @@
  * pickers in two wide columns, the knobs in columns of two, Mix at the
  * rack's big dial, then the gain-reduction meter in a column of its own.
  * The on/off switch is the rack's rail.
+ *
+ * In a host's slot (windsor#692) the engine keys the compressor from its own
+ * input (record `2026-10-11-wet-path-slot` decision 8), so the card says so
+ * in place of the sidechain selector.
  */
 import { DEFAULT_COMPRESSOR } from '@windsor/engine';
 import { sidechainSelector } from './sidechainSelector';
 import { compressorMeter } from './compressorMeter';
 import { COMPRESSOR_KNOBS, COMPRESSOR_SELECTS } from './compressorTables';
-import { insertChange } from './insertTarget';
+import { isChildTarget, targetChange } from './insertTarget';
 import type { InsertCard } from './insertCards';
 import { setInsertField } from './insertEdits';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
-import { insertColumn, insertPage, insertSelect, wideColumn } from './insertLayout';
+import { insertColumn, insertNote, insertPage, insertSelect, wideColumn } from './insertLayout';
 import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
 
@@ -34,17 +38,24 @@ function steppedPicker(
     value: String(current[field]),
     change: (value) => {
       const inserts = setInsertField(insertsOf(ctx, slot), index, field, Number(value));
-      void ctx.change(insertChange(slot, inserts));
+      void ctx.change(targetChange(ctx, slot, inserts));
     },
   });
 }
+
+/** What a slot child's card says in place of its sidechain selector. */
+export const CHILD_SIDECHAIN_NOTE = 'In the slot its sidechain is forced to Internal.';
+
+/** The sidechain selector, or in a slot the note that the source is Internal. */
+const sidechainCell = (ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement =>
+  isChildTarget(slot) ? insertNote(CHILD_SIDECHAIN_NOTE) : sidechainSelector(ctx, slot, index);
 
 export const compressorCard: InsertCard = (ctx, slot, index) => [
   {
     name: 'Comp',
     build: () =>
       insertPage(
-        wideColumn(sidechainSelector(ctx, slot, index), steppedPicker(ctx, slot, index, 'ratio')),
+        wideColumn(sidechainCell(ctx, slot, index), steppedPicker(ctx, slot, index, 'ratio')),
         wideColumn(
           steppedPicker(ctx, slot, index, 'attack'),
           steppedPicker(ctx, slot, index, 'release'),

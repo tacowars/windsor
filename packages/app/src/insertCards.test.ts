@@ -34,6 +34,7 @@ import {
 } from '@windsor/engine';
 import { withoutInsertIds } from '@windsor/engine/__fixtures__/insertIds';
 import { fmtHz } from './consoleFormat';
+import { addPickerGroups } from './insertAddPicker';
 import { addInsert } from './insertEdits';
 import { INSERT_CARDS } from './insertCards';
 import {
@@ -61,6 +62,13 @@ describe('INSERT_CARDS', () => {
     const grouped = INSERT_GROUPS.flatMap((group) => group.kinds);
     expect([...grouped].sort()).toEqual([...INSERT_KIND_NAMES].sort());
     expect(new Set(grouped).size).toBe(grouped.length);
+  });
+
+  it('offers a host’s slot every Add group less the host’s own kind (windsor#692)', () => {
+    const groups = addPickerGroups('echo');
+    expect(groups.find((group) => group.label === 'Time')?.kinds).toEqual(['delay']);
+    expect(groups.flatMap((group) => group.kinds)).toHaveLength(INSERT_KIND_NAMES.length - 1);
+    expect(addPickerGroups('eq').map((group) => group.label)[0]).toBe('Filter');
   });
 
   it('groups the Add slot as decided: EQ, Filter, Drive, Dynamics, Modulation, Time, Space', () => {

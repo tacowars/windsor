@@ -16,7 +16,7 @@ import {
   matchingRetroPreset,
 } from '@windsor/engine';
 import { RETRO_REVERB_KNOBS } from './retroReverbTables';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import { el } from './dom';
 import type { InsertCard } from './insertCards';
 import { insertKnobs, insertsOf } from './insertKnobs';
@@ -91,7 +91,7 @@ export const retroReverbCard: InsertCard = (ctx, slot, index) => {
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== 'retro-reverb') return;
     inserts[index] = spec;
-    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const build = (): HTMLElement => {
     const preset = presetChoice(current, commit);

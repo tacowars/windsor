@@ -11,7 +11,7 @@ import {
   matchingPhaserPreset,
 } from '@windsor/engine';
 import { PHASER_KNOBS } from './phaserTables';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import { el } from './dom';
 import type { InsertCard } from './insertCards';
 import { insertKnobs, insertsOf } from './insertKnobs';
@@ -26,7 +26,7 @@ export const phaserCard: InsertCard = (ctx, slot, index) => {
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== 'phaser') return;
     inserts[index] = spec;
-    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const build = (): HTMLElement => {
     const preset = document.createElement('select');

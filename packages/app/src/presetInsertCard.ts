@@ -13,7 +13,7 @@ import type { InsertKnobEntry } from './insertKnobTables';
 import { insertKnobs, insertsOf } from './insertKnobs';
 import { insertPage, wideColumn } from './insertLayout';
 import type { InsertTarget } from './insertTarget';
-import { insertChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 
 type Switchable = Extract<InsertSpec, { readonly enabled: boolean }>;
 
@@ -42,7 +42,7 @@ function presetPage<S extends Switchable>(
     const inserts = [...insertsOf(ctx, slot)];
     if (inserts[index]?.kind !== card.kind) return;
     inserts[index] = spec;
-    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const preset = document.createElement('select');
   preset.className = 'field';

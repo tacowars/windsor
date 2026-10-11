@@ -8,12 +8,15 @@
  * On a part's strip, and on a group's (windsor#616), a knob is locked while
  * a lane on its field is on (windsor#351, `knobAutomation.ts`). A lane on a
  * field the insert's settings leave unread is inert and locks nothing; the
- * send buses and the master carry no lanes.
+ * send buses and the master carry no lanes. A host's slot child
+ * (windsor#692) locks under its host's lane on `slot.<field>`.
  */
+import type { InsertSpec } from '@windsor/engine';
+import { SLOT_FIELD } from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { insertChange, insertsOf, isGroupTarget } from './insertTarget';
+import { childAddress, hostIn, insertsOf, isGroupTarget, targetChange } from './insertTarget';
 export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
@@ -22,9 +25,27 @@ import { makeKnob, type KnobSpec } from './knob';
 import { insertKnobAutomation, insertLaneHolder, knobSongTick } from './knobAutomation';
 
 /**
+ * Where the lane on `field` of the insert at `index` in `target`'s chain
+ * lives: that chain, the insert and the field, or for a slot child its
+ * host's chain, the host and `slot.<field>` (windsor#692 decision 8), so the
+ * row is found through `automatableInsertFields(host)`.
+ */
+function laneAddress(
+  ctx: AppCtx,
+  target: InsertTarget,
+  index: number,
+  field: string,
+): { readonly chain: InsertTarget; readonly spec: InsertSpec | undefined; readonly field: string } {
+  const child = childAddress(target);
+  if (!child) return { chain: target, spec: insertsOf(ctx, target)[index], field };
+  const host = hostIn(ctx, child);
+  return { chain: child.chain, spec: host.list[host.index], field: `${SLOT_FIELD}.${field}` };
+}
+
+/**
  * The lock on the knob over `field` of the insert at `index` in `target`'s
- * chain, for a part's strip or a group's (windsor#616); nothing for a send
- * bus or the master.
+ * chain, for a part's strip or a group's (windsor#616), a slot child's
+ * included; nothing for a send bus or the master.
  */
 export function insertFieldLock(
   ctx: AppCtx,
@@ -32,13 +53,14 @@ export function insertFieldLock(
   index: number,
   field: string,
 ): Pick<KnobSpec, 'automation'> {
-  if (typeof target !== 'number' && !isGroupTarget(target)) return {};
+  const chain = childAddress(target)?.chain ?? target;
+  if (typeof chain !== 'number' && !isGroupTarget(chain)) return {};
   return {
     automation: () => {
-      const holder = insertLaneHolder(ctx.model.doc, target);
-      const spec = insertsOf(ctx, target)[index];
+      const at = laneAddress(ctx, target, index, field);
+      const holder = insertLaneHolder(ctx.model.doc, at.chain);
       const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
-      return insertKnobAutomation(holder, spec, field, tick);
+      return insertKnobAutomation(holder, at.spec, at.field, tick);
     },
   };
 }
@@ -63,7 +85,7 @@ function rackKnob<S>(
     },
     set: (v) => {
       const inserts = setInsertField(insertsOf(ctx, slot), index, f, v);
-      if (ctx.change(insertChange(slot, inserts)).ok) knob.onChange?.();
+      if (ctx.change(targetChange(ctx, slot, inserts)).ok) knob.onChange?.();
     },
   });
 }

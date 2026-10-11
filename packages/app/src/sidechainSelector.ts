@@ -4,13 +4,14 @@ import type { SidechainSource } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import {
-  insertChange,
   insertsOf,
   isBusTarget,
   isGroupTarget,
-  type InsertTarget,
+  targetChange,
+  type ChainTarget,
 } from './insertTarget';
-export function sidechainSelector(ctx: AppCtx, target: InsertTarget, index: number): HTMLElement {
+/** A chain's compressor's source; a slot child's is always Internal and has none (windsor#692). */
+export function sidechainSelector(ctx: AppCtx, target: ChainTarget, index: number): HTMLElement {
   const wrap = el('label', 'field-wrap', 'Sidechain (post-FX)');
   const select = document.createElement('select');
   select.className = 'field';
@@ -44,7 +45,7 @@ export function sidechainSelector(ctx: AppCtx, target: InsertTarget, index: numb
     const inserts = insertsOf(ctx, target).map((entry, at) =>
       at === index && entry.kind === 'compressor' ? { ...entry, sidechain } : entry,
     );
-    if (ctx.change(insertChange(target, inserts)).ok) ctx.render();
+    if (ctx.change(targetChange(ctx, target, inserts)).ok) ctx.render();
     else select.value = selected;
   };
   wrap.appendChild(select);

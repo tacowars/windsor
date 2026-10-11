@@ -4,59 +4,42 @@
  * mockup's side-rail layout, `docs/research/2026-09-30-insert-rack/mockup.html`):
  * the shell every kind shares around its card's pages.
  *
- * - The rail on the left: the on/off switch bound to the insert's `enabled`,
- *   the vertical `N · NAME`, and ◀ ▶ ✕. The name folds the insert to its
- *   rail, and a click on a folded insert opens it.
+ * - The rail on the left: the on/off switch bound to the insert's `enabled`
+ *   (`insertRailControls.ts`, locked while a lane holds it), the vertical
+ *   `N · NAME`, and ◀ ▶ ✕. The name folds the insert to its rail, and a
+ *   click on a folded insert opens it.
  * - The body: a row of tabs when the card has two or more pages, then the
  *   page shown, the only one built. An insert that is off dims its body.
- * - While a lane on the switch is on (windsor#631, record
- *   `2026-10-06-insert-switch-lanes` decision 9), the switch locks as an
- *   automated knob does (`knobLock.ts`): the lane's colour and an AUTO tag,
- *   the lane's level at the playhead on the button and the body, and a press
- *   that says to switch the lane off instead of toggling.
+ * - A host's slot (windsor#692, `insertSlotArea.ts`), after the body: the
+ *   collapsed tab, the picker, or the picker column and the child. Folding
+ *   the host hides it with the body. A slot child is drawn by its own box,
+ *   never by this shell, so a host kind as a child has no slot area.
  *
  * The page and the fold are session view state (`insertRackModel.ts`), kept
- * here for the life of the page. Paging and folding repaint only the one
- * insert; a document edit goes through `commitChain` and a render.
+ * for the life of the page. Paging and folding repaint only the one insert;
+ * a document edit goes through `commitChain` and a render.
  */
-import type { InsertSpec } from '@windsor/engine';
+import { INSERT_KINDS, isHostKind } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import type { InsertPage } from './insertCards';
 import { INSERT_CARDS } from './insertCards';
-import { moveInsert, removeInsert, setInsertField } from './insertEdits';
+import { moveInsert, removeInsert } from './insertEdits';
 import { INSERT_LABELS } from './insertKnobTables';
-import { insertFieldLock } from './insertKnobs';
-import { lockNotice, type KnobAutomation } from './knobAutomation';
-import { AUTO_TAG_TEXT, followAutomation, paintLock, switchShowsOn } from './knobLock';
-import type { RackView } from './insertRackModel';
-import { emptyRack, insertIdAt, showPage, toggleFold, viewAt } from './insertRackModel';
-import type { InsertTarget } from './insertTarget';
-import { insertChange, insertsOf } from './insertTarget';
-
-/**
- * Every rack's view state, for this session only: never in the song. It is
- * keyed by each insert's id, so no edit, undo or import has to move it.
- */
-let rackView: RackView = emptyRack();
-
-/** Send the chain's next insert list as one edit (one undo step) and render. */
-export function commitChain(ctx: AppCtx, slot: InsertTarget, inserts: readonly InsertSpec[]): void {
-  if (!ctx.change(insertChange(slot, inserts)).ok) return;
-  ctx.render();
-}
-
-/** One of the rail's small square buttons. */
-function railButton(glyph: string, title: string, className = ''): HTMLButtonElement {
-  const button = el('button', `insert-icon ${className}`.trim(), glyph) as HTMLButtonElement;
-  button.type = 'button';
-  button.title = title;
-  button.setAttribute('aria-label', title);
-  return button;
-}
+import { insertIdAt, showPage, toggleFold, viewAt } from './insertRackModel';
+import {
+  commitChain,
+  pageTabs,
+  powerSwitch,
+  railButton,
+  rackViewNow,
+  setRackView,
+} from './insertRailControls';
+import { slotArea } from './insertSlotArea';
+import type { ChainTarget } from './insertTarget';
+import { insertsOf } from './insertTarget';
 
 /** One nudge along the chain: ◀ towards the front, ▶ towards the back (#652). */
-function moveButton(ctx: AppCtx, slot: InsertTarget, index: number, delta: number): HTMLElement {
+function moveButton(ctx: AppCtx, slot: ChainTarget, index: number, delta: number): HTMLElement {
   const back = delta < 0;
   const list = insertsOf(ctx, slot);
   const kind = list[index]?.kind;
@@ -73,59 +56,19 @@ function moveButton(ctx: AppCtx, slot: InsertTarget, index: number, delta: numbe
 
 interface ShellParts {
   readonly ctx: AppCtx;
-  readonly slot: InsertTarget;
+  readonly slot: ChainTarget;
   readonly index: number;
   /** The insert's id: what its view state is kept by. */
   readonly id: string;
-  readonly spec: InsertSpec;
   readonly folded: boolean;
-  /** The insert's box, which the switch dims while the insert is off. */
-  readonly box: HTMLElement;
   /** Redraw this insert in place, then focus what `focus` selects inside it. */
   repaint(focus: string): void;
 }
 
-/** The switch's field, which a lane may hold (windsor#628). */
-const SWITCH_FIELD = 'enabled';
-
-/** The on/off switch and its AUTO tag, lit and following the lane while one holds it. */
-function powerSwitch({ ctx, slot, index, spec, box }: ShellParts): HTMLElement {
-  const label = INSERT_LABELS[spec.kind];
-  const root = el('div', 'insert-switch');
-  const power = railButton('⏻', '', 'insert-power');
-  root.append(power, el('span', 'knob-auto', AUTO_TAG_TEXT));
-  const automation = insertFieldLock(ctx, slot, index, SWITCH_FIELD).automation;
-  const lockNow = (): KnobAutomation | null => automation?.() ?? null;
-  const render = (): void => {
-    const lock = lockNow();
-    const on = switchShowsOn(spec.enabled, lock);
-    const title = lock ? `${label} is automated in the song` : `Turn ${label} ${on ? 'off' : 'on'}`;
-    power.title = title;
-    power.setAttribute('aria-label', title);
-    power.setAttribute('aria-pressed', String(on));
-    box.classList.toggle('off', !on);
-    paintLock(root, lock);
-  };
-  power.onclick = (): void => {
-    const lock = lockNow();
-    if (lock) return ctx.notify(lockNotice(`${label} On`, lock));
-    const now = insertsOf(ctx, slot)[index];
-    if (now)
-      commitChain(
-        ctx,
-        slot,
-        setInsertField(insertsOf(ctx, slot), index, SWITCH_FIELD, !now.enabled),
-      );
-  };
-  render();
-  if (automation) followAutomation(root, lockNow, render);
-  return root;
-}
-
-function rail(parts: ShellParts): HTMLElement {
-  const { ctx, slot, index, id, spec, folded, repaint } = parts;
+function rail(parts: ShellParts, power: HTMLElement): HTMLElement {
+  const { ctx, slot, index, id, folded, repaint } = parts;
   const root = el('div', 'insert-rail');
-  const label = INSERT_LABELS[spec.kind];
+  const label = INSERT_LABELS[insertsOf(ctx, slot)[index]!.kind];
   const name = el('button', 'insert-name') as HTMLButtonElement;
   name.type = 'button';
   name.setAttribute('aria-label', `${index + 1} ${label}`);
@@ -133,7 +76,7 @@ function rail(parts: ShellParts): HTMLElement {
   name.title = `${folded ? 'Open' : 'Fold'} ${label}`;
   name.setAttribute('aria-expanded', String(!folded));
   name.onclick = (): void => {
-    rackView = toggleFold(rackView, slot, id);
+    setRackView(toggleFold(rackViewNow(), slot, id));
     repaint('.insert-name');
   };
   const remove = railButton('✕', `Remove ${label}`);
@@ -142,42 +85,18 @@ function rail(parts: ShellParts): HTMLElement {
   };
   const tools = el('div', 'insert-tools');
   tools.append(moveButton(ctx, slot, index, -1), moveButton(ctx, slot, index, 1), remove);
-  root.append(powerSwitch(parts), name, tools);
+  root.append(power, name, tools);
   return root;
 }
 
-function tabs(parts: ShellParts, pages: readonly InsertPage[], shown: number): HTMLElement {
-  const row = el('div', 'insert-tabs');
-  row.setAttribute('role', 'tablist');
-  const names = pages.map((page) => page.name);
-  pages.forEach((page, at) => {
-    const tab = el('button', '', page.name) as HTMLButtonElement;
-    tab.type = 'button';
-    tab.setAttribute('role', 'tab');
-    tab.setAttribute('aria-selected', String(at === shown));
-    tab.dataset.page = String(at);
-    if (page.title) tab.title = page.title;
-    tab.onclick = (): void => {
-      rackView = showPage(rackView, parts.slot, parts.id, names, at);
-      parts.repaint(`[data-page="${at}"]`);
-    };
-    row.appendChild(tab);
-  });
-  return row;
-}
-
 /** The insert at `index` of the chain `slot` names, in its shell. */
-export function insertBox(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
+export function insertBox(ctx: AppCtx, slot: ChainTarget, index: number): HTMLElement {
   const list = insertsOf(ctx, slot);
   const spec = list[index]!;
   const id = insertIdAt(list, index);
   const pages = INSERT_CARDS[spec.kind](ctx, slot, index);
-  const view = viewAt(
-    rackView,
-    slot,
-    id,
-    pages.map((page) => page.name),
-  );
+  const names = pages.map((page) => page.name);
+  const view = viewAt(rackViewNow(), slot, id, names);
   const box = el('div', 'insert-box');
   box.classList.toggle('folded', view.folded);
   const parts: ShellParts = {
@@ -185,30 +104,47 @@ export function insertBox(ctx: AppCtx, slot: InsertTarget, index: number): HTMLE
     slot,
     index,
     id,
-    spec,
     folded: view.folded,
-    box,
     repaint: (focus) => {
       const next = insertBox(ctx, slot, index);
       box.replaceWith(next);
       next.querySelector<HTMLElement>(focus)?.focus();
     },
   };
-  box.appendChild(rail(parts));
+  box.appendChild(rail(parts, powerSwitch({ ctx, target: slot, index, spec, box })));
   if (view.folded) {
     box.onclick = (event): void => {
       if ((event.target as Element).closest('button')) return;
-      rackView = toggleFold(rackView, slot, id);
+      setRackView(toggleFold(rackViewNow(), slot, id));
       parts.repaint('.insert-name');
     };
     return box;
   }
   const stack = el('div', 'insert-stack');
-  if (pages.length > 1) stack.appendChild(tabs(parts, pages, view.page));
+  if (pages.length > 1) {
+    stack.appendChild(
+      pageTabs(pages, view.page, (at) => {
+        setRackView(showPage(rackViewNow(), slot, id, names, at));
+        parts.repaint(`[data-page="${at}"]`);
+      }),
+    );
+  }
   const body = el('div', 'insert-body');
-  const page = pages[view.page];
-  if (page) body.appendChild(page.build());
+  const page = pages[view.page]?.build();
+  if (page) body.appendChild(page);
   stack.appendChild(body);
   box.appendChild(stack);
+  if (isHostKind(INSERT_KINDS[spec.kind])) {
+    const area = slotArea({
+      ctx,
+      chain: slot,
+      id,
+      spec,
+      open: view.slotOpen,
+      repaint: parts.repaint,
+    });
+    page?.append(...area.page);
+    box.append(...area.box);
+  }
   return box;
 }

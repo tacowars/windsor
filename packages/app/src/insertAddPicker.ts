@@ -11,6 +11,9 @@
  * closes the picker; Escape, ✕ or a press outside closes it without adding,
  * and Escape and ✕ hand the focus back to the slot. One picker is open at a
  * time across every rack.
+ *
+ * The groups the picker lists are `addPickerGroups`, which a host's slot
+ * picker (windsor#692) lists too, less the host's own kind.
  */
 import type { InsertKindName } from '@windsor/engine';
 import { el } from './dom';
@@ -24,6 +27,20 @@ export interface AddSlotSpec {
   pick(kind: InsertKindName): void;
 }
 
+/** One heading of the Add picker and the kinds under it. */
+export interface PickerGroup {
+  readonly label: string;
+  readonly kinds: readonly InsertKindName[];
+}
+
+/** The Add picker's groups in order, less `except` (a host's own kind); a group left empty goes. */
+export function addPickerGroups(except?: InsertKindName): PickerGroup[] {
+  return INSERT_GROUPS.map((group) => ({
+    label: group.label,
+    kinds: group.kinds.filter((kind) => kind !== except),
+  })).filter((group) => group.kinds.length > 0);
+}
+
 /** The picker open now, anywhere on the page, as the way to close it. */
 let openPicker: ((restoreFocus: boolean) => void) | null = null;
 
@@ -31,7 +48,7 @@ const ADD_PROMPT = 'Add insert';
 
 function pickerList(pick: (kind: InsertKindName) => void): HTMLElement {
   const list = el('div', 'insert-picker-list');
-  INSERT_GROUPS.forEach((group, at) => {
+  addPickerGroups().forEach((group, at) => {
     const box = el('div', 'insert-picker-group');
     box.setAttribute('role', 'group');
     const heading = el('div', 'insert-picker-label', group.label);

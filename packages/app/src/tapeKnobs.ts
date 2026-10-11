@@ -2,7 +2,7 @@
 import { DEFAULT_TAPE, tapeControlValue, setTapeControl, type TapeNumber } from '@windsor/engine';
 import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
-import { insertsOf, insertChange } from './insertTarget';
+import { insertsOf, targetChange } from './insertTarget';
 import { insertFieldLock } from './insertKnobs';
 import { makeKnob } from './knob';
 import { STRIP_COLOR } from './consoleColors';
@@ -32,7 +32,7 @@ export function tapeKnobs(
             spec = inserts[index];
           if (spec?.kind !== 'tape') return;
           inserts[index] = setTapeControl(spec, field, value);
-          ctx.change(insertChange(target, inserts));
+          ctx.change(targetChange(ctx, target, inserts));
         },
       }),
     ),

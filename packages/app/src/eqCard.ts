@@ -22,6 +22,9 @@
  * curve follow the lane on the console's frame loop without a rebuild; a
  * drag on that point, or any curve edit of a held field, is refused with the
  * locked knob's notice.
+ *
+ * In a host's slot (windsor#692, record `2026-10-11-wet-path-slot` decision
+ * 8) the EQ draws no spectrum and has no Listen, and says so in a note.
  */
 import { DEFAULT_EQ, EQ_SPECTRUM } from '@windsor/engine';
 import type { EqSpec, InsertSpec, InsertStage } from '@windsor/engine';
@@ -51,10 +54,10 @@ import {
   EQ_FULL_MESSAGE,
 } from './eqTables';
 import type { InsertCard } from './insertCards';
-import { insertPage } from './insertLayout';
+import { insertNote, insertPage, wideColumn } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
-import { insertChange, insertsOf, liveInsert } from './insertTarget';
+import { insertsOf, isChildTarget, liveInsert, targetChange } from './insertTarget';
 import { insertLaneHolder, knobSongTick, lockedKnobNotice } from './knobAutomation';
 import { watchPlayhead } from './stepStrip';
 
@@ -74,7 +77,7 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
       const list = insertsOf(ctx, slot).map((held, i) =>
         i === index ? { ...held, ...spec } : held,
       );
-      return ctx.change(insertChange(slot, list)).ok;
+      return ctx.change(targetChange(ctx, slot, list)).ok;
     },
     sampleRate: () => ctx.host.system?.engine.context.sampleRate ?? EQ_FALLBACK_SAMPLE_RATE,
     plot: () => eqPlot(model.view().range, model.sampleRate()),
@@ -194,6 +197,12 @@ function followLanes(canvas: HTMLElement, model: EqCardModel, draw: () => void):
   });
 }
 
+/** What a slot child's EQ says in place of its spectrum and Listen. */
+export const CHILD_EQ_NOTE = 'In the slot it has no spectrum and no Listen.';
+
+/** A slot child's extras: no pill and no Listen, and so nothing to repaint. */
+const NO_EXTRAS = { pill: null, listen: { refresh: (): void => undefined } } as const;
+
 /** What the curve's edits repaint beyond the curve: the band row, the knobs, the Listen pill. */
 interface CurveRepaint {
   readonly select: (band: number) => void;
@@ -258,13 +267,14 @@ function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
       extras.listen.refresh();
     },
   });
-  const extras = liveExtras(ctx, slot, index, model, curve);
+  const inSlot = isChildTarget(slot);
+  const extras = inSlot ? NO_EXTRAS : liveExtras(ctx, slot, index, model, curve);
   const wrap = el('div', 'eq-plot-wrap');
   wrap.append(
     canvas,
     eqRangeToggle(model, () => repaint('curve')),
-    extras.pill,
   );
+  if (extras.pill) wrap.append(extras.pill);
   const graph = el('div', 'eq-graph');
   graph.append(chips, wrap);
   paint.chips();
@@ -274,6 +284,10 @@ function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   requestAnimationFrame(draw);
   const page = insertPage(graph, panel);
   page.classList.add('eq-page');
+  if (inSlot) {
+    page.classList.add('in-slot');
+    page.append(wideColumn(insertNote(CHILD_EQ_NOTE)));
+  }
   return page;
 }
 

@@ -16,12 +16,13 @@ import {
   MAX_INSERTS,
   RETURN_NAMES,
   createInsertIdSource,
+  insertSlot,
   isInsertId,
   withInsertIds,
 } from '@windsor/engine';
 import { withoutInsertIds } from '@windsor/engine/__fixtures__/insertIds';
 import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
-import { addInsertAtFront } from './insertEdits';
+import { addInsertAtFront, removeChild, setChild } from './insertEdits';
 import { groupKey } from './groupModel';
 
 /** `list` without its ids: the settings alone. */
@@ -154,5 +155,26 @@ describe('addInsertAtFront (windsor#173)', () => {
     while (canAddInsert(list)) list = addInsert(list, 'drive');
     const full = list.map((spec, i) => ({ ...spec, mix: i / MAX_INSERTS }));
     expect(addInsertAtFront(full, 'chorus')).toEqual(full);
+  });
+});
+
+describe('the slot child edits (windsor#692)', () => {
+  const drive = { ...DEFAULT_DRIVE, id: 'd' };
+  const echo = { ...DEFAULT_ECHO, mix: 1, id: 'h', slot: null };
+
+  it('puts a fresh child at its defaults in the host’s slot, a new id each change, the rest unchanged', () => {
+    const ids = createInsertIdSource(7);
+    const set = setChild([drive, echo], 'h', 'chorus', ids);
+    expect(set[0]).toBe(drive);
+    const child = insertSlot(set[1]!)!;
+    expect(withoutInsertIds([child])).toEqual([INSERT_KINDS.chorus.defaults]);
+    expect(isInsertId(child.id)).toBe(true);
+    // No onSendBus: a child starts at its defaults on a send bus's Echo too.
+    const plate = setChild(set, 'h', 'plate', ids);
+    const next = insertSlot(plate[1]!)!;
+    expect(withoutInsertIds([next])).toEqual([DEFAULT_PLATE_REVERB]);
+    expect(next.id).not.toBe(child.id);
+    expect(removeChild(plate, 'h')).toEqual([drive, echo]);
+    expect(setChild([drive], 'h', 'chorus', ids)).toEqual([drive]);
   });
 });

@@ -16,7 +16,7 @@ import { withGesture } from './gestureHooks';
 import { insertColumn } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
-import { insertChange, insertsOf } from './insertTarget';
+import { insertsOf, targetChange } from './insertTarget';
 import { makeKnob, type KnobElement } from './knob';
 import {
   coreKnobValue,
@@ -46,7 +46,7 @@ function section(ctx: AppCtx, target: InsertTarget, index: number): Section {
       const inserts = [...insertsOf(ctx, target)];
       if (inserts[index]?.kind !== 'tape') return;
       inserts[index] = spec;
-      ctx.change(insertChange(target, inserts));
+      ctx.change(targetChange(ctx, target, inserts));
     },
   };
 }
