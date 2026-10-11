@@ -21,17 +21,20 @@
  *   (√2, 0). The gains (`panLeft`/`panRight`) are rebuilt in place while
  *   Spread moves. Spread 0 is exactly mono: the synthesis skips the gains, L = R.
  *
- * The wet-path slot (`BLOOM_SLOT`): `split`
- * (`SLOT_SPLIT`, stepped, 0 or 1) glides linearly over `INSERT_FADE_SECONDS`
- * and lands exactly. It takes the internal wet out of `left`/`right`
- * (`wetGain · (1 − split)`) and hands it to the processor's outputs 1 and 2:
+ * The wet-path slot (`BLOOM_SLOT`): `split` (0..1) is set each sample by the
+ * route, from the processor's a-rate param, which the stage ramps on the
+ * same timeline as the child's fade. It takes the internal wet out of
+ * `left`/`right` (`wetGain · (1 − split)`) and hands the layer to the
+ * processor's outputs 1 and 2:
  *
  *   send     = gain · Amount² · wet               (`sendLeft`/`sendRight`, after Spread)
- *   sendGain = level · min(1, 2 Mix) · split       (Mix's wet share × switch × split)
+ *   sendGain = level · min(1, 2 Mix)               (Mix's wet share × switch)
  *
- * so `left + child(send) · sendGain` with an identity child is the output
- * without a child, at every point of the crossing. Split 0 leaves `wetGain`'s
- * expression untouched: no child is the output bit for bit.
+ * The child's own fade is the only fade on the return (the slot module's),
+ * so `left + fade · child(send) · sendGain` with an identity child is the
+ * output without a child whenever `fade` is `split`, as it is through an
+ * arrival and a departure. Split 0 leaves `wetGain`'s expression untouched:
+ * no child is the output bit for bit.
  *
  * Per sample: `tick` reads `inputLeft`/`inputRight` and `wetLeft`/`wetRight`,
  * and leaves `left`/`right`; `rest` is the same with the layer
@@ -39,11 +42,11 @@
  * is born NaN. Pinned by `inserts/bloomDsp.test.ts` and `bloomGolden.test.ts`.
  */
 import { BLOOM_OUTPUT as C } from '../../inserts/bloomOutputConstants';
-import { INSERT_FADE_SECONDS, INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
+import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { BLOOM_BANDS } from '../../inserts/bloomBandsConstants';
 import { bloomSinVersineInPlace } from './bloomBandsMath';
 import { bloomOnePoleStep } from './bloomPortable';
-import { SLOT_AMOUNT, SLOT_ENABLED, SLOT_MIX, SLOT_SPLIT, SLOT_SPREAD } from './bloomSlots';
+import { SLOT_AMOUNT, SLOT_ENABLED, SLOT_MIX, SLOT_SPREAD } from './bloomSlots';
 
 class BloomOutput {
   slots: Float64Array;
@@ -63,10 +66,9 @@ class BloomOutput {
   panLeft: Float64Array;
   panRight: Float64Array;
   scratch: Float64Array;
-  /** The slot's split (0..1), its target and its step a sample. */
+  /** The slot's split this sample (0..1, the route's), and the split the gains were last set for. */
   split: number;
-  targetSplit: number;
-  splitStep: number;
+  gainSplit: number;
   /** The layer's gain before Mix (gain · Amount²) and Mix's wet share. */
   preGain: number;
   postGain: number;
@@ -86,13 +88,12 @@ class BloomOutput {
     this.amount = this.mix = this.smoothStep = this.wetGain = this.dryGain = NaN;
     this.level = this.targetLevel = this.levelStep = this.wetLeft = this.wetRight = NaN;
     this.inputLeft = this.inputRight = this.left = this.right = this.spread = NaN;
-    this.split = this.targetSplit = this.splitStep = this.preGain = this.postGain = NaN;
+    this.split = this.gainSplit = this.preGain = this.postGain = NaN;
     this.sendLeft = this.sendRight = this.sendGain = NaN;
     this.slots = slots;
     this.controls = controls;
     this.smoothStep = bloomOnePoleStep(rate, C.smoothSeconds);
     this.levelStep = 1 / (INSERT_SWITCH_FADE_S * rate);
-    this.splitStep = 1 / (INSERT_FADE_SECONDS * rate);
     this.panLeft = new Float64Array(BLOOM_BANDS.count);
     this.panRight = new Float64Array(BLOOM_BANDS.count);
     this.scratch = new Float64Array(2);
@@ -106,17 +107,15 @@ class BloomOutput {
     this.mix = this.slots[SLOT_MIX];
     this.targetLevel = this.slots[SLOT_ENABLED] > 0 ? 1 : 0;
     this.level = this.targetLevel;
-    this.targetSplit = this.slots[SLOT_SPLIT] > 0 ? 1 : 0;
-    this.split = this.targetSplit;
+    this.split = 0;
     this.gains();
     this.wetLeft = this.wetRight = this.left = this.right = 0;
     this.sendLeft = this.sendRight = this.sendGain = 0;
   }
 
-  /** Once a block: the switch's and the split's targets, and the pan while Spread moves. */
+  /** Once a block: the switch's target, and the pan while Spread moves. */
   configure(): void {
     this.targetLevel = this.slots[SLOT_ENABLED] > 0 ? 1 : 0;
-    this.targetSplit = this.slots[SLOT_SPLIT] > 0 ? 1 : 0;
     if (this.controls[SLOT_SPREAD] !== this.spread) this.pan();
   }
 
@@ -150,9 +149,10 @@ class BloomOutput {
     if (this.split !== 0) this.wetGain *= 1 - this.split;
     this.preGain = C.gain * this.amount * this.amount;
     this.postGain = mix < 1 / 2 ? 2 * mix : 1;
+    this.gainSplit = this.split;
   }
 
-  /** Amount, Mix and the switch, one sample on. */
+  /** Amount, Mix and the switch, one sample on, and the gains again if the split has moved. */
   glide(): void {
     const slots = this.slots,
       step = this.smoothStep;
@@ -171,14 +171,7 @@ class BloomOutput {
         this.targetLevel > level
           ? Math.min(this.targetLevel, level + this.levelStep)
           : Math.max(this.targetLevel, level - this.levelStep);
-    const split = this.split;
-    if (split !== this.targetSplit) {
-      this.split =
-        this.targetSplit > split
-          ? Math.min(this.targetSplit, split + this.splitStep)
-          : Math.max(this.targetSplit, split - this.splitStep);
-      this.gains();
-    }
+    if (this.split !== this.gainSplit) this.gains();
   }
 
   tick(): void {
@@ -192,7 +185,7 @@ class BloomOutput {
     const pre = this.preGain;
     this.sendLeft = pre * this.wetLeft;
     this.sendRight = pre * this.wetRight;
-    this.sendGain = this.level * this.postGain * this.split;
+    this.sendGain = this.level * this.postGain;
   }
 
   /**
@@ -207,7 +200,7 @@ class BloomOutput {
     this.left = l + this.level * (this.dryGain * l - l);
     this.right = r + this.level * (this.dryGain * r - r);
     this.sendLeft = this.sendRight = 0;
-    this.sendGain = this.level * this.postGain * this.split;
+    this.sendGain = this.level * this.postGain;
   }
 }
 

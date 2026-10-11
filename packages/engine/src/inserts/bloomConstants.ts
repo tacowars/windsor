@@ -139,13 +139,14 @@ export const BLOOM_DSP = {
 };
 
 /**
- * The processor's outputs and its `split` param, for the wet-path slot.
- * Output 0 is bloom's whole output, or only the dry share once `split` is 1;
- * output 1 is the layer after Amount, before Mix (stereo); output 2 is the
- * gain the slot's return takes (Mix's wet share × the switch × `split`), a
- * mono signal into a native gain's `gain`. `split` glides over
- * `INSERT_FADE_SECONDS` inside the processor. The stage builds output 0
- * only until bloom becomes a slot host.
+ * The processor's outputs and its `split` param, for the wet-path slot
+ * (record `2026-10-11-bloom-insert`, E2). Output 0 is bloom's whole output,
+ * or only the dry share once `split` is 1; output 1 is the layer after
+ * Amount, before Mix (stereo); output 2 is the gain the slot's return takes
+ * (Mix's wet share × the switch), a mono signal into a native gain's `gain`.
+ * `split` is a-rate: the stage's `route` ramps it over `INSERT_FADE_SECONDS`
+ * with `fadeRamp`, on the same timeline as the child's own fade, and the
+ * processor applies it sample by sample. The stage always builds all three.
  */
 export const BLOOM_SLOT = {
   splitParam: 'split',

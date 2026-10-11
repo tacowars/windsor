@@ -38,9 +38,9 @@ function echoHolding(slot: unknown, registry?: InsertRegistry) {
 }
 
 describe('host kinds', () => {
-  it('is Echo alone, by the slot in its fields', () => {
+  it('is Echo and bloom, by the slot in their fields', () => {
     const hosts = Object.entries(INSERT_KINDS).filter(([, kind]) => isHostKind(kind));
-    expect(hosts.map(([name]) => name)).toEqual(['echo']);
+    expect(hosts.map(([name]) => name)).toEqual(['echo', 'bloom']);
     expect(insertSlot(DEFAULT_DRIVE)).toBeNull();
   });
 });

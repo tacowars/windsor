@@ -442,9 +442,11 @@ export function slotRows(host: InsertKindName, table: KindRows = KIND_ROWS): Ins
 
 /**
  * Each insert kind's continuous fields, the targets a lane may move on it,
- * and on a host its slot rows: Echo's are every other kind's, under `slot.`.
+ * and on a host its slot rows: Echo's and bloom's are every other kind's,
+ * under `slot.`.
  */
 export const INSERT_AUTOMATION_FIELDS: KindRows = {
   ...KIND_ROWS,
   echo: [...ECHO_ROWS, ...slotRows('echo')],
+  bloom: [...BLOOM_ROWS, ...slotRows('bloom')],
 };

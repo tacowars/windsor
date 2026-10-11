@@ -1,5 +1,6 @@
 /** Song-owned settings for the bloom insert; every number clamped to its bounds, every enum checked. */
 import type { FieldNormaliser } from '../song/arrangementFields';
+import type { InsertSpec } from './insertRegistry';
 import {
   BLOOM_BOUNDS,
   BLOOM_DEFAULTS,
@@ -44,6 +45,12 @@ export interface BloomSpec {
   /** The shared compressor's amount, 0..1. */
   readonly density: number;
   readonly enabled: boolean;
+  /**
+   * The child insert on the generated layer, before Mix (record
+   * `2026-10-11-wet-path-slot`): bloom is a host. Absent or null is none, so a
+   * spec built in code without it is valid. The registry normalises it.
+   */
+  readonly slot?: InsertSpec | null;
 }
 
 export const DEFAULT_BLOOM: BloomSpec = {
@@ -51,13 +58,14 @@ export const DEFAULT_BLOOM: BloomSpec = {
   ...BLOOM_DEFAULTS,
   key: BLOOM_KEY_DEFAULT,
   scale: BLOOM_SCALE_DEFAULT,
+  slot: null,
 };
 
 /** The numbers clamped as they are; Low, High and Octave are whole semitones. */
 export const BLOOM_NUMBERS = Object.keys(BLOOM_BOUNDS) as BloomNumber[];
 const BLOOM_WHOLE: readonly BloomNumber[] = ['low', 'high', 'octave'];
 export const BLOOM_SWITCHES = ['freeze', 'enabled'] as const;
-export const BLOOM_FIELDS = ['kind', ...BLOOM_NUMBERS, ...BLOOM_SWITCHES, 'key', 'scale'];
+export const BLOOM_FIELDS = ['kind', ...BLOOM_NUMBERS, ...BLOOM_SWITCHES, 'key', 'scale', 'slot'];
 
 /** `value` if it is one of `BLOOM_OCTAVES`, else the nearest (reported). */
 function octaveOf(value: number, path: string, n: FieldNormaliser): number {
@@ -68,7 +76,7 @@ function octaveOf(value: number, path: string, n: FieldNormaliser): number {
   return nearest;
 }
 
-/** `raw` over the defaults. */
+/** `raw` over the defaults; `slot` is the registry's (`normaliseInsertEntry`), so this leaves it empty. */
 export function normaliseBloom(
   raw: Record<string, unknown>,
   path: string,
@@ -89,5 +97,6 @@ export function normaliseBloom(
     ...values,
     key: n.pick(raw.key, BLOOM_KEYS, BLOOM_KEY_DEFAULT, `${path}.key`),
     scale: n.pick(raw.scale, BLOOM_SCALES, BLOOM_SCALE_DEFAULT, `${path}.scale`),
+    slot: null,
   };
 }

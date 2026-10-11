@@ -28,9 +28,11 @@
  * fully off clears everything; while off nothing runs and the input is copied
  * to the bit, and switching on starts from rest.
  *
- * The wet-path slot: `sendLeft`/`sendRight` (the layer after Amount) and
- * `sendGain` (Mix's wet share × switch × split) leave beside `left`/`right`,
- * for the processor's outputs 1 and 2 (`bloomOutput.ts`). Dormant, they are 0.
+ * The wet-path slot: `split` comes in each sample beside the input (the
+ * processor's a-rate param), and `sendLeft`/`sendRight` (the layer after
+ * Amount) and `sendGain` (Mix's wet share × switch) leave beside
+ * `left`/`right`, for the processor's outputs 1 and 2 (`bloomOutput.ts`).
+ * Dormant, they are 0, so off cuts a child's tail as it cuts the layer.
  *
  * Sleep: once the input has been under `sleepInputFloor` for
  * `sleepWaitSeconds` and a whole block of the generated layer has stayed under
@@ -80,6 +82,8 @@ class BloomDsp {
   outputPeak: number;
   inputLeft: number;
   inputRight: number;
+  /** The slot's split this sample, 0..1: how much of the layer the child carries. */
+  split: number;
   left: number;
   right: number;
   /** The slot's send (outputs 1) and the gain its return takes (output 2). */
@@ -90,7 +94,7 @@ class BloomDsp {
   constructor(rate: number, slots: Float64Array) {
     this.rate = this.blockStep = this.blockFrames = this.quietFrames = this.sleepWait = NaN;
     this.inputPeak = this.outputPeak = NaN;
-    this.inputLeft = this.inputRight = this.left = this.right = NaN;
+    this.inputLeft = this.inputRight = this.left = this.right = this.split = NaN;
     this.sendLeft = this.sendRight = this.sendGain = NaN;
     this.rate = rate;
     this.slots = slots;
@@ -113,7 +117,7 @@ class BloomDsp {
     this.dormant = this.asleep = false;
     this.clear();
     this.dormant = false;
-    this.left = this.right = 0;
+    this.left = this.right = this.split = 0;
     this.sendLeft = this.sendRight = this.sendGain = 0;
   }
 
@@ -213,6 +217,7 @@ class BloomDsp {
     const output = this.output;
     output.inputLeft = this.inputLeft;
     output.inputRight = this.inputRight;
+    output.split = this.split;
     output.rest();
     this.left = output.left;
     this.right = output.right;
@@ -240,6 +245,7 @@ class BloomDsp {
     output.inputRight = r;
     output.wetLeft = wetLeft;
     output.wetRight = wetRight;
+    output.split = this.split;
     output.tick();
     const peakLeft = wetLeft < 0 ? -wetLeft : wetLeft,
       peakRight = wetRight < 0 ? -wetRight : wetRight;

@@ -3,7 +3,8 @@
 - **Date:** 2026-10-11
 - **Status:** proposed (tacowars's design decisions of 2026-10-11; the
   card's mockup approved the same day, decision 15)
-- **Links:** windsor#712 (the insert, epic windsor#710) · the wet-path slot record
+- **Links:** windsor#712 (the insert, epic windsor#710) · windsor#713 (the
+  slot, E2) · the wet-path slot record
   `2026-10-11-wet-path-slot` (epic windsor#686) · the switch lanes record
   `2026-10-06-insert-switch-lanes`, which decision 13 amends · the cost note
   `docs/research/2026-10-11-bloom-insert/`
@@ -178,6 +179,62 @@ the kind's constants files, one file a module.
     shape, bright, octave, key, scale, low, high, focus, density }`. It is
     additive. Octave snaps to its nearest step, and Low and High round to
     whole notes, each with a correction.
+
+## E2: Bloom as a slot host (windsor#713)
+
+Decision 14 built on the wet-path contract (`2026-10-11-wet-path-slot`).
+
+17. **Host by fields.** `slot` is in Bloom's `fields` and `DEFAULT_BLOOM`
+    has `slot: null`. Bloom's own `normalise` returns `slot: null` and never
+    reads it; the registry does. Bloom's table entry is its own rows, then
+    `slotRows('bloom')`. Echo can't hold an Echo and Bloom can't hold a
+    Bloom, but each can hold the other with its own slot forced to none.
+18. **The wet path leaves the worklet.** The stage always builds the
+    processor's three outputs and the return, so the first child takes the
+    normal arrival path:
+    - `send` is output 1, the layer after Amount and Spread, before Mix.
+    - `ret` is a native gain at 0. Output 2 drives its gain, and it sums
+      into Bloom's output beside output 0.
+    - `route(on)` ramps the processor's `split` to 1 or 0.
+19. **One fade.** Output 2 is the return's gain, `level · min(1, 2·Mix)`,
+    with no `· split`. The slot module's fade on each child is the only fade
+    on the return. Output 0 keeps `wetGain · (1 − split)` of the layer, so
+    an identity child sums to `1 − split + fade` of the layer, which is 1
+    whenever the fade and `split` are equal.
+20. **`split` is a-rate.** The stage's `route` ramps it with `fadeRamp`
+    from the same `now` and over the same `INSERT_FADE_SECONDS` as the slot
+    module ramps the child's fade, and the processor applies it sample by
+    sample. The two are the same ramp on the same clock.
+    - **Why not k-rate:** a k-rate `split`, gliding inside the worklet, would
+      start on the first quantum the audio thread reads. That trails the
+      child's native ramp by up to a quantum plus the message's latency. A
+      quantum is 22 % of the 12 ms window at 48 kHz, so an identity child's
+      sum could miss by about a fifth of the layer during every change.
+    - **Cost:** one value read per sample. While `split` is constant a
+      browser may hand one value a quantum. Bloom's gains are recomputed per
+      sample only while `split` moves.
+    - **What this gives:** an identity child sums to Bloom without a child
+      through an arrival, a departure, a kind change and a departure that
+      reverses an arrival mid-window. An arrival that reverses a departure
+      mid-window has no step. The leaving child reaches 0 before `split` is
+      back at 1, so the layer dips and recovers, continuously: to 3/4 for a
+      reversal halfway. This is the slot module's crossing, and Echo's
+      direct edge does the same.
+21. **An empty slot is bit for bit.** At `split` 0 the output's expression
+    is untouched, so `bloomGolden` holds and output 0 equals Bloom before
+    the slot. Off is the input to the bit with a child. Output 2 is 0 then,
+    so off cuts a child's tail as Echo's off does. At Mix 0 output 2 is 0,
+    and at Amount 0 output 1 is silent. Asleep, the return keeps its gain,
+    so a child's tail still sounds.
+22. **Tests.** `bloomSplit.test.ts` pins the worklet: split 0 bit for bit,
+    output 2 never carrying `split`, `split` applied sample by sample, and
+    the corners (Mix 0, 0.5 and 1, Amount 0 and 1, off, Freeze on, a switch
+    off mid-crossing). `bloomSlot.test.ts` builds the stage in the chain on
+    the fake context. It renders the shipped processor on the stage's own
+    `split` schedule, with the host's sum modelled as the stage wires it.
+    It also covers the slot rows and the child's load meter.
+
+The field is additive, so `ARRANGEMENT_VERSION` doesn't move.
 
 ## Cost
 
