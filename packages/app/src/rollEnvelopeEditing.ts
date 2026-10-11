@@ -24,7 +24,7 @@ import { envelopeY } from './rollEnvelopeGeometry';
 import { type RollEnvelopeFrame, envelopeAxisTicks, rollEnvelopeHost } from './rollEnvelopeHost';
 import type { EnvelopeLayer } from './rollEnvelopeOverlay';
 import { dragReading, envelopeOffsetText } from './rollEnvelopeReadout';
-import { editablePoints, envelopeUndoLabel, settlePoints } from './rollEnvelopeSettle';
+import { editablePoints, envelopeUndoLabel, settleGesture } from './rollEnvelopeSettle';
 import { ROLL_ENVELOPE_READOUT_PX, ROLL_ENVELOPE_TOOL_UNDO } from './rollEnvelopeTables';
 import { wireLaneEditing } from './songAutomationGesture';
 import type { ShapeLifeHooks } from './songShapeLife';
@@ -48,6 +48,8 @@ export interface EnvelopeEditingHost {
   shown(): ShownEnvelope | null;
   /** Write `points` as the shown envelope's, one undo step named `label`. */
   write(points: readonly RollEnvelopePoint[], label: string): void;
+  /** A gesture refused on a full envelope (true), or the next one begun (false), for the column's hint. */
+  refused(full: boolean): void;
   /** The value under the pointer over the layer, read for the column; null once it leaves. */
   hover(text: string | null): void;
   /** The card's hold on the Shape tool, so the tool closes with it (`rollPopoverLife.ts`). */
@@ -72,7 +74,14 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
     return start;
   };
   const settle = (next: readonly RollEnvelopePoint[]): RollEnvelopePoint[] =>
-    settlePoints(next, { start, loopTicks: loop(), stroke: view.envelope.tool === 'draw' });
+    settleGesture(next, { start, loopTicks: loop(), stroke: view.envelope.tool === 'draw' }).points;
+  /** Write a gesture's settled points, or, when the cap refused it, write nothing and say so. */
+  const land = (settled: { points: RollEnvelopePoint[]; refused: boolean }, label: string) => {
+    if (settled.refused) input.refused(true);
+    else input.write(settled.points, label);
+  };
+  /** Whether the Shape tool's last settle, the one Apply writes, was refused. */
+  let shapeRefused = false;
 
   const hideReadout = (): void => {
     readout?.remove();
@@ -100,6 +109,7 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
   for (const type of ['pointerdown', 'pointermove'] as const) {
     lane.addEventListener(type, (e) => {
       pointerTick = tickOf(e);
+      if (type === 'pointerdown') input.refused(false);
       // The Shape tool's range previews nothing until its popover: read the curve as it is.
       if (view.envelope.tool === 'shape' && (e.buttons & 1) === 1) showReadout(points());
     });
@@ -121,7 +131,11 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
     },
     commit: (label, next) => {
       hideReadout();
-      input.write(settle(next), envelopeUndoLabel(label, name()));
+      const stroke = view.envelope.tool === 'draw';
+      land(
+        settleGesture(next, { start, loopTicks: loop(), stroke }),
+        envelopeUndoLabel(label, name()),
+      );
     },
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
@@ -145,8 +159,13 @@ export function envelopeEditing(input: EnvelopeEditingHost): ShapeTool {
     },
     points,
     // The preview and Apply both settle here, so Apply writes the dashed curve.
-    settle: (next) => settlePoints(next, { start, loopTicks: loop(), stroke: false }),
-    commit: (_label, next) => input.write(next, ROLL_ENVELOPE_TOOL_UNDO.shape(name())),
+    settle: (next) => {
+      const settled = settleGesture(next, { start, loopTicks: loop(), stroke: false });
+      shapeRefused = settled.refused;
+      return settled.points;
+    },
+    commit: (_label, next) =>
+      land({ points: [...next], refused: shapeRefused }, ROLL_ENVELOPE_TOOL_UNDO.shape(name())),
     valueText: (value) => envelopeOffsetText(input.shown()?.envelope.target ?? '', value),
   });
   return shape;

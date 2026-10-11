@@ -35,16 +35,39 @@ export interface RollSource {
 }
 
 /** The part's voice slots and which of them its song lanes hold, as one string: what the picker reads. */
-export const voiceSlotKey = (part: VoiceSlotPart | undefined): string =>
-  part
-    ? JSON.stringify([[...laneVoicePaths(part)].sort(), [...voiceSlotTargets(part)].sort()])
-    : '';
+export const buildVoiceSlotKey = (part: VoiceSlotPart): string =>
+  JSON.stringify([[...laneVoicePaths(part)].sort(), [...voiceSlotTargets(part)].sort()]);
+
+/** A part's key, as `build` makes it, built once per part object. */
+export type VoiceSlotKeyOf = (part: VoiceSlotPart | undefined) => string;
+
+/**
+ * `build`'s key, kept by the part object's identity (windsor#724 decision
+ * 2): the document is immutable, so a new part object is the only change,
+ * and an open Roll's per-frame read builds nothing while the part stands.
+ */
+export function cachedVoiceSlotKey(build = buildVoiceSlotKey): VoiceSlotKeyOf {
+  const keys = new WeakMap<VoiceSlotPart, string>();
+  return (part) => {
+    if (!part) return '';
+    let key = keys.get(part);
+    if (key === undefined) {
+      key = build(part);
+      keys.set(part, key);
+    }
+    return key;
+  };
+}
+
+/** The one cache every Roll reads through. */
+export const voiceSlotKey: VoiceSlotKeyOf = cachedVoiceSlotKey();
 
 /** Region `region`'s roll on `slot` (the first region's with none named), from `doc`. */
 export function readRollSource(
   doc: ArrangementDocument,
   slot: number,
   region: number | undefined,
+  keyOf: VoiceSlotKeyOf = voiceSlotKey,
 ): RollSource {
   const part = partAt(doc, slot);
   const pattern = patternOf(doc, slot, region);
@@ -66,7 +89,7 @@ export function readRollSource(
     barTicks,
     harmony: doc.harmony,
     songTicks,
-    inputs: [spec, target, doc.harmony, doc.transport.meter, songTicks, voiceSlotKey(part)],
+    inputs: [spec, target, doc.harmony, doc.transport.meter, songTicks, keyOf(part)],
   };
 }
 

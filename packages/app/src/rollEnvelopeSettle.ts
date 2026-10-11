@@ -25,7 +25,9 @@
  *   loop left make room first, furthest past the loop's end first; a heard
  *   point is never dropped for it. Past that, the gesture's own points are
  *   thinned evenly across its range, its first and last kept, until the
- *   whole envelope fits.
+ *   whole envelope fits. When the heard points alone fill the cap, an Edit
+ *   add has no room at all: the gesture is refused (`settleGesture`), and
+ *   the column says so (windsor#724 decision 1).
  *
  * An envelope with no point heard is drawn as its flat 0 line, and the
  * gestures edit that line: `editablePoints` hands them a point at tick 0
@@ -119,6 +121,13 @@ function droppedSilent(
   return new Set(silent.slice(0, excess));
 }
 
+/** A gesture's points as the envelope keeps them, and whether it was refused. */
+export interface SettledGesture {
+  readonly points: RollEnvelopePoint[];
+  /** The gesture wrote points and the cap kept none of them: the heard points fill it. */
+  readonly refused: boolean;
+}
+
 /**
  * `next` within the cap: when it holds more, the silent points the gesture
  * found past the loop's end go first, furthest first, so a gesture inside
@@ -126,14 +135,14 @@ function droppedSilent(
  * heard points alone pass the cap, the points the gesture wrote (those not
  * in `start`) are thinned evenly by index, their first and last kept, so the
  * gesture still spans its whole range. A gesture with room for fewer than
- * two keeps what fits from its first.
+ * two keeps what fits from its first; one with no room is refused.
  */
-export function withinPointCap(
+export function cappedGesture(
   next: readonly RollEnvelopePoint[],
   start: readonly RollEnvelopePoint[],
   { loopTicks, cap = ROLL_ENVELOPE_POINTS_MAX }: PointCap,
-): RollEnvelopePoint[] {
-  if (next.length <= cap) return [...next];
+): SettledGesture {
+  if (next.length <= cap) return { points: [...next], refused: false };
   const found = new Set(start);
   const dropped = droppedSilent(
     new Set(next.filter((point) => found.has(point))),
@@ -141,7 +150,7 @@ export function withinPointCap(
     loopTicks,
   );
   const kept = next.filter((point) => !dropped.has(point));
-  if (kept.length <= cap) return kept;
+  if (kept.length <= cap) return { points: kept, refused: false };
   const written = kept.filter((point) => !found.has(point));
   const room = Math.max(0, cap - (kept.length - written.length));
   const thinned = new Set<RollEnvelopePoint>();
@@ -149,17 +158,34 @@ export function withinPointCap(
   for (let i = 0; room > 1 && i < room; i++) {
     thinned.add(written[Math.round((i * (written.length - 1)) / (room - 1))]!);
   }
-  return kept.filter((point) => found.has(point) || thinned.has(point));
+  const points = kept.filter((point) => found.has(point) || thinned.has(point));
+  return { points, refused: room === 0 && written.length > 0 };
 }
 
-/** A gesture's `next` points as the envelope can hold them: heard inside the loop, one to a tick, within the cap. */
-export function settlePoints(
+/** `next` within the cap, as `cappedGesture` keeps it. */
+export const withinPointCap = (
+  next: readonly RollEnvelopePoint[],
+  start: readonly RollEnvelopePoint[],
+  cap: PointCap,
+): RollEnvelopePoint[] => cappedGesture(next, start, cap).points;
+
+/**
+ * A gesture's `next` points as the envelope can hold them: heard inside the
+ * loop, one to a tick, within the cap; refused when the cap left it no room.
+ */
+export function settleGesture(
   next: readonly RollEnvelopePoint[],
   frame: SettleFrame,
-): RollEnvelopePoint[] {
+): SettledGesture {
   const settled = oneToATick(shortOfNeighbours(inLoop(next, frame), frame.start), frame.start);
-  return withinPointCap(settled, frame.start, { loopTicks: frame.loopTicks });
+  return cappedGesture(settled, frame.start, { loopTicks: frame.loopTicks });
 }
+
+/** A gesture's `next` points as the envelope can hold them (`settleGesture`'s points). */
+export const settlePoints = (
+  next: readonly RollEnvelopePoint[],
+  frame: SettleFrame,
+): RollEnvelopePoint[] => settleGesture(next, frame).points;
 
 /** `envelopes` with the one on `target` holding `points`. */
 export const withEnvelopePoints = (

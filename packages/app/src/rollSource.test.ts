@@ -4,14 +4,20 @@
  * roll's read, so the card repaints and its Envelopes tab's `Voice n/8` and
  * picker follow, though the roll itself is untouched.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { RollEnvelope } from '@windsor/engine';
 import { TICKS_PER_BAR, partAt, voiceTargetId } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import { sequencerKindChange } from './partEdits';
 import { envelopePicker, voiceTargetGroups } from './rollEnvelopePicker';
-import { readRollSource, sameInputs, sourceKey } from './rollSource';
+import {
+  buildVoiceSlotKey,
+  cachedVoiceSlotKey,
+  readRollSource,
+  sameInputs,
+  sourceKey,
+} from './rollSource';
 import { newSong } from './songParts';
 
 const BAR = TICKS_PER_BAR;
@@ -53,5 +59,22 @@ describe('an open Roll beside the Song timeline', () => {
     const removed = readRollSource(model.doc, 0, 0);
     expect(sourceKey(removed)).toBe(sourceKey(before));
     expect(slots(model)).toBe(1);
+  });
+});
+
+describe("an open Roll's per-frame read (windsor#724)", () => {
+  it('builds the voice-slot key once per part object', () => {
+    const model = rollSong();
+    const build = vi.fn(buildVoiceSlotKey);
+    const keyOf = cachedVoiceSlotKey(build);
+    const first = readRollSource(model.doc, 0, 0, keyOf);
+    const again = readRollSource(model.doc, 0, 0, keyOf);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(sameInputs(again, first)).toBe(true);
+
+    const lane = { target: voiceTargetId('filter.resonance'), on: true, points: [] };
+    model.merge({ parts: { 0: { automation: [lane] } } });
+    readRollSource(model.doc, 0, 0, keyOf);
+    expect(build).toHaveBeenCalledTimes(2);
   });
 });
