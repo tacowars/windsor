@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Mockup only (windsor#732, record 2026-10-11-bounce-to-roll): the Bounce
+     to Roll button in the Song view's detail pane header, and its toasts.
+     Everything else is today's detail pane for a Grid part, captured from the
+     dev build on 2026-10-11 in the project's headless Chrome at a 1440 px
+     window, with the acid audition song loaded
+     (docs/research/2026-10-04-acid-ladder-filter/audition/acid-audition.song.json,
+     the part Acid Saw: Grid, 16 steps at 1/16, 2 regions, its first region
+     selected): the header row's and the sequencer device's markup and styles
+     are that build's own. The strip at the very top is the mockup's own
+     switcher, not part of the console. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Bounce to Roll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ---------- today's console rules, copied from the dev build ---------- */
+:root { --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10; --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70; --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c; --sub-ground: #1a1f23; --sub-rail: #20272b; --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif; --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif; --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; --r: 3px; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 13px; }
+* { box-sizing: border-box; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+.btn.nudge { padding: 2px 6px; min-width: 22px; line-height: 1; }
+.seq-rack { display: flex; gap: 6px; min-width: 0px; max-width: 100%; overflow-x: auto; overscroll-behavior: none; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; scrollbar-color: var(--line-bright) var(--inset); }
+.seq-device { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seq-device.fixed { flex: 0 0 auto; height: var(--seq-h); }
+.seq-device :focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.seq-device-body { flex: 1 1 0%; min-width: 0px; }
+.seq-rail { width: var(--seq-rail); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0px; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.seq-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 3px; border-radius: 50%; background: var(--kc, var(--modulator)); }
+.seq-name { flex: 0 1 auto; min-height: 0px; overflow: hidden; writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px 0px; background: transparent; border: 0px; border-radius: var(--r); color: var(--ink); font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.seq-name:hover { background: var(--panel); }
+.seq-rail-spacer { flex: 1 1 0%; }
+.seq-icon { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; padding: 0px; background: transparent; border: 1px solid transparent; border-radius: var(--r); color: var(--ink-faint); font-size: 10px; line-height: 1; cursor: pointer; }
+.seq-icon:hover:not(:disabled) { color: var(--ink); border-color: var(--line-bright); }
+.seq-icon.danger:hover:not(:disabled) { color: var(--hot); }
+.seq-icon:disabled { opacity: 0.35; cursor: default; }
+.seq-icon-svg svg { display: block; width: 12px; height: 12px; }
+.seq-line-icon svg { fill: none; stroke: currentcolor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.seq-region { flex: 0 0 auto; writing-mode: vertical-rl; transform: rotate(180deg); color: var(--ink-faint); font-family: var(--f-num); font-size: 8.5px; white-space: nowrap; }
+.grid-device { display: flex; min-height: 0px; }
+.seq-section { flex: 0 0 auto; min-width: 0px; min-height: 0px; display: flex; flex-direction: column; padding: 4px 8px 6px; }
+.seq-section + .seq-section { border-left: 1px solid var(--line); }
+.seq-section.steps { padding-right: 4px; }
+.seq-sec-label { flex: 0 0 auto; height: 14px; display: flex; align-items: baseline; gap: 8px; color: var(--ink-faint); font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.seq-sec-label em { color: var(--ink-dim); font-family: var(--f-num); font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; text-transform: none; }
+.seq-sec-body { flex: 1 1 0%; min-height: 0px; display: flex; gap: 2px; }
+.seq-col { min-height: 0px; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; }
+.seq-col.wide { width: var(--seq-wide-col); align-items: stretch; }
+.seq-col.k3 { display: grid; grid-template-rows: repeat(3, 1fr); place-items: center; }
+.seq-device.fixed .knob { width: 52px; gap: 0px; padding: 1px 0px; }
+.seq-device.fixed .knob svg { width: var(--seq-dial); height: var(--seq-dial); }
+.seq-device.fixed .knob .knob-val { line-height: 13px; }
+.seq-device.fixed .knob .knob-label { line-height: 11px; }
+.seq-device.fixed .field-label { margin: 0px 0px 2px; font-size: 8.5px; letter-spacing: 0.1em; line-height: 11px; }
+.seq-device.fixed select.field { appearance: none; width: 100%; max-width: none; height: 22px; padding: 0px 16px 0px 6px; background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 6px center; border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink); font-family: var(--f-ui); font-size: 11.5px; line-height: 20px; text-overflow: ellipsis; cursor: pointer; }
+.seq-device.fixed select.field:disabled { opacity: 0.5; cursor: default; }
+.seq-device.fixed .btn.seq-btn { padding: 4px 8px; border-color: var(--kc); color: var(--ink); font-size: 9.5px; letter-spacing: 0.08em; text-align: center; white-space: nowrap; }
+.seq-strip { flex: 0 0 auto; min-height: 0px; display: flex; gap: 2px; overflow: hidden auto; overscroll-behavior: none; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); scrollbar-gutter: stable; }
+.seq-strip > .grid-strip { flex: 0 0 auto; gap: 2px; overflow: visible; padding: 0px; }
+.seq-strip .grid-col { width: var(--step-w); }
+.seq-strip .grid-col.beat { margin-left: var(--beat-gap); }
+.seq-strip .strip-head { position: sticky; top: 0px; z-index: 1; flex: 0 0 auto; height: var(--strip-head-h); display: flex; flex-direction: column; gap: 2px; background: var(--panel); }
+.seq-strip .grid-idx { flex: 0 0 auto; height: 12px; padding: 0px; border-radius: 2px; line-height: 12px; }
+.seq-strip .gcell { flex: 0 0 auto; height: 18px; min-height: 0px; padding: 0px; overflow: hidden; font-size: 9.5px; letter-spacing: 0.02em; line-height: 16px; white-space: nowrap; }
+.seq-strip .gcell.oct { font-family: var(--f-num); font-size: 9px; font-weight: 400; }
+.seq-strip .gcell.oct.dim { color: var(--ink-faint); }
+.seq-strip .grid-col select.gsel { appearance: none; flex: 0 0 auto; height: 18px; padding: 0px 7px 0px 2px; background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='3'%3E%3Cpath d='M0 0h5L2.5 3z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 2px center; font-size: 9px; line-height: 16px; text-align: center; cursor: pointer; }
+.seq-strip .gcell[aria-pressed="true"] { background: var(--kc); border-color: var(--kc); }
+.seq-strip .gcell.ratchet { position: relative; height: 14px; color: var(--ink-faint); font-family: var(--f-num); font-size: 8px; font-weight: 400; line-height: 12px; }
+.seq-strip .gcell.ratchet.idle { opacity: 0.4; cursor: default; }
+.seq-strip .gcell.ratchet.idle:hover { background: var(--inset); }
+.seq-names { flex: 0 0 auto; width: var(--names-w); display: flex; flex-direction: column; gap: 2px; padding-right: 4px; background: var(--panel); }
+.seq-names .seq-corner { z-index: 2; justify-content: flex-end; gap: 3px; }
+.seq-corner select.field { height: 20px; font-size: 10.5px; }
+.seq-meas { color: var(--ink-faint); font-family: var(--f-num); font-size: 10px; line-height: 1.2; }
+.seq-row-label { height: 14px; margin-top: 2px; color: var(--ink-faint); font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; line-height: 14px; text-align: right; text-transform: uppercase; white-space: nowrap; }
+.seq-lane-names { display: flex; flex-direction: column; gap: 2px; }
+.seq-lane-names[hidden] { display: none; }
+.grid-strip { display: flex; gap: 3px; overflow-x: auto; padding: 8px 0px 6px; scrollbar-width: thin; }
+.grid-col { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; width: 46px; }
+.grid-idx { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); text-align: center; border-radius: var(--r); padding: 1px 0px; }
+.gcell { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 4px 0px; cursor: pointer; text-align: center; min-height: 22px; }
+.gcell:hover { background: var(--panel-hi); color: var(--ink); }
+.gcell[aria-pressed="true"] { background: var(--modulator); border-color: var(--modulator); color: rgb(17, 20, 22); }
+.gcell.note { color: var(--ink); border-color: var(--line-bright); }
+.gcell.blank { visibility: hidden; }
+.grid-col select.gsel { width: 100%; max-width: none; font-size: 10px; padding: 3px 1px; font-family: var(--f-num); background: var(--inset); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r); }
+.grid-col select.gsel option { background: var(--panel); color: var(--ink); }
+:is(.grid-scroll, .chord-strip, .seq-strip) .grid-col:is(.playing, .ghost) :is(.gcell, select.gsel, .mod-cell) { border-color: var(--head); }
+.detail-pane { position: sticky; bottom: 0px; z-index: 4; border-top: 2px solid var(--line-bright); background: var(--panel); padding: 10px 14px 14px; max-height: 60vh; overflow-y: auto; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+.card-head small { font-family: var(--f-num); font-size: 9px; letter-spacing: 0.04em; text-transform: none; color: var(--ink-faint); margin-left: 8px; }
+.btn.fold { margin-right: 8px; font-family: system-ui, sans-serif; font-size: 16px; letter-spacing: 0px; }
+.knob { width: 54px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0px 4px; border-radius: var(--r); cursor: ns-resize; touch-action: none; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--knob-color, var(--ink-dim)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; pointer-events: none; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); pointer-events: none; }
+.knob .knob-auto, .insert-switch .knob-auto { display: none; padding: 0px 4px; border-radius: 6px; background: var(--lock-color); color: var(--ground); font-family: var(--f-panel); font-size: 7.5px; font-weight: 600; letter-spacing: 0.14em; line-height: 11px; pointer-events: none; }
+select.field, input.field { width: 100%; max-width: 260px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 7px; font-size: 12px; }
+.btn { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; color: var(--ink-dim); font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.field-label { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+/* The console's notices (toast.ts, console.css): an info toast has no tone class of its own. */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; width: min(380px, 100vw - 32px); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; width: 100%; background: var(--panel-hi); border-left: 3px solid var(--ink-faint); border-radius: var(--r); padding: 9px 8px 9px 12px; box-shadow: rgba(0, 0, 0, 0.35) 0px 8px 24px; }
+.toast-success { border-left-color: var(--modulator); }
+.toast-warning { border-left-color: var(--carrier); }
+.toast-error { border-left-color: var(--hot); }
+.toast-text { flex: 1 1 0%; margin: 0px; color: var(--ink); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.toast-close { flex: 0 0 auto; width: 22px; height: 22px; margin: -2px 0px; border: 0px; border-radius: var(--r); background: transparent; color: var(--ink-faint); font-size: 15px; line-height: 1; cursor: pointer; }
+.toast-close:hover { background: var(--inset); color: var(--ink); }
+.toast[hidden] { display: none; }
+.hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.5; margin: 0px 0px 8px; }
+/* The pane is sticky at the window's foot in the app; here it sits in the page. */
+.detail-pane { position: static; max-height: none; overflow: visible; }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line-bright); }
+.tb .grp { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb .grp button:first-of-type { border-radius: var(--r) 0 0 var(--r); margin-left: 0; }
+.tb .grp button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb .grp button:only-of-type { border-radius: var(--r); }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.notes { max-width: 980px; margin: 14px 16px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.55; color: var(--ink-dim); }
+.notes h2 { font: 700 14px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--carrier); margin: 12px 0 2px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ul { margin: 4px 0 0; padding-left: 18px; }
+.notes code { font: 12px var(--f-num); color: var(--ink); }
+.view-label { margin: 18px 16px 6px; font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.caption { margin: 0 16px 10px; max-width: 980px; color: var(--ink-dim); font-size: 12px; line-height: 1.5; }
+.caption b { color: var(--carrier); font-weight: 600; }
+.stage { padding: 0 0 120px; }
+body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px; }
+.standin { flex: 1 1 auto; height: 244px; display: grid; place-items: center; padding: 16px; border: 1px dashed var(--line-bright); border-radius: 5px; color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+.staged { display: inline-block; margin-left: 8px; padding: 1px 5px; border: 1px dashed var(--ink-faint); border-radius: var(--r); color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; vertical-align: middle; }
+
+/* ---------- the proposal: Bounce to Roll ---------- */
+/* The console's .btn at the size of the device's own buttons (Randomize,
+   Reverse: .seq-btn's padding and type), so it is 22 px tall, the header
+   row's height, and the row does not grow. Its border stays .btn's: the
+   part colour belongs to the device, not the pane's header. */
+.btn.bounce { vertical-align: top; padding: 4px 8px; font-size: 9.5px; letter-spacing: 0.08em; white-space: nowrap; }
+.btn.bounce:disabled { opacity: 0.4; cursor: default; background: var(--inset); color: var(--ink-dim); border-color: var(--line); }
+.btn.bounce.at-note { margin-left: 16px; }
+.btn.bounce.at-fold { margin-right: 10px; }
+body:not([data-place="note"]) .btn.bounce.at-note,
+body:not([data-place="fold"]) .btn.bounce.at-fold,
+body[data-state="roll"] .btn.bounce,
+body[data-state="success"] .btn.bounce { display: none; }
+body:not([data-state="grid"]):not([data-state="error"]) .grid-only,
+body:not([data-state="noregions"]) .noregions-only,
+body:not([data-state="roll"]):not([data-state="success"]) .roll-only { display: none; }
+</style>
+</head>
+<body data-place="note" data-state="grid" class="show-new">
+<div class="tb">
+  <div class="grp"><span class="lbl">Placement</span><button type="button" data-place="note" class="on">After the note (recommended)</button><button type="button" data-place="fold">After the fold arrow</button><button type="button" data-place="today">Today, no button</button></div>
+  <div class="grp"><span class="lbl">State</span><button type="button" data-state="grid" class="on">Grid part</button><button type="button" data-state="noregions">No regions</button><button type="button" data-state="roll">Roll part</button><button type="button" data-state="success">Bounced</button><button type="button" data-state="error">Note cap</button></div>
+  <div class="grp"><span class="lbl">Additions</span><button type="button" id="newToggle" class="on">Outline new controls</button></div>
+</div>
+
+<div class="notes">
+  <h2>Bounce to Roll</h2>
+  Today's Song view detail pane for the Grid part <b>Acid Saw</b> (the acid audition song: 16 steps at 1/16,
+  A natural minor, 2 regions of 2 bars), plus a <b>Bounce to Roll</b> button in its header. A dashed outline
+  marks the button; the toggle above hides it. The decisions behind it, and the render, the loop search and
+  the Roll's new slide, are in <code>docs/log/2026-10-11-bounce-to-roll.md</code>.
+
+  <h3>The proposal</h3>
+  <ul>
+    <li><b>Placement.</b> The button follows the summary note, 16 px clear of it. It is the console's
+      <code>btn</code> at the size of the device's own Randomize and Reverse, 22 px tall like the fold
+      arrow, so the header row keeps its height. <b>After the fold arrow</b> shows the other candidate, and
+      <b>Today, no button</b> is the header as the build draws it, for comparison.</li>
+    <li><b>Recommended: after the note.</b> The part's name keeps its place, which is where it is on every
+      pane, including a chord's, which has no fold arrow. The command sits beside the summary it rewrites
+      (<code>grid · 16 steps · 1/16 · 2 regions</code>), and it stays clear of the fold arrow, which is
+      pressed far more often. Next to the fold arrow, a missed fold would rewrite the part. Undo takes that
+      back, but it is a fright.</li>
+    <li><b>States.</b>
+      <ul>
+        <li><b>Grid part</b>: enabled, as on any Euclid, Grid, Chord, Arp, Basslead or Figure part.</li>
+        <li><b>No regions</b>: drawn disabled, titled <code>No regions to bounce</code> (hover it). The
+          pane shows today's hint in place of the device.</li>
+        <li><b>Roll part</b>: no button. The header reads as the bounced part would:
+          <code>Acid Saw — Roll</code> over <code>roll · 12 notes · 1 bar loop · 2 regions</code>.</li>
+        <li><b>Bounced</b>: the pane right after the bounce, with the summary toast (an <code>info</code>
+          toast): <code>Bounced to Roll: 24 notes in 2 regions · 8 accents lost their mod</code>. Those
+          are the numbers the record works out for this part: each 2-bar region loops 1 bar of 12 notes,
+          and 4 of them are accented, with an accent mod of 1. One undo step, "Bounce to Roll", takes it
+          back.</li>
+        <li><b>Note cap</b>: the bounce changes nothing, and an <code>error</code> toast says why. It stays
+          until dismissed.</li>
+      </ul></li>
+  </ul>
+
+  <h3>Stand-ins</h3>
+  <ul>
+    <li><b>No regions</b> and <b>Note cap</b> are staged on the captured part, which has 2 regions of 12
+      notes each. The error toast's text is the record's example, not this part's.</li>
+    <li>The Roll part's device is not drawn: it is today's Roll device, unchanged, and a dashed box stands
+      in for it.</li>
+    <li>The toasts sit at the window's foot on the right, where the console puts them.</li>
+    <li>Only the toolbar responds. The captured controls are pictures of today's.</li>
+  </ul>
+</div>
+
+<p class="view-label">Detail pane</p>
+<p class="caption" id="caption"></p>
+<div class="stage">
+  <section class="detail-pane">
+    <div class="card-head"><span><button class="btn nudge fold" type="button" data-fold="sequencerOpen" aria-expanded="true" aria-label="Sequencer" title="Collapse sequencer">▾</button><button class="btn bounce at-fold is-new" type="button">Bounce to Roll</button><span id="title">Acid Saw — Grid</span><small id="note">grid · 16 steps · 1/16 · 2 regions</small><button class="btn bounce at-note is-new" type="button">Bounce to Roll</button></span><button class="btn nudge" type="button" aria-label="Close">×</button></div>
+    <div class="grid-only">
+<div class="seq-rack" style="--seq-h: 244px; --seq-rail: 24px; --step-w: 32px; --chord-step-w: 42px; --chord-step-gap: 6px; --chord-dial-h: 21px; --chord-row-gap: 5px; --chord-strip-foot: 10px; --chord-inset: 12px; --chord-col-gap: 13px; --chord-field-w: 120px; --chord-fields-pad: 33px; --chord-tile-w: 110px; --chord-tile-gap: 10px; --chord-knob-pad: 9px; --arp-inset: 12px; --arp-col-gap: 13px; --arp-field-w: 112px; --arp-knob-pad: 9px; --arp-reseed: 22px; --arp-cell-h: 20px; --arp-row-gap: 4px; --arp-step-gap: 6px; --arp-strip-head-h: 126px; --euclid-inset: 12px; --euclid-col-gap: 13px; --euclid-field-w: 96px; --euclid-knob-pad: 9px; --euclid-cell-w: 22px; --euclid-cell-gap: 2px; --euclid-trigger-h: 22px; --euclid-ratchet-h: 14px; --euclid-accent-h: 16px; --euclid-names-w: 104px; --euclid-rule-h: 18px; --euclid-row-gap: 2px; --euclid-mod-w: 150px; --euclid-plot-min-w: 160px; --beat-gap: 4px; --bar-gap: 10px; --lane-h: 42px; --names-w: 96px; --strip-head-h: 128px; --seq-wide-col: 96px; --seq-dial: 30px; --figure-tabs-h: 20px; --figure-field-w: 100px; --figure-row-gap: 1px; --figure-strip-head-h: 122px; --figure-chip-h: 26px; --figure-source-w: 140px; --figure-row-knob-w: 56px; --figure-pick: 30px; --roll-min-w: 620px; --roll-ctl-w: 112px; --roll-ctl-gap: 10px; --roll-ctl-h: 20px; --roll-keys-w: 44px; --roll-head-h: 32px; --roll-vel-h: 34px; --roll-ruler-h: 17px; --roll-chord-h: 14px;"><div class="seq-device fixed" style="--kc: #5FA8A0;"><div class="seq-rail"><span class="seq-dot" aria-hidden="true"></span><button class="seq-name" type="button" title="Fold the Grid device to its rail, or open it" aria-expanded="true">Grid</button><span class="seq-rail-spacer"></span><span class="seq-region" title="Region 1 of 2">1/2</span><button class="seq-icon seq-line-icon" type="button" title="Split the region in two at its middle bar (alt-click a region to cut it under the pointer)" aria-label="Split the region in two at its middle bar (alt-click a region to cut it under the pointer)"><span class="seq-icon-svg"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="3" width="4" height="6" rx="1"></rect><rect x="7" y="3" width="4" height="6" rx="1"></rect><path d="M6 1v10" stroke-dasharray="1.5 1.5"></path></svg></span></button><button class="seq-icon seq-line-icon danger" type="button" title="Delete this region, leaving a rest" aria-label="Delete this region, leaving a rest"><span class="seq-icon-svg"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"></path></svg></span></button></div><div class="seq-device-body grid-device"><div class="seq-section"><div class="seq-sec-label">Play</div><div class="seq-sec-body"><div class="seq-col wide"><div><span class="field-label">Step</span><select class="field" name="step" aria-label="Step"><option value="96">1 bar</option><option value="48">1/2</option><option value="32">1/2T</option><option value="24">1/4</option><option value="16">1/4T</option><option value="12">1/8</option><option value="8">1/8T</option><option value="6" selected>1/16</option><option value="4">1/16T</option><option value="3">1/32</option></select></div><button class="btn seq-btn" type="button" title="Every step: a random degree from the key, octave, accent and slide">Randomize</button><button class="btn seq-btn" type="button" title="Mirror the steps: every cell and lane value, last to first">Reverse</button></div><div class="seq-col k3"><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Octave" title="Octave - drag, shift-drag for fine, double-click to reset" aria-valuenow="1" aria-valuetext="1"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 4.73 23.64 A 15 15 0 0 1 4.18 16.65"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-81 19 19)"></line></svg><span class="knob-val">1</span><span class="knob-label">Octave</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Length" title="Length - drag, shift-drag for fine, double-click to reset" aria-valuenow="16" aria-valuetext="16"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 17.86 4.04"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-4.354838709677409 19 19)"></line></svg><span class="knob-val">16</span><span class="knob-label">Length</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Rotate" title="Rotate - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="0"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(0 19 19)"></line></svg><span class="knob-val">0</span><span class="knob-label">Rotate</span></div></div><div class="seq-col k3"><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Vel" title="Vel - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.8" aria-valuetext="0.80"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 33.82 16.65"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(81 19 19)"></line></svg><span class="knob-val">0.80</span><span class="knob-label">Vel</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Acc vel" title="Acc vel - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.2" aria-valuetext="0.20"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 4.18 16.65"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-81 19 19)"></line></svg><span class="knob-val">0.20</span><span class="knob-label">Acc vel</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Acc mod" title="Acc mod - drag, shift-drag for fine, double-click to reset" aria-valuenow="1" aria-valuetext="1.00"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(135 19 19)"></line></svg><span class="knob-val">1.00</span><span class="knob-label">Acc mod</span></div></div><div class="seq-col k3"><div class="knob" tabindex="0" role="slider" style="--knob-color: #5FA8A0;" aria-label="Skip" title="Skip - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="0.00"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-135 19 19)"></line></svg><span class="knob-val">0.00</span><span class="knob-auto">AUTO</span><span class="knob-label">Skip</span></div></div></div></div><div class="seq-section steps"><div class="seq-sec-label">Steps<em>16</em></div><div class="seq-sec-body"><div class="seq-strip"><div class="seq-names"><div class="strip-head seq-corner"><select class="field mod-add" aria-label="add a modulation lane"><option value="">+ Lane</option><option value="filter.cutoff">Cutoff</option><option value="filter.envAmount">Filt Env Amt</option><option value="filter.resonance">Resonance</option><option value="filter.env.decayTime">Filter Decay</option><option value="filter.vowel">Vowel</option><option value="ops.0.level">Op A Level</option><option value="ops.0.env.decayTime">Op A Decay</option><option value="ops.0.env.decayCurve">Op A Dcy Crv</option><option value="ops.0.feedback">Op A Fdbk</option><option value="ops.0.width">Op A Width</option><option value="ops.0.ratio">Op A Ratio</option><option value="ops.1.level">Op B Level</option><option value="ops.1.env.decayTime">Op B Decay</option><option value="ops.1.env.decayCurve">Op B Dcy Crv</option><option value="ops.1.feedback">Op B Fdbk</option><option value="ops.1.width">Op B Width</option><option value="ops.1.ratio">Op B Ratio</option><option value="ops.2.level">Op C Level</option><option value="ops.2.env.decayTime">Op C Decay</option><option value="ops.2.env.decayCurve">Op C Dcy Crv</option><option value="ops.2.feedback">Op C Fdbk</option><option value="ops.2.width">Op C Width</option><option value="ops.2.ratio">Op C Ratio</option><option value="ops.3.level">Op D Level</option><option value="ops.3.env.decayTime">Op D Decay</option><option value="ops.3.env.decayCurve">Op D Dcy Crv</option><option value="ops.3.feedback">Op D Fdbk</option><option value="ops.3.width">Op D Width</option><option value="ops.3.ratio">Op D Ratio</option><option value="lfo.amount">LFO 1 Amt</option><option value="lfo.rate">LFO 1 Rate</option><option value="lfo2.amount">LFO 2 Amt</option><option value="lfo2.rate">LFO 2 Rate</option><option value="pitchEnvAmount">Pitch Env</option></select><span class="seq-meas">0 of 4 lanes</span><span class="seq-row-label">Ratchet</span></div><div class="seq-lane-names" hidden=""></div></div><div class="grid-strip"><div class="grid-col"><div class="strip-head"><div class="grid-idx">1</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A</button><select class="gsel" aria-label="step 1 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="true">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 1 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">2</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A</button><select class="gsel" aria-label="step 2 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 2 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">3</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A+1</button><select class="gsel" aria-label="step 3 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct" type="button" title="octave: click up, shift-click down">+1</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="true">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 3 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">4</div><button class="gcell" type="button" title="tie: click for the next of note, tie, rest">—</button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell ratchet r1 idle" type="button" disabled="" title="A rest or a tie has no ratchet" aria-label="Step 4 ratchet: none on a rest or a tie"></button></div></div><div class="grid-col beat"><div class="strip-head"><div class="grid-idx">5</div><button class="gcell note" type="button" title="degree 3: click for tie, rest, note">C</button><select class="gsel" aria-label="step 5 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0">1 A</option><option value="1">2 B</option><option value="2" selected>3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 5 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">6</div><button class="gcell" type="button" title="rest: click for the next of note, tie, rest">·</button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell ratchet r1 idle" type="button" disabled="" title="A rest or a tie has no ratchet" aria-label="Step 6 ratchet: none on a rest or a tie"></button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">7</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A</button><select class="gsel" aria-label="step 7 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="true">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 7 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">8</div><button class="gcell note" type="button" title="degree 7: click for tie, rest, note">G</button><select class="gsel" aria-label="step 8 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0">1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6" selected>7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="true">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 8 ratchet: times 1">×1</button></div></div><div class="grid-col beat"><div class="strip-head"><div class="grid-idx">9</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A</button><select class="gsel" aria-label="step 9 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 9 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">10</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A+1</button><select class="gsel" aria-label="step 10 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct" type="button" title="octave: click up, shift-click down">+1</button><button class="gcell" type="button" title="accent" aria-pressed="true">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 10 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">11</div><button class="gcell note" type="button" title="degree 4: click for tie, rest, note">D</button><select class="gsel" aria-label="step 11 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0">1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3" selected>4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="true">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 11 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">12</div><button class="gcell" type="button" title="tie: click for the next of note, tie, rest">—</button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell ratchet r1 idle" type="button" disabled="" title="A rest or a tie has no ratchet" aria-label="Step 12 ratchet: none on a rest or a tie"></button></div></div><div class="grid-col beat"><div class="strip-head"><div class="grid-idx">13</div><button class="gcell" type="button" title="rest: click for the next of note, tie, rest">·</button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell blank" type="button"></button><button class="gcell ratchet r1 idle" type="button" disabled="" title="A rest or a tie has no ratchet" aria-label="Step 13 ratchet: none on a rest or a tie"></button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">14</div><button class="gcell note" type="button" title="degree 5: click for tie, rest, note">E</button><select class="gsel" aria-label="step 14 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0">1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4" selected>5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="true">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 14 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">15</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A</button><select class="gsel" aria-label="step 15 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct dim" type="button" title="octave: click up, shift-click down">oct</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="true">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 15 ratchet: times 1">×1</button></div></div><div class="grid-col"><div class="strip-head"><div class="grid-idx">16</div><button class="gcell note" type="button" title="degree 1: click for tie, rest, note">A+1</button><select class="gsel" aria-label="step 16 degree" title="Degree from the key; a red border means it folded into the current scale"><option value="0" selected>1 A</option><option value="1">2 B</option><option value="2">3 C</option><option value="3">4 D</option><option value="4">5 E</option><option value="5">6 F</option><option value="6">7 G</option></select><button class="gcell oct" type="button" title="octave: click up, shift-click down">+1</button><button class="gcell" type="button" title="accent" aria-pressed="false">A</button><button class="gcell" type="button" title="slide" aria-pressed="false">S</button><button class="gcell ratchet r1" type="button" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step 16 ratchet: times 1">×1</button></div></div></div></div></div></div></div></div></div>
+    </div>
+    <p class="hint noregions-only">No regions: click an empty stretch of the lane to draw one, then edit it here.</p>
+    <div class="seq-rack roll-only"><div class="standin">Stand-in: today's Roll device, unchanged</div></div>
+  </section>
+</div>
+
+<section class="toasts" aria-label="Notifications" aria-live="polite">
+  <div class="toast toast-info" role="status" id="toastInfo" hidden><p class="toast-text">Bounced to Roll: 24 notes in 2 regions · 8 accents lost their mod</p><button class="toast-close" type="button" aria-label="Dismiss notification">×</button></div>
+  <div class="toast toast-error" role="alert" id="toastError" hidden><p class="toast-text">Region 3 needs 3104 notes; a Roll region holds 2048. Split it first.</p><button class="toast-close" type="button" aria-label="Dismiss notification">×</button></div>
+</section>
+
+<script>
+(() => {
+  const body = document.body;
+  const HEAD = {
+    grid: ['Acid Saw — Grid', 'grid · 16 steps · 1/16 · 2 regions'],
+    noregions: ['Acid Saw — Grid', 'grid · 16 steps · 1/16 · 0 regions'],
+    roll: ['Acid Saw — Roll', 'roll · 12 notes · 1 bar loop · 2 regions'],
+    success: ['Acid Saw — Roll', 'roll · 12 notes · 1 bar loop · 2 regions'],
+    error: ['Acid Saw — Grid', 'grid · 16 steps · 1/16 · 2 regions'],
+  };
+  const CAPTIONS = {
+    note: '<b>Recommended.</b> After the summary note: the title keeps its place, the command sits beside the summary it rewrites, and it stays clear of the fold arrow.',
+    fold: 'The other candidate: directly after the fold arrow. The title moves right by the button\'s width, and a missed fold lands on the bounce.',
+    today: 'Today\'s header, as the dev build draws it.',
+  };
+  function setState(state) {
+    body.dataset.state = state;
+    const [title, note] = HEAD[state];
+    document.getElementById('title').textContent = title;
+    document.getElementById('note').textContent = note;
+    document.querySelectorAll('.btn.bounce').forEach((b) => {
+      const off = state === 'noregions';
+      b.disabled = off;
+      b.title = off
+        ? 'No regions to bounce'
+        : 'Rewrite every region of this part as a Roll of the notes it plays. One undo step.';
+    });
+    document.getElementById('toastInfo').hidden = state !== 'success';
+    document.getElementById('toastError').hidden = state !== 'error';
+  }
+  function setPlace(place) {
+    body.dataset.place = place;
+    document.getElementById('caption').innerHTML = CAPTIONS[place];
+  }
+  document.querySelectorAll('button[data-place]').forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll('button[data-place]').forEach((x) => x.classList.toggle('on', x === b));
+      setPlace(b.dataset.place);
+    };
+  });
+  document.querySelectorAll('button[data-state]').forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll('button[data-state]').forEach((x) => x.classList.toggle('on', x === b));
+      setState(b.dataset.state);
+    };
+  });
+  document.querySelectorAll('.toast-close').forEach((b) => { b.onclick = () => { b.parentElement.hidden = true; }; });
+  document.getElementById('newToggle').onclick = (e) => {
+    body.classList.toggle('show-new');
+    e.currentTarget.classList.toggle('on', body.classList.contains('show-new'));
+  };
+  setPlace('note');
+  setState('grid');
+})();
+</script>
+</body>
+</html>
