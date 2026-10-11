@@ -61,7 +61,11 @@ is a measured claim.
   without filtering it.
 - **Keep `tankLowCut` and `tankHighCut`.** The low cut is a rumble guard,
   and the high cut stays the plate's main darkening control.
-- **HOLD** keeps its own gain (`HOLD_DECAY`) and bypasses the low band.
+- **HOLD** keeps its own gain (`HOLD_DECAY`) and bypasses the low band's
+  output, not its state. The band's lowpass keeps tracking the circulating
+  signal at its real coefficient, so releasing HOLD doesn't step the
+  feedback. The tank's damping filters do the same today (`tank.ts`, the
+  comment above `dampLp`).
 - **Format:** `decay` changes meaning, so `ARRANGEMENT_VERSION` bumps.
   Converting an old gain to seconds depends on Size and the diffusion
   settings, so an upgrade would need a measured table. Proposed: no upgrade.
