@@ -49,6 +49,7 @@
   --sub-ground: #1a1f23;
   --sub-rail: #20272b;
   --sub-rail-w: 20px;
+  --slot-tab-w: 22px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -202,7 +203,7 @@ button, select, input { font-family: inherit; font-size: inherit; color: inherit
 /* ---------- new: the slot and its child (variant A) ---------- */
 /* Echo switched off bypasses its child too, so the child dims with it. */
 .insert-box.off .sub { opacity: 0.4; }
-.insert-box.folded .insert-stack, .insert-box.folded .sub { display: none; }
+.insert-box.folded .insert-stack, .insert-box.folded .sub, .insert-box.folded .slot-tab { display: none; }
 .sub { flex: none; display: flex; border-left: 1px solid var(--line-bright); background: var(--sub-ground); }
 .sub-rail {
   width: var(--sub-rail-w); flex: none; display: flex; flex-direction: column; align-items: center;
@@ -212,9 +213,22 @@ button, select, input { font-family: inherit; font-size: inherit; color: inherit
 .sub.folded .sub-rail { border-right: 0; }
 .sub.folded .sub-stack { display: none; }
 .sub-rail .insert-name { font-size: 9.5px; color: var(--kc); }
+/* The child's switch takes the chain's accent: teal on a strip, amber on a send bus. */
+.sub-rail .insert-icon.insert-power { color: var(--kc); }
 .sub.off .sub-rail .insert-power { color: var(--ink-faint); }
 .sub.off .sub-stack { opacity: 0.4; }
 .sub-stack { display: flex; flex-direction: column; min-width: 0; }
+/* The empty slot's tab: collapsed (›), it is all the slot shows; expanded (‹), the picker follows it. */
+.slot-tab {
+  width: var(--slot-tab-w); flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 5px 0; background: var(--panel-hi); border: 0; border-left: 1px solid var(--line); border-radius: 0;
+  color: var(--ink-faint); cursor: pointer;
+}
+.slot-tab.open { border-right: 1px solid var(--line); }
+.slot-tab:hover { color: var(--ink); background: var(--panel); }
+.slot-tab-glyph { font-size: 13px; line-height: 1; }
+.slot-tab-label { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.slot-open { flex: none; display: flex; }
 /* A kind whose card this page doesn't draw: marked as a stand-in. */
 .stand-in { margin: 8px; padding: 8px; width: 180px; border: 1px dashed var(--return); border-radius: var(--r); color: #cbbfe6; font-size: 10.5px; line-height: 1.35; background: #2a2140; }
 .stand-in b { display: block; font: 600 8.5px/12px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--return); margin-bottom: 4px; }
@@ -233,15 +247,16 @@ button, select, input { font-family: inherit; font-size: inherit; color: inherit
     <div>
       <h3>How it works</h3>
       <ul>
-        <li><b>The slot column</b> follows a rule after Echo's Mix. It holds a picker labelled <i>Slot</i> and a short note. The picker lists <i>None</i> first, then the Add picker's groups minus Echo (<code>insertAddPicker.ts</code>, <code>INSERT_GROUPS</code>).</li>
-        <li><b>The child's rail</b> holds its own on/off switch and its name, <code>SLOT · &lt;KIND&gt;</code>, in the rack's accent, and nothing else. It has no ◀ ▶ ✕: the child can't move or leave the slot. Setting the picker back to <i>None</i> removes it.</li>
+        <li><b>The empty slot is collapsed by default:</b> a narrow tab at Echo's right edge, about a rail's width, with <i>›</i> and a vertical <i>Slot</i> label. Clicking it expands the slot to its picker on <i>None</i>; the tab turns to <i>‹</i>, and clicking it again collapses the slot. Collapsed or expanded is session view state, like the folds.</li>
+        <li><b>The slot column</b> holds a picker labelled <i>Slot</i> and nothing else. The picker lists <i>None</i> first, then the Add picker's groups minus Echo (<code>insertAddPicker.ts</code>, <code>INSERT_GROUPS</code>). Picking a kind shows the child, and the column then follows a rule after Echo's Mix.</li>
+        <li><b>The child's rail</b> holds its own on/off switch, its name, <code>SLOT · &lt;KIND&gt;</code>, and a ✕, and nothing else. The switch and the name take the chain's accent: teal on a strip, amber on a send bus. It has no ◀ ▶: the child can't move. The ✕ removes the child, and the slot returns to empty and collapsed. Setting the picker back to <i>None</i> removes it too.</li>
         <li><b>The child's page</b> is its card as it is on the rack today, its own <b>Mix</b> included (epic decision 3). A child with pages shows its own tabs over the child's area only.</li>
       </ul>
     </div>
     <div>
       <h3>Folding</h3>
       <ul>
-        <li>Clicking the child's name folds it to its rail (<span id="railW">21</span> px with its border). Echo goes back to its own width, and the picker still names the child. Clicking the name again opens it.</li>
+        <li>Clicking the child's name folds it to its rail (<span id="railW">21</span> px with its border). Echo goes back to its own width plus the slot column, and the picker still names the child. Clicking the name again opens it.</li>
         <li>Clicking Echo's own name folds the whole insert, child included, to the rack's 26 px fold, as any insert folds today.</li>
         <li>Switching Echo off dims its child with it, since Echo bypasses its whole wet path. Switching the child off dims only the child.</li>
       </ul>
@@ -249,14 +264,6 @@ button, select, input { font-family: inherit; font-size: inherit; color: inherit
   </div>
 
   <div id="states"></div>
-
-  <h2>Questions for tacowars</h2>
-  <ol>
-    <li><b>The slot column's note.</b> It reads <i>Wet path, before Mix</i>, or <i>Empty: the repeats go straight to Mix</i> with no child. Keep it, or drop it and let the picker's label stand alone? Dropping it doesn't change the width.</li>
-    <li><b>The child's on/off glyph.</b> It is drawn in the rail's teal on both racks, as every insert's switch is today, and only the child's name takes the accent (amber on Send B). Keep the teal, or take the accent too?</li>
-    <li><b>Wide children.</b> Advanced Drive's Stage page makes Echo about 1,270 px wide (state 4, Stage 1 tab), so on a laptop Echo can fill the visible rack. Accept this, since folding the child answers it, or limit the slot to one-page kinds?</li>
-    <li><b>The Filter's Mode and Slope buttons on Send B.</b> Today's Filter card lights them in the strip's teal on every rack, while its knobs take the bus's amber (state 6 keeps this). Is that worth a separate fix?</li>
-  </ol>
 </div>
 
 <script>
@@ -465,9 +472,25 @@ const pagesOf = (kind) => CARDS[kind] || standInPages(kind);
 function slotColumn(v) {
   const picker = select('Slot', [['none', 'None'], ...SLOT_KINDS], v.slot, {
     aria: 'Slot: an insert on Echo’s wet path, before Mix',
-    change: (kind) => { v.slot = kind; v.page = 0; v.subFolded = false; v.childOn = true; v.paint(); },
+    change: (kind) => { v.slot = kind; v.page = 0; v.subFolded = false; v.childOn = true; v.slotOpen = kind === 'none'; v.paint(); },
   });
-  return wide(picker, note(v.slot === 'none' ? 'Empty: the repeats go straight to Mix.' : 'Wet path, before Mix'));
+  return wide(picker);
+}
+/** The empty slot's tab: › expands it to its picker, ‹ collapses it again. */
+function slotTab(v) {
+  const t = h('button', v.slotOpen ? 'slot-tab open' : 'slot-tab');
+  t.type = 'button';
+  t.title = t.ariaLabel = v.slotOpen ? 'Collapse the empty slot' : 'Expand the slot: add an insert on Echo’s wet path';
+  t.setAttribute('aria-expanded', String(v.slotOpen));
+  t.append(h('span', 'slot-tab-glyph', v.slotOpen ? '‹' : '›'), h('span', 'slot-tab-label', 'Slot'));
+  t.onclick = (e) => { e.stopPropagation(); v.slotOpen = !v.slotOpen; v.paint(); };
+  return t;
+}
+/** The empty slot expanded: its tab (‹), then the picker on None. */
+function slotOpen(v) {
+  const wrap = h('div', 'slot-open');
+  wrap.append(slotTab(v), page(slotColumn(v)));
+  return wrap;
 }
 
 /* ---------- the child: its rail, then its tabs (two or more pages) over its page ---------- */
@@ -486,7 +509,13 @@ function childRail(v) {
   name.title = `${v.subFolded ? 'Open' : 'Fold'} ${label}`;
   name.setAttribute('aria-expanded', String(!v.subFolded));
   name.onclick = (e) => { e.stopPropagation(); v.subFolded = !v.subFolded; v.paint(); };
-  r.append(swWrap, name);
+  const tools = h('div', 'insert-tools');
+  const del = h('button', 'insert-icon', '✕');
+  del.type = 'button';
+  del.title = del.ariaLabel = `Remove ${label} from the slot`;
+  del.onclick = (e) => { e.stopPropagation(); v.slot = 'none'; v.slotOpen = false; v.page = 0; v.subFolded = false; v.childOn = true; v.paint(); };
+  tools.append(del);
+  r.append(swWrap, name, tools);
   return r;
 }
 function childStack(v) {
@@ -554,11 +583,13 @@ function echoBox(v) {
   const stack = h('div', 'insert-stack');
   const body = h('div', 'insert-body');
   const cols = echoCols(v.bus);
-  if (v.slot !== undefined) cols.push(rule(), slotColumn(v));
+  const hasChild = v.slot !== undefined && v.slot !== 'none';
+  if (hasChild) cols.push(rule(), slotColumn(v));
   body.append(page(...cols));
   stack.append(body);
   box.append(rail, stack);
-  if (v.slot !== undefined && v.slot !== 'none') box.append(child(v));
+  if (v.slot === 'none') box.append(v.slotOpen ? slotOpen(v) : slotTab(v));
+  if (hasChild) box.append(child(v));
   return box;
 }
 function addSlot(where) {
@@ -572,10 +603,12 @@ function addSlot(where) {
 const STATES = [
   { id: 'today', tag: 'Today', title: 'Echo as it is today, for comparison', v: {},
     text: 'Read from the master rack in <code>npm run dev</code>: no slot column. Every row below keeps these cells as they are.' },
-  { id: 's1', tag: '1', title: 'The slot empty (picker on None)', v: { slot: 'none' },
-    text: 'Only the slot column is new: a rule after Mix, then the picker and its note. This width is Echo\'s own width from here on.' },
+  { id: 's1', tag: '1a', title: 'Empty, collapsed (default)', v: { slot: 'none' },
+    text: 'The empty slot takes no column: only a narrow tab at Echo\'s right edge, with <i>›</i> and a vertical <i>Slot</i> label. Click it to expand the slot.' },
+  { id: 's1b', tag: '1b', title: 'Empty, expanded', v: { slot: 'none', slotOpen: true },
+    text: 'The tab turns to <i>‹</i> and the slot picker follows it, on <i>None</i>. Click <i>‹</i> to collapse the slot, or pick a kind to add a child.' },
   { id: 's2', tag: '2', title: 'A Chorus child', v: { slot: 'chorus' },
-    text: 'The child\'s rail (switch, <code>SLOT · CHORUS</code>), then the Chorus card as today, its Mix included.' },
+    text: 'A rule after Mix, the slot picker, then the child\'s rail (switch, <code>SLOT · CHORUS</code>, ✕) and the Chorus card as today, its Mix included. The ✕ removes the child and collapses the slot.' },
   { id: 's3', tag: '3', title: 'A Phaser child', v: { slot: 'phaser' },
     text: 'The Phaser card as today: Starting point, eight knobs in columns of two, and Mix at the end.' },
   { id: 's4', tag: '4', title: 'An Advanced Drive child, multi-page', v: { slot: 'advanced-drive' },
@@ -583,7 +616,7 @@ const STATES = [
   { id: 's5', tag: '5', title: 'A folded child', v: { slot: 'chorus', subFolded: true },
     text: 'The Chorus child folded by its name: only its rail shows, and the picker still names it. Click the name to open it.' },
   { id: 's6', tag: '6', title: 'Echo on Send B with a Filter child', v: { slot: 'filter', bus: true },
-    text: 'A send bus\'s rack takes the bus accent (<code>--carrier</code>): the knob arcs, the child\'s name and its tabs. Echo\'s Mix reads 1.00, as Echo does when it is added to a send bus.', bus: true },
+    text: 'A send bus\'s rack takes the bus accent (<code>--carrier</code>): the knob arcs, the child\'s switch and name, and its tabs. The Filter\'s Mode and Slope stay teal, as today\'s card draws them. Echo\'s Mix reads 1.00, as Echo does when it is added to a send bus.', bus: true },
 ];
 const host = document.getElementById('states');
 const views = {};
@@ -592,11 +625,18 @@ function paintMeasure(s) {
   if (!box) return; // not painted yet
   const r = box.getBoundingClientRect();
   let text = `Echo's box: <b>${Math.round(r.width)} × ${Math.round(r.height)} px</b> · rack height 196 px`;
-  if (v.slot !== undefined) text += ` · slot: ${v.slot === 'none' ? 'None' : LABELS[v.slot]}${v.subFolded ? ' (folded)' : ''}`;
-  const empty = views.s1 && views.s1.row.querySelector('.insert-box');
-  if (s.id !== 's1' && v.subFolded && !v.folded && empty) {
-    const ew = Math.round(empty.getBoundingClientRect().width), rail = Math.round(v.row.querySelector('.sub').getBoundingClientRect().width);
-    text += ` · = Echo with its slot empty (${ew} px) + the child's rail (${rail} px) = ${ew + rail} px`;
+  if (v.slot !== undefined) text += ` · slot: ${v.slot === 'none' ? (v.slotOpen ? 'None, expanded' : 'None, collapsed') : LABELS[v.slot]}${v.subFolded ? ' (folded)' : ''}`;
+  const today = views.today.row.querySelector('.insert-box');
+  const w = (n) => Math.round(n.getBoundingClientRect().width);
+  if (today && !v.folded && v.slot === 'none' && !v.slotOpen) {
+    text += ` · = Echo today (${w(today)} px) + the slot's tab (${w(v.row.querySelector('.slot-tab'))} px)`;
+  }
+  if (today && !v.folded && v.subFolded) {
+    /* The slot column: from Echo's Mix column's right edge to the picker's, so the rule, its margins and the gaps count. */
+    const cols = v.row.querySelectorAll('.insert-box > .insert-stack .insert-page > *');
+    const mix = cols[3].getBoundingClientRect().right, picker = cols[cols.length - 1].getBoundingClientRect().right;
+    const slotW = Math.round(picker - mix), rail = w(v.row.querySelector('.sub'));
+    text += ` · = Echo today (${w(today)} px) + the rule and slot picker (${slotW} px) + the child's rail (${rail} px) = ${w(today) + slotW + rail} px`;
   }
   m.innerHTML = text;
 }
@@ -614,7 +654,7 @@ for (const s of STATES) {
   const tagNote = h('span', 'mock-note', s.bus ? 'Send B\'s rack: Add, 1 Echo, Add.' : 'The master rack: Add, 1 Echo, Add.');
   sec.append(h2, p, tagNote, row, measure);
   host.append(sec);
-  const v = Object.assign({ page: 0, childOn: true, subFolded: false, echoOn: true, folded: false, bus: false }, s.v, { row, measure });
+  const v = Object.assign({ page: 0, childOn: true, subFolded: false, slotOpen: false, echoOn: true, folded: false, bus: false }, s.v, { row, measure });
   v.paint = () => {
     const keep = row.scrollLeft;
     row.replaceChildren(addSlot('front'), echoBox(v), addSlot('back'));
