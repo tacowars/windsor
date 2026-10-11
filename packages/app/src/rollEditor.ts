@@ -15,10 +15,11 @@
  * listener per device would keep every discarded one alive). Escape with
  * nothing selected is left to Expand, which closes.
  */
-import type { RollSequencerConfig } from '@windsor/engine';
+import type { RollEnvelope, RollSequencerConfig } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { regionPatternChange } from './partEdits';
 import { type RollEdit, deleteNotes, settle } from './rollEdits';
+import { writeEnvelopes } from './rollEnvelopeWrite';
 import { type RollPlace, forgetGone, keepSelected, selectedIn } from './rollSelection';
 import { readRollSource } from './rollSource';
 import { isFieldFocused } from './songAutomationToolbar';
@@ -34,6 +35,8 @@ export interface RollEditorTarget {
   previewNotes(): void;
   /** Redraw the whole roll (a loop in progress, a write). */
   repaint(): void;
+  /** Whether the notes take no keys: the Envelopes tab shows (windsor#707). */
+  inert?(): boolean;
 }
 
 /** One Roll device's selection and edit in progress. */
@@ -116,9 +119,20 @@ export class RollEditor {
     return ok;
   }
 
+  /**
+   * Write the roll's clip envelopes, whole, as one undo step named `label`
+   * (windsor#707 decision 7); false when the song refused them.
+   */
+  commitEnvelopes(envelopes: readonly RollEnvelope[], label: string): boolean {
+    const ok = writeEnvelopes(this.target.ctx, this.place, envelopes, label);
+    this.target.repaint();
+    return ok;
+  }
+
   /** A key for the device; true when it took it. */
   key(e: KeyboardEvent): boolean {
     const { body } = this.target;
+    if (this.target.inert?.()) return false;
     if (!body.isConnected || body.closest('[hidden]') !== null || isFieldFocused(e)) return false;
     const selected = this.selected();
     if (selected.length === 0) return false;

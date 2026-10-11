@@ -39,8 +39,8 @@ export function syncPanes(panes: RollPanes): void {
   panes.keys.scrollTop = panes.body.scrollTop;
 }
 
-/** A wheel over a follower scrolls the notes; with Shift, sideways. */
-function forwardWheel(body: HTMLElement, e: WheelEvent): void {
+/** A wheel over a follower (or the Envelopes tab's layer) scrolls the notes; with Shift, sideways. */
+export function forwardWheel(body: HTMLElement, e: WheelEvent): void {
   e.preventDefault();
   body.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
   if (!e.shiftKey) body.scrollTop += e.deltaY;

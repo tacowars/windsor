@@ -3068,18 +3068,29 @@ body.chord-dragging {
   padding: 0 8px;
   border-bottom: 1px solid var(--line);
 }
-.roll-tab {
+/* Notes · Envelopes (windsor#707), drawn as the Figure card's tabs. */
+.roll-tabs button {
   height: 17px;
   padding: 2px 8px;
+  background: transparent;
+  border: 0;
   border-radius: var(--r) var(--r) 0 0;
-  background: var(--carrier);
-  color: var(--inset);
+  color: var(--ink-faint);
   font-family: var(--f-panel);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  line-height: 1.4;
+  line-height: 1.1;
   text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.roll-tabs button:hover {
+  color: var(--ink);
+}
+.roll-tabs button[aria-selected='true'] {
+  background: var(--carrier);
+  color: var(--inset);
 }
 .roll-summary {
   margin-left: auto;
@@ -3789,6 +3800,262 @@ body.chord-dragging {
   color: var(--ink-faint);
   font-family: var(--f-num);
   font-size: 11px;
+}
+
+/* The Envelopes tab (windsor#707, epic windsor#699; the approved mockup
+   docs/design/roll-envelopes-mockup.html). Its column takes the note
+   controls' place, at their width; its layer covers the note pane, where
+   the notes dim and take no pointer. The curve, the chips and the ● and ×
+   are the Song tab's lanes' (.auto-*), in the carrier colour. */
+.roll-device-body {
+  --lane-c: var(--carrier);
+}
+.roll-grid {
+  position: relative;
+}
+/* The panes by name, so the layer can share the notes' cell. */
+.roll-corner {
+  grid-area: 1 / 1;
+}
+.roll-head {
+  grid-area: 1 / 2;
+}
+.roll-keys {
+  grid-area: 2 / 1;
+}
+.roll-body {
+  grid-area: 2 / 2;
+}
+.roll-vcorner {
+  grid-area: 3 / 1;
+}
+.roll-vel {
+  grid-area: 3 / 2;
+}
+.env-on .roll-notes {
+  opacity: 0.3;
+  pointer-events: none;
+}
+.roll-ctl-cols[hidden],
+.renv-ctl[hidden],
+.renv-layer[hidden] {
+  display: none;
+}
+.renv-ctl {
+  display: grid;
+  grid-template-columns: var(--roll-ctl-w) var(--roll-ctl-w);
+  column-gap: var(--roll-ctl-gap);
+  row-gap: 5px;
+  align-content: start;
+}
+.renv-ctl .renv-span {
+  grid-column: 1 / -1;
+}
+/* The tools and their hint, drawn as the Song tab's (.seg.auto-tools, .auto-hint). */
+.seg.renv-tools {
+  flex-wrap: nowrap;
+}
+.seg.renv-tools button {
+  min-width: 0;
+  padding: 5px 8px;
+}
+.renv-hint {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.renv-pick {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: var(--roll-ctl-h);
+  padding: 0 16px 0 5px;
+  overflow: hidden;
+  background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 11px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.renv-pick[aria-expanded='true'] {
+  border-color: var(--carrier);
+}
+.renv-pick .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.renv-pick.none {
+  color: var(--ink-faint);
+}
+.renv-pick .auto-chip,
+.renv-opt .auto-chip {
+  flex: none;
+  height: 12px;
+  margin: 0;
+}
+.renv-pick .auto-chip.off {
+  opacity: 0.32;
+}
+.renv-at {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.renv-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.renv-row .auto-count {
+  margin-left: 3px;
+  line-height: 11px;
+}
+.renv-kind {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.renv-layer {
+  grid-area: 2 / 2;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.renv-layer[data-tool='edit'] {
+  cursor: crosshair;
+}
+.renv-layer[data-tool='draw'] {
+  cursor: cell;
+}
+.renv-layer[data-tool='shape'] {
+  cursor: col-resize;
+}
+.renv-layer > svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  overflow: visible;
+}
+.renv-zero {
+  stroke: var(--line-bright);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.renv-scale {
+  fill: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 8px;
+}
+.renv-ghost {
+  opacity: var(--roll-ghost);
+}
+.renv-off {
+  opacity: 0.32;
+}
+/* The picker's list, on the page under its button: the marked targets first, then the voice sections. */
+.renv-list {
+  --lane-c: var(--carrier);
+  position: fixed;
+  z-index: 20;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 0;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) var(--panel);
+}
+.renv-list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.renv-list-head.full {
+  color: var(--hot);
+}
+.renv-list-note {
+  padding: 0 10px 6px;
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.renv-group {
+  padding: 6px 10px 2px;
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.renv-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0 10px 0 14px;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.renv-opt:hover:not(:disabled) {
+  background: var(--panel-hi);
+}
+.renv-opt:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.renv-opt .tag {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.renv-opt.marked {
+  padding-left: 10px;
+}
+.renv-opt.marked.off .nm {
+  color: var(--ink-dim);
+}
+.renv-opt.marked.off .auto-chip {
+  opacity: 0.32;
+}
+.renv-opt[aria-current='true'] {
+  background: rgba(224, 164, 78, 0.08);
+}
+.renv-opt[aria-current='true'] .tag {
+  color: var(--carrier);
 }
 
 /* ---------- the Euclidean card (#610; the device, windsor#356, windsor#393) ---------- */
