@@ -107,6 +107,8 @@ export class EnvelopeWindow {
       ? rampsBetween(lane.row, lane.points, { fromTick: pos, toTick: pos + 1 })
       : null;
     this.last = lane ? lane.last : track.last;
+    // An envelope's 0 is the patch's own value; a lane's slot is the lane's (windsor#718).
+    track.handle.setRelative(lane === undefined);
     this.start();
     this.inside();
     if (envelope) this.settle(envelope, frame, this.last);
