@@ -60,6 +60,13 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
    */
   setHarmony?(root: number, scale: Harmony['scale']): void;
   /**
+   * Optional song chord input (windsor#729): the pitch set of the chord the
+   * harmony track is on, from `time` on the audio clock; `hold` cancels what
+   * was scheduled from `time` first. `harmonyInsertRegistry` forwards what
+   * `bloomChordFollower.ts` schedules to every live stage.
+   */
+  setChord?(mask: number, time: number, hold: boolean): void;
+  /**
    * A song lane's handle on `field` (windsor#345, record
    * `2026-10-01-song-automation-lanes` decision 1): the param or params `set`
    * writes for it, with `set`'s mapping at each breakpoint. While engaged it

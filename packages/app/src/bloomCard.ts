@@ -9,10 +9,11 @@
  *   on/off switch is the rail's ⏻).
  * - Generator: Shape and Bright, Octave (six steps), then the Key and Scale
  *   pickers in one wide column. They read as the transport's do (windsor#728):
- *   Key its note names, Scale `chromatic` first, `song key` in its own group
- *   (windsor#717), then Windsor's scales under the transport's groups and
- *   names. On `song key` Key is disabled and shows the song's key, as the
- *   transport's Key does; the bloom's own key stays underneath.
+ *   Key its note names, Scale `chromatic` first, `song key` (windsor#717) and
+ *   `song chord` (windsor#729) in their own group, then Windsor's scales under
+ *   the transport's groups and names. On either song choice Key is disabled
+ *   and shows the song's key, as the transport's Key does; the bloom's own
+ *   key stays underneath.
  * - Bands: Low and High (note names; they never cross), then Focus.
  * - Dynamics: Density, read as the compressor's ratio.
  * - Output: Amount and Spread, then Mix at the big dial, last.
@@ -90,24 +91,37 @@ function freezeButton(view: BloomView): HTMLElement {
   return button;
 }
 
-/** Scale's Song key (windsor#717): the song's root and scale, resolved by the engine. */
+/**
+ * Scale's Song key (windsor#717) and Song chord (windsor#729): the song's root
+ * and scale, or the chord its harmony track is on, resolved by the engine.
+ */
 const SONG_KEY: BloomScale = 'song';
+const SONG_CHORD: BloomScale = 'chord';
 
-/** Scale's groups: `song key` alone, then the transport's. */
+/** Scale's groups: `song key` and `song chord`, then the transport's. */
 export const BLOOM_SCALE_GROUPS: readonly SelectGroup[] = [
-  { group: 'Song', options: [{ value: SONG_KEY, label: 'song key' }] },
+  {
+    group: 'Song',
+    options: [
+      { value: SONG_KEY, label: 'song key' },
+      { value: SONG_CHORD, label: 'song chord' },
+    ],
+  },
   ...SCALE_OPTION_GROUPS,
 ];
 
 /**
- * What Key shows: the bloom's own key, or on Song key the song's (`root`, a
- * pitch class), named as the transport's Key names it, and disabled.
+ * What Key shows: the bloom's own key, or on Song key or Song chord the
+ * song's (`root`, a pitch class), named as the transport's Key names it, and
+ * disabled.
  */
 export function bloomKeyShown(
   spec: Pick<BloomSpec, 'key' | 'scale'>,
   root: number,
 ): { readonly value: string; readonly disabled: boolean } {
-  if (spec.scale !== SONG_KEY) return { value: spec.key, disabled: false };
+  if (spec.scale !== SONG_KEY && spec.scale !== SONG_CHORD) {
+    return { value: spec.key, disabled: false };
+  }
   const song = KEY_OPTIONS.find((option) => option.value === String(root));
   return { value: song?.label ?? spec.key, disabled: true };
 }

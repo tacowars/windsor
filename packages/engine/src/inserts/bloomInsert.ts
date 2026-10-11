@@ -14,11 +14,23 @@
  * `fadeRamp`, so the layer leaves output 0 exactly as the child's fade
  * brings it back. All three outputs and `ret` are built with the stage, so
  * the first child takes the normal arrival path.
+ *
+ * On Scale's Song chord (windsor#729) the stage owns `pitches`: `set` leaves
+ * it out, and `setChord` schedules the sets the follower hands over. The
+ * stage keeps the last one on any scale, so a switch to Song chord takes it
+ * at once; a switch away cancels what is scheduled from now and writes the
+ * spec's own set.
  */
 import { fadeRamp } from './fadeRamp';
 import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
-import { BLOOM_BOUNDS, BLOOM_NAME, BLOOM_SCALE_SONG, BLOOM_SLOT } from './bloomConstants';
+import {
+  BLOOM_BOUNDS,
+  BLOOM_NAME,
+  BLOOM_SCALE_CHORD,
+  BLOOM_SCALE_SONG,
+  BLOOM_SLOT,
+} from './bloomConstants';
 import { bloomPitches } from './bloomPitches';
 import type { SongKey } from './bloomPitches';
 import {
@@ -98,7 +110,11 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
     let current = spec;
     // The last song key the registry handed over (windsor#717): Scale's `song` reads it.
     let songKey: SongKey | undefined;
+    // The last song chord's set (windsor#729): Scale's `chord` plays it.
+    let chord: number | undefined;
+    const onChord = (s: BloomSpec): boolean => s.scale === BLOOM_SCALE_CHORD;
     const { processor, input, output, ret } = bloomGraph(context, spec);
+    const pitches = processor.parameters.get('pitches')!;
     const params = workletFieldParams(
       processor,
       (name) => bloomValues(current, songKey)[name]!,
@@ -111,14 +127,26 @@ export const BLOOM_INSERT: InsertKind<BloomSpec> = {
       processor,
       wetPath: bloomWetPath(context, processor, ret),
       set(next): void {
+        const was = onChord(current);
         current = next;
-        params.write(bloomValues(next, songKey));
+        const { pitches: own, ...values } = bloomValues(next, songKey);
+        if (was !== onChord(next)) pitches.cancelScheduledValues(context.currentTime);
+        if (!onChord(next)) values.pitches = own!;
+        else if (!was) values.pitches = chord ?? own!;
+        params.write(values);
       },
       setHarmony(root, scale): void {
         songKey = { root, scale };
-        if (current.scale === BLOOM_SCALE_SONG) {
+        // Song chord plays the song key until a chord is handed over.
+        if (current.scale === BLOOM_SCALE_SONG || (onChord(current) && chord === undefined)) {
           params.write({ pitches: bloomPitches(current, songKey) });
         }
+      },
+      setChord(mask, time, hold): void {
+        chord = mask;
+        if (!onChord(current)) return;
+        if (hold) pitches.cancelScheduledValues(time);
+        pitches.setValueAtTime(mask, time);
       },
       param: (field) => params.param(field),
       dispose(): void {

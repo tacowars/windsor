@@ -93,6 +93,12 @@ export const BLOOM_SCALE_DEFAULT = 'chromatic';
  * in the stage from the harmony the registry hands it, never in the spec.
  */
 export const BLOOM_SCALE_SONG = 'song';
+/**
+ * Scale's Song chord (windsor#729): the pitch classes of the chord the
+ * harmony track is on, scheduled on the transport (`bloomChordFollower.ts`)
+ * and held by the stage, never in the spec.
+ */
+export const BLOOM_SCALE_CHORD = 'chord';
 
 /** The route's tunables (`worklet/bloom/bloomDsp.ts`). */
 export const BLOOM_DSP = {
