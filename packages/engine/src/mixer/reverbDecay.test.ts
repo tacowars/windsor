@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   channel,
   impulseAt,
+  internals,
   loadReverb,
   noiseBurst,
   renderReverb,
@@ -44,7 +45,11 @@ describe('Decay in seconds', () => {
   it.each([
     { size: 0.05, decay: 2, diffusionTank1: 0.8, diffusionTank2: 0.8 },
     { size: 1, decay: 5, diffusionTank1: 0, diffusionTank2: 0 },
-    { size: 4, decay: 20, diffusionTank1: 0.8, diffusionTank2: 0 },
+    { size: 4, decay: 60, diffusionTank1: 0.8, diffusionTank2: 0 },
+    // The top at the smallest Size, where the measured correction is largest.
+    // At tank diffusion 2 of 0.8 this cell runs up to 11 % long, and at 44.1 kHz
+    // up to 25 % short: the research note has the sweep.
+    { size: 0.05, decay: 60, diffusionTank1: 0.8, diffusionTank2: 0 },
   ])(
     'measures a T30 within 10 % of Decay: %j',
     (space) => {
@@ -57,7 +62,10 @@ describe('Decay in seconds', () => {
 
 /**
  * Each space's broadband T30 before windsor#748, when Decay was a feedback
- * gain: the impulse after half a second at the space's Size, 48 kHz.
+ * gain: the impulse after half a second at the space's Size, 48 kHz. `wash`
+ * is left out: at its old T30 of 31.4 s its 200 Hz tank low cut and 5 kHz
+ * high cut leave it 26 % short, and tacowars ruled it gets no further tuning
+ * (record `2026-10-12-plate-decay-in-seconds`).
  */
 const BEFORE: Record<string, number> = {
   default: 3.366,
@@ -65,6 +73,7 @@ const BEFORE: Record<string, number> = {
   room: 0.421,
   hall: 6.336,
   shimmer: 4.355,
+  cathedral: 30.376,
 };
 
 describe('the converted spaces', () => {
@@ -81,26 +90,40 @@ describe('the converted spaces', () => {
     },
     60_000,
   );
-
-  it('holds cathedral and wash, which rang about 30 s, at the 20 s ceiling', () => {
-    expect(SPACES.cathedral.decay).toBe(REVERB_SPACE_RANGES.decay[1]);
-    expect(SPACES.wash.decay).toBe(REVERB_SPACE_RANGES.decay[1]);
-  });
 });
 
 describe('the longest corner', () => {
-  it('dies away: Decay 20 × lowDecay 4 at tank diffusion 0.8 and Size 4, after 3 × 80 s', () => {
+  /**
+   * Every gain point, and the low band's gain at DC on it (the shelf's
+   * largest), stays under 1 on every block: the all-passes and the damping
+   * never gain, so no loop round the tank can either.
+   */
+  it('dies away: Decay 60 × lowDecay 4 at tank diffusion 0.8 and Size 4, after 3 × 240 s', () => {
     const longest = REVERB_SPACE_RANGES.decay[1] * REVERB_SPACE_RANGES.lowDecay[1];
-    const result = renderReverb(loaded, 3 * longest + 1, noiseBurst(1), {
-      decay: REVERB_SPACE_RANGES.decay[1],
-      lowDecay: REVERB_SPACE_RANGES.lowDecay[1],
-      lowCross: REVERB_SPACE_RANGES.lowCross[1],
-      size: REVERB_SPACE_RANGES.size[1],
-      diffusionTank1: REVERB_SPACE_RANGES.diffusionTank1[1],
-      diffusionTank2: REVERB_SPACE_RANGES.diffusionTank2[1],
-      tankLowCut: 10,
-      tankHighCut: 20000,
-    });
+    let largest = 0;
+    const afterBlock = (_block: number, processor: Parameters<typeof internals>[0]): void => {
+      const plate = internals(processor);
+      for (let p = 0; p < plate._gain.length; p++) {
+        largest = Math.max(largest, plate._gain[p]!, plate._gain[p]! + plate._lowExtra[p]!);
+      }
+    };
+    const result = renderReverb(
+      loaded,
+      3 * longest + 1,
+      noiseBurst(1),
+      {
+        decay: REVERB_SPACE_RANGES.decay[1],
+        lowDecay: REVERB_SPACE_RANGES.lowDecay[1],
+        lowCross: REVERB_SPACE_RANGES.lowCross[1],
+        size: REVERB_SPACE_RANGES.size[1],
+        diffusionTank1: REVERB_SPACE_RANGES.diffusionTank1[1],
+        diffusionTank2: REVERB_SPACE_RANGES.diffusionTank2[1],
+        tankLowCut: 10,
+        tankHighCut: 20000,
+      },
+      { afterBlock },
+    );
+    expect(largest).toBeLessThan(1);
     expect(result.nonFinite).toBe(0);
     const firstSecond = Math.max(...result.trace.slice(0, Math.round(loaded.sampleRate / BLOCK)));
     expect(rmsAt(result, 3 * longest)).toBeLessThan(firstSecond * 1e-3);

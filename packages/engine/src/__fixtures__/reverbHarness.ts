@@ -112,6 +112,9 @@ export interface ReverbInternals {
   /** Whether the low band ran the last block, and its lowpasses' states (windsor#748). */
   _band: boolean;
   _lowState: Float64Array;
+  /** Each tank line's gain point, and the low band's extra gain on it (windsor#748). */
+  _gain: Float64Array;
+  _lowExtra: Float64Array;
 }
 
 /** White-box access to one processor's delay lines. */

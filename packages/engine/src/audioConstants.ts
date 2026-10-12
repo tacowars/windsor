@@ -289,7 +289,7 @@ export const REVERB_SPACE_RANGES = {
   diffusionIn1: [0, 1],
   diffusionIn2: [0, 1],
   size: [0.05, 4],
-  decay: [0.2, 20],
+  decay: [0.2, 60],
   lowDecay: [0.25, 4],
   lowCross: [80, 10000],
   diffusionTank1: [0, 0.8],

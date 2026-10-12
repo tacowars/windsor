@@ -67,9 +67,11 @@ const HOLD_DECAY = 0.9999;
  * Decay is an RT60 in seconds (windsor#748), and the low band's multiplier and
  * crossover: each `[default, min, max]`, as the descriptors declare them.
  * DECAY's default is the measured T30 of the plate's old default (decay gain
- * 0.7 at Size 1): `docs/research/2026-10-12-plate-decay-seconds/`.
+ * 0.7 at Size 1): `docs/research/2026-10-12-plate-decay-seconds/`. Its top,
+ * 60 s, is tacowars's (record `2026-10-12-plate-decay-in-seconds`): the old
+ * feedback gain had no time ceiling, and its longest spaces rang about 30 s.
  */
-const DECAY_SECONDS = [3.35, 0.2, 20];
+const DECAY_SECONDS = [3.35, 0.2, 60];
 const LOW_DECAY = [1, 0.25, 4];
 const LOW_CROSS = [300, 80, 10000];
 

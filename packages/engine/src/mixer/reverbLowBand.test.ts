@@ -140,8 +140,8 @@ describe('moves with a tail ringing', () => {
   });
 
   it.each([
-    [0.2, 20],
-    [20, 0.2],
+    [0.2, 60],
+    [60, 0.2],
   ])('Decay stepped from %f to %f and back', (rest, moved) => {
     expectNoStep(6, { decay: rest, lowDecay: 4 }, between('decay', 2, 4, rest, moved));
   });

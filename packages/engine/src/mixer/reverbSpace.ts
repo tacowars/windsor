@@ -25,7 +25,7 @@ export interface ReverbSpace {
   /** Scales every tank delay: 0.05 is a box, 4 is a cathedral. */
   size: number;
   /**
-   * Seconds, 0.2..20: the tail's RT60, the time it takes to fall 60 dB,
+   * Seconds, 0.2..60: the tail's RT60, the time it takes to fall 60 dB,
    * whatever the `size` (windsor#748).
    */
   decay: number;
@@ -70,8 +70,9 @@ export const DEFAULT_SPACE: ReverbSpace = {
  * seconds (windsor#748), rounded to 0.05 s, and `DEFAULT_SPACE`'s likewise:
  * `docs/research/2026-10-12-plate-decay-seconds/`. Two exceptions: at that
  * value `shimmer`'s 250 Hz tank low cut took its T30 13 % short, so it takes
- * the Decay that measures its old T30; and `cathedral` and `wash` measured
- * about 30 s, past the 20 s ceiling, so they sit at 20.
+ * the Decay that measures its old T30 (record
+ * `2026-10-12-plate-decay-in-seconds`). The rows are transitional: item 8 of
+ * `docs/research/2026-10-11-plate-reverb-upgrades/` replaces them.
  */
 export const SPACES = {
   plate: makeSpace({
@@ -107,7 +108,7 @@ export const SPACES = {
   }),
   cathedral: makeSpace({
     size: 3,
-    decay: 20,
+    decay: 30.4,
     preDelay: 0.05,
     inputLowCut: 45,
     inputHighCut: 8000,
@@ -118,7 +119,7 @@ export const SPACES = {
   }),
   wash: makeSpace({
     size: 2.2,
-    decay: 20,
+    decay: 31.35,
     inputLowCut: 90,
     inputHighCut: 6000,
     tankLowCut: 200,

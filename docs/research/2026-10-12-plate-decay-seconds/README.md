@@ -8,7 +8,8 @@ through the scripts in this folder. Machine: Apple M1, 16 GB. Backend: Node
 
 ## What changed
 
-- **Decay is an RT60 in seconds, 0.2 to 20.** Each tank line, lines 4 to 11,
+- **Decay is an RT60 in seconds, 0.2 to 60** (20 s until fix round 1, record
+  `2026-10-12-plate-decay-in-seconds`). Each tank line, lines 4 to 11,
   has its own gain point (`worklet/reverb/tankGains.ts`): the long lines at
   their output, where the old feedback gain sat, and the all-pass lines inside
   their all-pass, on the delayed sample both of its sums read. A line `L`
@@ -47,9 +48,9 @@ to −35 dB. Then each row's new `decay` and its T30 on this branch.
 | `plate` | 0.62 | 1.240 s | 1.244 s | 1.25 s | 1.189 s | 1.194 s | −4.1 % |
 | `room` | 0.45 | 0.421 s | 0.426 s | 0.40 s | 0.382 s | 0.386 s | −9.3 % |
 | `hall` | 0.78 | 6.336 s | 6.377 s | 6.35 s | 6.017 s | 6.052 s | −5.0 % |
-| `shimmer` | 0.85 | 4.355 s | 4.402 s | **5.05 s** | 4.342 s | 4.304 s | −0.3 % |
-| `cathedral` | 0.9 | 30.376 s | 30.537 s | **20 s** | 18.712 s | 18.846 s | −38 % |
-| `wash` | 0.95 | 31.372 s | 31.146 s | **20 s** | 16.245 s | 16.172 s | −48 % |
+| `shimmer` | 0.85 | 4.355 s | 4.402 s | **5.05 s** | 4.342 s | 4.381 s | −0.3 % |
+| `cathedral` | 0.9 | 30.376 s | 30.537 s | 30.40 s | 28.140 s | 28.287 s | −7.4 % |
+| `wash` | 0.95 | 31.372 s | 31.146 s | 31.35 s | 23.104 s | 22.985 s | −26 % |
 
 - The rows in plain type follow the issue's rule: the old T30 rounded to
   0.05 s. Their T30 now lands a little short of it because the spaces damp the
@@ -58,21 +59,31 @@ to −35 dB. Then each row's new `decay` and its T30 on this branch.
 - **`shimmer`** at the rule's 4.35 s measured 3.805 s, 12.6 % short: its
   250 Hz tank low cut takes the most. It takes 5.05 s instead, the 0.05 s
   step whose T30 is nearest the old one.
-- **`cathedral` and `wash`** rang about 30 s, past the 20 s ceiling, so they
-  sit at 20 s. Item 8 replaces both (Old Mill about 4 s, Last Train about 8 s).
+- **`cathedral` and `wash`** rang about 30 s. Until fix round 1 they sat at
+  the 20 s ceiling (18.7 s and 16.2 s measured, −38 % and −48 %). With the
+  ceiling at 60 s they follow the rule like the plain rows. `cathedral` lands
+  within 10 %. `wash` lands 26 % short: its 200 Hz tank low cut and 5 kHz
+  high cut take a fixed bite a second, which costs a 31 s tail far more than
+  a short one, as `shimmer`'s low cut did. tacowars ruled that neither gets
+  further tuning: item 8's preset bank replaces both (Old Mill about 4 s,
+  Last Train about 8 s), and `cathedral`, `shimmer` and `wash` are not kept
+  (record `2026-10-12-plate-decay-in-seconds`).
 - `PLATE_REVERB_SPACE_DEFAULT` stays `hall`.
 
 ## T30 against Decay: the sweep
 
 `sweepT30.mjs`: an impulse after half a second at the Size, `tankLowCut`
 10 Hz, `tankHighCut` 20 kHz, `lowDecay` 1, modulation off, wet 1. Decay over
-0.2, 0.3, 0.5, 0.7, 1, 1.5, 2.5, 4, 7, 12 and 20 s; Size over 0.05, 0.08,
-0.15, 0.3, 0.6, 1, 1.7, 2.5 and 4; `diffusionTank1` and `diffusionTank2` each
-over 0, 0.4 and 0.8 (nine pairs per cell). Each cell is the error range over
-the nine pairs, in percent. A cell in brackets is one where one trip round
-the tank (0.7254 s × Size) is a quarter of Decay or more: its tail is a few
-discrete echoes, reported without a fit to hold it to. The full rows are
-`sweep48.tsv` and `sweep44.tsv`.
+0.2, 0.3, 0.5, 0.7, 1, 1.5, 2.5, 4, 7, 12, 20, 30, 45 and 60 s; Size over
+0.05, 0.08, 0.15, 0.3, 0.6, 1, 1.7, 2.5 and 4; `diffusionTank1` and
+`diffusionTank2` each over 0, 0.4 and 0.8 (nine pairs per cell). Each cell is
+the error range over the nine pairs, in percent. A cell in brackets is one
+where one trip round the tank (0.7254 s × Size) is a quarter of Decay or
+more: its tail is a few discrete echoes, reported without a fit to hold it
+to. The full rows are `sweep48.tsv` and `sweep44.tsv` up to 20 s, and
+`sweep48-long.tsv` and `sweep44-long.tsv` from 30 s, measured in fix round 1
+when Decay's top went from 20 s to 60 s (record
+`2026-10-12-plate-decay-in-seconds`).
 
 **48 kHz:**
 
@@ -89,6 +100,9 @@ discrete echoes, reported without a fit to hold it to. The full rows are
 | 7 s | −1..−0 | +0..+1 | −0 | −0 | +0 | −0 | −1 | (−0..+1) | (+0..+2) |
 | 12 s | −0 | +0..+1 | −0..+1 | −0 | +0 | −0 | −1..−0 | −1..−0 | +0..+1 |
 | 20 s | −1..+0 | +0..+1 | −0..+1 | −0..+1 | +0 | +0 | −1..−0 | −0 | −0 |
+| 30 s | −1..+2 | +0..+2 | −0..+1 | −0..+1 | +0 | +0 | −1..−0 | −0 | +0 |
+| 45 s | +3..+12 | +2..+6 | −0..+1 | −0..+1 | +0..+1 | +0 | −1..−0 | −0 | −0..+0 |
+| 60 s | −3..+11 | +2..+8 | −1..+1 | −1..+1 | +0..+1 | +0 | −1..−0 | −0 | +0 |
 
 **44.1 kHz** (the table was measured at 48 kHz only):
 
@@ -105,9 +119,14 @@ discrete echoes, reported without a fit to hold it to. The full rows are
 | 7 s | −4..−2 | +0..+1 | −0..+1 | −0 | −0 | +0 | +0..+1 | (+1..+2) | (+1..+3) |
 | 12 s | −5..−4 | +1 | −0..+1 | −1..+0 | −0 | +0 | +0..+1 | +1 | +1..+2 |
 | 20 s | −9..−7 | +1..+2 | −0..+1 | −1..+0 | −0 | +0 | +0 | +1 | +0..+1 |
+| 30 s | −14..−8 | +1..+3 | −0..+1 | −1..−0 | −1..−0 | −0..+0 | +0 | +1 | +1 |
+| 45 s | −17..−4 | +3..+7 | −0..+2 | −2..−1 | −1..−0 | −0 | +0 | +1 | +0..+1 |
+| 60 s | −25..−8 | +2..+8 | −1..+1 | −2..−1 | −1..−0 | −0 | +0 | +1 | +0..+1 |
 
-- Every measured cell is within ±10 % but one: **Decay 0.2 s at Size 0.05**,
-  up to +14.5 % at 48 kHz and +12.5 % at 44.1 kHz. That is a floor, not the
+- Every measured cell is within ±10 % but two: **Decay 0.2 s at Size 0.05**,
+  and **Size 0.05 at Decay 30 s and up** (below).
+- **Decay 0.2 s at Size 0.05** measures up to +14.5 % at 48 kHz and +12.5 %
+  at 44.1 kHz. That is a floor, not the
   tank: with the tank's own Decay set to 0.05 s the plate still measures a
   T30 of 0.18 to 0.19 s, the ring of the four input diffusers (3.6 to 12.7 ms
   at coefficients 0.75 and 0.625), which sit outside the loop and do not
@@ -117,7 +136,23 @@ discrete echoes, reported without a fit to hold it to. The full rows are
   every segment, the all-passes' included, is what keeps them out of it.
 - At 44.1 kHz the smallest Size runs a few percent short at long Decays
   (−9 % at 20 s), where the interpolating reads lose more per pass than at
-  48 kHz. Still within ±10 %.
+  48 kHz. Still within ±10 % up to 20 s.
+- **Size 0.05 from Decay 30 s** is the second miss, new with the 60 s top.
+  A 36 ms tank asked to ring for a minute loses nearly that minute's 60 dB
+  to its own passes, so the correction there is large (5.58 at 60 s) and
+  anything that changes the loss a pass moves the result:
+  - At 48 kHz, three of the 243 cells from 30 s up miss, all at Size 0.05
+    with `diffusionTank2` 0.8: +11.6 % and +10.2 % at 45 s, +11.0 % at
+    60 s. The table holds the default diffusions (0.7, 0.5) and, near 60 s,
+    a second tank diffusion of 0.8 lengthens the tail by about 10 %. The 45 s
+    cells also sit between the 40 s and 60 s columns, where the factor
+    curves steeply and the bilinear read runs a few percent high.
+  - At 44.1 kHz, Size 0.05 runs short from 30 s: −14 to −8 % at 30 s, −17
+    to −4 % at 45 s and −25 to −8 % at 60 s. The table was measured at
+    48 kHz, and each pass loses more at 44.1 kHz.
+  - Size 0.08 and up is within ±10 % at both rates through 60 s. A table per
+    sample rate (measured the same way at 44.1 kHz) would close the 44.1 kHz
+    miss; it is left for tacowars to rule on.
 
 ### Why a correction table
 
@@ -128,12 +163,21 @@ damping one-poles are not transparent even at 10 Hz and 20 kHz (the low cut
 takes about 0.3 dB a pass at 37.5 Hz), and every fractional read
 interpolates. `decayTable.mjs` measures, per Size and Decay, the factor `f`
 with `T30(Decay × f) = Decay`, by three steps of
-`f ← f × Decay / T30(Decay × f)` on a bundle built with every factor 1. A
+`f ← f × Decay / T30(Decay × f)` on a bundle built with every factor 1, and
+more steps (up to twelve) while a cell is still more than 1 % off. A
 cell whose trip is a quarter of Decay or more holds the factor of the shortest
 measured Decay at its Size, and a factor under 1 is held at 1 (that happens
 only at Decay 0.2 s and Size 0.05, the input-diffuser floor above). The
-factors run from 1 to 1.50; the table is read bilinearly in Size and
-Decay.
+factors run from 1 to 1.50 up to 20 s, and to 5.58 at 60 s; the table is
+read bilinearly in Size and Decay.
+
+The 30, 40 and 60 s columns came in fix round 1, with Decay's 60 s top. The
+whole table was re-measured in one run on a bundle with every factor 1, and
+every cell up to 20 s came out as before to the fourth decimal: they had all
+converged within 1 % in three steps. Six new cells needed more steps, all at
+Size 0.1 and under: near the smallest Size's own loss each step closes only
+part of the gap, and three steps had left Size 0.05 at 60 s 11 % short
+(factor 3.29, where the converged one is 5.58).
 
 The correction is broadband: it stretches the whole tank, so a band the
 plate loses little in (the mids at small Sizes) rings up to a few percent
@@ -199,20 +243,33 @@ Decay 6 s and `lowCross` 1 kHz, the 125 Hz band within 15 % of Decay ×
 
 ## The corners
 
-`corners.mjs`: a 1 s noise burst into every corner of Decay 0.2 and 20 s,
+`corners.mjs`: a 1 s noise burst into every corner of Decay 0.2 and 60 s,
 `lowDecay` 0.25 and 4, Size 0.05 and 4, both tank diffusions 0 and 0.8,
 `lowCross` 80 Hz and 10 kHz, HOLD off and on (on from 1.5 s to 11.5 s, then
 released); damping open, modulation at its default. Full rows in
-`corners48.tsv`.
+`corners48.tsv`. Fix round 1 moved the top corner from 20 s to 60 s; the
+Decay 0.2 s rows came out as before.
 
-- **Nothing runs away.** Three times the longest RT60 after the burst (or
-  after HOLD's release), every corner is at least 17 dB under the first
-  second's peak (128-sample RMS). The 17 dB ones are Decay 0.2 s at Size 4,
-  where one trip takes 2.9 s, so 0.6 s after the burst its echoes are still
-  arriving; every corner at Decay 20 s had decayed to the sleep floor and
-  slept. No sample was non-finite.
+- **Every gain point stays under 1.** Before each block outside HOLD the
+  script reads each of the eight gain points, and the low band's gain at DC
+  on it (`g + (gL − g)`, the shelf's largest). The largest over every corner
+  is 0.999994, at Decay 60 s × `lowDecay` 4 and Size 0.05, where the
+  measured correction (5.58) cuts the low band's gains for an RT60 of about
+  1340 s. The all-passes (|H| ≤ 1 for a gain under 1 inside) and the damping
+  one-poles never gain, so no loop round the tank can reach 1.
+- **Nothing runs away.** The renders ran in full: three times the longest
+  RT60 after the burst (or after HOLD's release), up to 3 × 240 s = 720 s
+  for Decay 60 s × `lowDecay` 4. Every corner is at least 17 dB under the
+  first second's peak (128-sample RMS). The 17 dB ones are Decay 0.2 s at
+  Size 4, where one trip takes 2.9 s, so 0.6 s after the burst its echoes
+  are still arriving. Every corner at Decay 60 s had decayed to the sleep
+  floor (about −140 dBFS) and slept. No sample was non-finite.
+  `mixer/reverbDecay.test.ts` renders the longest corner the same way (Decay
+  60 × `lowDecay` 4, tank diffusions 0.8, Size 4, 720 s) and holds both the
+  gains and the level.
 - **HOLD holds.** Over the eight seconds held, the last second is 1 to 11 dB
-  under the second second, never above it. The most is at Size 0.05, where
+  under the second second, never above it (2 to 4 dB at Decay 60 s). The
+  most is at Size 0.05, where
   the tank is passed 28 times a second and the interpolating reads take the
   top off the noise; HOLD's gains are the old ones, so this is the plate's
   HOLD as it was (the golden table's `hold` row is unchanged).
@@ -232,12 +289,18 @@ the render's peak, times 3. Defaults otherwise.
 | HOLD on and off, `lowDecay` 4 | 0.0355 | 0.1062 | pass |
 | `lowDecay` 1 → 0.25 at 2 s, back at 4 s | 0.0236 | 0.0708 | pass |
 | `lowDecay` 1 → 4 at 2 s, back at 4 s | 0.0352 | 0.1055 | pass |
-| Decay 0.2 → 20 s at 2 s, back at 4 s | 0.0596 | 0.1781 | pass |
-| Decay 20 → 0.2 s at 2 s, back at 4 s | 0.0596 | 0.1781 | pass |
-| Decay 0.2 → 20 s and back, `lowDecay` 4 | 0.0684 | 0.2046 | pass |
+| Decay 0.2 → 60 s at 2 s, back at 4 s | 0.0720 | 0.2152 | pass |
+| Decay 60 → 0.2 s at 2 s, back at 4 s | 0.0721 | 0.2152 | pass |
+| Decay 0.2 → 60 s and back, `lowDecay` 4 | 0.0758 | 0.2266 | pass |
+| Decay 60 s, HOLD on at 2 s, off at 4 s, `lowDecay` 0.25 | 0.0818 | 0.2451 | pass |
+| Decay 60 s, HOLD on and off, `lowDecay` 1 | 0.1022 | 0.3054 | pass |
+| Decay 60 s, HOLD on and off, `lowDecay` 4 | 0.1084 | 0.3237 | pass |
 | Steady, defaults | 0.0238 | 0.0714 | pass |
 
-At 44.1 kHz every row passes with the same margins.
+At 44.1 kHz every row passes with the same margins. Fix round 1 moved the
+Decay steps' top from 20 s to 60 s and added the HOLD rows at Decay 60 s;
+the other rows are unchanged. `mixer/reverbLowBand.test.ts` pins the Decay
+steps 0.2 ↔ 60 s.
 
 **The Size ramp 0.05 → 4 → 0.05** (`sweepSlow.mjs`) passes over 8 s each way
 at `lowDecay` 0.25, 1 and 4, but not over 2 s or 4 s each way:
@@ -304,7 +367,9 @@ Plate card on Send A (the `room` return) and a Plate insert on the master
 each show 15 space knobs over their three pages (Space: Pre, Size, Decay;
 Diffusion: six; Tone: the four cuts, `Low ×` and `Low Hz`). Decay reads
 `6.35s`, `Low ×` reads `×1.00` and `Low Hz` `300` at their defaults, and
-nothing overflows the card.
+nothing overflows the card. In fix round 1, Decay dragged to the top of its
+travel on both cards reads `60.00s`, within its knob, and the page does not
+scroll sideways.
 
 ![Send A, Space](room-return-space.png)
 ![Send A, Tone](room-return-tone.png)

@@ -42,15 +42,20 @@ check('Size 0.05 -> 4 over 2 s and back over 2 s', { size: 0.05 }, (b, v) => {
   const t = (b * BLOCK) / fs;
   v.size[0] = t < 1 ? 0.05 : t < 3 ? 0.05 + ((t - 1) / 2) * 3.95 : t < 5 ? 4 - ((t - 3) / 2) * 3.95 : 0.05;
 }, 7);
-check('Decay 0.2 -> 20 at 2 s, back at 4 s', { decay: 0.2 }, (b, v) => {
-  v.decay[0] = b >= at(2) && b < at(4) ? 20 : 0.2;
+check('Decay 0.2 -> 60 at 2 s, back at 4 s', { decay: 0.2 }, (b, v) => {
+  v.decay[0] = b >= at(2) && b < at(4) ? 60 : 0.2;
 });
-check('Decay 20 -> 0.2 at 2 s, back at 4 s', { decay: 20 }, (b, v) => {
-  v.decay[0] = b >= at(2) && b < at(4) ? 0.2 : 20;
+check('Decay 60 -> 0.2 at 2 s, back at 4 s', { decay: 60 }, (b, v) => {
+  v.decay[0] = b >= at(2) && b < at(4) ? 0.2 : 60;
 });
-check('lowDecay 4, Decay 0.2 -> 20 at 2 s, back at 4 s', { decay: 0.2, lowDecay: 4 }, (b, v) => {
-  v.decay[0] = b >= at(2) && b < at(4) ? 20 : 0.2;
+check('lowDecay 4, Decay 0.2 -> 60 at 2 s, back at 4 s', { decay: 0.2, lowDecay: 4 }, (b, v) => {
+  v.decay[0] = b >= at(2) && b < at(4) ? 60 : 0.2;
 });
+for (const lowDecay of [0.25, 1, 4]) {
+  check(`Decay 60, HOLD on at 2 s, off at 4 s, lowDecay ${lowDecay}`, { decay: 60, lowDecay }, (b, v) => {
+    v.hold[0] = b >= at(2) && b < at(4) ? 1 : 0;
+  });
+}
 check('lowDecay 0.25, Size 0.05 -> 4 and back', { size: 0.05, lowDecay: 0.25 }, (b, v) => {
   const t = (b * BLOCK) / fs;
   v.size[0] = t < 1 ? 0.05 : t < 3 ? 0.05 + ((t - 1) / 2) * 3.95 : t < 5 ? 4 - ((t - 3) / 2) * 3.95 : 0.05;

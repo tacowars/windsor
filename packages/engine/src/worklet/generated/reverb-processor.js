@@ -87,7 +87,7 @@ var LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length;
 var MIN_LENGTH = 8;
 var ANTI_DENORMAL = 1e-20;
 var HOLD_DECAY = 0.9999;
-var DECAY_SECONDS = [3.35, 0.2, 20];
+var DECAY_SECONDS = [3.35, 0.2, 60];
 var LOW_DECAY = [1, 0.25, 4];
 var LOW_CROSS = [300, 80, 1e4];
 var RT60_LOG = 3 * Math.LN10;
@@ -290,7 +290,7 @@ function shelf(plate, p) {
 
 // packages/engine/src/worklet/reverb/reverbDecayTables.ts
 var DECAY_TABLE_SIZES = [0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3, 4];
-var DECAY_TABLE_DECAYS = [0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20];
+var DECAY_TABLE_DECAYS = [0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 40, 60];
 var DECAY_TABLE_FACTORS = [
   1,
   1.0422,
@@ -305,6 +305,9 @@ var DECAY_TABLE_FACTORS = [
   1.274,
   1.3788,
   1.5013,
+  1.8397,
+  2.3903,
+  5.58,
   // Size 0.05
   1.048,
   1.048,
@@ -319,6 +322,9 @@ var DECAY_TABLE_FACTORS = [
   1.2514,
   1.3261,
   1.4067,
+  1.5906,
+  1.8417,
+  2.6892,
   // Size 0.075
   1.055,
   1.055,
@@ -333,6 +339,9 @@ var DECAY_TABLE_FACTORS = [
   1.2159,
   1.2722,
   1.3286,
+  1.4482,
+  1.5826,
+  1.9543,
   // Size 0.1
   1.0559,
   1.0559,
@@ -347,6 +356,9 @@ var DECAY_TABLE_FACTORS = [
   1.1801,
   1.2185,
   1.2572,
+  1.3384,
+  1.4268,
+  1.6303,
   // Size 0.15
   1.0729,
   1.0729,
@@ -361,6 +373,9 @@ var DECAY_TABLE_FACTORS = [
   1.1611,
   1.1895,
   1.2174,
+  1.2752,
+  1.3366,
+  1.473,
   // Size 0.2
   1.0661,
   1.0661,
@@ -375,6 +390,9 @@ var DECAY_TABLE_FACTORS = [
   1.135,
   1.154,
   1.1718,
+  1.2065,
+  1.2415,
+  1.3151,
   // Size 0.3
   1.0636,
   1.0636,
@@ -389,6 +407,9 @@ var DECAY_TABLE_FACTORS = [
   1.1184,
   1.1318,
   1.1433,
+  1.1642,
+  1.1842,
+  1.2245,
   // Size 0.5
   1.0729,
   1.0729,
@@ -403,6 +424,9 @@ var DECAY_TABLE_FACTORS = [
   1.1074,
   1.1199,
   1.1295,
+  1.1459,
+  1.1606,
+  1.189,
   // Size 0.7
   1.0663,
   1.0663,
@@ -417,6 +441,9 @@ var DECAY_TABLE_FACTORS = [
   1.1017,
   1.1133,
   1.1224,
+  1.1367,
+  1.1487,
+  1.1705,
   // Size 1
   1.0704,
   1.0704,
@@ -431,6 +458,9 @@ var DECAY_TABLE_FACTORS = [
   1.0904,
   1.1021,
   1.1103,
+  1.1229,
+  1.1329,
+  1.1499,
   // Size 1.5
   1.0738,
   1.0738,
@@ -445,6 +475,9 @@ var DECAY_TABLE_FACTORS = [
   1.0821,
   1.0925,
   1.1012,
+  1.1129,
+  1.1221,
+  1.1368,
   // Size 2
   1.0717,
   1.0717,
@@ -459,6 +492,9 @@ var DECAY_TABLE_FACTORS = [
   1.0717,
   1.0846,
   1.0914,
+  1.1031,
+  1.1111,
+  1.1235,
   // Size 3
   1.0742,
   1.0742,
@@ -472,7 +508,10 @@ var DECAY_TABLE_FACTORS = [
   1.0742,
   1.0742,
   1.0742,
-  1.0824
+  1.0824,
+  1.0928,
+  1.1014,
+  1.113
   // Size 4
 ];
 

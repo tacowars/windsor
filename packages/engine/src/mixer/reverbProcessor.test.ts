@@ -101,7 +101,7 @@ describe('stability', () => {
    */
   it('does not run away at maximum diffusion and decay', () => {
     const result = renderReverb(loaded, 45, noiseBurst(2), {
-      decay: 20,
+      decay: 60,
       diffusionTank1: 0.8,
       diffusionTank2: 0.8,
       tankLowCut: 10,
