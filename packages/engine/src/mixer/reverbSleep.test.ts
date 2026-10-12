@@ -104,24 +104,34 @@ describe('sleep', () => {
     expect(skipped).toBeLessThanOrEqual(topology.sleepOutputFloor);
   });
 
-  it('wakes on the next sound and renders it exactly as a fresh plate would', () => {
-    // Where a lone impulse's plate falls asleep, observed; the second lands after it.
+  it('wakes on the next sound, on R alone, and renders it exactly as a fresh plate would', () => {
+    // A stereo tail (L and R apart, windsor#763), and where its plate falls
+    // asleep, observed; a click on R alone lands after it, and must find both
+    // chains, both pre-delays and both Build lines empty.
+    const stereo: Feed = (block, left, right) => {
+      if (block !== 0) return;
+      left[0] = 1;
+      right[0] = -0.5;
+      right[7] = 0.75;
+    };
+    const rightAlone: Feed = (block, _left, right) => {
+      if (block === 0) right[0] = 1;
+    };
     const probe = sleepWatch();
-    renderReverb(loaded, RENDER_S, impulse, PLATE, { afterBlock: probe.afterBlock });
+    renderReverb(loaded, RENDER_S, stereo, PLATE, { afterBlock: probe.afterBlock });
     expect(probe.firstAsleep()).toBeGreaterThan(0);
     const second = probe.firstAsleep() + 1;
 
     const twice: Feed = (block, left, right) => {
-      if (block !== 0 && block !== second) return;
-      left[0] = 1;
-      right[0] = 1;
+      if (block === 0) stereo(0, left, right);
+      if (block === second) rightAlone(0, left, right);
     };
     const watch = sleepWatch();
     const woken = renderReverb(loaded, (second * BLOCK) / SR + COMPARE_S, twice, PLATE, {
       collectSamples: true,
       afterBlock: watch.afterBlock,
     });
-    const fresh = renderReverb(loaded, COMPARE_S, impulse, PLATE, { collectSamples: true });
+    const fresh = renderReverb(loaded, COMPARE_S, rightAlone, PLATE, { collectSamples: true });
 
     expect(watch.firstAsleep()).toBe(probe.firstAsleep());
     const after = woken.samples.subarray(second * BLOCK * 2);
@@ -172,8 +182,7 @@ describe('settled SIZE', () => {
     };
     const feed: Feed = (block, left, right) => {
       if (block % blockAt(0.3) !== 0) return;
-      // Same sign on both channels: the plate sums its input to mono, so
-      // opposite signs would cancel and leave the tank silent.
+      // A centred click, on both channels.
       left[0] = 1;
       right[0] = 1;
     };

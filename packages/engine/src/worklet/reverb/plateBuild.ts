@@ -1,13 +1,15 @@
 /**
  * The plate's Build (windsor#761): a short multi-tap delay between the input
- * diffusers and the tank, with a tap set per side. The one diffused signal is
- * written into the Build line, each side's taps are summed, and each sum
- * feeds its half of the tank where the diffused signal fed it before, and
- * goes to the wet output directly at a level that falls as Build rises. So
+ * diffusers and the tank, with a tap set per side. Since windsor#763 each
+ * input channel's diffused signal is written into its own Build line, and one
+ * tap set reads each: the left line's sum feeds the right loop and the right
+ * line's the left loop (the half each side's output reads most), and each sum
+ * goes to its own side of the wet output directly, at a level that falls as
+ * Build rises. So
  * Build 0 is a dense, immediate onset with an early burst ahead of the tail,
  * and Build 1 swells in.
  *
- * This file is the block-rate half. `makeBuild` allocates the line once, at
+ * This file is the block-rate half. `makeBuild` allocates the lines once, at
  * construction, for the longest spread (`BUILD_SPREAD`) at the running
  * sample rate, so a read never wraps short at any rate. `configureBuild`
  * runs once a block, after the tank has smoothed `build` as it smooths Size
@@ -42,7 +44,7 @@ const READ_REACH = 2;
 const DIRECT_SLOTS = 3;
 
 /**
- * The Build line and its ramps, from the processor's constructor, after its
+ * The Build lines and their ramps, from the processor's constructor, after its
  * double fields are first written as NaN (worklet rule 7). The first block
  * sets every ramp outright.
  */
@@ -50,6 +52,7 @@ function makeBuild(plate: DattorroReverb): void {
   const capacity = Math.ceil(BUILD_SPREAD * sampleRate) + READ_REACH;
   const size = 2 ** Math.ceil(Math.log2(capacity));
   plate._buildLine = new Float32Array(size);
+  plate._buildLineRight = new Float32Array(size);
   plate._buildMask = size - 1;
   plate._buildWrite = 0;
   plate._buildTime = new Float64Array(BUILD_TAP_TIME.length);

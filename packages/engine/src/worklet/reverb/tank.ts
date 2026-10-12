@@ -1,15 +1,19 @@
-/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the mono sum's half, the tank's line indices and the modulation's detune are the algorithm; the tunables are reverbConstants.ts (#671) */
+/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the line indices and the modulation's detune are the algorithm; the tunables are reverbConstants.ts (#671) */
 /**
- * The plate's awake render (#671): the input's mono sum into the pre-delay
- * ring with the dry output (`_writeInput`), and one quantum through the
- * pre-delay, the input filters, the four diffusers, Build's multi-tap delay,
- * the figure-of-eight tank and the fourteen output taps (`_renderBlock`), with
- * the sleep bookkeeping (#547) at its end. Build (windsor#761, `plateBuild.ts`)
- * writes the diffused sample into its line and reads each side's taps back,
- * linear between samples: the left sum feeds the left loop and the right sum
- * the right loop, and both go to the wet output at the direct level. Its
- * reads and sums are written out in the sample loop too, never called
- * (`mixer/reverbBuild.test.ts`). Decay reaches the tank as a gain point on
+ * The plate's awake render (#671): one quantum, after `plateInput.ts` has
+ * written each input channel into its own pre-delay ring, through the
+ * pre-delays, the input filters, the two chains of four diffusers, Build's
+ * multi-tap delay, the figure-of-eight tank and the fourteen output taps
+ * (`_renderBlock`), with the sleep bookkeeping (#547) at its end. The input
+ * is stereo (windsor#763): L runs through lines 0..3 and R through lines
+ * 12..15, at the same pre-delay, filter coefficients and diffusions, so a
+ * panned source keeps its side. Build (windsor#761, `plateBuild.ts`) writes
+ * each chain's diffused sample into its own line and reads one side's taps
+ * back from each, linear between samples: L's sum feeds the right loop (line
+ * 8) and R's the left loop (line 4), because table 2's left output takes four
+ * of its seven taps from the right loop's lines, and each sum goes to its own
+ * side of the wet output at the direct level. Its reads and sums are written
+ * out in the sample loop too, never called (`mixer/reverbBuild.test.ts`). Decay reaches the tank as a gain point on
  * each of its eight lines (windsor#748): `tankGains.ts` sets them once a block, the loop
  * ramps them a sample at a time, and while the low band runs
  * (`plateLowBand.ts`) each point is its first-order shelf, written out here at
@@ -36,6 +40,7 @@ import {
   OUTPUT_TRIM,
   SLEEP_OUTPUT_FLOOR,
   SMOOTH_SECONDS,
+  TANK_LINE_END,
   TAP_SIGN,
   TAP_TIME,
   TAPS_PER_SIDE,
@@ -57,36 +62,6 @@ function poleCoefficients(parameters: Record<string, Float32Array>, poles: Float
   for (let k = 0; k < POLE_CUTS.length; k++) {
     const hz = parameters[POLE_CUTS[k]][0];
     poles[k] = 1 - Math.exp((-2 * Math.PI * Math.min(hz, sampleRate * 0.49)) / sampleRate);
-  }
-}
-
-/**
- * Mono sum of the input into the pre-delay ring, and the dry output. It reads
- * `dry` from the parameters itself, so no double crosses the call.
- */
-function _writeInput(
-  this: DattorroReverb,
-  input: Float32Array[],
-  output: Float32Array[],
-  parameters: Record<string, Float32Array>,
-): void {
-  const dry = parameters.dry[0];
-  const left = output[0];
-  const right = output[1];
-
-  if (input.length >= 2) {
-    for (let i = 0; i < 128; i++) {
-      this._preDelay[this._preDelayWrite + i] = (input[0][i] + input[1][i]) * 0.5;
-      left[i] = input[0][i] * dry;
-      right[i] = input[1][i] * dry;
-    }
-  } else if (input.length === 1) {
-    this._preDelay.set(input[0], this._preDelayWrite);
-    for (let i = 0; i < 128; i++) {
-      left[i] = right[i] = input[0][i] * dry;
-    }
-  } else {
-    this._preDelay.fill(0, this._preDelayWrite, this._preDelayWrite + 128);
   }
 }
 
@@ -167,6 +142,15 @@ function _renderBlock(
   // ramped across the block; the reads are written out below.
   configureBuild(this, parameters);
   const buildLine = this._buildLine;
+  const buildLineRight = this._buildLineRight;
+  // R's chain, read in the loop below.
+  const buffers = this._buffers;
+  const writes = this._write;
+  const masks = this._mask;
+  const lengths = this._length;
+  const rightReads = this._rightReads;
+  let line: Float32Array;
+  let v: number;
   const buildMask = this._buildMask;
   const buildTime = this._buildTime;
   const buildTimeStep = this._buildTimeStep;
@@ -198,18 +182,24 @@ function _renderBlock(
   );
 
   for (let i = 0; i < 128; i++) {
-    const delayed =
-      this._preDelay[
-        (this._preDelayLength + this._preDelayWrite - preDelaySamples + i) % this._preDelayLength
-      ];
+    const delayedAt =
+      (this._preDelayLength + this._preDelayWrite - preDelaySamples + i) % this._preDelayLength;
+    const delayed = this._preDelay[delayedAt];
+    const delayedRight = this._preDelayRight[delayedAt];
 
+    // HOLD's input mute (`_inputGain`) on both channels, ahead of their
+    // filters and diffusers, so what either chain holds drains into the tank.
     this._inputLp += inputLp * (delayed * this._inputGain - this._inputLp);
     this._inputHp += inputHp * (this._inputLp - this._inputHp);
     const shaped = this._inputLp - this._inputHp;
+    this._inputLpRight += inputLp * (delayedRight * this._inputGain - this._inputLpRight);
+    this._inputHpRight += inputHp * (this._inputLpRight - this._inputHpRight);
+    const shapedRight = this._inputLpRight - this._inputHpRight;
 
-    // Pre-tank: four all-passes, the first pair at diffusion 1, second at 2.
-    // Each read leaves its sample in `_value`, and `_write1` stores `_value`;
-    // every expression is the one the returning reads were summed in.
+    // Pre-tank, L's chain (lines 0..3): four all-passes, the first pair at
+    // diffusion 1, second at 2. Each read leaves its sample in `_value`, and
+    // `_write1` stores `_value`; every expression is the one the returning
+    // reads were summed in.
     this._read(0, 0);
     this._value = shaped - diffuse1 * this._value;
     this._write1(0);
@@ -234,24 +224,55 @@ function _renderBlock(
     pre = this._value;
 
     this._read(3, 0);
-    // Build: the diffused sample into the Build line, then each side's taps
-    // read back from it, linear between samples as the tank's reads are, and
-    // summed at their gains. The left sum feeds the left loop (line 4) and the
-    // right the right loop (line 8), where the diffused sample fed both.
+    // L's diffused sample into its Build line.
     buildLine[buildWrite] = diffuse2 * pre + this._value;
+
+    // R's chain (lines 12..15): the same four all-passes at the same
+    // diffusions, on lines of their own lengths (INPUT_DELAYS_RIGHT). Its
+    // reads are written out, not called: each line is read once, linear
+    // between samples as `_read` reads it, since a line's sample is not
+    // written before both its reads (its length is over one sample), and the
+    // stages are L's expressions on those reads.
+    for (let k = 0; k < 4; k++) {
+      line = buffers[k + 12];
+      position = writes[k + 12] - lengths[k + 12];
+      whole = Math.floor(position);
+      a = line[whole & masks[k + 12]];
+      rightReads[k] = a + (line[(whole + 1) & masks[k + 12]] - a) * (position - whole);
+    }
+    v = shapedRight - diffuse1 * rightReads[0];
+    buffers[12][writes[12]] = v;
+    v = diffuse1 * (v - rightReads[1]) + rightReads[0];
+    buffers[13][writes[13]] = v;
+    v = diffuse1 * v + rightReads[1] - diffuse2 * rightReads[2];
+    buffers[14][writes[14]] = v;
+    v = diffuse2 * (v - rightReads[3]) + rightReads[2];
+    buffers[15][writes[15]] = v;
+    buildLineRight[buildWrite] = diffuse2 * v + rightReads[3];
+
+    // Build: each side's taps read back from its own line, linear between
+    // samples as the tank's reads are, and summed at their gains. L's sum
+    // feeds the right loop (line 8) and R's the left loop (line 4), so each
+    // side reaches first the loop its own output taps read most.
     let buildLeft = 0;
-    let buildRight = 0;
-    for (let t = 0; t < buildTime.length; t++) {
+    for (let t = 0; t < BUILD_TAPS_PER_SIDE; t++) {
       position = buildWrite - buildTime[t];
       whole = Math.floor(position);
       a = buildLine[whole & buildMask];
-      a = (a + (buildLine[(whole + 1) & buildMask] - a) * (position - whole)) * buildGain[t];
-      if (t < BUILD_TAPS_PER_SIDE) buildLeft += a;
-      else buildRight += a;
+      buildLeft +=
+        (a + (buildLine[(whole + 1) & buildMask] - a) * (position - whole)) * buildGain[t];
+    }
+    let buildRight = 0;
+    for (let t = BUILD_TAPS_PER_SIDE; t < buildTime.length; t++) {
+      position = buildWrite - buildTime[t];
+      whole = Math.floor(position);
+      a = buildLineRight[whole & buildMask];
+      buildRight +=
+        (a + (buildLineRight[(whole + 1) & buildMask] - a) * (position - whole)) * buildGain[t];
     }
     this._denormal = -this._denormal;
-    const splitLeft = buildLeft + this._denormal;
-    const splitRight = buildRight + this._denormal;
+    const splitLeft = buildRight + this._denormal;
+    const splitRight = buildLeft + this._denormal;
 
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
@@ -380,7 +401,7 @@ function _renderBlock(
       if (t < TAPS_PER_SIDE) left += sample;
       else right += sample;
     }
-    // Build's direct path: each side's tap sum, ahead of the tail.
+    // Build's direct path: each input's tap sum on its own side, ahead of the tail.
     left += buildLeft * direct;
     right += buildRight * direct;
 
@@ -417,7 +438,7 @@ function _renderBlock(
       this._write[line] = (this._write[line] + 1) & this._mask[line];
     }
     if (stepping) {
-      for (let line = FIRST_TANK_LINE; line < LINE_COUNT; line++) {
+      for (let line = FIRST_TANK_LINE; line < TANK_LINE_END; line++) {
         this._length[line] += this._lengthStep[line];
       }
       for (let t = 0; t < TAP_TIME.length; t++) {
@@ -438,4 +459,4 @@ function _renderBlock(
   return true;
 }
 
-export { poleCoefficients, _writeInput, _renderBlock };
+export { poleCoefficients, _renderBlock };

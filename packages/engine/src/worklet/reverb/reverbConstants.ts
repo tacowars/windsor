@@ -17,8 +17,21 @@
 /** Largest SIZE, and so the factor every tank buffer is over-allocated by. */
 const MAX_SIZE = 4;
 
-/** Pre-tank diffusers. Not scaled by SIZE: input smear is not room size. */
+/**
+ * Pre-tank diffusers, lines 0..3: the left input's chain. Not scaled by SIZE:
+ * input smear is not room size.
+ */
 const INPUT_DELAYS = [0.004771345, 0.003595309, 0.012734787, 0.009307483];
+
+/**
+ * The right input's diffusers (windsor#763), lines 12..15, after the tank so
+ * the tank keeps its numbers. Windsor's own lengths, chosen by measurement
+ * (`docs/research/2026-10-12-plate-stereo-input/`): each a little off its
+ * left counterpart, so the two chains decorrelate a centred source without
+ * changing how fast either one smears. Not scaled by SIZE, as INPUT_DELAYS
+ * are not.
+ */
+const INPUT_DELAYS_RIGHT = [0.005312, 0.003825, 0.011459, 0.008022];
 
 /** Tank, as [diffuse, long, diffuse, long] per loop. Lines 4..11. */
 const TANK_DELAYS = [
@@ -52,7 +65,9 @@ const TAP_SIGN = [1, 1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1];
 const TAPS_PER_SIDE = 7;
 
 const FIRST_TANK_LINE = 4;
-const LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length;
+/** One past the tank's last line, and the right input's first diffuser (windsor#763). */
+const TANK_LINE_END = FIRST_TANK_LINE + TANK_DELAYS.length;
+const LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length + INPUT_DELAYS_RIGHT.length;
 
 /** Shortest a scaled tank line may become, leaving room for the interpolators. */
 const MIN_LENGTH = 8;
@@ -129,12 +144,14 @@ const SLEEP_OUTPUT_FLOOR = 1e-7;
 export {
   MAX_SIZE,
   INPUT_DELAYS,
+  INPUT_DELAYS_RIGHT,
   TANK_DELAYS,
   TAP_TIME,
   TAP_LINE,
   TAP_SIGN,
   TAPS_PER_SIDE,
   FIRST_TANK_LINE,
+  TANK_LINE_END,
   LINE_COUNT,
   MIN_LENGTH,
   ANTI_DENORMAL,

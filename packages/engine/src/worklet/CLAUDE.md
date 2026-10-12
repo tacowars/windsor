@@ -229,11 +229,22 @@ this generated processor, including its second input and telemetry.
 `generated/reverb-processor.js` and checked by its own `reverb/tsconfig.json`:
 `reverbProcessor.ts` (the entry: `DattorroReverb`, its fields, the load
 sampler, `process`, the sleep, `registerProcessor`), `delayLines.ts` (allocation,
-the SIZE-scaled lengths and taps, the reads), `tank.ts` (`_writeInput` and
-`_renderBlock`, the awake render) and `reverbConstants.ts` (the tunables and the
-delay and tap tables). The delay lines and the tank are `this`-typed functions
+the SIZE-scaled lengths and taps, the reads), `plateInput.ts` (`_writeInput`,
+each input channel into its pre-delay ring), `tank.ts` (`_renderBlock`, the
+awake render) and `reverbConstants.ts` (the tunables and the
+delay and tap tables). The delay lines, the input write and the tank are `this`-typed functions
 installed on the processor's prototype, so each body is still the method the
 hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
+The input is stereo (windsor#763): L and R each have a pre-delay ring, input
+filter states, four diffusers and a Build line, at one set of controls. Lines
+0..3 are L's diffusers, 4..11 the tank (`FIRST_TANK_LINE` to `TANK_LINE_END`,
+the only lines Size scales) and 12..15 R's (`INPUT_DELAYS_RIGHT`). L's chain
+feeds the right loop (line 8) and R's the left (line 4), the half each side's
+output taps read most, and each Build sum goes to its own side of the wet
+output. R's chain is written out in the sample loop beside L's.
+`mixer/reverbStereo.test.ts` holds the sides, the mirror, the centre, the
+anti-phase ring, the live moves and the rates, and
+`mixer/plateStereoGraph.test.ts` two hard-panned parts through a group's Plate.
 Decay is an RT60 in seconds (windsor#748): `tankGains.ts` gives each tank
 line a gain point, set once a block from Decay and Size and ramped a sample at
 a time by the tank, through the measured correction in `reverbDecayTables.ts`,
@@ -247,14 +258,15 @@ prewarp is `fm/portableTangent.ts`'s `tanInPlace`, so an edit there rebuilds
 `reverb-processor.js` too. `mixer/reverbDecay.test.ts` holds the T30 to Decay
 and `mixer/reverbLowBand.test.ts` the band and the live moves.
 Build (windsor#761) is a multi-tap delay between the input diffusers and the
-tank, a tap set per side: `plateBuild.ts` allocates its line at construction
-for the longest spread at the running rate and, once a block, aims each tap's
-time and gain and the direct level at the smoothed `build` from
-`reverbBuildTables.ts` (tap times in seconds, the gain rows, the direct
-levels), ramped a sample at a time. The tap reads and sums are written out in
-the tank's sample loop, not called; each side's sum feeds its loop and goes
-to the wet output at the direct level. `mixer/reverbBuild.test.ts` holds the
-onset, the tail, the live moves and the rates.
+tank, a tap set per side: `plateBuild.ts` allocates its lines (one per input
+since windsor#763) at construction for the longest spread at the running rate
+and, once a block, aims each tap's time and gain and the direct level at the
+smoothed `build` from `reverbBuildTables.ts` (tap times in seconds, the gain
+rows, the direct levels), ramped a sample at a time. The tap reads and sums
+are written out in the tank's sample loop, not called; each side's sum feeds
+the opposite loop and goes to its own side of the wet output at the direct
+level. `mixer/reverbBuild.test.ts` holds the onset, the tail, the live moves
+and the rates.
 
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. The map of `fm/` (#644):
@@ -406,7 +418,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
-   twenty-one scenarios in the default, `sleep: false` and `settledSkip: false`
+   twenty-four scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

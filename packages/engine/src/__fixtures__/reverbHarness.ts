@@ -127,6 +127,10 @@ export interface ReverbInternals {
   _lowExtra: Float64Array;
   /** Build (windsor#761): the line, each tap's time in samples and gain, and the direct level now. */
   _buildLine: Float32Array;
+  /** The stereo input (windsor#763): the right input's Build line, and both pre-delay rings. */
+  _buildLineRight: Float32Array;
+  _preDelay: Float32Array;
+  _preDelayRight: Float32Array;
   _buildTime: Float64Array;
   _buildGain: Float64Array;
   _buildDirect: Float64Array;

@@ -53,6 +53,7 @@ var LoadSampler = class {
 // packages/engine/src/worklet/reverb/reverbConstants.ts
 var MAX_SIZE = 4;
 var INPUT_DELAYS = [4771345e-9, 3595309e-9, 0.012734787, 9307483e-9];
+var INPUT_DELAYS_RIGHT = [5312e-6, 3825e-6, 0.011459, 8022e-6];
 var TANK_DELAYS = [
   0.022579886,
   0.149625349,
@@ -83,7 +84,8 @@ var TAP_LINE = [9, 9, 10, 11, 5, 6, 7, 5, 5, 6, 7, 9, 10, 11];
 var TAP_SIGN = [1, 1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1];
 var TAPS_PER_SIDE = 7;
 var FIRST_TANK_LINE = 4;
-var LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length;
+var TANK_LINE_END = FIRST_TANK_LINE + TANK_DELAYS.length;
+var LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length + INPUT_DELAYS_RIGHT.length;
 var MIN_LENGTH = 8;
 var ANTI_DENORMAL = 1e-20;
 var HOLD_DECAY = 0.9999;
@@ -113,7 +115,7 @@ function _makeDelay(seconds, headroom) {
 }
 function _applySize(immediate) {
   const size = this._size;
-  for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
+  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
     this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * size);
   }
   for (let t = 0; t < TAP_TIME.length; t++) {
@@ -125,7 +127,7 @@ function _applySize(immediate) {
   for (let t = 0; t < TAP_TIME.length; t++) {
     if (Math.fround(this._tap[t] + this._tapStep[t]) !== this._tap[t]) stepping = true;
   }
-  for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
+  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
     if (immediate) this._length[i] = this._lengthTarget[i];
     this._lengthStep[i] = immediate ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
     if (Math.fround(this._length[i] + this._lengthStep[i]) !== this._length[i]) stepping = true;
@@ -208,6 +210,7 @@ function makeBuild(plate) {
   const capacity = Math.ceil(BUILD_SPREAD * sampleRate) + READ_REACH;
   const size = 2 ** Math.ceil(Math.log2(capacity));
   plate._buildLine = new Float32Array(size);
+  plate._buildLineRight = new Float32Array(size);
   plate._buildMask = size - 1;
   plate._buildWrite = 0;
   plate._buildTime = new Float64Array(BUILD_TAP_TIME.length);
@@ -258,6 +261,31 @@ function configureBuild(plate, parameters) {
   if (direct[2] !== 0) ramping = true;
   plate._buildPrimed = true;
   plate._buildRamping = ramping;
+}
+
+// packages/engine/src/worklet/reverb/plateInput.ts
+function _writeInput(input, output, parameters) {
+  const dry = parameters.dry[0];
+  const left = output[0];
+  const right = output[1];
+  const at = this._preDelayWrite;
+  if (input.length >= 2) {
+    this._preDelay.set(input[0], at);
+    this._preDelayRight.set(input[1], at);
+    for (let i = 0; i < 128; i++) {
+      left[i] = input[0][i] * dry;
+      right[i] = input[1][i] * dry;
+    }
+  } else if (input.length === 1) {
+    this._preDelay.set(input[0], at);
+    this._preDelayRight.set(input[0], at);
+    for (let i = 0; i < 128; i++) {
+      left[i] = right[i] = input[0][i] * dry;
+    }
+  } else {
+    this._preDelay.fill(0, at, at + 128);
+    this._preDelayRight.fill(0, at, at + 128);
+  }
 }
 
 // packages/engine/src/worklet/reverb/reverbDecayTables.ts
@@ -782,25 +810,6 @@ function poleCoefficients(parameters, poles) {
     poles[k] = 1 - Math.exp(-2 * Math.PI * Math.min(hz, sampleRate * 0.49) / sampleRate);
   }
 }
-function _writeInput(input, output, parameters) {
-  const dry = parameters.dry[0];
-  const left = output[0];
-  const right = output[1];
-  if (input.length >= 2) {
-    for (let i = 0; i < 128; i++) {
-      this._preDelay[this._preDelayWrite + i] = (input[0][i] + input[1][i]) * 0.5;
-      left[i] = input[0][i] * dry;
-      right[i] = input[1][i] * dry;
-    }
-  } else if (input.length === 1) {
-    this._preDelay.set(input[0], this._preDelayWrite);
-    for (let i = 0; i < 128; i++) {
-      left[i] = right[i] = input[0][i] * dry;
-    }
-  } else {
-    this._preDelay.fill(0, this._preDelayWrite, this._preDelayWrite + 128);
-  }
-}
 function _renderBlock(inputs, outputs, parameters) {
   const output = outputs[0];
   const wet = parameters.wet[0] * OUTPUT_TRIM;
@@ -841,6 +850,14 @@ function _renderBlock(inputs, outputs, parameters) {
   const tank2 = parameters.diffusionTank2[0];
   configureBuild(this, parameters);
   const buildLine = this._buildLine;
+  const buildLineRight = this._buildLineRight;
+  const buffers = this._buffers;
+  const writes = this._write;
+  const masks = this._mask;
+  const lengths = this._length;
+  const rightReads = this._rightReads;
+  let line;
+  let v;
   const buildMask = this._buildMask;
   const buildTime = this._buildTime;
   const buildTimeStep = this._buildTimeStep;
@@ -866,10 +883,15 @@ function _renderBlock(inputs, outputs, parameters) {
     (shortest - MIN_LENGTH) / 2
   );
   for (let i = 0; i < 128; i++) {
-    const delayed = this._preDelay[(this._preDelayLength + this._preDelayWrite - preDelaySamples + i) % this._preDelayLength];
+    const delayedAt = (this._preDelayLength + this._preDelayWrite - preDelaySamples + i) % this._preDelayLength;
+    const delayed = this._preDelay[delayedAt];
+    const delayedRight = this._preDelayRight[delayedAt];
     this._inputLp += inputLp * (delayed * this._inputGain - this._inputLp);
     this._inputHp += inputHp * (this._inputLp - this._inputHp);
     const shaped = this._inputLp - this._inputHp;
+    this._inputLpRight += inputLp * (delayedRight * this._inputGain - this._inputLpRight);
+    this._inputHpRight += inputHp * (this._inputLpRight - this._inputHpRight);
+    const shapedRight = this._inputLpRight - this._inputHpRight;
     this._read(0, 0);
     this._value = shaped - diffuse1 * this._value;
     this._write1(0);
@@ -894,19 +916,39 @@ function _renderBlock(inputs, outputs, parameters) {
     pre = this._value;
     this._read(3, 0);
     buildLine[buildWrite] = diffuse2 * pre + this._value;
+    for (let k = 0; k < 4; k++) {
+      line = buffers[k + 12];
+      position = writes[k + 12] - lengths[k + 12];
+      whole = Math.floor(position);
+      a = line[whole & masks[k + 12]];
+      rightReads[k] = a + (line[whole + 1 & masks[k + 12]] - a) * (position - whole);
+    }
+    v = shapedRight - diffuse1 * rightReads[0];
+    buffers[12][writes[12]] = v;
+    v = diffuse1 * (v - rightReads[1]) + rightReads[0];
+    buffers[13][writes[13]] = v;
+    v = diffuse1 * v + rightReads[1] - diffuse2 * rightReads[2];
+    buffers[14][writes[14]] = v;
+    v = diffuse2 * (v - rightReads[3]) + rightReads[2];
+    buffers[15][writes[15]] = v;
+    buildLineRight[buildWrite] = diffuse2 * v + rightReads[3];
     let buildLeft = 0;
-    let buildRight = 0;
-    for (let t = 0; t < buildTime.length; t++) {
+    for (let t = 0; t < BUILD_TAPS_PER_SIDE; t++) {
       position = buildWrite - buildTime[t];
       whole = Math.floor(position);
       a = buildLine[whole & buildMask];
-      a = (a + (buildLine[whole + 1 & buildMask] - a) * (position - whole)) * buildGain[t];
-      if (t < BUILD_TAPS_PER_SIDE) buildLeft += a;
-      else buildRight += a;
+      buildLeft += (a + (buildLine[whole + 1 & buildMask] - a) * (position - whole)) * buildGain[t];
+    }
+    let buildRight = 0;
+    for (let t = BUILD_TAPS_PER_SIDE; t < buildTime.length; t++) {
+      position = buildWrite - buildTime[t];
+      whole = Math.floor(position);
+      a = buildLineRight[whole & buildMask];
+      buildRight += (a + (buildLineRight[whole + 1 & buildMask] - a) * (position - whole)) * buildGain[t];
     }
     this._denormal = -this._denormal;
-    const splitLeft = buildLeft + this._denormal;
-    const splitRight = buildRight + this._denormal;
+    const splitLeft = buildRight + this._denormal;
+    const splitRight = buildLeft + this._denormal;
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
     this._read(11, 0);
@@ -1050,12 +1092,12 @@ function _renderBlock(inputs, outputs, parameters) {
     if (this._excPhase >= 1) this._excPhase -= 1;
     this._excPhase2 += excRate * 1.0007;
     if (this._excPhase2 >= 1) this._excPhase2 -= 1;
-    for (let line = 0; line < LINE_COUNT; line++) {
-      this._write[line] = this._write[line] + 1 & this._mask[line];
+    for (let line2 = 0; line2 < LINE_COUNT; line2++) {
+      this._write[line2] = this._write[line2] + 1 & this._mask[line2];
     }
     if (stepping) {
-      for (let line = FIRST_TANK_LINE; line < LINE_COUNT; line++) {
-        this._length[line] += this._lengthStep[line];
+      for (let line2 = FIRST_TANK_LINE; line2 < TANK_LINE_END; line2++) {
+        this._length[line2] += this._lengthStep[line2];
       }
       for (let t = 0; t < TAP_TIME.length; t++) {
         this._tap[t] += this._tapStep[t];
@@ -1106,12 +1148,14 @@ var DattorroReverb = class extends AudioWorkletProcessor {
   constructor(options) {
     super(options);
     this._inputLp = this._inputHp = NaN;
+    this._inputLpRight = this._inputHpRight = NaN;
     this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = this._build = NaN;
     this._value = this._offset = NaN;
     this._cross = this._rt60 = this._cellAt = NaN;
-    this._preDelayLength = sampleRate + (128 - sampleRate % 128);
+    this._preDelayLength = Math.ceil(MAX_PRE_DELAY * sampleRate / 128) * 128 + 128;
     this._preDelay = new Float32Array(this._preDelayLength);
+    this._preDelayRight = new Float32Array(this._preDelayLength);
     this._preDelayWrite = 0;
     this._buffers = [];
     this._write = new Int32Array(LINE_COUNT);
@@ -1122,10 +1166,14 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._lengthStep = new Float32Array(LINE_COUNT);
     INPUT_DELAYS.forEach((seconds) => this._makeDelay(seconds, 1));
     TANK_DELAYS.forEach((seconds) => this._makeDelay(seconds, MAX_SIZE));
+    INPUT_DELAYS_RIGHT.forEach((seconds) => this._makeDelay(seconds, 1));
     this._tap = new Float32Array(TAP_TIME.length);
     this._tapStep = new Float32Array(TAP_TIME.length);
     this._inputLp = 0;
     this._inputHp = 0;
+    this._inputLpRight = 0;
+    this._inputHpRight = 0;
+    this._rightReads = new Float64Array(INPUT_DELAYS_RIGHT.length);
     this._dampLp = new Float64Array(2);
     this._dampHp = new Float64Array(2);
     this._poles = new Float64Array(4);
@@ -1200,9 +1248,12 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     for (let line = 0; line < LINE_COUNT; line++) this._buffers[line].fill(0);
     this._write.fill(0);
     this._preDelay.fill(0);
+    this._preDelayRight.fill(0);
     this._preDelayWrite = 0;
     this._inputLp = 0;
     this._inputHp = 0;
+    this._inputLpRight = 0;
+    this._inputHpRight = 0;
     this._dampLp[0] = this._dampLp[1] = 0;
     this._dampHp[0] = this._dampHp[1] = 0;
     this._excPhase = 0;
@@ -1214,6 +1265,7 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._lowExtraTarget.fill(0);
     this._lowState.fill(0);
     this._buildLine.fill(0);
+    this._buildLineRight.fill(0);
     this._buildWrite = 0;
     this._buildPrimed = false;
     this._quiet = 0;

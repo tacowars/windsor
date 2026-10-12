@@ -21,6 +21,8 @@ import {
 } from '../__fixtures__/reverbHarness';
 
 const loaded = loadReverb();
+const SR = loaded.sampleRate;
+const BLOCK = 128;
 
 describe('the tail', () => {
   it('rings on after the input stops, in stereo, without going non-finite', () => {
@@ -116,10 +118,21 @@ describe('stability', () => {
     const result = renderReverb(loaded, 30, noiseBurst(0.5), { hold: 1 });
 
     expect(result.nonFinite).toBe(0);
-    const early = rmsAt(result, 5);
+    // Over a second, not one block: a held tank's few modes beat, and one
+    // block's RMS swings with them. Under windsor#763's stereo input a block
+    // at 29 s reads 0.62 of the one at 5 s, and 0.43 with one right chain
+    // tried, while a second's RMS reads 0.70 in every case, as on main.
+    const second = (at: number): number => {
+      const blocks = result.trace.slice(
+        Math.floor((at * SR) / BLOCK),
+        Math.floor(((at + 1) * SR) / BLOCK),
+      );
+      return Math.sqrt(blocks.reduce((sum, rms) => sum + rms * rms, 0) / blocks.length);
+    };
+    const early = second(5);
     expect(early).toBeGreaterThan(0.01);
     // Freeze is meant to be indefinite: still within a factor of two at 30 s.
-    expect(rmsAt(result, 29)).toBeGreaterThan(early * 0.5);
+    expect(second(28.9)).toBeGreaterThan(early * 0.5);
   });
 
   /**
