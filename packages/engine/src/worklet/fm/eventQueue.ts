@@ -48,8 +48,16 @@
  * the render, called every quantum, is optimised again within a few hundred.
  * `post` reads no field, so it costs nothing in any tier.
  *
- * A slot drops its message once the message is taken, admitted, cleared or
- * moved down (windsor#262), so a burst or a cancelled run of note-ons does
+ * A queued note-on can be cancelled (windsor#759): a note-off applied for a
+ * handle no voice plays drops that handle's note-on still waiting, booked
+ * ahead (a ratchet's last hit) and then overtaken by its own release, which
+ * would otherwise start after it and never end. The render finds the event,
+ * since only it reads a message, and `removeAt` drops it, moving the later
+ * events down; `eventQueue.test.ts` and `synth/fmProcessorQueuedNoteOff.test.ts`
+ * pin it.
+ *
+ * A slot drops its message once the message is taken, admitted, cleared,
+ * removed or moved down (windsor#262), so a burst or a cancelled run of note-ons does
  * not stay alive until a later schedule overwrites its slots. The empty value
  * is `undefined`, written over the reference: `items` holds objects
  * (PACKED_ELEMENTS), which holds `undefined` with no elements-kind
@@ -166,6 +174,22 @@ class EventQueue {
     for (let i = tail; i > lo; i--) items[i] = items[i - 1];
     items[lo] = event;
     frames[lo] = frame;
+  }
+
+  /**
+   * Drop the event at `index`, in [head, tail): the later events and their
+   * frames move down one slot, the frames as one `copyWithin`, read in place,
+   * and the slot freed at the tail drops its message. It reads no message:
+   * the render found the event (windsor#759). Allocates nothing.
+   */
+  removeAt(index: number): void {
+    const items = this.items;
+    const tail = this.tail - 1;
+    this.frames.copyWithin(index, index + 1, tail + 1);
+    for (let i = index; i < tail; i++) items[i] = items[i + 1];
+    items[tail] = undefined;
+    this.tail = tail;
+    if (this.head === tail) this.head = this.tail = 0;
   }
 
   /**

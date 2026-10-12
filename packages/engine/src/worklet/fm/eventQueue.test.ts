@@ -216,6 +216,36 @@ describe('the FM part event queue', () => {
     takeDue(q, Infinity);
     expect(q.items.every((slot) => slot === undefined)).toBe(true);
   });
+
+  it('removes one event, keeping the rest in frame order with their frames and releasing the freed slot (windsor#759)', () => {
+    const q = new EventQueue(8);
+    for (let id = 0; id < 5; id++) insert(q, id, 2 ** 32 + id * 10);
+    takeDue(q, 2 ** 32);
+    q.removeAt(q.head + 1);
+    expect(q.tail - q.head).toBe(3);
+    expect(q.items[q.tail]).toBeUndefined();
+    insert(q, 5, 2 ** 32 + 15);
+    expect(takeDue(q, Infinity)).toEqual([
+      [1, 2 ** 32 + 10],
+      [5, 2 ** 32 + 15],
+      [3, 2 ** 32 + 30],
+      [4, 2 ** 32 + 40],
+    ]);
+    expect(q.items.every((slot) => slot === undefined)).toBe(true);
+  });
+
+  it('empties when it removes its last event, and its room holds a full burst again', () => {
+    const q = new EventQueue(4);
+    for (let id = 0; id < 3; id++) insert(q, id, id);
+    takeDue(q, 1);
+    q.removeAt(q.head);
+    expect(q.empty).toBe(true);
+    expect([q.head, q.tail]).toEqual([0, 0]);
+    expect(q.items.every((slot) => slot === undefined)).toBe(true);
+    for (let id = 0; id < 4; id++) insert(q, id, 4 - id);
+    expect(q.frames.length).toBe(4);
+    expect(takeDue(q, Infinity).map(([id]) => id)).toEqual([3, 2, 1, 0]);
+  });
 });
 
 describe('the FM part event queue admitting a one-quantum burst (windsor#273)', () => {

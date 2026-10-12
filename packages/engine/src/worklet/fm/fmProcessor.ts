@@ -16,7 +16,8 @@
  * notes, live retune, load sampling, the song lanes' slot map), the
  * fader's ramp across a quantum (windsor#346), the frame-stamped event queue, the
  * note map, and `renderBlock`, which admits the notes posted since the last
- * quantum, reads each message as it takes it (windsor#270), and walks each
+ * quantum, reads each message as it takes it (windsor#270), cancels a
+ * queued note-on whose note-off lands first (windsor#759), and walks each
  * active voice up to the next event or control boundary, each voice's
  * control interval its own (windsor#326). Which voice a note
  * takes is `voiceAllocation.ts`. Everything a voice does is
@@ -230,8 +231,6 @@ class FmPartProcessor extends AudioWorkletProcessor {
         this.liveRetune = !!msg.enabled;
         break;
       case 'noteOn':
-        this.schedule(msg);
-        break;
       case 'noteOff':
         this.schedule(msg);
         break;
@@ -392,15 +391,22 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return false;
   }
 
-  /** Release every voice the note map holds under handle `id`, and drop them from it. */
-  noteOffId(id: number): void {
+  /**
+   * Release every voice the note map holds under handle `id`, and drop them
+   * from it. False when it held none (windsor#759: the render then cancels
+   * the handle's note-on still queued).
+   */
+  noteOffId(id: number): boolean {
     const vs = this.voices;
+    let released = false;
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
       if (!v.keyed || v.voiceId !== id) continue;
       v.keyed = false;
       this.releaseVoice(v);
+      released = true;
     }
+    return released;
   }
 
   /** Note-off for one voice: a dormant voice's release is silence, so it just ends (#547). */
@@ -505,7 +511,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
           this.stepModIn = ev.stepMod || null;
           this.noteOn(id);
           this.stepModIn = null; // the message's array, not kept alive (windsor#262)
-        } else if (ev.type === 'noteOff') this.noteOffId(id);
+        } else if (ev.type === 'noteOff' && !this.noteOffId(id)) {
+          // No voice plays the handle: its note-on, booked ahead and
+          // overtaken by its own note-off, is dropped from the queue, or it
+          // would start with no release to come (windsor#759). The scan
+          // reads messages, so it stays here, in the render.
+          let k = q.head;
+          while (k < q.tail && !(q.items[k]!.type === 'noteOn' && q.items[k]!.id === id)) k++;
+          if (k < q.tail) q.removeAt(k);
+        }
       }
 
       // Render up to the next event, the next control boundary, or block end.
