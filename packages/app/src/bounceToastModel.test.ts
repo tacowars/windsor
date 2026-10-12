@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BounceSummary } from '@windsor/engine';
 import { bounceToRoll } from '@windsor/engine';
-import { BOUNCE_SLOT, gridSpec } from '@windsor/engine/__fixtures__/bounceRig';
+import { BOUNCE_SLOT, gridNote, gridSpec, REST } from '@windsor/engine/__fixtures__/bounceRig';
 import { ACID_SAW, bounceDocument } from '@windsor/engine/__fixtures__/bounceToRollRig';
 import { bounceRefusalText, bounceSuccessText } from './bounceToastModel';
 
@@ -22,13 +22,37 @@ const NOTHING_LOST: BounceSummary = {
 };
 
 describe('the success toast', () => {
-  it('reads the Acid Saw bounce as the engine sums it', () => {
+  it('reads the Acid Saw bounce as the engine sums it: its accents written, nothing lost', () => {
     const doc = bounceDocument(gridSpec(ACID_SAW, { accentVelocity: 0.2, accentMod: 1 }), {
       preset: 'acid-saw',
     });
     const result = bounceToRoll(doc, BOUNCE_SLOT);
     expect(result.ok && bounceSuccessText(result.summary)).toBe(
-      'Bounced to Roll: 12 notes in 1 region · 4 accents lost their mod',
+      'Bounced to Roll: 12 notes in 1 region',
+    );
+  });
+
+  it('reads ratchets one note plays as those notes, nothing rounded or lost', () => {
+    // A ×4 at 1/16 then a rest: eight in the one-bar loop, each one note ×4.
+    const steps = [gridNote(0, { ratchet: 4 }), REST];
+    const result = bounceToRoll(bounceDocument(gridSpec(steps)), BOUNCE_SLOT);
+    expect(result.ok && bounceSuccessText(result.summary)).toBe(
+      'Bounced to Roll: 8 notes in 1 region',
+    );
+  });
+
+  it('says what a fallback lost: accents baked where a region’s differ, hits a fallen-back ratchet merged', () => {
+    const summary: BounceSummary = {
+      ...NOTHING_LOST,
+      notes: 12,
+      regions: 1,
+      ticksRounded: 5,
+      ratchetHitsLost: 1,
+      accentsLostMod: 4,
+    };
+    expect(bounceSuccessText(summary)).toBe(
+      'Bounced to Roll: 12 notes in 1 region · 5 ticks rounded · 1 ratchet hit lost · ' +
+        '4 accents lost their mod',
     );
   });
 

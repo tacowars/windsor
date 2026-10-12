@@ -1,7 +1,10 @@
 /**
  * Bounce to Roll's render against the record's worked examples (windsor#740,
  * `docs/log/2026-10-11-bounce-to-roll.md`): the velocity table, the Acid
- * Saw bar and its slide over the bar line, and the Arp's skip take.
+ * Saw bar and its slide over the bar line, and the Arp's skip take. Since
+ * windsor#755 (record `2026-10-12-roll-note-accent-and-ratchet` decision
+ * 11) an accent is written as `accent` at its level without the bump, which
+ * its region's roll plays back, so nothing is baked or lost.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -70,15 +73,17 @@ describe('the Acid Saw bar (decision 5’s first example)', () => {
     expect(notes.map(span)).toEqual(bars);
   });
 
-  it('plays the eight plain notes at the part’s 0.8 and the four accents at 1, each losing its mod', () => {
+  it('writes all twelve at the part’s 0.8, the four accents marked to play the roll’s 0.2 and 1', () => {
     for (const note of notes.slice(0, ACID_BAR.length)) {
       const accented = ACCENTED_TICKS.includes(note.tick);
-      expect(note.velocity).toBe(accented ? 1 : 0.8);
-      expect(note.marks.accentMod).toBe(accented);
+      expect(note.velocity).toBe(0.8);
+      expect(note.accent).toBe(accented ? true : undefined);
+      expect(note.marks.accentMod).toBe(false);
     }
+    expect(render(acidSong()).accent).toEqual({ velocity: 0.2, mod: 1 });
     expect(counts).toMatchObject({
       notes: 48,
-      accentsLostMod: 16,
+      accentsLostMod: 0,
       ticksRounded: 0,
       ratchetHitsLost: 0,
       repeatsTrimmed: 0,
@@ -101,28 +106,30 @@ describe('the Acid Saw bar (decision 5’s first example)', () => {
   });
 });
 
-describe('the velocity table (decision 4)', () => {
-  it('a Grid at Vel 0.8 with a bump of 0.3 plays 0.8 plain and 1.0 accented', () => {
+describe('the velocity table (decision 4), its accents written as `accent` (windsor#755)', () => {
+  it('a Grid at Vel 0.8 with a bump of 0.3: both written at 0.8, the accent’s 1.0 played back by the roll', () => {
     const song = bounceSong(
       gridSpec([gridNote(0), gridNote(0, { accent: true })], { accentVelocity: 0.3 }),
     );
-    const [plain, accented] = render(song).notes;
+    const { notes, accent } = render(song);
+    const [plain, accented] = notes;
     expect(plain?.velocity).toBe(0.8);
-    expect(accented?.velocity).toBe(1);
-    // Rescaled by the highest level, 1.0, both are given back exactly.
-    expect(1 * (plain!.velocity / 1)).toBe(0.8);
+    expect(accented).toMatchObject({ velocity: 0.8, accent: true });
+    expect(accent).toEqual({ velocity: 0.3, mod: 1 });
+    expect(Math.min(1, accented!.velocity + accent!.velocity)).toBe(1);
   });
 
-  it('at Vel 0.5 an accent plays 0.8, and the plain note written 0.5 ÷ 0.8 plays back 0.5', () => {
+  it('at Vel 0.5 the accent is written at 0.5 and plays 0.5 + 0.3 = 0.8; the Vel stays', () => {
     const steps = [gridNote(0), gridNote(0, { accent: true })];
     const song = bounceSong(gridSpec(steps, { accentVelocity: 0.3 }), { velocity: 0.5 });
-    const [plain, accented] = render(song).notes;
-    expect(accented?.velocity).toBe(0.8);
-    expect(plain!.velocity / accented!.velocity).toBe(0.625);
-    expect(accented!.velocity * (plain!.velocity / accented!.velocity)).toBe(0.5);
+    const { notes, accent } = render(song);
+    const [plain, accented] = notes;
+    expect(plain?.velocity).toBe(0.5);
+    expect(accented).toMatchObject({ velocity: 0.5, accent: true });
+    expect(accented!.velocity + accent!.velocity).toBe(0.8);
   });
 
-  it('a Figure cell at 0.5 under Vel 0.8, accented, plays 0.7, which 0.8 × (0.7 ÷ 0.8) gives back', () => {
+  it('a Figure cell at 0.5 under Vel 0.8, accented, is written at 0.4 and plays 0.4 + 0.3 = 0.7', () => {
     const figure: FigureSpec = {
       kind: 'figure',
       ...DEFAULT_FIGURE_CONFIG,
@@ -130,11 +137,10 @@ describe('the velocity table (decision 4)', () => {
       length: 1,
       accentVelocity: 0.3,
     };
-    const [note] = render(bounceSong(figure)).notes;
-    expect(note?.velocity).toBe(0.7);
-    expect(note?.own).toBe(0.5);
-    expect(note!.velocity / 0.8).toBe(0.8749999999999999);
-    expect(0.8 * (note!.velocity / 0.8)).toBe(0.7);
+    const { notes, accent } = render(bounceSong(figure));
+    const [note] = notes;
+    expect(note).toMatchObject({ velocity: 0.4, own: 0.5, accent: true });
+    expect(note!.velocity + accent!.velocity).toBe(0.7);
   });
 });
 

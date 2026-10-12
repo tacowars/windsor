@@ -36,33 +36,38 @@ const acidDocument = (steps = ACID_SAW) =>
   bounceDocument(gridSpec(steps, { accentVelocity: 0.2, accentMod: 1 }), { preset: 'acid-saw' });
 
 describe('the record’s worked examples', () => {
-  it('bounces the Acid Saw 4-bar region to a 1-bar loop of 12 notes, its Vel at 1.0, 4 accents losing their mod', () => {
+  it('bounces the Acid Saw 4-bar region to a 1-bar loop of 12 notes, its 4 accents flagged and its Vel kept at 0.8', () => {
     const doc = acidDocument();
     const result = bounceToRoll(doc, BOUNCE_SLOT);
     const part = bounced(doc, result);
-    expect(part.velocity).toBe(1);
+    expect(part.velocity).toBe(0.8);
     expect(part.sequencer).toEqual({ kind: 'roll', loopTicks: TICKS_PER_BAR, notes: [] });
     const roll = rollOf(part);
     expect(roll.loopTicks).toBe(TICKS_PER_BAR);
     expect(roll.notes).toHaveLength(12);
-    // The eight plain notes keep the part's 0.8; the four accents play 1, written as no key.
+    // Every note plays the part's 0.8, written as no key; the four accents add the roll's amounts.
     expect(roll.notes.slice(0, 3)).toEqual([
-      { tick: 0, ticks: 6, pitch: 33 },
-      { tick: 6, ticks: 7, pitch: 33, velocity: 0.8 },
-      { tick: 12, ticks: 12, pitch: 45, velocity: 0.8 },
+      { tick: 0, ticks: 6, pitch: 33, accent: true },
+      { tick: 6, ticks: 7, pitch: 33 },
+      { tick: 12, ticks: 12, pitch: 45 },
     ]);
-    expect(roll.notes.filter((note) => note.velocity === undefined)).toHaveLength(4);
+    expect(roll.notes.filter((note) => note.accent).map((note) => note.tick)).toEqual([
+      0, 36, 54, 78,
+    ]);
+    // The amounts are the defaults, 0.2 and 1, which the roll writes as no key.
+    expect(roll.accentVelocity).toBeUndefined();
+    expect(roll.accentMod).toBeUndefined();
     expect(result.ok && result.summary).toMatchObject({
       notes: 12,
       regions: 1,
-      accentsLostMod: 4,
+      accentsLostMod: 0,
       ticksRounded: 0,
       ratchetHitsLost: 0,
       repeatsTrimmed: 0,
       euclidTailsCut: 0,
       silenced: 0,
       lanesBaked: [],
-      velocity: 1,
+      velocity: 0.8,
       followers: [],
     });
   });

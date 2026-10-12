@@ -61,14 +61,15 @@ describe('a part at Vel 0', () => {
     expect(result.ok && result.summary.silenced).toBe(0);
   });
 
-  it('with an accent, rises to the bump and silences the plain notes, counting them', () => {
+  it('with an accent written as `accent`, keeps the Vel at 0 and silences nothing (windsor#755)', () => {
     const grid = gridSpec([gridNote(0, { accent: true }), gridNote(2)], { accentVelocity: 0.3 });
     const { roll, part, result } = bouncedRoll(grid, 0);
-    expect(part.velocity).toBe(0.3);
+    expect(part.velocity).toBe(0);
+    expect(roll).toMatchObject({ accentVelocity: 0.3 });
     expect(roll.notes.slice(0, 2)).toEqual([
-      { tick: 0, ticks: 6, pitch: 33 },
-      { tick: 6, ticks: 6, pitch: 36, velocity: 0 },
+      { tick: 0, ticks: 6, pitch: 33, accent: true },
+      { tick: 6, ticks: 6, pitch: 36 },
     ]);
-    expect(result.ok && result.summary.silenced).toBe(roll.notes.length / 2);
+    expect(result.ok && result.summary.silenced).toBe(0);
   });
 });

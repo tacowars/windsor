@@ -9,7 +9,10 @@
  * (`bounceRenderCapture.ts`), its notes are put on the tick grid by
  * decision 4's rules (`bounceRenderNotes.ts`), and its step offsets become
  * envelopes (`bounceRenderEnvelopes.ts`). Whether an onset cuts another
- * pitch is read from the part's patch as the player resolves it.
+ * pitch is read from the part's patch as the player resolves it. Since
+ * windsor#755 a ratchet one note plays exactly is written as that note
+ * (`bounceRenderRatchets.ts`), and the region's accents as `accent` with
+ * the amounts its roll plays (`bounceRenderAccents.ts`).
  *
  * Not here, and the bounce's: the loop search, the note and loop caps, the
  * Vel rescale across regions, removing the sequencer lanes, the canon's
@@ -18,6 +21,7 @@
  */
 import type { Arrangement, MusicPart } from './arrangement';
 import { partLabel, presetFor, validateArrangement, type PresetTable } from './arrangementValidate';
+import { settleAccents } from './bounceRenderAccents';
 import { captureRegion } from './bounceRenderCapture';
 import { stepModEnvelopes } from './bounceRenderEnvelopes';
 import { writeNotes } from './bounceRenderNotes';
@@ -26,21 +30,25 @@ import type { BounceCounts, BounceNote, BounceRegion } from './bounceRenderTypes
 import { partGateConfig } from './partGateConfig';
 import type { SeqField } from '../sequencing/regionGate';
 
-/** Decision 8's counts over `notes`: a region's, or the notes a loop keeps of it. */
-export function bounceCounts(notes: readonly BounceNote[]): BounceCounts {
+/**
+ * Decision 8's counts over `notes`: a region's, or the notes a loop keeps of
+ * it. A note carrying `accent` plays `bump` over its velocity (its region's
+ * `accentVelocity`), so it counts at velocity 0 only where both are 0.
+ */
+export function bounceCounts(notes: readonly BounceNote[], bump = 0): BounceCounts {
   let ticksRounded = 0;
   let ratchetHitsLost = 0;
   let accentsLostMod = 0;
   let repeatsTrimmed = 0;
   let euclidTailsCut = 0;
   let zeroVelocity = 0;
-  for (const { marks, velocity } of notes) {
+  for (const { marks, velocity, accent } of notes) {
     ticksRounded += marks.rounded;
     ratchetHitsLost += marks.lost;
     accentsLostMod += Number(marks.accentMod);
     repeatsTrimmed += Number(marks.trimmed);
     euclidTailsCut += Number(marks.tailCut);
-    zeroVelocity += Number(velocity === 0);
+    zeroVelocity += Number(velocity + (accent ? bump : 0) === 0);
   }
   return {
     notes: notes.length,
@@ -80,19 +88,21 @@ export function renderBounceRegion(
   const region = part.regions[regionIndex];
   if (!region) throw new RangeError(`${where}: no region ${regionIndex}`);
   const { mono } = presetFor(presets, where, part.preset);
-  const { notes: played, clock } = captureRegion(arrangement, slot, region);
+  const { notes: played, clock, ratchetClock } = captureRegion(arrangement, slot, region);
   const written = writeNotes(played, {
     start: region.start,
     duration: region.duration,
     mono,
     clock,
+    ratchetClock,
   });
-  const notes = written.map(({ note }) => note);
+  const { notes, accent } = settleAccents(written);
   const onsets = written.map(({ note, stepMod }) => ({ tick: note.tick, stepMod }));
   return {
     notes,
+    accent,
     envelopes: stepModEnvelopes(onsets),
-    counts: bounceCounts(notes),
+    counts: bounceCounts(notes, accent?.velocity),
     seqLanes: seqLanesRead(arrangement, part),
   };
 }

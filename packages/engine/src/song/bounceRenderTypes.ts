@@ -2,7 +2,10 @@
  * What Bounce to Roll's render hands back for one region (windsor#740,
  * record `2026-10-11-bounce-to-roll` decisions 3, 4 and 8), and what it
  * captures on the way. The render is `bounceRender.ts`; the loop search,
- * the caps and the Vel rescale across regions read these next.
+ * the caps and the Vel rescale across regions read these next. Since
+ * windsor#755 (record `2026-10-12-roll-note-accent-and-ratchet` decision
+ * 11) a note may carry an accent and a ratchet, and a region its roll's
+ * accent amounts.
  */
 import type { SeqField } from '../sequencing/regionGate';
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
@@ -22,7 +25,11 @@ export interface BounceMarks {
   readonly rounded: number;
   /** Ratchet hits that rounded onto its onset tick and were merged into it, unheard. */
   readonly lost: number;
-  /** It was accented with a mod the Roll cannot send (`accentMod` above 0). */
+  /**
+   * Its accent was baked into its velocity, not written as `accent`, and
+   * its mod (above 0) is lost: its region's accents differ, or it shares
+   * its onset with another note.
+   */
   readonly accentMod: boolean;
   /** It was held into a later onset of its own pitch and trimmed there. */
   readonly trimmed: boolean;
@@ -33,10 +40,16 @@ export interface BounceMarks {
 /**
  * One rendered note: a Roll note in the region's local ticks, at the
  * velocity the part played (`partNoteOn`'s, before the Vel rescale across
- * every region, which is the bounce's).
+ * every region, which is the bounce's). An `accent` plays its region's
+ * amounts (`BounceRegion.accent`); a `ratchet` plays its hits as the
+ * generator did.
  */
 export interface BounceNote extends RollNote {
-  /** What the part played: its Vel × the event's velocity, plus an accent's bump, at most 1. */
+  /**
+   * What the part played: its Vel × the event's velocity, plus an accent's
+   * bump, at most 1. A note carrying `accent` holds its level without the
+   * bump, which the Roll adds back as it plays.
+   */
   readonly velocity: number;
   /**
    * The event's own velocity, a Figure cell's, else 1: what a part Vel of 0
@@ -58,10 +71,21 @@ export interface BounceCounts {
   readonly zeroVelocity: number;
 }
 
+/** An accent's velocity bump and per-note mod, as a generator's note-on carries them. */
+export interface AccentAmounts {
+  readonly velocity: number;
+  readonly mod: number;
+}
+
 /** One region rendered as it plays from its start. */
 export interface BounceRegion {
   /** Sorted by tick, then pitch, as a Roll holds them; no two of one pitch on one tick. */
   readonly notes: readonly BounceNote[];
+  /**
+   * The amounts every note's `accent` plays: the region's roll's
+   * `accentVelocity` and `accentMod`. Null when no note carries one.
+   */
+  readonly accent: AccentAmounts | null;
   /** The step-mod rows as clip envelopes, one per row that moved on some note. */
   readonly envelopes: readonly RollEnvelope[];
   readonly counts: BounceCounts;
@@ -81,10 +105,17 @@ export interface PlayedNote {
   /** Where it is released: a `trigger`'s hold, or the note-off that let it go; null while held. */
   off: number | null;
   readonly velocity: number;
+  /** What it would have played without its accent: the part's Vel × `own`. */
+  readonly plain: number;
   readonly own: number;
-  /** The mod its accent sent, 0 without one. */
-  readonly mod: number;
+  /** Its accent's bump and mod, as its event carried them; undefined unaccented. */
+  readonly accent: AccentAmounts | undefined;
   readonly slide: boolean;
   /** Its step's offsets, one per voice target row; absent when every lane read 0. */
   readonly stepMod: readonly number[] | undefined;
+  /**
+   * The ratchet it is a hit of, as an id unique within the capture: every
+   * hit of one roll of two or more carries it. Null on a plain note.
+   */
+  readonly roll: number | null;
 }

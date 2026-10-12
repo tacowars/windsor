@@ -23,9 +23,15 @@
  *   it, and kept on a poly one.
  * - **The region's end.** A hold past it (a Euclid hit's) is cut there and
  *   counted.
+ * - **Ratchets** (windsor#755). Once every hit is placed, a ratchet whose
+ *   hits one note with `ratchet` would play exactly is written as that note
+ *   (`bounceRenderRatchets.ts`); any other keeps its hits as written here.
+ *   Accents are settled after, over the whole region
+ *   (`bounceRenderAccents.ts`).
  */
 import { BOUNCE_TICK_EPSILON } from './bounceRenderTables';
-import type { WarpClock } from './bounceRenderCapture';
+import type { RatchetClock, WarpClock } from './bounceRenderCapture';
+import { collapseRatchets } from './bounceRenderRatchets';
 import type { BounceNote, PlayedNote } from './bounceRenderTypes';
 
 /** Where a region's notes are written. */
@@ -38,12 +44,22 @@ export interface NoteFrame {
   readonly mono: boolean;
   /** The swing the region was played under. */
   readonly clock: WarpClock;
+  /** What a ratchet written as one note is spaced by. */
+  readonly ratchetClock: RatchetClock;
 }
 
-/** A written note with the step offsets its onset carried, which its envelopes read. */
+/**
+ * A written note with the step offsets its onset carried, which its
+ * envelopes read, and the accent it was played with, which
+ * `bounceRenderAccents.ts` writes or bakes in. Its note's velocity is the
+ * level played, the bump included.
+ */
 export interface WrittenNote {
   readonly note: BounceNote;
   readonly stepMod: readonly number[] | undefined;
+  readonly accent: PlayedNote['accent'];
+  /** Its level without the accent's bump. */
+  readonly plain: number;
 }
 
 /** A transport tick a played position lands on, and whether it fell between two. */
@@ -53,7 +69,8 @@ export interface SnappedTick {
 }
 
 /** A note on its way to the grid. */
-interface Draft {
+export interface Draft {
+  /** Its note-on as played: a ratchet's hit 0 when it is written as one note. */
   readonly played: PlayedNote;
   readonly tick: number;
   end: number;
@@ -62,10 +79,14 @@ interface Draft {
   /** Its written release is one that fell between ticks: not one a slide, a trim or the region's end set. */
   offRounded: boolean;
   lost: number;
+  /** The played notes it holds: its own, then any merged into it. */
+  readonly holds: PlayedNote[];
   trimmed: boolean;
   tailCut: boolean;
   /** The onset this note slid into, which its overlap is kept for. */
   slidInto: Draft | null;
+  /** Its ratchet, when its roll's hits are written as this one note; else 1. */
+  readonly ratchet: number;
 }
 
 /**
@@ -101,9 +122,11 @@ function draftOf(played: PlayedNote, frame: NoteFrame): Draft {
     onRounded: on.rounded,
     offRounded: off?.rounded === true,
     lost: 0,
+    holds: [played],
     trimmed: false,
     tailCut: false,
     slidInto: null,
+    ratchet: 1,
   };
 }
 
@@ -122,6 +145,7 @@ function mergeOneTick(drafts: readonly Draft[]): Draft[] {
     }
     earlier.end = Math.max(earlier.end, draft.end);
     earlier.lost += 1 + draft.lost;
+    earlier.holds.push(...draft.holds);
   }
   return kept;
 }
@@ -181,18 +205,19 @@ function trimOverlaps(groups: readonly Draft[][], mono: boolean): void {
 }
 
 function written(draft: Draft): WrittenNote {
-  const { played, tick, end, onRounded, offRounded, lost, trimmed, tailCut } = draft;
+  const { played, tick, end, onRounded, offRounded, lost, trimmed, tailCut, ratchet } = draft;
   const rounded = Number(onRounded) + Number(offRounded);
-  const marks = { rounded, lost, accentMod: played.mod !== 0, trimmed, tailCut };
+  const marks = { rounded, lost, accentMod: false, trimmed, tailCut };
   const note: BounceNote = {
     tick,
     ticks: end - tick,
     pitch: played.pitch,
     velocity: played.velocity,
+    ...(ratchet > 1 ? { ratchet } : {}),
     own: played.own,
     marks,
   };
-  return { note, stepMod: played.stepMod };
+  return { note, stepMod: played.stepMod, accent: played.accent, plain: played.plain };
 }
 
 /** The region's played notes as Roll notes, sorted by tick then pitch. */
@@ -206,5 +231,7 @@ export function writeNotes(played: readonly PlayedNote[], frame: NoteFrame): Wri
     setEnd(draft, frame.duration);
     draft.tailCut = true;
   }
-  return drafts.sort((a, b) => a.tick - b.tick || a.played.pitch - b.played.pitch).map(written);
+  return collapseRatchets(drafts, played, frame)
+    .sort((a, b) => a.tick - b.tick || a.played.pitch - b.played.pitch)
+    .map(written);
 }

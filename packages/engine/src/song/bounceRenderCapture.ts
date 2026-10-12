@@ -20,11 +20,15 @@
  * The tick on the region's end is issued too, for its leave alone: the
  * releases it sends are the region's, and anything it starts belongs to
  * whatever follows. An ∞ region has no leave, and what it holds stays open.
+ *
+ * Each note also records what the Roll needs to play it back marked
+ * (windsor#755): its accent's bump and mod and its level without them, and,
+ * for a hit of a roll of two or more, which roll it belongs to.
  */
 import type { Arrangement, MusicPart, PartRegion } from './arrangement';
 import { PartBinding, type PartOutput } from './partBinding';
 import { partGateConfig } from './partGateConfig';
-import { euclidNoteOn } from './partNoteOn';
+import { euclidNoteOn, partNoteOn, type NoteOnMarks } from './partNoteOn';
 import { PLAIN_HIT, pitchedRollShape, playPitched, type RollTarget } from './pitchedRoll';
 import { rollHits, type RollHit, type RollShape } from './rollSpan';
 import { setSongClock, songTicksOf, withClockFields } from './songClock';
@@ -32,8 +36,10 @@ import { BOUNCE_TICK_EPSILON } from './bounceRenderTables';
 import type { PlayedNote } from './bounceRenderTypes';
 import { euclidHitRead } from '../sequencing/euclidLanes';
 import { meterBeats } from '../sequencing/meter';
+import type { MeterBeats } from '../sequencing/meterTables';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import { TickTransport } from '../sequencing/scheduler';
+import type { Swing } from '../sequencing/swingTables';
 import type { NoteExtras } from '../synth/audioPart';
 
 /** The clock's warp, both ways: what turns a played time back into a tick. */
@@ -44,18 +50,35 @@ export interface WarpClock {
   unswungTicks(warped: number): number;
 }
 
+/** What a Roll note's ratchet is spaced by, as the player spaces it (`rollHits`). */
+export interface RatchetClock {
+  readonly secondsPerTick: number;
+  readonly swing: Swing;
+  readonly beats: MeterBeats;
+}
+
 export interface RegionCapture {
   /** Every note the part was asked to play, in the order it was asked. */
   readonly notes: readonly PlayedNote[];
   /** The swing the region was played under, at the transport's phase. */
   readonly clock: WarpClock;
+  /** The tempo, swing and meter the region was played under, for a ratchet's spacing. */
+  readonly ratchetClock: RatchetClock;
 }
 
-/** One `noteOn` (no duration) or `trigger` the part was asked for, with its event's own velocity. */
+/** What every hit of one note-on shares beyond its call: see `PlayedNote`. */
+interface HitMark {
+  readonly own: number;
+  readonly plain: number;
+  readonly accent: PlayedNote['accent'];
+  readonly roll: number | null;
+}
+
+/** One `noteOn` (no duration) or `trigger` the part was asked for, with its note-on's marks. */
 interface PartCall {
   readonly pitch: number;
   readonly velocity: number;
-  readonly own: number;
+  readonly mark: HitMark;
   readonly time: number;
   readonly extras: NoteExtras | undefined;
   readonly duration?: number;
@@ -67,16 +90,31 @@ class PlayLog {
   /** Set for the tick on the region's end: only its releases are the region's. */
   closing = false;
   private readonly held = new Map<number, PlayedNote[]>();
+  private rolls = 0;
 
   constructor(private readonly secondsPerTick: number) {}
 
-  /** A part playing notes whose event velocity is `own`, as `playPitched` and a Euclid hit call it. */
-  target(own: number): RollTarget {
+  /**
+   * The marks of a note-on of `hits` hits over the part's `velocity`: its
+   * event's own velocity, its level unaccented, its accent, and a new roll
+   * id when it plays two or more.
+   */
+  mark(marks: NoteOnMarks, velocity: number, hits: number): HitMark {
+    return {
+      own: marks.velocity ?? 1,
+      plain: partNoteOn({ ...marks, accent: undefined }, velocity).velocity,
+      accent: marks.accent,
+      roll: hits > 1 ? this.rolls++ : null,
+    };
+  }
+
+  /** A part playing the hits of one note-on marked `mark`, as `playPitched` and a Euclid hit call it. */
+  target(mark: HitMark): RollTarget {
     return {
       noteOn: (pitch, velocity = 1, time = 0, extras) =>
-        this.play({ pitch, velocity, own, time, extras }),
+        this.play({ pitch, velocity, mark, time, extras }),
       trigger: (pitch, velocity = 1, duration = 0, time = 0, extras) =>
-        this.play({ pitch, velocity, own, time, extras, duration }),
+        this.play({ pitch, velocity, mark, time, extras, duration }),
     };
   }
 
@@ -91,7 +129,7 @@ class PlayLog {
 
   private play(call: PartCall): number {
     if (this.closing) return 0;
-    const { pitch, velocity, own, time, extras, duration } = call;
+    const { pitch, velocity, mark, time, extras, duration } = call;
     const on = time / this.secondsPerTick;
     const off = duration === undefined ? null : (time + duration) / this.secondsPerTick;
     const played: PlayedNote = {
@@ -99,8 +137,7 @@ class PlayLog {
       on,
       off,
       velocity,
-      own,
-      mod: extras?.mod ?? 0,
+      ...mark,
       slide: extras?.slide === true,
       stepMod: extras?.stepMod,
     };
@@ -135,7 +172,8 @@ function partOutput(
     note: (event) => {
       if (event.kind === 'noteOff') return log.release(event.note, event.time);
       const hits = event.roll ? rollAt(pitchedRollShape(event.roll), event.roll) : PLAIN_HIT;
-      playPitched(log.target(event.velocity ?? 1), event, hits, part.velocity);
+      const mark = log.mark(event, part.velocity, hits.length);
+      playPitched(log.target(mark), event, hits, part.velocity);
     },
     onset: (event, spec) => {
       if (spec.kind !== 'euclidean') return;
@@ -145,7 +183,7 @@ function partOutput(
       const { ratchet } = read;
       const plain = [{ offset: 0, held: hold }];
       const hits = ratchet > 1 ? rollAt({ divisor, hold, ratchet }, event) : plain;
-      const target = log.target(1);
+      const target = log.target(log.mark(read, part.velocity, hits.length));
       for (const { offset, held } of hits) {
         target.trigger(note, velocity, held, event.time + offset, extras);
       }
@@ -187,5 +225,7 @@ export function captureRegion(
   log.closing = true;
   transport.advance(transport.transportSeconds);
   for (const binding of bindings.values()) binding?.dispose();
-  return { notes: log.notes, clock: transport };
+  const { secondsPerTick, swing } = transport;
+  const beats = meterBeats(song.transport.meter);
+  return { notes: log.notes, clock: transport, ratchetClock: { secondsPerTick, swing, beats } };
 }

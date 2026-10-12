@@ -20,11 +20,18 @@ export interface BounceSummary {
   readonly notes: number;
   /** The part's regions, an empty one included. */
   readonly regions: number;
-  /** Written ratchet onsets and releases, and swung Euclid releases, that fell between ticks. */
+  /**
+   * Written ratchet onsets and releases, and swung Euclid releases, that
+   * fell between ticks. A ratchet written as one note's `ratchet`
+   * (windsor#755) rounds nothing; only one written as its hits counts.
+   */
   readonly ticksRounded: number;
-  /** Ratchet hits merged into an earlier hit on their tick, unheard. */
+  /** Hits of a ratchet written as its hits, merged into an earlier hit on their tick, unheard. */
   readonly ratchetHitsLost: number;
-  /** Accented notes whose mod the Roll cannot send. */
+  /**
+   * Accents baked into their velocity, whose mod is lost: those of a region
+   * whose accents differ, or on an onset another note shares (windsor#755).
+   */
   readonly accentsLostMod: number;
   /** Notes held into a later onset of their own pitch, trimmed there. */
   readonly repeatsTrimmed: number;
@@ -38,7 +45,10 @@ export interface BounceSummary {
   readonly silenced: number;
   /** The sequencer lanes the render read and the bounce removed: "Skip and Gate lanes baked". */
   readonly lanesBaked: readonly SeqField[];
-  /** The part's Vel after the bounce: its own, or the highest level it played (decision 4). */
+  /**
+   * The part's Vel after the bounce: its own, or the highest level a baked
+   * accent played (decision 4, and windsor#755).
+   */
   readonly velocity: number;
   /** The Figure parts whose canon this part led, in song order. */
   readonly followers: readonly BounceFollower[];

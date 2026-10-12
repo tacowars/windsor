@@ -8,12 +8,19 @@
  * region rendered is the second of two, so its stream is the one the gate
  * mints for region 1, and its draws (skips, densities, random styles,
  * pitch choices) must land where the player's did.
+ *
+ * Since windsor#755 a note may carry an accent, whose bump its roll adds
+ * back, so the render is held against the player through the bounced Roll
+ * itself: the part bounced and played again sounds as it did, hit for hit,
+ * level and accent mod included (`bounceParity.ts`). The accents and
+ * ratchets, and each ratchet that falls back to its hits, are held the same
+ * way in `bounceRenderParityMarks.test.ts`.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'vitest';
 
-import { bounceSong, gridNote, gridSpec, playRegion, render } from '../__fixtures__/bounceRig';
-import type { Call } from '../__fixtures__/recordingPart';
-import type { Arrangement, SequencerSpec } from './arrangement';
+import { expectSameSound, playBoth } from '../__fixtures__/bounceParity';
+import { gridNote, gridSpec } from '../__fixtures__/bounceRig';
+import type { SequencerSpec } from './arrangement';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import { DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
@@ -41,48 +48,16 @@ const HARMONY: Harmony = {
   })),
 };
 
-/** A note as `[tick, end, pitch, velocity]`. */
-type Row = [number, number, number, number];
-
-/** What the player's calls play in region 1, as rows in local ticks: each note-on to its release. */
-function playedRows(calls: readonly Call[], start: number, duration: number): Row[] {
-  const rows: Row[] = [];
-  const held = new Map<number, Row[]>();
-  for (const call of calls) {
-    const tick = Math.round(call.time! / SPT) - start;
-    const pitch = call.note!;
-    if (call.kind === 'noteOffByNote') {
-      for (const row of held.get(pitch) ?? []) row[1] = tick;
-      held.delete(pitch);
-      continue;
-    }
-    const end =
-      call.kind === 'trigger' ? Math.round((call.time! + call.duration!) / SPT) - start : NaN;
-    const row: Row = [tick, end, pitch, call.velocity!];
-    rows.push(row);
-    if (call.kind === 'noteOn') held.set(pitch, [...(held.get(pitch) ?? []), row]);
-  }
-  for (const row of rows) if (Number.isNaN(row[1])) row[1] = duration;
-  return rows.sort((a, b) => a[0] - b[0] || a[2] - b[2]);
-}
-
-function expectParity(song: Arrangement): void {
-  const { notes } = render(song, 1);
-  const rows = playedRows(playRegion(song, 1).calls, REGIONS[1]!.start, REGIONS[1]!.duration);
-  expect(rows.length).toBeGreaterThan(0);
-  expect(
-    notes.map((note): Row => [note.tick, note.tick + note.ticks, note.pitch, note.velocity]),
-  ).toEqual(rows);
-}
-
-const songOf = (sequencer: SequencerSpec, preset = 'saw-arp'): Arrangement =>
-  bounceSong(sequencer, { regions: REGIONS, harmony: HARMONY, preset });
+/** Region 1 of the part, played as generated and again bounced, sounds alike. */
+const expectParity = (sequencer: SequencerSpec, preset = 'saw-arp'): void =>
+  expectSameSound(playBoth(sequencer, { regions: REGIONS, harmony: HARMONY, preset }, 1));
 
 describe('each kind renders what the player plays from the region’s start', () => {
   it('Euclid: a generative figure whose density breathes on the region’s stream', () => {
     const hold = 2 * SPT;
     expectParity(
-      songOf({ kind: 'euclidean', ...DEFAULT_EUCLIDEAN_CONFIG, seed: 7, note: 36, hold }, 'kick'),
+      { kind: 'euclidean', ...DEFAULT_EUCLIDEAN_CONFIG, seed: 7, note: 36, hold },
+      'kick',
     );
   });
 
@@ -90,7 +65,7 @@ describe('each kind renders what the player plays from the region’s start', ()
     const steps = [0, 2, 4, 2, 5, 4, 2, 1].map((degree) =>
       gridNote(degree, { accent: degree === 4 }),
     );
-    expectParity(songOf(gridSpec(steps, { divisor: 12, skipChance: 0.3, seed: 3 })));
+    expectParity(gridSpec(steps, { divisor: 12, skipChance: 0.3, seed: 3 }));
   });
 
   it('Chord: the harmony’s chord voiced on every hit, its notes on one tick', () => {
@@ -102,28 +77,24 @@ describe('each kind renders what the player plays from the region’s start', ()
       register: { octave: 3 },
       steps: [hitStep(), hitStep(), hitStep()],
     };
-    expectParity(songOf(chord, 'drone-sqr'));
+    expectParity(chord, 'drone-sqr');
   });
 
   it('Arp: a random walk with skips, at its gate', () => {
-    expectParity(
-      songOf({ kind: 'arp', ...DEFAULT_ARP_CONFIG, style: 'random', skipChance: 0.2, seed: 5 }),
-    );
+    expectParity({ kind: 'arp', ...DEFAULT_ARP_CONFIG, style: 'random', skipChance: 0.2, seed: 5 });
   });
 
   it('Basslead: follow chord with a root bias and its density', () => {
-    expectParity(
-      songOf({
-        kind: 'bass',
-        ...DEFAULT_BASS_CONFIG,
-        pitchMode: 'followChord',
-        rootBias: 0.5,
-        seed: 9,
-      }),
-    );
+    expectParity({
+      kind: 'bass',
+      ...DEFAULT_BASS_CONFIG,
+      pitchMode: 'followChord',
+      rootBias: 0.5,
+      seed: 9,
+    });
   });
 
   it('Figure: the default broken chord with skips', () => {
-    expectParity(songOf({ kind: 'figure', ...DEFAULT_FIGURE_CONFIG, skipChance: 0.25, seed: 11 }));
+    expectParity({ kind: 'figure', ...DEFAULT_FIGURE_CONFIG, skipChance: 0.25, seed: 11 });
   });
 });
