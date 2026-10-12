@@ -164,7 +164,7 @@ export class RollEnvelopeMode {
     this.column.root.hidden = !on;
     this.layer.root.hidden = !on;
     // One Snap, the roll's, first in whichever column shows.
-    const home = on ? this.column.root : controls.cols.firstElementChild;
+    const home = on ? this.column.root : controls.firstCol;
     if (home && controls.snap.parentElement !== home) home.prepend(controls.snap);
     if (on) this.render();
     else {

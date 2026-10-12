@@ -7,15 +7,24 @@
  * carries its index in the roll's list for the gestures. A note still held
  * while Rec records (windsor#663) is drawn growing with a record-coloured
  * edge, outside the roll's list, until it is written.
+ *
+ * Whatever the lane shows (windsor#754, record
+ * `2026-10-12-roll-note-accent-and-ratchet` decision 8), an accented note
+ * has an ink top edge and a ratcheted one is cut into its hits
+ * (`noteMarks`), its ghost repeats too, dimmed with them. The lane under
+ * the notes draws the stems, or the Acc or Rat cells (`rollLanePaint.ts`).
  */
+import { rollSharedOnsets } from '@windsor/engine';
 import { noteName } from './consoleFormat';
 import { el } from './dom';
 import { type RollTones, tierOf } from './rollHarmony';
+import { paintCells } from './rollLanePaint';
+import { type RollLane, noteMarks } from './rollMarks';
 import { fillPct, instanceLook, noteNamed, stemLook, stemPx, velocityOf } from './rollNoteLook';
 import type { RollPanes } from './rollPanes';
 import { type RollInstance, heldStart, sounding } from './rollRepeats';
 import type { RollScene } from './rollScene';
-import { ROLL_NOTE, ROLL_PANE_PX, ROLL_REC } from './rollTables';
+import { ROLL_MARK_TEXT, ROLL_NOTE, ROLL_PANE_PX, ROLL_REC } from './rollTables';
 import type { HeldNote } from './rollTake';
 
 /** One drawn note and what it draws. */
@@ -26,7 +35,39 @@ export interface DrawnNote {
 
 const px = (n: number): string => `${n}px`;
 
-function noteNode(scene: RollScene, instance: RollInstance, sel: boolean): HTMLElement | null {
+/** No chord onsets: a held note is drawn plain anyway. */
+const NONE_SHARED: ReadonlySet<number> = new Set();
+
+/** The accent's edge and the ratchet's cuts on a note drawn `w` px wide, and the title's words. */
+function markNote(
+  node: HTMLElement,
+  scene: RollScene,
+  instance: RollInstance,
+  shared: ReadonlySet<number>,
+): string {
+  const note = scene.notes[instance.index];
+  if (!note) return '';
+  const marks = noteMarks(note, instance, { loopTicks: scene.loopTicks, shared });
+  node.classList.toggle('accent', marks.accent);
+  for (const cut of marks.cuts) {
+    const line = el('span', 'roll-hit-cut');
+    line.style.left = px(cut * scene.pxPerTick);
+    node.appendChild(line);
+  }
+  const words = [marks.accent ? ROLL_MARK_TEXT.accent : ''];
+  if (marks.cuts.length > 0) words.push(ROLL_MARK_TEXT.ratchet(marks.cuts.length + 1));
+  return words
+    .filter(Boolean)
+    .map((w) => ` · ${w}`)
+    .join('');
+}
+
+function noteNode(
+  scene: RollScene,
+  instance: RollInstance,
+  sel: boolean,
+  shared: ReadonlySet<number> = NONE_SHARED,
+): HTMLElement | null {
   const note = scene.notes[instance.index];
   const row = note ? scene.rowByPitch.get(note.pitch) : undefined;
   if (!note || !row) return null;
@@ -47,8 +88,11 @@ function noteNode(scene: RollScene, instance: RollInstance, sel: boolean): HTMLE
   node.style.width = px(w);
   node.style.height = px(h);
   node.style.setProperty('--vm', `${fillPct(velocityOf(note))}%`);
+  const marked = markNote(node, scene, instance, shared);
   if (instance.parked) node.title = `${noteName(note.pitch)}: past the loop, kept and silent`;
-  else if (!ghost) node.title = `${noteName(note.pitch)} · vel ${velocityOf(note).toFixed(2)}`;
+  else if (!ghost) {
+    node.title = `${noteName(note.pitch)} · vel ${velocityOf(note).toFixed(2)}${marked}`;
+  }
   return node;
 }
 
@@ -63,33 +107,44 @@ function stemNode(scene: RollScene, instance: RollInstance, sel: boolean): HTMLE
   return stem;
 }
 
+/** What one paint of the notes draws: the instances in the window, the selection, the lane. */
+export interface NotesPaint {
+  readonly instances: readonly RollInstance[];
+  readonly selected: ReadonlySet<number>;
+  readonly lane: RollLane;
+}
+
 /**
- * The notes and the stems of `instances`, the ones the view's window holds
- * (`rollInstances`), the `selected` notes ringed on their own pass;
- * returns the drawn notes and the lane's playhead.
+ * The notes of `instances`, the ones the view's window holds
+ * (`rollInstances`), the `selected` notes ringed on their own pass, and
+ * under them the lane's stems or cells; returns the drawn notes and the
+ * lane's playhead.
  */
 export function paintNotes(
   panes: RollPanes,
   layer: HTMLElement,
   scene: RollScene,
-  paint: { readonly instances: readonly RollInstance[]; readonly selected: ReadonlySet<number> },
+  paint: NotesPaint,
 ): { drawn: DrawnNote[]; ph: HTMLElement } {
   const drawn: DrawnNote[] = [];
+  const shared = rollSharedOnsets(scene.notes);
   const notes = document.createDocumentFragment();
   const stems = document.createDocumentFragment();
   for (const instance of paint.instances) {
     const sel = instance.pass === 0 && paint.selected.has(instance.index);
-    const node = noteNode(scene, instance, sel);
+    const node = noteNode(scene, instance, sel, shared);
     if (!node) continue;
     notes.appendChild(node);
     drawn.push({ node, instance });
-    const stem = stemNode(scene, instance, sel);
+    const stem = paint.lane === 'vel' ? stemNode(scene, instance, sel) : null;
     if (stem) stems.appendChild(stem);
   }
   layer.replaceChildren(notes);
+  panes.vel.dataset.lane = paint.lane;
   panes.velIn.style.width = px(scene.width + ROLL_PANE_PX.overhang);
   const ph = el('span', 'roll-ph');
-  panes.velIn.replaceChildren(stems, ph);
+  const under = paint.lane === 'vel' ? stems : paintCells(scene, paint.lane, paint);
+  panes.velIn.replaceChildren(under, ph);
   return { drawn, ph };
 }
 
@@ -112,7 +167,8 @@ export function paintHeld(
     const start = heldStart(note, scene);
     const instance = { index, start, ticks: note.ticks, pass: 0, parked: false };
     const node = noteNode(held, instance, false);
-    const stem = stemNode(held, instance, false);
+    // A stem only where the lane shows stems: the Acc and Rat lanes have no cell for a held note.
+    const stem = panes.vel.dataset.lane === 'vel' ? stemNode(held, instance, false) : null;
     if (node) {
       delete node.dataset.index;
       node.title = `${noteName(note.pitch)} · ${ROLL_REC.held}`;

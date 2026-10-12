@@ -98,8 +98,18 @@ export const ROLL_PANE_PX = {
   overhang: 24,
 } as const;
 
+/**
+ * The Roll device's height (record `2026-10-12-roll-note-accent-and-ratchet`
+ * decision 9): the other devices' 244 px (`SEQUENCER_DEVICE_H_PX`) and the
+ * Velocity row's 40, which the Roll alone takes, as `--roll-h` over its own
+ * `--seq-h` (console.css).
+ */
+export const ROLL_DEVICE_H_PX = 284;
+
 /** Custom property → px, set on the sequencer row with `SEQUENCER_DEVICE_PX`. */
 export const ROLL_DEVICE_PX: Readonly<Record<string, number>> = {
+  /** The device's height, the Roll's own. */
+  '--roll-h': ROLL_DEVICE_H_PX,
   /** The device's narrowest width; it grows to the pane's. */
   '--roll-min-w': 620,
   /** One control column's width. */
@@ -173,6 +183,50 @@ export const ROLL_EDIT = {
   velocityMax: 1,
   velocitySteps: 100,
 } as const;
+
+/**
+ * The lane under the notes (record `2026-10-12-roll-note-accent-and-ratchet`
+ * decision 7): its three tabs, top down, each with its label and title.
+ */
+export const ROLL_LANES = [
+  { id: 'vel', label: 'Vel', title: 'Velocity: drag a stem up or down' },
+  { id: 'acc', label: 'Acc', title: "Accent: click a note's cell to accent it" },
+  {
+    id: 'rat',
+    label: 'Rat',
+    title: "Ratchet: click a note's cell for ×1 → ×2 → ×3 → ×4, shift-click back",
+  },
+] as const;
+
+/** The lane a roll opens on: Vel. */
+export const ROLL_LANE_DEFAULT = 'vel';
+
+/** An Acc or Rat cell's place under its note, in px (the mockup's). */
+export const ROLL_MARK_CELL = {
+  /** Inset from the note's left edge, and from its right for a Rat cell. */
+  insetPx: 1,
+  /** An Acc cell's width: the note's, between these. */
+  accMinPx: 8,
+  accMaxPx: 14,
+  /** A Rat cell's least width. */
+  ratMinPx: 10,
+} as const;
+
+/** The cells' words, the titles of a note's marks, and the undo steps a click makes. */
+export const ROLL_MARK_TEXT = {
+  accCell: 'A',
+  accOn: 'accented, click to clear',
+  accOff: 'not accented, click to accent',
+  ratTitle: (n: number): string => `ratchet ×${n}: click for more, shift-click for fewer`,
+  ratShort: 'too short for a ratchet (under a 1/32)',
+  accent: 'accent',
+  ratchet: (n: number): string => `ratchet ×${n}`,
+  undoAccent: 'Accent',
+  undoRatchet: 'Ratchet',
+} as const;
+
+/** The Velocity row under the controls (decision 9): its label. */
+export const ROLL_VELOCITY_ROW = { label: 'Velocity' } as const;
 
 /** Edge scroll: a note dragged within `zonePx` of the notes pane's edge scrolls it, up to `maxPx` a frame. */
 export const ROLL_EDGE_SCROLL = { zonePx: 24, maxPx: 14 } as const;

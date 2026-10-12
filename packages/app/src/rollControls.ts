@@ -1,7 +1,11 @@
 /**
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
- * columns: Snap, Loop, Keys, Fold and Quantise; then Vel, the ↔ and ↕
- * zooms, the Audition switch and Rec (windsor#663, `rollRecView.ts`). Vel is the console's knob on the part's `velocity`.
+ * columns: Snap, Loop, Keys, Fold and Quantise; then the ↔ and ↕ zooms, the
+ * Audition switch and Rec (windsor#663, `rollRecView.ts`). Under both, the
+ * Velocity row (windsor#754; record `2026-10-12-roll-note-accent-and-ratchet`
+ * decision 9): Vel, the console's knob on the part's `velocity`, beside Acc
+ * vel and Acc mod, the Grid's knobs on the roll's `accentVelocity` and
+ * `accentMod`, written as any card's sequencer knob is (`driverKnob`).
  * Snap, Keys, Fold and the zooms are the view's (`rollView.ts`), and
  * Audition the console's (`rollAudition.ts`), never the song's. Loop's − and
  * + step the song's loop through whole bars (windsor#603 decision 3).
@@ -11,9 +15,9 @@ import type { AppCtx } from './context';
 import { el, seg, select } from './dom';
 import { auditionOn, setAudition } from './rollAudition';
 import { tableKnob } from './seqFields';
-import { ROLL_KNOBS } from './sequencerKnobTables';
+import { ROLL_ACCENT_KNOBS, ROLL_KNOBS } from './sequencerKnobTables';
 import { barsOf, loopText } from './rollSummary';
-import { ROLL_QUANTISE, ROLL_SNAP_OFF_TICKS, ROLL_SNAPS } from './rollTables';
+import { ROLL_QUANTISE, ROLL_SNAP_OFF_TICKS, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
 import type { RollKeys } from './rollRows';
 import { type RollViewState, type RollZoom, rowZoomText, snapOf, timeZoomText } from './rollView';
 
@@ -21,6 +25,8 @@ import { type RollViewState, type RollZoom, rowZoomText, snapOf, timeZoomText } 
 export interface RollControlsTarget {
   readonly ctx: AppCtx;
   readonly slot: number;
+  /** The region whose roll the accent knobs write; none is the part's sequencer. */
+  readonly region: number | undefined;
   readonly view: RollViewState;
   /** The zoom of the view on show, device or Expanded. */
   zoom(): RollZoom;
@@ -46,8 +52,10 @@ export interface RollControlsTarget {
 /** The controls, and the readouts' refresh after a repaint. */
 export interface RollControls {
   readonly root: HTMLElement;
-  /** The two columns of note controls, which the Envelopes tab hides (windsor#707). */
+  /** The Notes page's controls, the two columns and the Velocity row, which the Envelopes tab hides (windsor#707). */
   readonly cols: HTMLElement;
+  /** The first column, where Snap sits on the Notes page. */
+  readonly firstCol: HTMLElement;
   /** Snap's field, which heads whichever tab's column shows. */
   readonly snap: HTMLElement;
   refresh(): void;
@@ -214,7 +222,6 @@ function zooms(target: RollControlsTarget): { node: HTMLElement; refresh: () => 
 }
 
 function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
-  const vel = ROLL_KNOBS[0];
   const zoom = zooms(target);
   const audition = segs(
     [
@@ -226,22 +233,36 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
   );
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
   const col = el('div', 'roll-ctl');
-  if (vel) col.appendChild(tableKnob(target.ctx, target.slot, vel, PITCH_COLOR));
   col.append(zoom.node, item('Audition', audition), target.rec);
   return { node: col, refresh: zoom.refresh };
 }
 
-/** The two columns as one section of the device. */
+/** The Velocity row: Vel on the part, Acc vel and Acc mod on the roll. */
+function velocityRow(target: RollControlsTarget): HTMLElement {
+  const { ctx, slot, region } = target;
+  const knobs = el('div', 'roll-vel-knobs');
+  for (const entry of [...ROLL_KNOBS, ...ROLL_ACCENT_KNOBS]) {
+    knobs.appendChild(tableKnob(ctx, slot, entry, PITCH_COLOR, region));
+  }
+  const row = el('div', 'roll-vel-row');
+  row.append(el('span', 'field-label', ROLL_VELOCITY_ROW.label), knobs);
+  return row;
+}
+
+/** The two columns over the Velocity row, as one section of the device. */
 export function rollControls(target: RollControlsTarget): RollControls {
   const first = firstColumn(target);
   const second = secondColumn(target);
-  const cols = el('div', 'roll-ctl-cols');
-  cols.append(first.node, second.node);
+  const columns = el('div', 'roll-ctl-cols');
+  columns.append(first.node, second.node);
+  const cols = el('div', 'roll-ctl-stack');
+  cols.append(columns, velocityRow(target));
   const root = el('div', 'seq-section roll-controls');
   root.appendChild(cols);
   return {
     root,
     cols,
+    firstCol: first.node,
     snap: first.snap,
     refresh: () => {
       first.refresh();
