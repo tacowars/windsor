@@ -29,7 +29,7 @@ import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
 import { FIGURE_OPTIONAL_KEYS, type FigureSequencerConfig } from '../sequencing/figureSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
-import type { RollSequencerConfig } from '../sequencing/rollSequencer';
+import { ROLL_OPTIONAL_KEYS, type RollSequencerConfig } from '../sequencing/rollSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { Meter } from '../sequencing/meterTables';
 import type { Region } from '../sequencing/regionClock';
@@ -244,14 +244,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /**
  * A key the current object may lack and a partial still reaches: a Euclid
- * sequencer's optional rows (windsor#355) and a Figure's schedule, drift and
- * source (windsor#484). A normalised song omits a row it
- * does not use, so the first lane or ratchet a live edit draws arrives here
- * with nothing to merge into; the player's validation still judges it.
+ * sequencer's optional rows (windsor#355), a Figure's schedule, drift and
+ * source (windsor#484), and a Roll's accent amounts (windsor#753). A
+ * normalised song omits a row it does not use and an amount at its default,
+ * so the first lane, ratchet or amount a live edit writes arrives here with
+ * nothing to merge into; the player's validation still judges it.
  */
 const OPTIONAL_KEYS: ReadonlyMap<unknown, ReadonlySet<string>> = new Map([
   ['euclidean', new Set<string>(EUCLID_ROW_KEYS)],
   ['figure', new Set<string>(FIGURE_OPTIONAL_KEYS)],
+  ['roll', new Set<string>(ROLL_OPTIONAL_KEYS)],
 ]);
 
 const reaches = (current: Record<string, unknown>, key: string): boolean =>

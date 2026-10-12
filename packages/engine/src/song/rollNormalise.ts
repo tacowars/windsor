@@ -14,6 +14,17 @@
  * export carries no default. A note at or past `loopTicks` is kept: it is
  * silent until the loop grows back over it.
  *
+ * **Accents and ratchets** (windsor#753, record
+ * `2026-10-12-roll-note-accent-and-ratchet`). A note's `accent` is a
+ * boolean and its `ratchet` a whole number 1..`RATCHET_MAX`; anything else
+ * is dropped, reported, and the note is plain. `accent: false` and
+ * `ratchet: 1` leave no key. Once the list is settled, every note sharing
+ * its onset with another (a chord) loses both, and a note shorter than
+ * `ROLL_RATCHET_MIN_TICKS` (after any trim) loses its ratchet, each
+ * reported. The roll's `accentVelocity` and `accentMod` are clamped into
+ * 0..1, and a default (`ACCENT_VELOCITY_DEFAULT`, `ACCENT_MOD_DEFAULT`)
+ * leaves no key, so a roll without them round-trips byte for byte.
+ *
  * **Envelopes** (windsor#701, epic windsor#699). An envelope whose target is
  * not a voice target, one on a target an earlier envelope holds, and those
  * past `ROLL_ENVELOPES_MAX` are dropped; a missing `on` is true. A point
@@ -27,7 +38,14 @@
  * leaves no key, as a velocity of 1 does. A point at or past `loopTicks` is
  * kept, silent like a note there.
  */
-import { MIDI_MIDDLE_C, MIDI_NOTE_MAX, ROLL_NOTES_MAX } from '../audioConstants';
+import {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
+  MIDI_MIDDLE_C,
+  MIDI_NOTE_MAX,
+  RATCHET_MAX,
+  ROLL_NOTES_MAX,
+} from '../audioConstants';
 import { ticksPerBar } from '../sequencing/meter';
 import {
   ROLL_ENVELOPES_MAX,
@@ -35,20 +53,21 @@ import {
   type RollEnvelopePoint,
 } from '../sequencing/rollEnvelope';
 import { ROLL_ENVELOPE_POINTS_MAX } from '../sequencing/rollEnvelopeTables';
-import { ROLL_LOOP_TICKS_MAX, type RollNote } from '../sequencing/rollSequencer';
+import { ROLL_RATCHET_MIN_TICKS } from '../sequencing/rollNoteTables';
+import { ROLL_LOOP_TICKS_MAX, rollSharedOnsets, type RollNote } from '../sequencing/rollSequencer';
 import { isVoiceTargetPath } from '../sequencing/stepModLanes';
 import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 import { DIVISORS } from '../sequencing/scheduler';
 import type { RollDriver } from './arrangement';
 import { isRecord, show, type FieldNormaliser } from './arrangementFields';
 
-const ROLL_KEYS = ['loopTicks', 'notes', 'envelopes'];
-const NOTE_KEYS = ['tick', 'ticks', 'pitch', 'velocity'];
+const ROLL_KEYS = ['loopTicks', 'notes', 'accentVelocity', 'accentMod', 'envelopes'];
+const NOTE_KEYS = ['tick', 'ticks', 'pitch', 'velocity', 'accent', 'ratchet'];
 const ENVELOPE_KEYS = ['target', 'on', 'points'];
 const POINT_KEYS = ['tick', 'value', 'bend'];
 
 /** A written note's mutable shape while the list is settled. */
-type DraftNote = { tick: number; ticks: number; pitch: number; velocity?: number };
+type DraftNote = { -readonly [K in keyof RollNote]: RollNote[K] };
 
 export function rollDriver(raw: unknown, path: string, n: FieldNormaliser): RollDriver {
   const o = n.section(raw, path);
@@ -58,6 +77,16 @@ export function rollDriver(raw: unknown, path: string, n: FieldNormaliser): Roll
     loopTicks: n.int(o.loopTicks, ticksPerBar(n.meter), 1, ROLL_LOOP_TICKS_MAX, at),
     notes: rollNotes(o.notes, `${path}.notes`, n),
   };
+  const accentVelocity = n.num(
+    o.accentVelocity,
+    ACCENT_VELOCITY_DEFAULT,
+    0,
+    1,
+    `${path}.accentVelocity`,
+  );
+  if (accentVelocity !== ACCENT_VELOCITY_DEFAULT) driver.accentVelocity = accentVelocity;
+  const accentMod = n.num(o.accentMod, ACCENT_MOD_DEFAULT, 0, 1, `${path}.accentMod`);
+  if (accentMod !== ACCENT_MOD_DEFAULT) driver.accentMod = accentMod;
   const envelopes = rollEnvelopes(o.envelopes, `${path}.envelopes`, n);
   if (envelopes.length > 0) driver.envelopes = envelopes;
   return driver;
@@ -80,7 +109,7 @@ function rollNotes(raw: unknown, path: string, n: FieldNormaliser): RollNote[] {
   if (settled.length > ROLL_NOTES_MAX) {
     n.correction(`${path}: ${settled.length} notes trimmed to ${ROLL_NOTES_MAX}`);
   }
-  return settled.slice(0, ROLL_NOTES_MAX);
+  return withMarksSettled(settled.slice(0, ROLL_NOTES_MAX), path, n);
 }
 
 /** One note, or null (reported) when it is not an object. */
@@ -97,7 +126,52 @@ function rollNote(raw: unknown, path: string, n: FieldNormaliser): DraftNote | n
   };
   const velocity = n.num(raw.velocity, 1, 0, 1, `${path}.velocity`);
   if (velocity !== 1) note.velocity = velocity;
+  if (noteAccent(raw.accent, `${path}.accent`, n)) note.accent = true;
+  const ratchet = noteRatchet(raw.ratchet, `${path}.ratchet`, n);
+  if (ratchet > 1) note.ratchet = ratchet;
   return note;
+}
+
+/** A note's accent: a boolean; anything else is dropped, reported, and the note is plain. */
+function noteAccent(raw: unknown, path: string, n: FieldNormaliser): boolean {
+  if (raw === undefined || typeof raw === 'boolean') return raw === true;
+  n.correction(`${path}: ${show(raw)} is not a boolean — dropped`);
+  return false;
+}
+
+/** A note's ratchet: a whole 1..`RATCHET_MAX`; anything else is dropped, reported, and the note is one hit. */
+function noteRatchet(raw: unknown, path: string, n: FieldNormaliser): number {
+  if (raw === undefined) return 1;
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 && raw <= RATCHET_MAX) {
+    return raw;
+  }
+  n.correction(`${path}: ${show(raw)} is not a whole number 1..${RATCHET_MAX} — dropped`);
+  return 1;
+}
+
+/**
+ * The settled notes with the marks they may not carry cleared, each
+ * reported: both from a note that shares its onset (the record's decision
+ * 5), and the ratchet from one shorter than `ROLL_RATCHET_MIN_TICKS`
+ * (decision 6).
+ */
+function withMarksSettled(notes: DraftNote[], path: string, n: FieldNormaliser): DraftNote[] {
+  const shared = rollSharedOnsets(notes);
+  for (const note of notes) {
+    const where = `${path}: the note at tick ${note.tick} pitch ${note.pitch}`;
+    if (shared.has(note.tick) && (note.accent !== undefined || note.ratchet !== undefined)) {
+      delete note.accent;
+      delete note.ratchet;
+      n.correction(`${where} shares its onset with another — its accent and ratchet cleared`);
+    }
+    if (note.ratchet !== undefined && note.ticks < ROLL_RATCHET_MIN_TICKS) {
+      delete note.ratchet;
+      n.correction(
+        `${where} is shorter than ${ROLL_RATCHET_MIN_TICKS} ticks — its ratchet cleared`,
+      );
+    }
+  }
+  return notes;
 }
 
 interface NoteField {
