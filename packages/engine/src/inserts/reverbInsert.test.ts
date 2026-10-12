@@ -18,7 +18,7 @@ import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { KICK, song } from '../__fixtures__/documentCases';
 import { ARRANGEMENT_VERSION, REVERB_SPACE_RANGES } from '../audioConstants';
 import { PLATE_FULLY_WET, createPlate } from '../mixer/returnEffects';
-import { SPACES } from '../mixer/reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { makeArrangement } from '../song/arrangementDocument';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
@@ -61,7 +61,7 @@ describe('the Reverb insert sound', () => {
 
     const { context: c, source } = await context();
     // The room return's plate, as it was built before windsor#172.
-    const plate = createPlate(c.asAudioContext(), SPACES.hall, PLATE_FULLY_WET);
+    const plate = createPlate(c.asAudioContext(), SPACE_ROWS.hall, PLATE_FULLY_WET);
     source.connect(fake(plate));
     const [returned] = renderGraph(c, SECONDS, [fake(plate)]);
 
@@ -99,17 +99,17 @@ describe('the Reverb insert graph', () => {
     const { wet, dry } = plateMix(DEFAULT_REVERB);
     expect(plate?.parameters.get('wet')?.value).toBeCloseTo(wet, 6);
     expect(plate?.parameters.get('dry')?.value).toBeCloseTo(dry, 6);
-    expect(plate?.parameters.get('size')?.value).toBe(SPACES.hall.size);
+    expect(plate?.parameters.get('size')?.value).toBe(SPACE_ROWS.hall.size);
   });
 
   it('takes new settings as param writes, with no change to the graph', async () => {
     const { context: c } = await context();
     const stage = REVERB_INSERT.create(c.asAudioContext(), DEFAULT_REVERB);
     const before = c.nodes.map((n) => [...n.outbound]);
-    stage.set({ ...DEFAULT_REVERB, ...SPACES.cathedral, mix: 0.8, enabled: false });
+    stage.set({ ...DEFAULT_REVERB, ...SPACE_ROWS.cathedral, mix: 0.8, enabled: false });
     expect(c.nodes.map((n) => [...n.outbound])).toEqual(before);
     const plate = c.workletNodes.find((n) => n.name === REVERB_PROCESSOR_NAME);
-    expect(plate?.parameters.get('size')?.value).toBe(SPACES.cathedral.size);
+    expect(plate?.parameters.get('size')?.value).toBe(SPACE_ROWS.cathedral.size);
     expect(plate?.parameters.get('wet')?.value).toBeCloseTo(Math.sin(0.4 * Math.PI), 6);
   });
 
@@ -143,7 +143,7 @@ describe('plateMix (windsor#748)', () => {
 
 describe('REVERB_INSERT', () => {
   it('starts in the hall space at Mix 0.30, switched on', () => {
-    expect(plateSpace(DEFAULT_REVERB)).toEqual(SPACES.hall);
+    expect(plateSpace(DEFAULT_REVERB)).toEqual(SPACE_ROWS.hall);
     expect(DEFAULT_REVERB.mix).toBe(0.3);
     expect(DEFAULT_REVERB.enabled).toBe(true);
   });

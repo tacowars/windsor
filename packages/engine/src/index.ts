@@ -374,7 +374,7 @@ export {
 } from './inserts/retroReverbPresets';
 export { createStereoRotate, rotationAngle, rotationGains } from './mixer/stereoRotate';
 export type { RotationGains, StereoRotate } from './mixer/stereoRotate';
-export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './mixer/reverbSpace';
+export { DEFAULT_SPACE, makeSpace } from './mixer/reverbSpace';
 export {
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
@@ -389,7 +389,7 @@ export {
   REVERB_SPACE_RANGES,
   SECONDS_PER_MINUTE,
 } from './audioConstants';
-export type { ReverbSpace, SpaceName } from './mixer/reverbSpace';
+export type { ReverbSpace } from './mixer/reverbSpace';
 export { renderPatchToBuffer } from './render/offlineRender';
 export type { BakeOptions } from './render/offlineRender';
 // The song render and the WAV writer (windsor#40).
@@ -766,7 +766,16 @@ export {
   plateSpace,
 } from './inserts/reverbInsert';
 export type { ReverbInsertSpec } from './inserts/reverbInsert';
-export { REVERB_MIX_DEFAULT, REVERB_SPACE_DEFAULT } from './inserts/reverbInsertConstants';
+export { REVERB_MIX_DEFAULT, REVERB_PRESET_DEFAULT } from './inserts/reverbInsertConstants';
+// The Reverb's preset bank (windsor#774).
+export {
+  REVERB_PRESETS,
+  REVERB_PRESET_GROUPS,
+  applyReverbPreset,
+  matchingReverbPreset,
+  reverbPreset,
+} from './inserts/reverbPresets';
+export type { ReverbPreset, ReverbPresetGroup } from './inserts/reverbPresets';
 export { DEFAULT_ECHO, ECHO_INSERT } from './inserts/echoInsert';
 export type { EchoSpec } from './inserts/echoInsert';
 export { ECHO_BOUNDS, ECHO_MIX_DEFAULT } from './inserts/echoConstants';

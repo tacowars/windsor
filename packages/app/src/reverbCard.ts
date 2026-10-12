@@ -1,7 +1,8 @@
 /**
- * The Reverb insert's card (windsor#171): the `room` return's Starting
- * point picker and 16 space knobs, then Mix. Picking a space writes its
- * numbers into the insert; the knobs edit them from there. Three pages
+ * The Reverb insert's card (windsor#171): the Starting point picker over
+ * the preset bank (windsor#774) and 16 space knobs, then Mix. Picking a
+ * preset writes its whole space, voicing included, into the insert; the
+ * knobs edit it from there. Three pages
  * (windsor#173): Space (the picker, pre-delay and size, then decay and mix
  * at the rack's big dial), Diffusion (the voicing's `Plate | Room` switch
  * (windsor#746), the two input diffusion knobs, Build in a column of its own
@@ -11,7 +12,7 @@
  * rail.
  */
 import type { ReverbInsertSpec } from '@windsor/engine';
-import { DEFAULT_REVERB, SPACES, plateSpace } from '@windsor/engine';
+import { DEFAULT_REVERB, applyReverbPreset, plateSpace } from '@windsor/engine';
 import { STRIP_COLOR } from './consoleColors';
 import { el, seg } from './dom';
 import type { InsertCard } from './insertCards';
@@ -55,7 +56,7 @@ export const reverbCard: InsertCard = (ctx, slot, index) => {
   const space = (): HTMLElement => {
     const picker = spacePicker(
       () => plateSpace(current()),
-      (name) => commit({ ...current(), ...SPACES[name] }),
+      (number) => commit(applyReverbPreset(current(), number)),
     );
     return insertPage(
       wideColumn(picker.root),

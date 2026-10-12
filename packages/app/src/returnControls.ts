@@ -2,21 +2,23 @@
  * The controls the returns and the inserts that run their DSP share
  * (windsor#171): the plate's 16 space knobs and its Starting point picker,
  * the delay line's Time, Regen, Damp and Q, and the tempo buttons. The
- * Mixer tab's returns (`returnsPanel.ts`) and the Plate reverb and Echo
+ * Mixer tab's returns (`returnsPanel.ts`) and the Reverb and Echo
  * cards bind them to their own fields, so the two cannot drift apart.
  */
-import type { ReverbSpace, SpaceName } from '@windsor/engine';
+import type { ReverbSpace } from '@windsor/engine';
 import {
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
   DELAY_RESONANCE_MAX_DB,
   DELAY_RESONANCE_MIN_DB,
+  REVERB_PRESETS,
+  REVERB_PRESET_GROUPS,
   SECONDS_PER_MINUTE,
-  SPACES,
-  SPACE_NAMES,
+  matchingReverbPreset,
 } from '@windsor/engine';
 import { fmt2, fmtDb, fmtHz, fmtMs } from './consoleFormat';
-import { el, select } from './dom';
+import type { SelectGroup } from './dom';
+import { el, groupedSelect } from './dom';
 import type { KnobSpec } from './knob';
 import {
   DAMP_MAX,
@@ -96,44 +98,44 @@ export const DELAY_LINE_KNOBS: readonly DelayLineKnob[] = [
   },
 ];
 
-/** The named starting point whose numbers `space` holds exactly, field by field, if any. */
-export function matchingSpace(space: ReverbSpace | undefined): SpaceName | undefined {
-  if (!space) return undefined;
-  return SPACE_NAMES.find((key) => {
-    const named = SPACES[key];
-    return (Object.keys(named) as (keyof ReverbSpace)[]).every((f) => named[f] === space[f]);
-  });
-}
-
 /** A control that re-reads the document when a knob beside it edits what it shows. */
 export interface RefreshingControl {
   readonly root: HTMLElement;
   refresh(): void;
 }
 
+/** The preset bank as the picker's groups (windsor#774): each group in its order, its presets in the bank's. */
+export const PRESET_GROUPS: readonly SelectGroup[] = REVERB_PRESET_GROUPS.map((group) => ({
+  group,
+  options: REVERB_PRESETS.filter((preset) => preset.group === group).map((preset) => ({
+    value: String(preset.number),
+    label: preset.label,
+  })),
+}));
+
 /**
- * The Starting point picker: the named spaces, and "custom" when the space
- * `read` returns matches none. Picking one hands its name to `onPick`, which
- * writes its numbers into the document. `refresh` re-evaluates the match, so
- * a knob turn that leaves every space reads "custom", and picking the space
- * it left is a one-step reset.
+ * The Starting point picker: "custom" when the space `read` returns matches
+ * no preset, then the bank under its four groups (windsor#774). Picking one
+ * hands its number to `onPick`, which writes its space into the document.
+ * `refresh` re-evaluates the match, so a knob turn that leaves every preset
+ * reads "custom", and picking the preset it left is a one-step reset.
  */
 export function spacePicker(
   read: () => ReverbSpace | undefined,
-  onPick: (name: SpaceName) => void,
+  onPick: (number: number) => void,
 ): RefreshingControl {
-  const options = SPACE_NAMES.map((key) => ({ value: key, label: key }));
-  const root = select('Starting point', options, '', (key) => {
-    if (key === '') return;
-    onPick(key as SpaceName);
+  const root = groupedSelect('Starting point', PRESET_GROUPS, '', (value) => {
+    if (value === '') return;
+    onPick(Number(value));
   });
   const sel = root.querySelector('select') as HTMLSelectElement;
   const custom = new Option('custom', '');
   const refresh = (): void => {
-    const match = matchingSpace(read());
-    if (match) custom.remove();
-    else if (custom.parentElement !== sel) sel.add(custom, 0);
-    sel.value = match ?? '';
+    const match = matchingReverbPreset(read());
+    // Ahead of the first group, never inside it as `sel.add(custom, 0)` would put it.
+    if (match !== undefined) custom.remove();
+    else if (custom.parentElement !== sel) sel.insertBefore(custom, sel.firstChild);
+    sel.value = match === undefined ? '' : String(match);
   };
   refresh();
   return { root, refresh };

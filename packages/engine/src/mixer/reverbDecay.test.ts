@@ -23,7 +23,8 @@ import {
   t30,
 } from '../__fixtures__/reverbHarness';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
-import { DEFAULT_SPACE, SPACES } from './reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
+import { DEFAULT_SPACE } from './reverbSpace';
 import type { ReverbSpace } from './reverbSpace';
 
 const loaded = loadReverb();
@@ -81,7 +82,8 @@ describe('the converted spaces', () => {
   it.each(Object.keys(BEFORE))(
     '%s rings within 10 % of its old T30',
     (name) => {
-      const space = name === 'default' ? DEFAULT_SPACE : SPACES[name as keyof typeof SPACES];
+      const space =
+        name === 'default' ? DEFAULT_SPACE : SPACE_ROWS[name as keyof typeof SPACE_ROWS];
       const before = BEFORE[name]!;
       const measured = measure(
         { ...space, wet: 1, dry: 0 } as Partial<ReverbSpace>,

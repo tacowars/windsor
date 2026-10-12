@@ -20,7 +20,7 @@ import {
   renderReverb,
   spaceParams,
 } from '../__fixtures__/reverbHarness';
-import { SPACES } from './reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 
 const loaded = loadReverb();
 const SR = loaded.sampleRate;
@@ -67,8 +67,8 @@ const writeSpace = (values: Record<string, Float32Array>, space: Record<string, 
   for (const [name, value] of Object.entries(space)) values[name]![0] = value;
 };
 
-const PLATE_HALL = spaceParams({ ...SPACES.hall, voicing: 'plate', decay: 10 });
-const ROOM_SPACE = spaceParams({ ...SPACES.room, voicing: 'room', decay: 10 });
+const PLATE_HALL = spaceParams({ ...SPACE_ROWS.hall, voicing: 'plate', decay: 10 });
+const ROOM_SPACE = spaceParams({ ...SPACE_ROWS.room, voicing: 'room', decay: 10 });
 
 /** Each switch, as automation from 2 s: the issue's four, each way where it has two. */
 const switches: [string, Record<string, number>, Automate][] = [

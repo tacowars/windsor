@@ -31,7 +31,7 @@ import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { RETURNS, onSendBus } from '../mixer/mix';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { DEFAULT_REVERB } from '../inserts/reverbInsert';
-import { SPACES } from '../mixer/reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { PRESETS } from '../patch/presets';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
@@ -234,7 +234,7 @@ describe('returns', () => {
   it('takes a third bus as one more RETURNS entry, with no change to the types or routing', async () => {
     const returns = {
       ...RETURNS,
-      short: { level: 0.5, inserts: [onSendBus({ ...DEFAULT_REVERB, ...SPACES.plate })] },
+      short: { level: 0.5, inserts: [onSendBus({ ...DEFAULT_REVERB, ...SPACE_ROWS.plate })] },
     } satisfies Record<string, ReturnSpec>;
     const mix = {
       p: strip({ short: 0.5 }),
