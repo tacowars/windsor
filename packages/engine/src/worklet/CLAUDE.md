@@ -265,7 +265,7 @@ counts `INPUT_SPAN`. The duck's gain is written out in the sample loop.
 `mixer/reverbVoicing.test.ts` holds the switch, the sleep and the rows.
 `mixer/reverbStereo.test.ts` holds the sides, the mirror, the centre, the
 anti-phase ring, the live moves and the rates, and
-`mixer/plateStereoGraph.test.ts` two hard-panned parts through a group's Plate.
+`mixer/plateStereoGraph.test.ts` two hard-panned parts through a group's Reverb insert.
 The output taps are Windsor's own (windsor#766, `reverbTapTables.ts`): twelve
 a side over all eight tank lines, interleaved around the loop, at full and
 three-quarter gain, each output weighing most the half its own input feeds,

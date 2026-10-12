@@ -138,10 +138,12 @@ function bloomScalesRenamed(doc: RawDocument): RawDocument {
  * and no value of it renders a song saved without it as before), from 12
  * to 13 (windsor#764: the plate's `modRate` and `modDepth` drive four
  * irregular sources where they drove one sine and cosine, and no setting
- * renders the old modulation) or from 13 to 14 (windsor#746: the plate's
+ * renders the old modulation), from 13 to 14 (windsor#746: the plate's
  * `voicing`, whose plate row's shorter input diffusers change how every
- * plate renders, and no voicing renders the old diffusers), so a song saved
- * at any version from 5 to 13 is refused too: the chain stops at 10.
+ * plate renders, and no voicing renders the old diffusers) or from 14 to 15
+ * (windsor#771: the `plate` insert kind renamed `reverb`, with no upgrade by
+ * tacowars's decision), so a song saved at any version from 5 to 14 is
+ * refused too: the chain stops at 10.
  * Version 2 was retired by #705, version 3 by windsor#238 (record
  * `2026-10-01-retire-song-version-3`) and version 4 by windsor#224, each
  * with no upgrade, so a song saved at any of them is refused.

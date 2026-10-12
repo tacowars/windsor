@@ -25,8 +25,8 @@ import type { PhaserSpec } from './phaserSpec';
 import { ENSEMBLE_INSERT } from './ensembleInsert';
 import type { EnsembleSpec } from './ensembleSpec';
 import type { RetroReverbSpec } from './retroReverbSpec';
-import { PLATE_REVERB_INSERT } from './plateReverbInsert';
-import type { PlateReverbSpec } from './plateReverbInsert';
+import { REVERB_INSERT } from './reverbInsert';
+import type { ReverbInsertSpec } from './reverbInsert';
 import { ECHO_INSERT } from './echoInsert';
 import type { EchoSpec } from './echoInsert';
 import { EQ_INSERT } from './eqInsert';
@@ -59,7 +59,7 @@ export type InsertSpec = (
   | PhaserSpec
   | DelaySpec
   | EnsembleSpec
-  | PlateReverbSpec
+  | ReverbInsertSpec
   | EchoSpec
   | EqSpec
   | FilterSpec
@@ -81,7 +81,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   delay: DELAY_INSERT,
   ensemble: ENSEMBLE_INSERT,
   tape: TAPE_INSERT,
-  plate: PLATE_REVERB_INSERT,
+  reverb: REVERB_INSERT,
   echo: ECHO_INSERT,
   eq: EQ_INSERT,
   filter: FILTER_INSERT,

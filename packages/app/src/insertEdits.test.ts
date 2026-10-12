@@ -10,7 +10,7 @@ import type { InsertSpec } from '@windsor/engine';
 import {
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
-  DEFAULT_PLATE_REVERB,
+  DEFAULT_REVERB,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   MAX_INSERTS,
@@ -58,23 +58,23 @@ describe('insert edits', () => {
   });
 
   it('fills the ids of a chain the code holds before adding to it', () => {
-    const code = [DEFAULT_PLATE_REVERB];
+    const code = [DEFAULT_REVERB];
     const next = addInsert(code, 'drive', 'a');
     expect(next[0]).toEqual(withInsertIds(code)[0]);
     expect(next[1]!.id).not.toBe(next[0]!.id);
   });
 
-  it('starts a Plate reverb or an Echo at Mix 1.00 on a send bus, and at its default elsewhere (windsor#172)', () => {
+  it('starts a Reverb or an Echo at Mix 1.00 on a send bus, and at its default elsewhere (windsor#172)', () => {
     for (const bus of RETURN_NAMES) {
-      expect(bare(addInsert([], 'plate', bus))).toEqual([{ ...DEFAULT_PLATE_REVERB, mix: 1 }]);
+      expect(bare(addInsert([], 'reverb', bus))).toEqual([{ ...DEFAULT_REVERB, mix: 1 }]);
       expect(bare(addInsert([], 'echo', bus))).toEqual([{ ...DEFAULT_ECHO, mix: 1 }]);
       expect(bare(addInsert([], 'drive', bus))).toEqual([DEFAULT_DRIVE]);
     }
     for (const target of [0, 3, 'master', undefined] as const) {
-      expect(bare(addInsert([], 'plate', target))).toEqual([DEFAULT_PLATE_REVERB]);
+      expect(bare(addInsert([], 'reverb', target))).toEqual([DEFAULT_REVERB]);
       expect(bare(addInsert([], 'echo', target))).toEqual([DEFAULT_ECHO]);
     }
-    expect(DEFAULT_PLATE_REVERB.mix).toBe(0.3);
+    expect(DEFAULT_REVERB.mix).toBe(0.3);
     expect(DEFAULT_ECHO.mix).toBe(0.3);
   });
 
@@ -122,14 +122,14 @@ describe('addInsertAtFront (windsor#173)', () => {
     expect(list).toEqual([a, b]);
   });
 
-  it('starts every kind at its part defaults on a group, so a Plate reverb starts at Mix 0.30 (windsor#287)', () => {
+  it('starts every kind at its part defaults on a group, so a Reverb starts at Mix 0.30 (windsor#287)', () => {
     const target = groupKey(3);
     for (const kind of INSERT_KIND_NAMES) {
       expect(bare(addInsert([], kind, target))).toEqual([INSERT_KINDS[kind].defaults]);
       expect(bare(addInsertAtFront([], kind, target))).toEqual([INSERT_KINDS[kind].defaults]);
     }
-    expect(bare(addInsert([], 'plate', target))).toEqual([DEFAULT_PLATE_REVERB]);
-    expect(DEFAULT_PLATE_REVERB.mix).toBe(0.3);
+    expect(bare(addInsert([], 'reverb', target))).toEqual([DEFAULT_REVERB]);
+    expect(DEFAULT_REVERB.mix).toBe(0.3);
   });
 
   it('adds the first insert to an empty chain, as addInsert does', () => {
@@ -138,16 +138,16 @@ describe('addInsertAtFront (windsor#173)', () => {
     );
   });
 
-  it('starts a Plate reverb or an Echo at Mix 1.00 at the front of a send bus (windsor#172)', () => {
+  it('starts a Reverb or an Echo at Mix 1.00 at the front of a send bus (windsor#172)', () => {
     const drive = { ...DEFAULT_DRIVE, drive: 3, id: 'd' };
     for (const bus of RETURN_NAMES) {
-      expect(bare(addInsertAtFront([drive], 'plate', bus))).toEqual(
-        bare([{ ...DEFAULT_PLATE_REVERB, mix: 1 }, drive]),
+      expect(bare(addInsertAtFront([drive], 'reverb', bus))).toEqual(
+        bare([{ ...DEFAULT_REVERB, mix: 1 }, drive]),
       );
       expect(bare(addInsertAtFront([drive], 'echo', bus))[0]).toEqual({ ...DEFAULT_ECHO, mix: 1 });
     }
     for (const target of [0, 'master', undefined] as const)
-      expect(bare(addInsertAtFront([drive], 'plate', target))[0]).toEqual(DEFAULT_PLATE_REVERB);
+      expect(bare(addInsertAtFront([drive], 'reverb', target))[0]).toEqual(DEFAULT_REVERB);
   });
 
   it('leaves a full chain as it was', () => {
@@ -170,9 +170,9 @@ describe('the slot child edits (windsor#692)', () => {
     expect(withoutInsertIds([child])).toEqual([INSERT_KINDS.chorus.defaults]);
     expect(isInsertId(child.id)).toBe(true);
     // No onSendBus: a child starts at its defaults on a send bus's Echo too.
-    const plate = setChild(set, 'h', 'plate', ids);
+    const plate = setChild(set, 'h', 'reverb', ids);
     const next = insertSlot(plate[1]!)!;
-    expect(withoutInsertIds([next])).toEqual([DEFAULT_PLATE_REVERB]);
+    expect(withoutInsertIds([next])).toEqual([DEFAULT_REVERB]);
     expect(next.id).not.toBe(child.id);
     expect(removeChild(plate, 'h')).toEqual([drive, echo]);
     expect(setChild([drive], 'h', 'chorus', ids)).toEqual([drive]);

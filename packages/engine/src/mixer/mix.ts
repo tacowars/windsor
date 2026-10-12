@@ -15,7 +15,7 @@ import { LOW_CUT_MIN_HZ } from '../audioConstants';
 import type { AutomationLane } from '../automation/automationLane';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import type { InsertSpec } from '../inserts/insertRegistry';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 
 /**
  * A send bus (windsor#172; record `2026-09-30-insert-rack-and-send-bus-chains`
@@ -33,15 +33,15 @@ export interface ReturnSpec {
   readonly inserts: readonly InsertSpec[];
 }
 
-/** The Mix a Plate reverb or an Echo starts at on a send bus: the effect alone, as the returns ran. */
+/** The Mix a Reverb or an Echo starts at on a send bus: the effect alone, as the returns ran. */
 export const SEND_BUS_WET_MIX = 1;
 
 /**
- * `spec` as a send bus starts it (record §5): a Plate reverb or an Echo fully
+ * `spec` as a send bus starts it (record §5): a Reverb or an Echo fully
  * wet, since the bus's level is its amount; any other kind as it is.
  */
 export function onSendBus(spec: InsertSpec): InsertSpec {
-  return spec.kind === 'plate' || spec.kind === 'echo' ? { ...spec, mix: SEND_BUS_WET_MIX } : spec;
+  return spec.kind === 'reverb' || spec.kind === 'echo' ? { ...spec, mix: SEND_BUS_WET_MIX } : spec;
 }
 
 /**
@@ -51,7 +51,7 @@ export function onSendBus(spec: InsertSpec): InsertSpec {
  * sounds the fixed `room` and `echo` returns made before windsor#172.
  */
 export const RETURNS = {
-  a: { level: 0.9, inserts: [onSendBus(DEFAULT_PLATE_REVERB)] },
+  a: { level: 0.9, inserts: [onSendBus(DEFAULT_REVERB)] },
   b: { level: 0.6, inserts: [onSendBus(DEFAULT_ECHO)] },
 } satisfies Record<string, ReturnSpec>;
 

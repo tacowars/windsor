@@ -22,7 +22,7 @@ import { ensembleCard } from './ensembleCard';
 import { tapeCard } from './tapeCard';
 import { phaserCard } from './phaserCard';
 import { retroReverbCard } from './retroReverbCard';
-import { plateReverbCard } from './plateReverbCard';
+import { reverbCard } from './reverbCard';
 import { echoCard } from './echoCard';
 import { eqCard } from './eqCard';
 import { filterCard } from './filterCard';
@@ -52,7 +52,7 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   tape: tapeCard,
   delay: delayCard,
   ensemble: ensembleCard,
-  plate: plateReverbCard,
+  reverb: reverbCard,
   echo: echoCard,
   eq: eqCard,
   filter: filterCard,

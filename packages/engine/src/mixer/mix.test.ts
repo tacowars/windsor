@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { BLOCK } from '../__fixtures__/fakeAudioNodes';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, onSendBus, stripFor } from './mix';
 import { SPACES } from './reverbSpace';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
@@ -67,7 +67,7 @@ describe('RETURNS', () => {
   it('holds the hall plate on Send A at 0.90 and the echo on Send B at 0.60, both fully wet', () => {
     expect(RETURNS.a).toEqual({
       level: 0.9,
-      inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.hall, mix: 1 }],
+      inserts: [{ ...DEFAULT_REVERB, ...SPACES.hall, mix: 1 }],
     });
     expect(RETURNS.b).toEqual({ level: 0.6, inserts: [{ ...DEFAULT_ECHO, mix: 1 }] });
   });
@@ -90,8 +90,8 @@ describe('RETURNS', () => {
 });
 
 describe('onSendBus', () => {
-  it('starts a Plate reverb or an Echo fully wet, and any other kind at its defaults', () => {
-    expect(onSendBus(DEFAULT_PLATE_REVERB)).toEqual({ ...DEFAULT_PLATE_REVERB, mix: 1 });
+  it('starts a Reverb or an Echo fully wet, and any other kind at its defaults', () => {
+    expect(onSendBus(DEFAULT_REVERB)).toEqual({ ...DEFAULT_REVERB, mix: 1 });
     expect(onSendBus(DEFAULT_ECHO)).toEqual({ ...DEFAULT_ECHO, mix: 1 });
     expect(onSendBus(DEFAULT_CHORUS)).toBe(DEFAULT_CHORUS);
   });

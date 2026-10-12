@@ -46,7 +46,7 @@ describe('INSERT_KINDS', () => {
       'delay',
       'ensemble',
       'tape',
-      'plate',
+      'reverb',
       'echo',
       'eq',
       'filter',

@@ -22,7 +22,7 @@ import { musicPartName } from '../song/documentParts';
 import { FmEngine } from '../synth/fmEngine';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import type { EchoSpec } from '../inserts/echoInsert';
-import type { PlateReverbSpec } from '../inserts/plateReverbInsert';
+import type { ReverbInsertSpec } from '../inserts/reverbInsert';
 import { RETURNS } from '../mixer/mix';
 import { makePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
@@ -46,7 +46,7 @@ async function system(document: ArrangementDocument): Promise<AudioSystem> {
 
 const stripOf = (sys: AudioSystem, id: FullPartId) => sys.strip(musicPartName(FULL_SLOT[id]));
 
-const PLATE = RETURNS.a.inserts[0] as PlateReverbSpec;
+const PLATE = RETURNS.a.inserts[0] as ReverbInsertSpec;
 const ECHO = RETURNS.b.inserts[0] as EchoSpec;
 
 /** The kinds on a bus's live chain, in order. */
