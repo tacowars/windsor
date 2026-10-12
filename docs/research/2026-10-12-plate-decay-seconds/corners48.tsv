@@ -15,14 +15,14 @@ decay	lowDecay	size	tank	lowCross	hold	result
 0.2	0.25	4	0.8	80	on	held: last second -2 dB re its second second; largest gain 0.428540; after 3×RT60 -83 dB re first second's peak
 0.2	0.25	4	0.8	10000	off	largest gain 0.428540; after 3×RT60 -49 dB re first second's peak
 0.2	0.25	4	0.8	10000	on	held: last second -2 dB re its second second; largest gain 0.428540; after 3×RT60 -105 dB re first second's peak
-0.2	4	0.05	0	80	off	largest gain 0.990299; after 3×RT60 -354 dB re first second's peak
-0.2	4	0.05	0	80	on	held: last second -1 dB re its second second; largest gain 0.990299; after 3×RT60 -Infinity dB re first second's peak
-0.2	4	0.05	0	10000	off	largest gain 0.990299; after 3×RT60 -198 dB re first second's peak
-0.2	4	0.05	0	10000	on	held: last second -4 dB re its second second; largest gain 0.990299; after 3×RT60 -241 dB re first second's peak
-0.2	4	0.05	0.8	80	off	largest gain 0.990299; after 3×RT60 -346 dB re first second's peak
-0.2	4	0.05	0.8	80	on	held: last second -1 dB re its second second; largest gain 0.990299; after 3×RT60 -Infinity dB re first second's peak
-0.2	4	0.05	0.8	10000	off	largest gain 0.990299; after 3×RT60 -195 dB re first second's peak
-0.2	4	0.05	0.8	10000	on	held: last second -4 dB re its second second; largest gain 0.990299; after 3×RT60 -238 dB re first second's peak
+0.2	4	0.05	0	80	off	largest gain 0.991137; after 3×RT60 -340 dB re first second's peak
+0.2	4	0.05	0	80	on	held: last second -1 dB re its second second; largest gain 0.991137; after 3×RT60 -Infinity dB re first second's peak
+0.2	4	0.05	0	10000	off	largest gain 0.991137; after 3×RT60 -182 dB re first second's peak
+0.2	4	0.05	0	10000	on	held: last second -4 dB re its second second; largest gain 0.991137; after 3×RT60 -222 dB re first second's peak
+0.2	4	0.05	0.8	80	off	largest gain 0.991137; after 3×RT60 -330 dB re first second's peak
+0.2	4	0.05	0.8	80	on	held: last second -1 dB re its second second; largest gain 0.991137; after 3×RT60 -Infinity dB re first second's peak
+0.2	4	0.05	0.8	10000	off	largest gain 0.991137; after 3×RT60 -179 dB re first second's peak
+0.2	4	0.05	0.8	10000	on	held: last second -4 dB re its second second; largest gain 0.991137; after 3×RT60 -219 dB re first second's peak
 0.2	4	4	0	80	off	largest gain 0.809092; after 3×RT60 -174 dB re first second's peak
 0.2	4	4	0	80	on	held: last second -2 dB re its second second; largest gain 0.809092; after 3×RT60 -189 dB re first second's peak
 0.2	4	4	0	10000	off	largest gain 0.809092; after 3×RT60 -162 dB re first second's peak
@@ -55,11 +55,11 @@ decay	lowDecay	size	tank	lowCross	hold	result
 60	4	0.05	0.8	80	on	held: last second -4 dB re its second second; largest gain 0.999994; after 3×RT60 -Infinity dB re first second's peak
 60	4	0.05	0.8	10000	off	largest gain 0.999994; after 3×RT60 -Infinity dB re first second's peak
 60	4	0.05	0.8	10000	on	held: last second -4 dB re its second second; largest gain 0.999994; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0	80	off	largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0	80	on	held: last second -2 dB re its second second; largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0	10000	off	largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0	10000	on	held: last second -2 dB re its second second; largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0.8	80	off	largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0.8	80	on	held: last second -2 dB re its second second; largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0.8	10000	off	largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
-60	4	4	0.8	10000	on	held: last second -2 dB re its second second; largest gain 0.999352; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0	80	off	largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0	80	on	held: last second -2 dB re its second second; largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0	10000	off	largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0	10000	on	held: last second -2 dB re its second second; largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0.8	80	off	largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0.8	80	on	held: last second -2 dB re its second second; largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0.8	10000	off	largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak
+60	4	4	0.8	10000	on	held: last second -2 dB re its second second; largest gain 0.999437; after 3×RT60 -Infinity dB re first second's peak

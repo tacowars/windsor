@@ -96,36 +96,42 @@ describe('the longest corner', () => {
   /**
    * Every gain point, and the low band's gain at DC on it (the shelf's
    * largest), stays under 1 on every block: the all-passes and the damping
-   * never gain, so no loop round the tank can either.
+   * never gain, so no loop round the tank can either. At Size 0.05 the band's
+   * 240 s is past what the tank can ring at all (its ceiling, 73.9 s), so its
+   * correction is the table's largest: the closest the gains come to 1.
    */
-  it('dies away: Decay 60 × lowDecay 4 at tank diffusion 0.8 and Size 4, after 3 × 240 s', () => {
-    const longest = REVERB_SPACE_RANGES.decay[1] * REVERB_SPACE_RANGES.lowDecay[1];
-    let largest = 0;
-    const afterBlock = (_block: number, processor: Parameters<typeof internals>[0]): void => {
-      const plate = internals(processor);
-      for (let p = 0; p < plate._gain.length; p++) {
-        largest = Math.max(largest, plate._gain[p]!, plate._gain[p]! + plate._lowExtra[p]!);
-      }
-    };
-    const result = renderReverb(
-      loaded,
-      3 * longest + 1,
-      noiseBurst(1),
-      {
-        decay: REVERB_SPACE_RANGES.decay[1],
-        lowDecay: REVERB_SPACE_RANGES.lowDecay[1],
-        lowCross: REVERB_SPACE_RANGES.lowCross[1],
-        size: REVERB_SPACE_RANGES.size[1],
-        diffusionTank1: REVERB_SPACE_RANGES.diffusionTank1[1],
-        diffusionTank2: REVERB_SPACE_RANGES.diffusionTank2[1],
-        tankLowCut: 10,
-        tankHighCut: 20000,
-      },
-      { afterBlock },
-    );
-    expect(largest).toBeLessThan(1);
-    expect(result.nonFinite).toBe(0);
-    const firstSecond = Math.max(...result.trace.slice(0, Math.round(loaded.sampleRate / BLOCK)));
-    expect(rmsAt(result, 3 * longest)).toBeLessThan(firstSecond * 1e-3);
-  }, 120_000);
+  it.each(REVERB_SPACE_RANGES.size.slice().reverse())(
+    'dies away: Decay 60 × lowDecay 4 at tank diffusion 0.8 and Size %f, after 3 × 240 s',
+    (size) => {
+      const longest = REVERB_SPACE_RANGES.decay[1] * REVERB_SPACE_RANGES.lowDecay[1];
+      let largest = 0;
+      const afterBlock = (_block: number, processor: Parameters<typeof internals>[0]): void => {
+        const plate = internals(processor);
+        for (let p = 0; p < plate._gain.length; p++) {
+          largest = Math.max(largest, plate._gain[p]!, plate._gain[p]! + plate._lowExtra[p]!);
+        }
+      };
+      const result = renderReverb(
+        loaded,
+        3 * longest + 1,
+        noiseBurst(1),
+        {
+          decay: REVERB_SPACE_RANGES.decay[1],
+          lowDecay: REVERB_SPACE_RANGES.lowDecay[1],
+          lowCross: REVERB_SPACE_RANGES.lowCross[1],
+          size,
+          diffusionTank1: REVERB_SPACE_RANGES.diffusionTank1[1],
+          diffusionTank2: REVERB_SPACE_RANGES.diffusionTank2[1],
+          tankLowCut: 10,
+          tankHighCut: 20000,
+        },
+        { afterBlock },
+      );
+      expect(largest).toBeLessThan(1);
+      expect(result.nonFinite).toBe(0);
+      const firstSecond = Math.max(...result.trace.slice(0, Math.round(loaded.sampleRate / BLOCK)));
+      expect(rmsAt(result, 3 * longest)).toBeLessThan(firstSecond * 1e-3);
+    },
+    120_000,
+  );
 });

@@ -63,6 +63,20 @@ describe('lowDecay 1', () => {
   });
 });
 
+/** The T30 of the octave band at `hz` for an impulse into the plate at `params`. */
+function bandT30(params: Record<string, number>, hz: number): number {
+  const settle = blockAt(0.5);
+  const seconds = 1.5 * params['decay']! * Math.max(1, params['lowDecay']!) + 2;
+  const { samples } = renderReverb(loaded, seconds, impulseAt(settle), params, {
+    collectSamples: true,
+  });
+  const from = settle * BLOCK;
+  return t30(octaveBand(channel(samples, 0, from), hz), octaveBand(channel(samples, 1, from), hz));
+}
+
+/** Damping open and modulation off: the conditions a band is measured in. */
+const OPEN = { tankLowCut: 10, tankHighCut: 20000, modDepth: 0 };
+
 describe('the two bands', () => {
   /**
    * Three octaves either side of `lowCross`, as the Retro Reverb's own test
@@ -75,34 +89,77 @@ describe('the two bands', () => {
   it.each([0.25, 4])(
     'holds Decay × %f below lowCross and Decay above',
     (lowDecay) => {
-      const params = {
-        size: 1,
-        decay: 6,
-        lowCross: 1000,
-        tankLowCut: 10,
-        tankHighCut: 20000,
-        modDepth: 0,
-      };
-      const settle = blockAt(0.5);
-      const band = (p: Record<string, number>, hz: number): number => {
-        const seconds = 1.5 * p['decay']! * Math.max(1, p['lowDecay']!) + 2;
-        const { samples } = renderReverb(loaded, seconds, impulseAt(settle), p, {
-          collectSamples: true,
-        });
-        const from = settle * BLOCK;
-        return t30(
-          octaveBand(channel(samples, 0, from), hz),
-          octaveBand(channel(samples, 1, from), hz),
-        );
-      };
-      const low = band({ ...params, lowDecay }, 125);
+      const params = { ...OPEN, size: 1, decay: 6, lowCross: 1000 };
+      const low = bandT30({ ...params, lowDecay }, 125);
       expect(Math.abs(low / (params.decay * lowDecay) - 1)).toBeLessThan(0.15);
-      const high = band({ ...params, lowDecay }, 8000);
-      const neutral = band({ ...params, lowDecay: 1 }, 8000);
+      const high = bandT30({ ...params, lowDecay }, 8000);
+      const neutral = bandT30({ ...params, lowDecay: 1 }, 8000);
       expect(Math.abs(high / neutral - 1)).toBeLessThan(0.1);
     },
     120_000,
   );
+
+  /**
+   * Each band at its own target, three octaves from `lowCross`, within 15 %
+   * (fix round 2 of PR windsor#750). The low band's gains take the measured
+   * correction at its own target, Decay × `lowDecay`; with the broadband
+   * factor times `lowDecay`, the first case's low band rang 39 s, 35 % short.
+   * - Size 0.05, Decay 15, `lowDecay` 4: the low band asks 60 s, where the
+   *   correction is 5.58 against Decay's 1.38. At Size 0.05 only about 250 Hz
+   *   to 500 Hz rings past a minute even with every gain at 1 (the research
+   *   note's ceilings), so the low band is read at 375 Hz, `lowCross` 3 kHz.
+   *   Three octaves above that is past what a 36 ms tank rings at all, so the
+   *   upper band is read at 640 Hz, `lowCross` 80 Hz.
+   * - Size 4, Decay 4, `lowDecay` 0.25: the low band asks 1 s, under one trip
+   *   round the tank (2.9 s), from the correction's short end.
+   */
+  it.each([
+    { size: 0.05, decay: 15, lowDecay: 4, lowCross: 3000, hz: 375, target: 60 },
+    { size: 0.05, decay: 15, lowDecay: 4, lowCross: 80, hz: 640, target: 15 },
+    { size: 4, decay: 4, lowDecay: 0.25, lowCross: 250, hz: 31.25, target: 1 },
+    { size: 4, decay: 4, lowDecay: 0.25, lowCross: 250, hz: 2000, target: 4 },
+  ])(
+    'holds its own target: $hz Hz at Size $size, Decay $decay × $lowDecay, lowCross $lowCross',
+    ({ hz, target, ...space }) => {
+      const measured = bandT30({ ...OPEN, ...space }, hz);
+      expect(Math.abs(measured / target - 1)).toBeLessThan(0.15);
+    },
+    120_000,
+  );
+});
+
+describe('the sample loop (worklet rule 6)', () => {
+  /**
+   * The low band's shelf is written out at each of the tank's eight gain
+   * points, never called: read off the shipped bundle, the sample loop calls
+   * only the plate's own line methods (#671's exception) and `Math`.
+   */
+  it('calls no helper per sample', () => {
+    const prototype = Object.getPrototypeOf(loaded.create()) as { _renderBlock: unknown };
+    const render = String(prototype._renderBlock);
+    const start = render.indexOf('for (let i = 0; i < 128; i++) {');
+    const end = render.indexOf('this._preDelayWrite = (', start);
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    const loop = render.slice(start, end);
+    const calls = new Set(
+      [...loop.matchAll(/([A-Za-z_$][\w$.]*)\s*\(/g)]
+        .map((match) => match[1]!)
+        .filter((name) => !['for', 'if', 'while'].includes(name)),
+    );
+    expect([...calls].sort()).toEqual([
+      'Math.abs',
+      'Math.cos',
+      'Math.max',
+      'Math.sin',
+      'this._read',
+      'this._readCubic',
+      'this._readTap',
+      'this._write1',
+    ]);
+    // The band runs in the loop: each point writes its lowpass's state there.
+    for (let p = 0; p < 8; p++) expect(loop).toContain(`lowState[${p}] = low + delta`);
+  });
 });
 
 const TONE_HZ = 220;

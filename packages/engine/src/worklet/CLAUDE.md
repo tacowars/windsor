@@ -236,9 +236,13 @@ installed on the processor's prototype, so each body is still the method the
 hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
 Decay is an RT60 in seconds (windsor#748): `tankGains.ts` gives each tank
 line a gain point, set once a block from Decay and Size and ramped a sample at
-a time by the tank, through the measured correction in `reverbDecayTables.ts`;
-`plateLowBand.ts` is the low band's shelf at each point, off at `lowDecay` 1.
-Both are functions over the plate (rule 6), not prototype methods. The band's
+a time by the tank, through the measured correction in `reverbDecayTables.ts`,
+which `decayCorrection.ts` reads for each RT60 asked; `plateLowBand.ts` sets
+the low band's shelf at each point once a block, its gains from the
+correction at its own target (Decay × `lowDecay`), off at `lowDecay` 1. The
+shelf itself is written out in the tank's sample loop at all eight points, not
+called (`mixer/reverbLowBand.test.ts` reads the loop's calls off the bundle).
+All three are functions over the plate (rule 6), not prototype methods. The band's
 prewarp is `fm/portableTangent.ts`'s `tanInPlace`, so an edit there rebuilds
 `reverb-processor.js` too. `mixer/reverbDecay.test.ts` holds the T30 to Decay
 and `mixer/reverbLowBand.test.ts` the band and the live moves.

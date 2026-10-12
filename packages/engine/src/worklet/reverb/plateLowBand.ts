@@ -11,11 +11,16 @@
  *
  * `configureLowBand` runs once a block from `configureGains`, against the
  * block's gain targets: the extra low gain (gL − g) per point, ramped across
- * the block as the gains are, and the lowpass's coefficient. `shelf` is the
- * per-sample point the tank calls while the band runs.
+ * the block as the gains are, and the lowpass's coefficient. gL is cut from
+ * the band's own target through the measured correction at that target
+ * (`decayCorrection.ts`), never from the broadband Decay's corrected value
+ * times `lowDecay`: the correction climbs with the RT60 asked, so the
+ * broadband factor leaves a long low band short (fix round 2 of PR
+ * windsor#750). The shelf itself is written out in the tank's sample loop at
+ * each point (`tank.ts`), never called per sample (worklet rule 6).
  *
  * At `lowDecay` exactly 1, once any ramp back has landed, the band is off:
- * nothing here runs per sample and the tank takes its plain gain, to the bit
+ * nothing of it runs per sample and the tank takes its plain gain, to the bit
  * (`mixer/reverbLowBand.test.ts` pins it against `lowBand: false`). Coming
  * on, each lowpass starts from the sample circulating at its point, not from
  * wherever it last stopped. HOLD bypasses the band's output, not its state:
@@ -23,13 +28,13 @@
  * coefficient, so releasing HOLD steps nothing, as the tank's damping filters
  * do (`tank.ts`, above `dampLp`).
  *
- * Samples cross in `plate._value`, never as arguments or results, and nothing
- * is allocated (worklet rule 2); the prewarp is `tanInPlace`, the same bits on
- * arm64 and x64 (`fm/portableTangent.ts`), so an edit there rebuilds this
- * bundle too.
+ * Nothing is allocated and no double crosses a call (worklet rule 2); the
+ * prewarp is `tanInPlace`, the same bits on arm64 and x64
+ * (`fm/portableTangent.ts`), so an edit there rebuilds this bundle too.
  */
 
 import { tanInPlace } from '../fm/portableTangent';
+import { correctDecay } from './decayCorrection';
 import { CUTOFF_CEILING, FIRST_TANK_LINE, RT60_LOG } from './reverbConstants';
 import type { DattorroReverb } from './reverbProcessor';
 
@@ -71,7 +76,10 @@ function configureLowBand(
   tanInPlace(tangent, 0);
   plate._cross = tangent[0] / (1 + tangent[0]);
 
-  const perSample = RT60_LOG / (plate._decay * lowDecay * sampleRate);
+  // The band's own target through its own correction, at the block's Size.
+  plate._rt60 = parameters.decay[0] * lowDecay;
+  correctDecay(plate);
+  const perSample = RT60_LOG / (plate._rt60 * sampleRate);
   const gains = plate._gainTarget;
   let ramping = false;
   for (let p = 0; p < extra.length; p++) {
@@ -84,19 +92,4 @@ function configureLowBand(
   return ramping;
 }
 
-/**
- * Gain point `p` with the band running: `plate._value` in, the shelf's output
- * back. The lowpass is the trapezoidal one-pole in its integrator form, as
- * the Retro Reverb's (`retroTank.ts`, `writeSplit`).
- */
-function shelf(plate: DattorroReverb, p: number): void {
-  const states = plate._lowState;
-  const x = plate._value;
-  if (plate._seedBand) states[p] = x;
-  const delta = (x - states[p]) * plate._cross;
-  const low = states[p] + delta;
-  states[p] = low + delta;
-  plate._value = plate._gain[p] * x + plate._lowExtra[p] * low;
-}
-
-export { configureLowBand, shelf };
+export { configureLowBand };

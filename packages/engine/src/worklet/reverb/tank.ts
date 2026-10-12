@@ -6,8 +6,11 @@
  * and the fourteen output taps (`_renderBlock`), with the sleep bookkeeping
  * (#547) at its end. Decay reaches the tank as a gain point on each of its
  * eight lines (windsor#748): `tankGains.ts` sets them once a block, the loop
- * ramps them a sample at a time, and `plateLowBand.ts`'s `shelf` takes a
- * point's place while the low band runs. `_renderBlock` stays one function read top to bottom --
+ * ramps them a sample at a time, and while the low band runs
+ * (`plateLowBand.ts`) each point is its first-order shelf, written out here at
+ * all eight points: no helper is called per sample (worklet rule 6, fix round
+ * 2 of PR windsor#750), and `mixer/reverbLowBand.test.ts` reads the sample
+ * loop's calls off the bundle. `_renderBlock` stays one function read top to bottom --
  * its eleven stages' order is the algorithm. Both are functions over the
  * processor, installed on its prototype by `reverbProcessor.ts`, so each body
  * is the method it was in the hand-written `reverb-processor.js`, line for
@@ -21,7 +24,6 @@
  * behaviour, and `mixer/reverbAllocation.test.ts` its allocation on V8.
  */
 
-import { shelf } from './plateLowBand';
 import {
   FIRST_TANK_LINE,
   LINE_COUNT,
@@ -142,6 +144,14 @@ function _renderBlock(
   const ramping = this._ramping;
   const gain = this._gain;
   const extra = this._lowExtra;
+  // The low band's shelf, written out at each point below: its lowpasses'
+  // states, their coefficient, and whether they start from this sample.
+  const lowState = this._lowState;
+  const cross = this._cross;
+  let seed = this._seedBand;
+  let x: number;
+  let delta: number;
+  let low: number;
   const tank1 = parameters.diffusionTank1[0];
   const tank2 = parameters.diffusionTank2[0];
 
@@ -208,16 +218,30 @@ function _renderBlock(
     // Left loop. Line 11 is the right loop's output, and vice versa: the
     // cross-feed is what makes this a figure of eight rather than two tanks.
     // Each line's gain point (`tankGains.ts`) takes its sample in `_value`:
-    // the plain gain, or the low band's shelf while it runs. Point p is line
-    // p + 4; an all-pass's point sits on the delayed sample both its sums read.
+    // the plain gain, or the low band's shelf while it runs, g x + (gL − g) lp
+    // with lp the trapezoidal one-pole in its integrator form, as the Retro
+    // Reverb's (`retroTank.ts`, `writeSplit`). Point p is line p + 4; an
+    // all-pass's point sits on the delayed sample both its sums read.
     this._read(11, 0);
-    if (band) shelf(this, 7);
-    else this._value *= gain[7];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[7] = x;
+      delta = (x - lowState[7]) * cross;
+      low = lowState[7] + delta;
+      lowState[7] = low + delta;
+      this._value = gain[7] * x + extra[7] * low;
+    } else this._value *= gain[7];
     first = this._value;
     this._offset = exc;
     this._readCubic(4);
-    if (band) shelf(this, 0);
-    else this._value *= gain[0];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[0] = x;
+      delta = (x - lowState[0]) * cross;
+      low = lowState[0] + delta;
+      lowState[0] = low + delta;
+      this._value = gain[0] * x + extra[0] * low;
+    } else this._value *= gain[0];
     let tapped = this._value;
     this._value = split + first + tank1 * tapped;
     this._write1(4);
@@ -228,12 +252,24 @@ function _renderBlock(
     this._dampLp[0] += dampLp * (rawLeft - this._dampLp[0]);
     this._dampHp[0] += dampHp * (this._dampLp[0] - this._dampHp[0]);
     this._value = held ? rawLeft : this._dampLp[0] - this._dampHp[0];
-    if (band) shelf(this, 1);
-    else this._value *= gain[1];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[1] = x;
+      delta = (x - lowState[1]) * cross;
+      low = lowState[1] + delta;
+      lowState[1] = low + delta;
+      this._value = gain[1] * x + extra[1] * low;
+    } else this._value *= gain[1];
     first = this._value;
     this._read(6, 0);
-    if (band) shelf(this, 2);
-    else this._value *= gain[2];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[2] = x;
+      delta = (x - lowState[2]) * cross;
+      low = lowState[2] + delta;
+      lowState[2] = low + delta;
+      this._value = gain[2] * x + extra[2] * low;
+    } else this._value *= gain[2];
     tapped = this._value;
     this._value = first - tank2 * tapped;
     this._write1(6);
@@ -242,13 +278,25 @@ function _renderBlock(
 
     // Right loop.
     this._read(7, 0);
-    if (band) shelf(this, 3);
-    else this._value *= gain[3];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[3] = x;
+      delta = (x - lowState[3]) * cross;
+      low = lowState[3] + delta;
+      lowState[3] = low + delta;
+      this._value = gain[3] * x + extra[3] * low;
+    } else this._value *= gain[3];
     first = this._value;
     this._offset = exc2;
     this._readCubic(8);
-    if (band) shelf(this, 4);
-    else this._value *= gain[4];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[4] = x;
+      delta = (x - lowState[4]) * cross;
+      low = lowState[4] + delta;
+      lowState[4] = low + delta;
+      this._value = gain[4] * x + extra[4] * low;
+    } else this._value *= gain[4];
     tapped = this._value;
     this._value = split + first + tank1 * tapped;
     this._write1(8);
@@ -259,12 +307,24 @@ function _renderBlock(
     this._dampLp[1] += dampLp * (rawRight - this._dampLp[1]);
     this._dampHp[1] += dampHp * (this._dampLp[1] - this._dampHp[1]);
     this._value = held ? rawRight : this._dampLp[1] - this._dampHp[1];
-    if (band) shelf(this, 5);
-    else this._value *= gain[5];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[5] = x;
+      delta = (x - lowState[5]) * cross;
+      low = lowState[5] + delta;
+      lowState[5] = low + delta;
+      this._value = gain[5] * x + extra[5] * low;
+    } else this._value *= gain[5];
     first = this._value;
     this._read(10, 0);
-    if (band) shelf(this, 6);
-    else this._value *= gain[6];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[6] = x;
+      delta = (x - lowState[6]) * cross;
+      low = lowState[6] + delta;
+      lowState[6] = low + delta;
+      this._value = gain[6] * x + extra[6] * low;
+    } else this._value *= gain[6];
     tapped = this._value;
     this._value = first - tank2 * tapped;
     this._write1(10);
@@ -293,7 +353,7 @@ function _renderBlock(
         extra[p] += this._lowExtraStep[p];
       }
     }
-    if (band) this._seedBand = false;
+    seed = false;
 
     this._excPhase += excRate;
     if (this._excPhase >= 1) this._excPhase -= 1;
@@ -314,6 +374,7 @@ function _renderBlock(
     }
   }
 
+  if (band) this._seedBand = false;
   this._preDelayWrite = (this._preDelayWrite + 128) % this._preDelayLength;
 
   if (inputQuiet && loudest <= SLEEP_OUTPUT_FLOOR) this._quiet += 128;

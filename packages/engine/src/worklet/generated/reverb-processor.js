@@ -174,6 +174,373 @@ function _readCubic(index) {
   this._value = ((a * frac + b) * frac + c) * frac + x1;
 }
 
+// packages/engine/src/worklet/reverb/reverbDecayTables.ts
+var DECAY_TABLE_SIZES = [0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3, 4];
+var DECAY_TABLE_DECAYS = [
+  0.05,
+  0.1,
+  0.15,
+  0.2,
+  0.3,
+  0.5,
+  0.75,
+  1,
+  1.5,
+  2,
+  3,
+  5,
+  7.5,
+  10,
+  15,
+  20,
+  30,
+  40,
+  60,
+  80,
+  120,
+  180,
+  240
+];
+var DECAY_TABLE_FACTORS = [
+  1,
+  1,
+  1,
+  1,
+  1.0422,
+  1.0802,
+  1.0929,
+  1.1033,
+  1.1187,
+  1.1309,
+  1.1509,
+  1.1852,
+  1.228,
+  1.274,
+  1.3788,
+  1.5013,
+  1.8397,
+  2.3903,
+  5.58,
+  16.7052,
+  11.0863,
+  7.3783,
+  5.5258,
+  // Size 0.05
+  1.048,
+  1.048,
+  1.048,
+  1.048,
+  1.048,
+  1.0867,
+  1.0979,
+  1.1056,
+  1.1191,
+  1.1299,
+  1.1481,
+  1.1792,
+  1.2155,
+  1.2514,
+  1.3261,
+  1.4067,
+  1.5906,
+  1.8417,
+  2.6892,
+  4.9309,
+  15.2051,
+  10.1941,
+  7.6145,
+  // Size 0.075
+  1.055,
+  1.055,
+  1.055,
+  1.055,
+  1.055,
+  1.0735,
+  1.0834,
+  1.0914,
+  1.1038,
+  1.1136,
+  1.1298,
+  1.1565,
+  1.1869,
+  1.2159,
+  1.2722,
+  1.3286,
+  1.4482,
+  1.5826,
+  1.9543,
+  2.5773,
+  7.0464,
+  14.3161,
+  10.7808,
+  // Size 0.1
+  1.0559,
+  1.0559,
+  1.0559,
+  1.0559,
+  1.0559,
+  1.0559,
+  1.0732,
+  1.0829,
+  1.0958,
+  1.1042,
+  1.1177,
+  1.1385,
+  1.1602,
+  1.1801,
+  1.2185,
+  1.2572,
+  1.3384,
+  1.4268,
+  1.6303,
+  1.9145,
+  2.9097,
+  12.2747,
+  15.1971,
+  // Size 0.15
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0806,
+  1.0927,
+  1.1009,
+  1.1125,
+  1.1293,
+  1.1461,
+  1.1611,
+  1.1895,
+  1.2174,
+  1.2752,
+  1.3366,
+  1.473,
+  1.6301,
+  2.11,
+  3.6728,
+  14.3072,
+  // Size 0.2
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0661,
+  1.0782,
+  1.0854,
+  1.0975,
+  1.1113,
+  1.1243,
+  1.135,
+  1.154,
+  1.1718,
+  1.2065,
+  1.2415,
+  1.3151,
+  1.395,
+  1.5779,
+  1.9883,
+  2.621,
+  // Size 0.3
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0636,
+  1.0731,
+  1.0844,
+  1.0989,
+  1.1099,
+  1.1184,
+  1.1318,
+  1.1433,
+  1.1642,
+  1.1842,
+  1.2245,
+  1.2661,
+  1.356,
+  1.5112,
+  1.715,
+  // Size 0.5
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0729,
+  1.0867,
+  1.099,
+  1.1074,
+  1.1199,
+  1.1295,
+  1.1459,
+  1.1606,
+  1.189,
+  1.2173,
+  1.2761,
+  1.3724,
+  1.4805,
+  // Size 0.7
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0663,
+  1.0823,
+  1.0929,
+  1.1017,
+  1.1133,
+  1.1224,
+  1.1367,
+  1.1487,
+  1.1705,
+  1.1911,
+  1.2324,
+  1.2973,
+  1.3671,
+  // Size 1
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0704,
+  1.0835,
+  1.0904,
+  1.1021,
+  1.1103,
+  1.1229,
+  1.1329,
+  1.1499,
+  1.165,
+  1.1931,
+  1.2344,
+  1.2767,
+  // Size 1.5
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0738,
+  1.0821,
+  1.0925,
+  1.1012,
+  1.1129,
+  1.1221,
+  1.1368,
+  1.1494,
+  1.172,
+  1.2038,
+  1.2354,
+  // Size 2
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0717,
+  1.0846,
+  1.0914,
+  1.1031,
+  1.1111,
+  1.1235,
+  1.1334,
+  1.1502,
+  1.1726,
+  1.194,
+  // Size 3
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0742,
+  1.0824,
+  1.0928,
+  1.1014,
+  1.113,
+  1.1221,
+  1.1365,
+  1.1545,
+  1.171
+  // Size 4
+];
+
+// packages/engine/src/worklet/reverb/decayCorrection.ts
+function locate(plate, grid) {
+  const at = plate._cellAt;
+  let i = 0;
+  while (i < grid.length - 2 && at > grid[i + 1]) i++;
+  plate._cell = i;
+  plate._cellAt = Math.min(1, Math.max(0, (at - grid[i]) / (grid[i + 1] - grid[i])));
+}
+function correctDecay(plate) {
+  const asked = plate._rt60;
+  const factors = DECAY_TABLE_FACTORS;
+  const row = DECAY_TABLE_DECAYS.length;
+  plate._cellAt = plate._size;
+  locate(plate, DECAY_TABLE_SIZES);
+  const lower = plate._cell * row;
+  const u = plate._cellAt;
+  plate._cellAt = asked;
+  locate(plate, DECAY_TABLE_DECAYS);
+  const j = plate._cell;
+  const v = plate._cellAt;
+  const near = factors[lower + j] + (factors[lower + j + 1] - factors[lower + j]) * v;
+  const far = factors[lower + row + j] + (factors[lower + row + j + 1] - factors[lower + row + j]) * v;
+  plate._rt60 = asked * (near + (far - near) * u);
+}
+
 // packages/engine/src/inserts/tapePortableMathTables.ts
 function factorial(n) {
   let f = 1;
@@ -267,7 +634,9 @@ function configureLowBand(plate, parameters, held, immediate) {
   tangent[0] = Math.PI * Math.min(parameters.lowCross[0], sampleRate * CUTOFF_CEILING) / sampleRate;
   tanInPlace(tangent, 0);
   plate._cross = tangent[0] / (1 + tangent[0]);
-  const perSample = RT60_LOG / (plate._decay * lowDecay * sampleRate);
+  plate._rt60 = parameters.decay[0] * lowDecay;
+  correctDecay(plate);
+  const perSample = RT60_LOG / (plate._rt60 * sampleRate);
   const gains = plate._gainTarget;
   let ramping = false;
   for (let p = 0; p < extra.length; p++) {
@@ -278,242 +647,6 @@ function configureLowBand(plate, parameters, held, immediate) {
   }
   return ramping;
 }
-function shelf(plate, p) {
-  const states = plate._lowState;
-  const x = plate._value;
-  if (plate._seedBand) states[p] = x;
-  const delta = (x - states[p]) * plate._cross;
-  const low = states[p] + delta;
-  states[p] = low + delta;
-  plate._value = plate._gain[p] * x + plate._lowExtra[p] * low;
-}
-
-// packages/engine/src/worklet/reverb/reverbDecayTables.ts
-var DECAY_TABLE_SIZES = [0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3, 4];
-var DECAY_TABLE_DECAYS = [0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 40, 60];
-var DECAY_TABLE_FACTORS = [
-  1,
-  1.0422,
-  1.0802,
-  1.0929,
-  1.1033,
-  1.1187,
-  1.1309,
-  1.1509,
-  1.1852,
-  1.228,
-  1.274,
-  1.3788,
-  1.5013,
-  1.8397,
-  2.3903,
-  5.58,
-  // Size 0.05
-  1.048,
-  1.048,
-  1.0867,
-  1.0979,
-  1.1056,
-  1.1191,
-  1.1299,
-  1.1481,
-  1.1792,
-  1.2155,
-  1.2514,
-  1.3261,
-  1.4067,
-  1.5906,
-  1.8417,
-  2.6892,
-  // Size 0.075
-  1.055,
-  1.055,
-  1.0735,
-  1.0834,
-  1.0914,
-  1.1038,
-  1.1136,
-  1.1298,
-  1.1565,
-  1.1869,
-  1.2159,
-  1.2722,
-  1.3286,
-  1.4482,
-  1.5826,
-  1.9543,
-  // Size 0.1
-  1.0559,
-  1.0559,
-  1.0559,
-  1.0732,
-  1.0829,
-  1.0958,
-  1.1042,
-  1.1177,
-  1.1385,
-  1.1602,
-  1.1801,
-  1.2185,
-  1.2572,
-  1.3384,
-  1.4268,
-  1.6303,
-  // Size 0.15
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0806,
-  1.0927,
-  1.1009,
-  1.1125,
-  1.1293,
-  1.1461,
-  1.1611,
-  1.1895,
-  1.2174,
-  1.2752,
-  1.3366,
-  1.473,
-  // Size 0.2
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0782,
-  1.0854,
-  1.0975,
-  1.1113,
-  1.1243,
-  1.135,
-  1.154,
-  1.1718,
-  1.2065,
-  1.2415,
-  1.3151,
-  // Size 0.3
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0731,
-  1.0844,
-  1.0989,
-  1.1099,
-  1.1184,
-  1.1318,
-  1.1433,
-  1.1642,
-  1.1842,
-  1.2245,
-  // Size 0.5
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0867,
-  1.099,
-  1.1074,
-  1.1199,
-  1.1295,
-  1.1459,
-  1.1606,
-  1.189,
-  // Size 0.7
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0823,
-  1.0929,
-  1.1017,
-  1.1133,
-  1.1224,
-  1.1367,
-  1.1487,
-  1.1705,
-  // Size 1
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0835,
-  1.0904,
-  1.1021,
-  1.1103,
-  1.1229,
-  1.1329,
-  1.1499,
-  // Size 1.5
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0821,
-  1.0925,
-  1.1012,
-  1.1129,
-  1.1221,
-  1.1368,
-  // Size 2
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0846,
-  1.0914,
-  1.1031,
-  1.1111,
-  1.1235,
-  // Size 3
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0824,
-  1.0928,
-  1.1014,
-  1.113
-  // Size 4
-];
 
 // packages/engine/src/worklet/reverb/tankGains.ts
 var QUANTUM2 = 128;
@@ -530,38 +663,19 @@ function makeGainPoints(plate) {
   plate._lowExtraStep = new Float64Array(TANK_DELAYS.length);
   plate._lowState = new Float64Array(TANK_DELAYS.length);
   plate._cross = 0;
-  plate._decay = DECAY_SECONDS[0];
+  plate._rt60 = DECAY_SECONDS[0];
   plate._cell = 0;
   plate._cellAt = 0;
   plate._tangent = new Float64Array(1);
-}
-function locate(plate, grid, at) {
-  let i = 0;
-  while (i < grid.length - 2 && at > grid[i + 1]) i++;
-  plate._cell = i;
-  plate._cellAt = Math.min(1, Math.max(0, (at - grid[i]) / (grid[i + 1] - grid[i])));
-}
-function correctDecay(plate, parameters) {
-  const decay = parameters.decay[0];
-  const factors = DECAY_TABLE_FACTORS;
-  const row = DECAY_TABLE_DECAYS.length;
-  locate(plate, DECAY_TABLE_SIZES, plate._size);
-  const lower = plate._cell * row;
-  const u = plate._cellAt;
-  locate(plate, DECAY_TABLE_DECAYS, decay);
-  const j = plate._cell;
-  const v = plate._cellAt;
-  const near = factors[lower + j] + (factors[lower + j + 1] - factors[lower + j]) * v;
-  const far = factors[lower + row + j] + (factors[lower + row + j + 1] - factors[lower + row + j]) * v;
-  plate._decay = decay * (near + (far - near) * u);
 }
 function configureGains(plate, parameters, held) {
   const gain = plate._gain;
   const target = plate._gainTarget;
   const step = plate._gainStep;
   const immediate = !plate._gainsPrimed;
-  correctDecay(plate, parameters);
-  const perSample = RT60_LOG / (plate._decay * sampleRate);
+  plate._rt60 = parameters.decay[0];
+  correctDecay(plate);
+  const perSample = RT60_LOG / (plate._rt60 * sampleRate);
   let ramping = false;
   for (let p = 0; p < gain.length; p++) {
     gain[p] = target[p];
@@ -630,6 +744,12 @@ function _renderBlock(inputs, outputs, parameters) {
   const ramping = this._ramping;
   const gain = this._gain;
   const extra = this._lowExtra;
+  const lowState = this._lowState;
+  const cross = this._cross;
+  let seed = this._seedBand;
+  let x;
+  let delta;
+  let low;
   const tank1 = parameters.diffusionTank1[0];
   const tank2 = parameters.diffusionTank2[0];
   const excRate = parameters.modRate[0] / sampleRate;
@@ -677,13 +797,25 @@ function _renderBlock(inputs, outputs, parameters) {
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
     this._read(11, 0);
-    if (band) shelf(this, 7);
-    else this._value *= gain[7];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[7] = x;
+      delta = (x - lowState[7]) * cross;
+      low = lowState[7] + delta;
+      lowState[7] = low + delta;
+      this._value = gain[7] * x + extra[7] * low;
+    } else this._value *= gain[7];
     first = this._value;
     this._offset = exc;
     this._readCubic(4);
-    if (band) shelf(this, 0);
-    else this._value *= gain[0];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[0] = x;
+      delta = (x - lowState[0]) * cross;
+      low = lowState[0] + delta;
+      lowState[0] = low + delta;
+      this._value = gain[0] * x + extra[0] * low;
+    } else this._value *= gain[0];
     let tapped = this._value;
     this._value = split2 + first + tank1 * tapped;
     this._write1(4);
@@ -694,25 +826,49 @@ function _renderBlock(inputs, outputs, parameters) {
     this._dampLp[0] += dampLp * (rawLeft - this._dampLp[0]);
     this._dampHp[0] += dampHp * (this._dampLp[0] - this._dampHp[0]);
     this._value = held ? rawLeft : this._dampLp[0] - this._dampHp[0];
-    if (band) shelf(this, 1);
-    else this._value *= gain[1];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[1] = x;
+      delta = (x - lowState[1]) * cross;
+      low = lowState[1] + delta;
+      lowState[1] = low + delta;
+      this._value = gain[1] * x + extra[1] * low;
+    } else this._value *= gain[1];
     first = this._value;
     this._read(6, 0);
-    if (band) shelf(this, 2);
-    else this._value *= gain[2];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[2] = x;
+      delta = (x - lowState[2]) * cross;
+      low = lowState[2] + delta;
+      lowState[2] = low + delta;
+      this._value = gain[2] * x + extra[2] * low;
+    } else this._value *= gain[2];
     tapped = this._value;
     this._value = first - tank2 * tapped;
     this._write1(6);
     this._value = tapped + tank2 * this._value;
     this._write1(7);
     this._read(7, 0);
-    if (band) shelf(this, 3);
-    else this._value *= gain[3];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[3] = x;
+      delta = (x - lowState[3]) * cross;
+      low = lowState[3] + delta;
+      lowState[3] = low + delta;
+      this._value = gain[3] * x + extra[3] * low;
+    } else this._value *= gain[3];
     first = this._value;
     this._offset = exc2;
     this._readCubic(8);
-    if (band) shelf(this, 4);
-    else this._value *= gain[4];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[4] = x;
+      delta = (x - lowState[4]) * cross;
+      low = lowState[4] + delta;
+      lowState[4] = low + delta;
+      this._value = gain[4] * x + extra[4] * low;
+    } else this._value *= gain[4];
     tapped = this._value;
     this._value = split2 + first + tank1 * tapped;
     this._write1(8);
@@ -723,12 +879,24 @@ function _renderBlock(inputs, outputs, parameters) {
     this._dampLp[1] += dampLp * (rawRight - this._dampLp[1]);
     this._dampHp[1] += dampHp * (this._dampLp[1] - this._dampHp[1]);
     this._value = held ? rawRight : this._dampLp[1] - this._dampHp[1];
-    if (band) shelf(this, 5);
-    else this._value *= gain[5];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[5] = x;
+      delta = (x - lowState[5]) * cross;
+      low = lowState[5] + delta;
+      lowState[5] = low + delta;
+      this._value = gain[5] * x + extra[5] * low;
+    } else this._value *= gain[5];
     first = this._value;
     this._read(10, 0);
-    if (band) shelf(this, 6);
-    else this._value *= gain[6];
+    if (band) {
+      x = this._value;
+      if (seed) lowState[6] = x;
+      delta = (x - lowState[6]) * cross;
+      low = lowState[6] + delta;
+      lowState[6] = low + delta;
+      this._value = gain[6] * x + extra[6] * low;
+    } else this._value *= gain[6];
     tapped = this._value;
     this._value = first - tank2 * tapped;
     this._write1(10);
@@ -754,7 +922,7 @@ function _renderBlock(inputs, outputs, parameters) {
         extra[p] += this._lowExtraStep[p];
       }
     }
-    if (band) this._seedBand = false;
+    seed = false;
     this._excPhase += excRate;
     if (this._excPhase >= 1) this._excPhase -= 1;
     this._excPhase2 += excRate * 1.0007;
@@ -771,6 +939,7 @@ function _renderBlock(inputs, outputs, parameters) {
       }
     }
   }
+  if (band) this._seedBand = false;
   this._preDelayWrite = (this._preDelayWrite + 128) % this._preDelayLength;
   if (inputQuiet && loudest <= SLEEP_OUTPUT_FLOOR) this._quiet += 128;
   else this._quiet = 0;
@@ -815,7 +984,7 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = NaN;
     this._value = this._offset = NaN;
-    this._cross = this._decay = this._cellAt = NaN;
+    this._cross = this._rt60 = this._cellAt = NaN;
     this._preDelayLength = sampleRate + (128 - sampleRate % 128);
     this._preDelay = new Float32Array(this._preDelayLength);
     this._preDelayWrite = 0;

@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-12
 - **Status:** accepted with windsor#748 (PR windsor#750); tacowars ruled on
-  the deviations and the ceiling on 2026-10-12
+  the deviations, the ceiling and the Size 0.05 corner on 2026-10-12
 - **Links:** issue windsor#748 · the plan
   `docs/research/2026-10-11-plate-reverb-upgrades/README.md` §1 and §6 ·
   the measurements `docs/research/2026-10-12-plate-decay-seconds/README.md` ·
@@ -69,12 +69,22 @@ All three change what the plate renders:
      `wash` measures 23.1 s (−26 %), because its 200 Hz tank low cut and
      5 kHz high cut cost a long tail more than a short one. tacowars ruled
      that neither gets further tuning (decision 7).
-5. **Two corner misses are accepted.** tacowars accepted both:
+5. **Three corner misses are accepted.** tacowars accepted all three:
    - **Decay 0.2 s at Size 0.05** measures up to +14.5 %. The floor is the
      input diffusers' own ring, which sits outside the loop.
    - **The fast Size ramp** (0.05 → 4 → 0.05 over 2 or 4 s each way) fails
      the no-step test. That is Doppler, not a step, and `main` does the
      same once its tail is as long. The 8 s ramp passes and is pinned.
+   - **Size 0.05 from Decay 30 s.** A 36 ms tank asked to ring for a
+     minute loses nearly all of it to its own passes, so the correction
+     there is large (5.58 at 60 s). At 48 kHz T30 tracks Decay within
+     ±10 % but for three cells with a second tank diffusion of 0.8 (up to
+     +11.6 %). At 44.1 kHz it runs short from 30 s (up to −25 % at 60 s),
+     because the table was measured at 48 kHz. Size 0.08 and up holds
+     ±10 % at both rates. No 44.1 kHz table is built. The low band's own
+     correction (decision 8) reads the same 48 kHz table, so a long low band
+     at Size 0.05 runs short at 44.1 kHz the same way: the 60 s band of the
+     test in decision 8 measures 47.9 s there (−20 %), 60.6 s at 48 kHz.
 6. **Decay's ceiling is 60 s, not 20.** Under the old feedback gain there
    was no time ceiling: Decay 1 sustained, and `cathedral` and `wash`
    measured about 30 s. A 20 s top took range away. `REVERB_SPACE_RANGES`
@@ -91,6 +101,45 @@ All three change what the plate renders:
    with a new preset bank, and tacowars does not plan to keep `cathedral`,
    `shimmer` or `wash`. Their values here only carry today's sound across
    the format change.
+8. **The low band takes the correction at its own target** (fix round 2,
+   from Codex's review). Fix round 1 cut the band's gains from the
+   broadband Decay's corrected value times `lowDecay`, so the factor it
+   used was the one for Decay, never for the band's own RT60. The factor
+   climbs with the RT60 asked, steeply at small Sizes, so a long low band
+   fell short: at Size 0.05, Decay 15 and `lowDecay` 4 the band asked 60 s
+   (factor 5.58) and got Decay's factor (1.38), and the 375 Hz band rang
+   38.8 s (−35 %). Now `decayCorrection.ts` looks the factor up for the
+   band's own target, Decay × `lowDecay`, at the block's Size, and the band
+   rings 60.6 s (+1.0 %).
+   - That target runs from 0.05 s to 240 s, so the table's RT60 axis now
+     does too. The new columns (0.05, 0.1 and 0.15 s; 80, 120, 180 and
+     240 s) were measured by `decayTable.mjs` the same way as the rest, in
+     one run that reproduced all 208 earlier cells to the fourth decimal.
+   - Under a quarter trip there is no T30 to fit, and those cells hold the
+     shortest measured factor at their Size, as the short end of each row
+     already did. A trip there loses at least 15 dB, so a factor a few
+     percent off moves nothing audible.
+   - Past the tank's ceiling no factor reaches the target. With every gain
+     at 1 the tank still loses a little each pass, so at each Size it can
+     only ring so long: 73.9 s at Size 0.05, 102 s at 0.075, 142 s at 0.1
+     and 197 s at 0.15, measured. A cell past 95 % of its ceiling takes the
+     factor that rings within 1 % of 95 % of it; past that, each doubling
+     of the factor buys under 2 %. The largest factor is 16.7, and every
+     gain point stays under 1.
+   - The golden rows `low-band` and `low-band-moves` moved, because their
+     band now takes its own factor. They were re-pinned. Every other row,
+     every one at `lowDecay` 1, kept its hash.
+9. **The shelf is written out in the tank's sample loop** (fix round 2,
+   from Codex's review). Fix round 1 called `shelf` at each of the eight
+   gain points while the band ran: 1,024 calls a quantum, against worklet
+   rule 6 (a helper runs once a block, never per sample). The shelf's
+   arithmetic is now written out at each point, with the same operations in
+   the same order: patched back to the broadband factor, the new bundle
+   renders bit for bit what fix round 1's did. `mixer/reverbLowBand.test.ts`
+   reads the sample loop's calls off the shipped bundle. At `lowDecay` 2 the
+   plate costs 36.8 µs a quantum in Node, down from 43.2 µs (37.3 from
+   43.2 µs in Chrome); at `lowDecay` 1 it is unchanged, 34.7 against
+   34.8 µs (research note, "CPU").
 
 ## Consequences
 
@@ -99,12 +148,9 @@ All three change what the plate renders:
 - The plate's sound changes wherever the tank runs, and tacowars listens on
   the PR preview before it merges.
 - At the 60 s top every gain point stays under 1, and the longest corner
-  (Decay 60 s × `lowDecay` 4, tank diffusions 0.8, Size 4) decays to the
-  sleep floor within 3 × 240 s. HOLD and a Decay step from 0.2 to 60 s and
+  (Decay 60 s × `lowDecay` 4, tank diffusions 0.8, at Size 4 and at Size
+  0.05) decays to the sleep floor within 3 × 240 s. HOLD and a Decay step from 0.2 to 60 s and
   back pass the no-step test.
-- **Open, for tacowars:** the 60 s top adds a corner miss. At Size 0.05,
-  T30 tracks Decay to within ±10 % at 48 kHz but for three cells with a
-  second tank diffusion of 0.8 (up to +11.6 %). At 44.1 kHz it runs short
-  from 30 s (up to −25 % at 60 s), because the table was measured at
-  48 kHz. Size 0.08 and up holds ±10 % at both rates. A second table
-  measured at 44.1 kHz would close the 44.1 kHz miss.
+- A low band asked to ring past the tank's ceiling rings as long as the
+  tank can at that Size. At Size 0.05, Decay 60 × `lowDecay` 4 asks 240 s
+  and the 375 Hz band rings 74.6 s.

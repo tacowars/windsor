@@ -110,9 +110,12 @@ class DattorroReverb extends AudioWorkletProcessor {
   _gainsPrimed!: boolean;
   /** Whether any gain point moves this block. */
   _ramping!: boolean;
-  /** This block's Decay after the measured correction (`reverbDecayTables.ts`), in seconds. */
-  _decay!: number;
-  /** A table lookup's cell and its fraction across it (`tankGains.ts`). */
+  /**
+   * An RT60 in seconds on its way through the measured correction
+   * (`decayCorrection.ts`): the RT60 asked in, the one the gains are cut from out.
+   */
+  _rt60!: number;
+  /** A table lookup's point in, its cell and its fraction across it out (`decayCorrection.ts`). */
   _cell!: number;
   _cellAt!: number;
   /**
@@ -181,7 +184,7 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = NaN;
     this._value = this._offset = NaN;
-    this._cross = this._decay = this._cellAt = NaN;
+    this._cross = this._rt60 = this._cellAt = NaN;
 
     // Pre-delay is a plain ring, always a full second, rounded up to a whole
     // number of render quanta so a block write never straddles the wrap.
