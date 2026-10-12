@@ -16,7 +16,8 @@
  * (`decayCorrection.ts`), never from the broadband Decay's corrected value
  * times `lowDecay`: the correction climbs with the RT60 asked, so the
  * broadband factor leaves a long low band short (fix round 2 of PR
- * windsor#750). The shelf itself is written out in the tank's sample loop at
+ * windsor#750). Both gains are cut for the same length: each moving
+ * all-pass's target length less its excursion (`_modExcursion`, windsor#764). The shelf itself is written out in the tank's sample loop at
  * each point (`tank.ts`), never called per sample (worklet rule 6).
  *
  * At `lowDecay` exactly 1, once any ramp back has landed, the band is off:
@@ -83,8 +84,9 @@ function configureLowBand(
   const gains = plate._gainTarget;
   let ramping = false;
   for (let p = 0; p < extra.length; p++) {
-    target[p] =
-      on && !held ? Math.exp(-perSample * plate._lengthTarget[p + FIRST_TANK_LINE]) - gains[p] : 0;
+    // The same effective length as the broadband gain: each moving line, less its excursion.
+    const length = plate._lengthTarget[p + FIRST_TANK_LINE] - plate._modExcursion[p];
+    target[p] = on && !held ? Math.exp(-perSample * length) - gains[p] : 0;
     if (immediate) extra[p] = target[p];
     step[p] = (target[p] - extra[p]) / QUANTUM;
     if (step[p] !== 0) ramping = true;

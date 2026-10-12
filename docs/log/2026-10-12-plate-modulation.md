@@ -94,6 +94,15 @@ not repeat audibly.
    left a source at rest at 0 ringing +12.7 % at Size 0.05; each source's
    place at every block's start moved every gain point every block, so the
    tank ramped all eight a sample at a time and the plate cost 5 % more.
+   The low band's gains (`plateLowBand.ts`) are cut for the same shortened
+   length, once a block, so both gains at a point see one effective length
+   (fix round 2 of PR windsor#767). At Size 0.05, Decay 10 s, `lowDecay` 4,
+   8 Hz and 4 ms, the 375 Hz band measured 32.7 s of its 40 cut for the full
+   length and 34.8 s cut for the shortened one. At Size 0.25, Decay 15 s and
+   `lowDecay` 4 it went from 49.3 s to 50.7 s of 60, still 15.5 % short: the
+   same share the modulation takes from the broadband tail in that octave at
+   Decay 60 s (53.5 s moving against 65.8 s still). Of the golden's rows,
+   `low-band` and `low-band-moves` moved.
 8. **The reverb golden is re-pinned on purpose.** Lines 6 and 10 read cubic,
    the new default, the new source and the re-measured table move every render
    that reaches the tank. Of `main`'s twenty-four scenarios, twenty-three

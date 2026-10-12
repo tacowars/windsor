@@ -126,6 +126,19 @@ describe('the two bands', () => {
     },
     120_000,
   );
+
+  /**
+   * With the all-passes moving, the low band's gains are cut for the same
+   * shortened length as the broadband gains (`tankGains.ts`): each moving
+   * line, less its excursion (fix round 2 of PR windsor#767). Cut for the
+   * full length, this band rang 32.7 s of its 40 (−18 %); cut for the
+   * shortened one, 34.8 s (−13 %).
+   */
+  it('holds its own target with modulation on: 375 Hz at Size 0.05, Decay 10 × 4, 8 Hz, 4 ms', () => {
+    const space = { size: 0.05, decay: 10, lowDecay: 4, lowCross: 3000, modRate: 8, modDepth: 4 };
+    const measured = bandT30({ ...OPEN, ...space }, 375);
+    expect(Math.abs(measured / 40 - 1)).toBeLessThan(0.15);
+  }, 120_000);
 });
 
 describe('the sample loop (worklet rule 6)', () => {
