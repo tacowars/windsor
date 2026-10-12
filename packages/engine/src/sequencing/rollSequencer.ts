@@ -59,8 +59,9 @@
  * performer releases it at the note's end, so slide by overlap into the
  * next note works as for a plain note. The normaliser keeps both marks off
  * a note sharing its onset (a chord), and a ratchet off a note shorter than
- * `ROLL_RATCHET_MIN_TICKS`, and the performer holds the same minimum over
- * the span a loop cut leaves.
+ * `ROLL_RATCHET_MIN_TICKS`. The performer holds the same rules as it plays,
+ * since a live edit reaches it before the normaliser: a chord's notes play
+ * plain, and so does a ratchet over less than the minimum a loop cut leaves.
  *
  * A live edit keeps every held note on its scheduled release, unless its
  * note (known by its onset and pitch) is gone, which releases it on the
@@ -316,7 +317,10 @@ export class RollSequencer {
     let events = this.heldCount > 0 ? this.releaseDue(tick, tick, time) : null;
     // Every note held now started on an earlier tick and is released after this one.
     let heldEarlier = this.heldCount;
-    for (let i = firstOnsetAt(onsets, position); i < onsets.length; i++) {
+    const first = firstOnsetAt(onsets, position);
+    // A chord's notes play no accent or ratchet, as the normaliser writes them; a live edit is not normalised.
+    const chord = onsets[first + 1]?.tick === position;
+    for (let i = first; i < onsets.length; i++) {
       const note = onsets[i] as RollNote;
       if (note.tick !== position) break;
       if (note.velocity === 0) continue;
@@ -325,7 +329,7 @@ export class RollSequencer {
         if ((this.heldSince[note.pitch] as number) < tick) heldEarlier--;
         events.push(this.off(note.pitch, tick, time));
       }
-      const on = this.start(note, event, loopTicks);
+      const on = this.start(note, event, loopTicks, chord);
       if (heldEarlier > 0) on.slide = true;
       events.push(on);
     }
@@ -365,11 +369,16 @@ export class RollSequencer {
    * The note-on of `note` on the event's local tick, held to the loop's end
    * at most, with its accent and its ratchet's roll over that hold.
    */
-  private start(note: RollNote, event: PartTickEvent, loopTicks: number): NoteOnEvent {
+  private start(
+    note: RollNote,
+    event: PartTickEvent,
+    loopTicks: number,
+    chord: boolean,
+  ): NoteOnEvent {
     const { tick, time, secondsPerTick } = event;
     const held = Math.min(note.ticks, loopTicks - note.tick);
     // A loop cut can leave a ratcheted note shorter than any ratchet plays on: it plays one hit.
-    const hits = held >= ROLL_RATCHET_MIN_TICKS ? (note.ratchet ?? 1) : 1;
+    const hits = !chord && held >= ROLL_RATCHET_MIN_TICKS ? (note.ratchet ?? 1) : 1;
     this.releaseAt[note.pitch] = tick + held;
     this.heldOnset[note.pitch] = note.tick;
     this.heldSince[note.pitch] = tick;
@@ -377,7 +386,7 @@ export class RollSequencer {
     this.heldCount++;
     const on: NoteOnEvent = { kind: 'noteOn', tick, time, note: note.pitch, degree: 0 };
     if (note.velocity !== undefined && note.velocity !== 1) on.velocity = note.velocity;
-    if (note.accent === true) on.accent = this.accent();
+    if (note.accent === true && !chord) on.accent = this.accent();
     // As a Grid step's: every hit but the last runs to the next, and the last is held open.
     if (hits > 1) on.roll = { hits, ticks: held, secondsPerTick, gate: 1, open: true };
     return on;

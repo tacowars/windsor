@@ -174,3 +174,27 @@ describe("a live edit of a Roll's accent amounts (windsor#753)", () => {
     expect(hit!.extras).toEqual({ mod: 0.5, slide: false });
   });
 });
+
+describe('a live edit that makes a chord of a marked Roll note (windsor#753)', () => {
+  it('plays the chord plain, as the normalised song will', () => {
+    const base = { ...FULL_ARRANGEMENT, transport: { ...FULL_ARRANGEMENT.transport, bpm: BPM } };
+    const marked: RollNote = { tick: 0, ticks: 12, pitch: 60, accent: true, ratchet: 4 };
+    const sequencer = {
+      kind: 'roll' as const,
+      loopTicks: BAR,
+      notes: [marked, { tick: 24, ticks: 12, pitch: 64 }],
+    };
+    const regions = [{ start: 0, duration: 4 * BAR }];
+    const r = rig(onlyParts(withPart(base, 'drone', { regions, sequencer }), 'drone'));
+    // The plain note dragged onto the marked one's onset: the app sends the array as it is.
+    const notes: RollNote[] = [marked, { tick: 0, ticks: 12, pitch: 64 }];
+    const result = r.player.apply({
+      parts: { [FULL_SLOT.drone]: { sequencer: { kind: 'roll', notes } } },
+    });
+    expect(result.ok).toBe(true);
+    r.run(1);
+    const played = sounding(r.parts.drone.calls);
+    expect(played.map((c) => c.note).sort()).toEqual([60, 64]);
+    for (const hit of played) expect(hit.velocity).toBeCloseTo(VELOCITY, 12);
+  });
+});

@@ -182,10 +182,27 @@ describe('a ratcheted note (windsor#753)', () => {
     expect(noteOns(played)[1]).toMatchObject({ slide: true, roll: { hits: 2, ticks: 12 } });
   });
 
+  it('plays a chord plain though its notes carry marks, as the normaliser would write them', () => {
+    const roll = new RollSequencer(
+      config([
+        { tick: 0, ticks: 12, pitch: 60, accent: true, ratchet: 4 },
+        { tick: 0, ticks: 12, pitch: 64, accent: true },
+        { tick: 12, ticks: 12, pitch: 67, accent: true, ratchet: 2 },
+      ]),
+    );
+    const [low, high, alone] = noteOns(events(roll, 13));
+    for (const on of [low, high]) {
+      expect(on).not.toHaveProperty('accent');
+      expect(on).not.toHaveProperty('roll');
+    }
+    expect(alone).toHaveProperty('accent');
+    expect(alone?.roll?.hits).toBe(2);
+  });
+
   it('keeps its scheduled release through an edit that removes it, since its hits are queued', () => {
     const notes: RollNote[] = [
       { tick: 0, ticks: 24, pitch: 60, ratchet: 2 },
-      { tick: 0, ticks: 24, pitch: 64 },
+      { tick: 2, ticks: 22, pitch: 64 },
     ];
     const roll = new RollSequencer(config(notes));
     const before = events(roll, 6);
@@ -194,7 +211,7 @@ describe('a ratcheted note (windsor#753)', () => {
     for (let t = 6; t < 30; t++) after.push(...roll.handleTick(at(t)));
     expect([...before, ...after].map(label)).toEqual([
       '0:on:60',
-      '0:on:64',
+      '2:on:64~',
       // The plain note goes on the next tick; the ratcheted one at its end.
       '6:off:64',
       '24:off:60',
