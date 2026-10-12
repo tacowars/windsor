@@ -22,6 +22,11 @@ export interface ReverbSpace {
   /** All-pass coefficients of the two input diffuser pairs, 0..1. */
   diffusionIn1: number;
   diffusionIn2: number;
+  /**
+   * 0..1 (windsor#761): how the onset forms. 0 is dense and immediate, with
+   * an early burst ahead of the tail; higher up the reverb swells in.
+   */
+  build: number;
   /** Scales every tank delay: 0.05 is a box, 4 is a cathedral. */
   size: number;
   /**
@@ -50,6 +55,7 @@ export const DEFAULT_SPACE: ReverbSpace = {
   inputHighCut: 10000,
   diffusionIn1: 0.75,
   diffusionIn2: 0.625,
+  build: 0.1,
   size: 1,
   decay: 3.35,
   lowDecay: 1,
@@ -71,7 +77,8 @@ export const DEFAULT_SPACE: ReverbSpace = {
  * `docs/research/2026-10-12-plate-decay-seconds/`. Two exceptions: at that
  * value `shimmer`'s 250 Hz tank low cut took its T30 13 % short, so it takes
  * the Decay that measures its old T30 (record
- * `2026-10-12-plate-decay-in-seconds`). The rows are transitional: item 8 of
+ * `2026-10-12-plate-decay-in-seconds`). Every row takes `DEFAULT_SPACE`'s
+ * `build` (windsor#761). The rows are transitional: item 8 of
  * `docs/research/2026-10-11-plate-reverb-upgrades/` replaces them.
  */
 export const SPACES = {

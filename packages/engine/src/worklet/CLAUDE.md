@@ -246,6 +246,15 @@ All three are functions over the plate (rule 6), not prototype methods. The band
 prewarp is `fm/portableTangent.ts`'s `tanInPlace`, so an edit there rebuilds
 `reverb-processor.js` too. `mixer/reverbDecay.test.ts` holds the T30 to Decay
 and `mixer/reverbLowBand.test.ts` the band and the live moves.
+Build (windsor#761) is a multi-tap delay between the input diffusers and the
+tank, a tap set per side: `plateBuild.ts` allocates its line at construction
+for the longest spread at the running rate and, once a block, aims each tap's
+time and gain and the direct level at the smoothed `build` from
+`reverbBuildTables.ts` (tap times in seconds, the gain rows, the direct
+levels), ramped a sample at a time. The tap reads and sums are written out in
+the tank's sample loop, not called; each side's sum feeds its loop and goes
+to the wet output at the direct level. `mixer/reverbBuild.test.ts` holds the
+onset, the tail, the live moves and the rates.
 
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. The map of `fm/` (#644):
@@ -317,7 +326,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    which is why the file must be one self-contained script) and the harness
    (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
-   `TANK_DELAYS`, `MAX_PRE_DELAY` and the sleep floors the same way).
+   `TANK_DELAYS`, `MAX_PRE_DELAY`, the sleep floors, `BUILD_TAP_TIME` and
+   `BUILD_SPREAD` the same way).
    The harness reaches internals by their **top-level names** (`ALGORITHMS`,
    `WAVE`, `Envelope`, `ST_SUSTAIN`, …), so a name stays unique across every
    module under `fm/`: esbuild renames a collision (`WAVE2`) and the harness
@@ -396,7 +406,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
-   eighteen scenarios in the default, `sleep: false` and `settledSkip: false`
+   twenty-one scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

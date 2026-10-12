@@ -133,8 +133,10 @@ function bloomScalesRenamed(doc: RawDocument): RawDocument {
 /**
  * Five upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9 and 9 → 10, and none from
  * 10 to 11 (windsor#748: the plate's `decay` became seconds, and converting
- * an old gain would take a measured table per Size and diffusion), so a song
- * saved at any version from 5 to 10 is refused too: the chain stops at 10.
+ * an old gain would take a measured table per Size and diffusion) or from 11
+ * to 12 (windsor#761: the plate's `build` changes how every plate renders,
+ * and no value of it renders a song saved without it as before), so a song
+ * saved at any version from 5 to 11 is refused too: the chain stops at 10.
  * Version 2 was retired by #705, version 3 by windsor#238 (record
  * `2026-10-01-retire-song-version-3`) and version 4 by windsor#224, each
  * with no upgrade, so a song saved at any of them is refused.

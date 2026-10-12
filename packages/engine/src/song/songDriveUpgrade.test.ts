@@ -2,8 +2,8 @@
  * Song version 5 → 6 (windsor#300, record `2026-10-01-voice-drive-stage`): a
  * version-5 song's embedded patches are patch format 2, the drive inside the
  * filter. The upgrade moves it to the voice's drive stage, the song opens
- * with no correction (through a stand-in 10 → 11, since windsor#748 ships
- * none), its patches render bit for bit as the library's
+ * with no correction (through stand-ins 10 → 11 and 11 → 12, since
+ * windsor#748 and windsor#761 ship none), its patches render bit for bit as the library's
  * (which the golden test pins to the pre-windsor#300 render), and the result
  * survives export and import.
  */
@@ -38,12 +38,16 @@ const versionFive = (): Record<string, unknown> => ({
 });
 
 /**
- * The shipped steps and a stand-in 10 → 11: windsor#748 ships none, so a
- * version-10 song is refused, and this reads a step's own work through to a
- * version this build loads.
+ * The shipped steps and stand-ins 10 → 11 and 11 → 12: windsor#748 and
+ * windsor#761 ship none, so a version-10 or version-11 song is refused, and
+ * this reads a step's own work through to a version this build loads.
  */
 const PAST_TEN = {
-  songs: { ...SONG_MIGRATIONS, 10: (doc: Record<string, unknown>) => doc },
+  songs: {
+    ...SONG_MIGRATIONS,
+    10: (doc: Record<string, unknown>) => doc,
+    11: (doc: Record<string, unknown>) => doc,
+  },
   patches: PATCH_MIGRATIONS,
 };
 const open = (raw: Record<string, unknown>) => makeArrangement(upgradeSong(raw, PAST_TEN).document);
@@ -55,7 +59,7 @@ const play = (patch: Patch): Float32Array =>
 
 describe('a version-5 song (windsor#300)', () => {
   it("opens at this build's version, through 6 to 10, with no correction, its drive out of the filter", () => {
-    expect(ARRANGEMENT_VERSION).toBe(11);
+    expect(ARRANGEMENT_VERSION).toBe(12);
     expect(KICK_PATCH.drive.gain).not.toBe(1); // the case is a driven patch
     const result = open(versionFive());
     expect(result.refused).toBeUndefined();

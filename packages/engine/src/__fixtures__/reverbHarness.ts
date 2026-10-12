@@ -52,6 +52,9 @@ export interface ReverbTopology {
   maxPreDelay: number;
   sleepInputFloor: number;
   sleepOutputFloor: number;
+  /** Build's tap times in seconds at Build 1, and the longest (windsor#761). */
+  buildTapTime: number[];
+  buildSpread: number;
 }
 
 export interface LoadedReverb {
@@ -61,8 +64,13 @@ export interface LoadedReverb {
   topology: ReverbTopology;
 }
 
-/** Load and evaluate the worklet with a stand-in global scope. */
-export function loadReverb(): LoadedReverb {
+/**
+ * Load and evaluate the worklet with a stand-in global scope, at 48 kHz
+ * unless a test asks for another rate (windsor#761's sample-rate checks).
+ * The render helpers below read time at 48 kHz, so a plate loaded at
+ * another rate is driven through `create` and `process` directly.
+ */
+export function loadReverb(sampleRate = SAMPLE_RATE): LoadedReverb {
   // The real scope gives every processor a port; the plate uses it for the
   // audio-load sampler (#445), so the stand-in has to have one too.
   const { Processor, exports: topology } = generatedProcessor<
@@ -70,7 +78,7 @@ export function loadReverb(): LoadedReverb {
     ReverbTopology
   >({
     file: 'reverb-processor.js',
-    sampleRate: SAMPLE_RATE,
+    sampleRate,
     base: inboxProcessor(),
     epilogue: `return {
       maxSize: MAX_SIZE,
@@ -78,13 +86,15 @@ export function loadReverb(): LoadedReverb {
       maxPreDelay: MAX_PRE_DELAY,
       sleepInputFloor: SLEEP_INPUT_FLOOR,
       sleepOutputFloor: SLEEP_OUTPUT_FLOOR,
+      buildTapTime: BUILD_TAP_TIME,
+      buildSpread: BUILD_SPREAD,
     };`,
   });
 
   return {
     descriptors: Processor.parameterDescriptors,
     create: (options = {}) => new Processor({ processorOptions: options }),
-    sampleRate: SAMPLE_RATE,
+    sampleRate,
     topology,
   };
 }
@@ -115,6 +125,11 @@ export interface ReverbInternals {
   /** Each tank line's gain point, and the low band's extra gain on it (windsor#748). */
   _gain: Float64Array;
   _lowExtra: Float64Array;
+  /** Build (windsor#761): the line, each tap's time in samples and gain, and the direct level now. */
+  _buildLine: Float32Array;
+  _buildTime: Float64Array;
+  _buildGain: Float64Array;
+  _buildDirect: Float64Array;
 }
 
 /** White-box access to one processor's delay lines. */

@@ -150,6 +150,7 @@ describe('the sample loop (worklet rule 6)', () => {
     expect([...calls].sort()).toEqual([
       'Math.abs',
       'Math.cos',
+      'Math.floor',
       'Math.max',
       'Math.sin',
       'this._read',
