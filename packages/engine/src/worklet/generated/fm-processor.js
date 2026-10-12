@@ -142,6 +142,21 @@ var EventQueue = class {
     frames[lo] = frame;
   }
   /**
+   * Drop the event at `index`, in [head, tail): the later events and their
+   * frames move down one slot, the frames as one `copyWithin`, read in place,
+   * and the slot freed at the tail drops its message. It reads no message:
+   * the render found the event (windsor#759). Allocates nothing.
+   */
+  removeAt(index) {
+    const items = this.items;
+    const tail = this.tail - 1;
+    this.frames.copyWithin(index, index + 1, tail + 1);
+    for (let i = index; i < tail; i++) items[i] = items[i + 1];
+    items[tail] = void 0;
+    this.tail = tail;
+    if (this.head === tail) this.head = this.tail = 0;
+  }
+  /**
    * Double the room, `frames` and `items` alike, each event staying in its
    * slot and the new object slots holding `undefined`. Only `post` calls it.
    */
@@ -4569,8 +4584,6 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.liveRetune = !!msg.enabled;
         break;
       case "noteOn":
-        this.schedule(msg);
-        break;
       case "noteOff":
         this.schedule(msg);
         break;
@@ -4705,15 +4718,22 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     for (let i = 0; i < vs.length; i++) if (vs[i].keyed && vs[i].voiceId === id) return true;
     return false;
   }
-  /** Release every voice the note map holds under handle `id`, and drop them from it. */
+  /**
+   * Release every voice the note map holds under handle `id`, and drop them
+   * from it. False when it held none (windsor#759: the render then cancels
+   * the handle's note-on still queued).
+   */
   noteOffId(id) {
     const vs = this.voices;
+    let released = false;
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
       if (!v.keyed || v.voiceId !== id) continue;
       v.keyed = false;
       this.releaseVoice(v);
+      released = true;
     }
+    return released;
   }
   /** Note-off for one voice: a dormant voice's release is silence, so it just ends (#547). */
   releaseVoice(v) {
@@ -4788,7 +4808,11 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
           this.stepModIn = ev.stepMod || null;
           this.noteOn(id);
           this.stepModIn = null;
-        } else if (ev.type === "noteOff") this.noteOffId(id);
+        } else if (ev.type === "noteOff" && !this.noteOffId(id)) {
+          let k = q.head;
+          while (k < q.tail && !(q.items[k].type === "noteOn" && q.items[k].id === id)) k++;
+          if (k < q.tail) q.removeAt(k);
+        }
       }
       let seg = n - cursor;
       if (!q.empty) {
