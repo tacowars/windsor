@@ -73,7 +73,14 @@ chosen for decorrelation, in a table of Windsor's own.
    allocates per block (`mixer/reverbAllocation.test.ts`).
    `poleCoefficients` moved to `platePoles.ts` with the same arithmetic,
    because the written-out loops took `tank.ts` past 350 lines.
-7. **Build's direct path is unchanged.**
+7. **Build's direct path is unchanged.** It keeps its old gain through its
+   own trim: the tank scales the direct sum by `OUTPUT_TRIM` with the taps',
+   so `plateBuild.ts` aims the direct level at `BUILD_DIRECT_TRIM` (0.6,
+   `main`'s trim) over `OUTPUT_TRIM` of its row, once a block
+   (`mixer/reverbTaps.test.ts`). With it, a centred click's first second
+   reads +0.01, +0.07, +0.01 and +0.11 dB against `main` at Build 0, 0.1, 0.5
+   and 1 at 48 kHz, and +0.07, +0.11, +0.02 and +0.13 dB at 44.1 kHz, so
+   item 5's bounds hold.
 8. **The reverb golden is re-pinned on purpose.** Every render that reaches
    the tank is read through the new taps and trim. Of `main`'s twenty-six
    scenarios, twenty-five moved: `anti-phase`, `build-moves`, `build-one`,

@@ -17,6 +17,9 @@
  * aims each tap's time (in samples), each tap's gain and the direct level
  * at this block's Build, from `reverbBuildTables.ts`, each ramped across the
  * block a sample at a time, so a sweep moves the reads in sub-sample steps.
+ * The direct level is its row times `BUILD_DIRECT_TRIM / OUTPUT_TRIM`, since
+ * the tank trims the direct sum with the taps' (windsor#766): the burst keeps
+ * `main`'s gain.
  * The tap reads, their linear interpolation (the tank's own reads') and the
  * sums are written out in the tank's sample loop (`tank.ts`), never called
  * per sample (worklet rule 6).
@@ -35,6 +38,7 @@ import {
   BUILD_TAP_TIME,
 } from './reverbBuildTables';
 import type { DattorroReverb } from './reverbProcessor';
+import { BUILD_DIRECT_TRIM, OUTPUT_TRIM } from './reverbTapTables';
 
 /** Samples a quantum: each ramp crosses one. */
 const QUANTUM = 128;
@@ -42,6 +46,12 @@ const QUANTUM = 128;
 const READ_REACH = 2;
 /** The direct level's slots: now, this block's target, its per-sample step. */
 const DIRECT_SLOTS = 3;
+/**
+ * The direct row's scale (windsor#766): the tank multiplies the direct sum by
+ * OUTPUT_TRIM with the taps', so the row is aimed at BUILD_DIRECT_TRIM over it
+ * and the direct path's gain is `main`'s.
+ */
+const DIRECT_SCALE = BUILD_DIRECT_TRIM / OUTPUT_TRIM;
 
 /**
  * The Build lines and their ramps, from the processor's constructor, after its
@@ -108,7 +118,8 @@ function configureBuild(plate: DattorroReverb, parameters: Record<string, Float3
   const direct = plate._buildDirect;
   direct[0] = direct[1];
   direct[1] =
-    BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along;
+    (BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along) *
+    DIRECT_SCALE;
   if (immediate) direct[0] = direct[1];
   direct[2] = (direct[1] - direct[0]) / QUANTUM;
   if (direct[2] !== 0) ramping = true;

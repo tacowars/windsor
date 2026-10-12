@@ -66,4 +66,13 @@ const TAPS_PER_SIDE = 12;
  */
 const OUTPUT_TRIM = 0.4781;
 
-export { TAP_TIME, TAP_LINE, TAP_GAIN, TAPS_PER_SIDE, OUTPUT_TRIM };
+/**
+ * The trim Build's direct path keeps: `main`'s output trim, from before the
+ * new taps. The tank adds each side's Build sum into its tap sum before both
+ * are scaled by the wet level and OUTPUT_TRIM, so `plateBuild.ts` aims the
+ * direct level at BUILD_DIRECT_TRIM / OUTPUT_TRIM of its row, once a block:
+ * the burst ahead of the tail keeps its old gain while the taps' trim moves.
+ */
+const BUILD_DIRECT_TRIM = 0.6;
+
+export { TAP_TIME, TAP_LINE, TAP_GAIN, TAPS_PER_SIDE, OUTPUT_TRIM, BUILD_DIRECT_TRIM };

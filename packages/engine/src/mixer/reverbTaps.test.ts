@@ -1,6 +1,7 @@
 /**
  * The plate's output taps (windsor#766, `worklet/reverb/reverbTapTables.ts`):
- * each output leads with its own input's half of the tank, and every tap
+ * Build's direct path keeps `main`'s gain under the new trim, each output
+ * leads with its own input's half of the tank, and every tap
  * reads inside its own line, behind the write head, at every Size, at every
  * rate, and on every sample of a Size move. The early density, the width, the
  * mono sum, the level and the CPU are measured in
@@ -9,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ReverbInternals } from '../__fixtures__/reverbHarness';
-import { internals, loadReverb, renderReverb } from '../__fixtures__/reverbHarness';
+import { impulseAt, internals, loadReverb, renderReverb } from '../__fixtures__/reverbHarness';
 
 const BLOCK = 128;
 
@@ -23,6 +24,76 @@ const LINE_MARGIN = 2;
 
 /** The block a one-block jump lands on: half a second in, once the plate has settled. */
 const jumpAt = (rate: number): number => Math.round((0.5 * rate) / BLOCK);
+
+describe("Build's direct path", () => {
+  /**
+   * `main`'s direct gain at Build 0: its output trim, 0.6, times the Build 0
+   * direct row, 0.6, at the default wet of 1.
+   */
+  const MAIN_DIRECT = 0.6 * 0.6;
+
+  /** The plate's Build state, and its Build line's write head after the block. */
+  type BuildRead = ReverbInternals & { _buildWrite: number };
+
+  /**
+   * Each side's Build sum for the first `count` samples of the block just
+   * rendered, read back from its line as the tank's loop reads it. Build 0 is
+   * settled, so no tap's time or gain moves across the block.
+   */
+  function buildSums(plate: BuildRead, count: number) {
+    const lines = [plate._buildLine, plate._buildLineRight];
+    const mask = plate._buildLine.length - 1;
+    const half = plate._buildTime.length / 2;
+    const sums: [number[], number[]] = [[], []];
+    for (let i = 0; i < count; i++) {
+      const write = (plate._buildWrite - BLOCK + i) & mask;
+      for (const side of [0, 1] as const) {
+        let sum = 0;
+        for (let t = side * half; t < (side + 1) * half; t++) {
+          const position = write - plate._buildTime[t]!;
+          const whole = Math.floor(position);
+          const a = lines[side]![whole & mask]!;
+          const b = lines[side]![(whole + 1) & mask]!;
+          sum += (a + (b - a) * (position - whole)) * plate._buildGain[t]!;
+        }
+        sums[side].push(sum);
+      }
+    }
+    return sums;
+  }
+
+  it("keeps main's gain ahead of the first output tap, at Build 0 in the default space", () => {
+    const loaded = loadReverb();
+    const click = jumpAt(loaded.sampleRate);
+    // Pre-delay 0 and Size 1 by default: no tap reads the tank before its shortest time.
+    const window = Math.floor(Math.min(...loaded.topology.tapTime) * loaded.sampleRate);
+    let sums: [number[], number[]] = [[], []];
+    const { samples } = renderReverb(
+      loaded,
+      0.6,
+      impulseAt(click),
+      { build: 0 },
+      {
+        collectSamples: true,
+        create: { sleep: false },
+        afterBlock: (block, processor) => {
+          if (block === click) sums = buildSums(internals(processor) as BuildRead, window);
+        },
+      },
+    );
+    for (const side of [0, 1] as const) {
+      let peak = 0;
+      let error = 0;
+      for (let i = 0; i < window; i++) {
+        const expected = MAIN_DIRECT * sums[side][i]!;
+        peak = Math.max(peak, Math.abs(expected));
+        error = Math.max(error, Math.abs(samples[(click * BLOCK + i) * 2 + side]! - expected));
+      }
+      expect(peak, `side ${side}: the direct burst sounds`).toBeGreaterThan(0.01);
+      expect(error / peak, `side ${side}`).toBeLessThan(1e-6);
+    }
+  });
+});
 
 describe('each output leads with its own input', () => {
   it("puts the larger share of each side's tap weight on the half its own input feeds", () => {
