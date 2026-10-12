@@ -4,18 +4,34 @@ A browser-based sequencer and DAW built on a custom four-operator FM engine:
 
 - **Synthesis:** FM, harmonic waveforms and subtractive filtering in
   AudioWorklets.
-- **Sequencers:** Euclidean, grid, chord, arpeggiator and bass/drone, driven
-  by a harmony timeline.
+- **Sequencers:** Euclidean, grid, chord, arpeggiator, bass/drone and
+  figure, driven by a harmony timeline, and a piano roll whose notes keep
+  their pitch. Bounce to Roll turns a generated part into notes you can
+  edit.
 - **Mixer:** channel strips with up to eight inserts each (compressor,
-  classic and advanced drive, chorus, ensemble, phaser, dub delay, retro
-  reverb), a plate and delay return, and a song master.
+  classic and advanced drive, tape, filter, parametric EQ, chorus, ensemble,
+  phaser, dub delay, echo, plate and retro reverbs, and bloom, a harmonic
+  pad generator), two send buses with their own insert chains, and a song
+  master. Song automation lanes move the knobs over time.
 
 Everything runs in the browser, and the app deploys as static files. Try it
 at <https://tacowars.github.io/windsor/>. Chrome is the tested browser.
 
-Windsor began as the music engine and arrangement console of the game
-Aotearoa204 and was forked on 2026-09-27. `#<n>` references in the code and
-docs point at that repository's issues.
+Windsor began as the audio engine for a web-based game I was building, but
+I soon became more interested in the synthesizer and sequencer than in the
+game itself, so I forked it and Windsor was born. The synth takes its
+influences from some of my favourites, like the Korg opsix and Ableton
+Live's Operator. The sequencer draws on many sources, but I want to call
+out Plugin Boutique's Scaler and Elektron as general influences.
+
+The plate reverb is based on the Dattorro algorithm, which is my favourite,
+and I think it pairs well with the harmonically rich sounds the synth can
+make. If you enjoy Windsor, let me know.
+
+The name comes from Windsor, Ontario, where kids grew up listening to radio
+broadcasts by the seminal techno artists from Detroit. Windsor can be used
+to make any kind of electronic music, but the techno mentality is at the
+heart of its design: step sequencing, polymeter, groove, acid and rhythm.
 
 ## Getting started
 
