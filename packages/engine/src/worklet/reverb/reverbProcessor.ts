@@ -39,8 +39,9 @@
  *      and muddies on sustained low material.
  *   3. HOLD. Decay to unity, input muted, tank filters bypassed -- an infinite
  *      freeze of whatever is in the tank.
- *   4. Two independent excursion phases, wrapped, rather than one accumulator
- *      read at two near-2pi multipliers.
+ *   4. Modulation on all four tank all-passes (windsor#764,
+ *      `plateModulation.ts`), each from its own seeded smoothed noise, where
+ *      the paper moves two from one sine.
  */
 
 import type { ReportLoadMessage } from '../../synth/workletMessages';
@@ -65,6 +66,7 @@ import {
 import { makeBuild } from './plateBuild';
 import { BUILD, BUILD_SPREAD } from './reverbBuildTables';
 import { _writeInput } from './plateInput';
+import { makeModulation, resetModulation } from './plateModulation';
 import { _renderBlock } from './tank';
 import { makeGainPoints } from './tankGains';
 
@@ -100,8 +102,29 @@ class DattorroReverb extends AudioWorkletProcessor {
   _value: number;
   /** The cubic read's offset: the modulation's excursion. */
   _offset: number;
-  _excPhase: number;
-  _excPhase2: number;
+  /**
+   * The tank modulation (windsor#764, `plateModulation.ts`), written by
+   * `makeModulation` from the constructor: per point (lines 4, 6, 8, 10),
+   * whether it rises to its next knot, its cursor into the draws, where the
+   * segment starts, its span, its phase, its width and its phase step; the
+   * excursion it gives this sample; the depth in samples now, this block's
+   * target and its per-sample step; each tank line's excursion (its mean while
+   * the sources move), which `tankGains.ts` cuts its gain for; and the block's speed.
+   */
+  _modRising!: Int32Array;
+  _modCursor!: Int32Array;
+  _modFrom!: Float64Array;
+  _modSpan!: Float64Array;
+  _modPhase!: Float64Array;
+  _modWidth!: Float64Array;
+  _modDt!: Float64Array;
+  _modOffset!: Float64Array;
+  _modDepth!: Float64Array;
+  _modDepthTarget!: Float64Array;
+  _modDepthStep!: Float64Array;
+  /** Each tank line's excursion for its gain, lines 4 to 11: 0 but at the moving all-passes. */
+  _modExcursion!: Float64Array;
+  _modSpeed!: number;
   _denormal: number;
   _size: number;
   _inputGain: number;
@@ -200,8 +223,8 @@ class DattorroReverb extends AudioWorkletProcessor {
       ['diffusionTank2', 0.5,  0,    MAX_TANK_DIFFUSION],
       ['tankLowCut',    20,    10,   1000],
       ['tankHighCut',   8000,  200,  20000],
-      ['modRate',       0.5,   0,    8],
-      ['modDepth',      0.7,   0,    4],
+      ['modRate',       3,     0,    8],
+      ['modDepth',      0.35,  0,    4],
       ['hold',          0,     0,    1],
       ['wet',           1,     0,    1],
       ['dry',           0,     0,    1],
@@ -220,7 +243,6 @@ class DattorroReverb extends AudioWorkletProcessor {
     // generalise it, deprecating the map and deoptimising the render.
     this._inputLp = this._inputHp = NaN;
     this._inputLpRight = this._inputHpRight = NaN;
-    this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = this._build = NaN;
     this._value = this._offset = NaN;
     this._cross = this._rt60 = this._cellAt = NaN;
@@ -263,9 +285,8 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._dampHp = new Float64Array(2);
     this._poles = new Float64Array(4);
 
-    this._excPhase = 0;
-    this._excPhase2 = 0;
     this._denormal = ANTI_DENORMAL;
+    makeModulation(this);
 
     this._size = 1;
     this._inputGain = 1;
@@ -352,7 +373,7 @@ class DattorroReverb extends AudioWorkletProcessor {
 
   /**
    * Empty the tank, once, on the way to sleep: every delay line, the pre-delay,
-   * the filter states, the write heads and the modulation phases go back to where a new
+   * the filter states, the write heads and the modulation's sources and cursors go back to where a new
    * processor starts, so the first sound after waking renders exactly as it
    * would from a fresh plate. Allocation-free: `fill` writes in place.
    */
@@ -370,8 +391,7 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._inputHpRight = 0;
     this._dampLp[0] = this._dampLp[1] = 0;
     this._dampHp[0] = this._dampHp[1] = 0;
-    this._excPhase = 0;
-    this._excPhase2 = 0;
+    resetModulation(this);
     this._denormal = ANTI_DENORMAL;
     // An empty tank cannot step, so the next block sets its gains outright.
     this._gainsPrimed = false;

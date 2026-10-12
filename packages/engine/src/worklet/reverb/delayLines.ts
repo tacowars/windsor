@@ -3,7 +3,7 @@
  * The plate's delay lines (#671): allocation (`_makeDelay`), the SIZE-scaled
  * lengths and taps and their per-sample ramp (`_applySize`), the write, and the
  * three fractional reads -- linear from the read point, linear back from the
- * write head for the output taps, cubic for the two modulated tank lines.
+ * write head for the output taps, cubic for the four modulated tank all-passes (windsor#764).
  * Each is a function over the processor (`this: DattorroReverb`), installed on
  * its prototype by `reverbProcessor.ts`, so its body is the method it was in
  * the hand-written `reverb-processor.js`, line for line, but for how a sample
@@ -132,7 +132,7 @@ function _readTap(this: DattorroReverb, t: number): void {
  * into `this._value`. The offset is the modulation's excursion, a double, so
  * it comes in a field rather than as an argument.
  *
- * Cubic rather than linear because these two reads carry the tank's delay
+ * Cubic rather than linear because these four reads carry the tank's delay
  * modulation: linear interpolation is a lowpass whose cutoff moves with the
  * fraction, which the ear hears as a chirp on the modulated tail.
  * O. Niemitalo, https://www.musicdsp.org/en/latest/Other/49-cubic-interpollation.html

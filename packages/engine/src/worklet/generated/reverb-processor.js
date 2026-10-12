@@ -288,6 +288,93 @@ function _writeInput(input, output, parameters) {
   }
 }
 
+// packages/engine/src/worklet/fm/prng.ts
+function makeRandom(seed) {
+  if (seed == null) return Math.random;
+  let state = seed >>> 0;
+  return function mulberry32() {
+    state = state + 1831565813 >>> 0;
+    let t = state;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randomSeed32(random) {
+  return random() * 4294967295 >>> 0 || 1;
+}
+
+// packages/engine/src/worklet/reverb/reverbModulationTables.ts
+var MOD_LINES = [4, 6, 8, 10];
+var MOD_SEEDS = [795548237, 2082071477, 1255391767, 333811561];
+var MOD_DRAW_LENGTH = 2 ** 15;
+var MOD_HALF = 0.5;
+var MOD_WIDTH_MIN = 0.5;
+var MOD_MEAN = 0.5;
+
+// packages/engine/src/worklet/reverb/plateModulation.ts
+var QUANTUM2 = 128;
+var MS = 1e3;
+var SEGMENTS_PER_CYCLE = 2;
+var DRAWS_PER_SEGMENT = 2;
+var SMOOTHSTEP = 3;
+var MOD_DRAWS = new Float32Array(MOD_LINES.length * MOD_DRAW_LENGTH);
+for (let p = 0; p < MOD_LINES.length; p++) {
+  const random = makeRandom(MOD_SEEDS[p]);
+  for (let i = 0; i < MOD_DRAW_LENGTH; i++) MOD_DRAWS[p * MOD_DRAW_LENGTH + i] = random();
+}
+function makeModulation(plate) {
+  const points = MOD_LINES.length;
+  plate._modRising = new Int32Array(points);
+  plate._modCursor = new Int32Array(points);
+  plate._modFrom = new Float64Array(points);
+  plate._modSpan = new Float64Array(points);
+  plate._modPhase = new Float64Array(points);
+  plate._modWidth = new Float64Array(points);
+  plate._modDt = new Float64Array(points);
+  plate._modOffset = new Float64Array(points);
+  plate._modDepth = new Float64Array(points);
+  plate._modDepthTarget = new Float64Array(points);
+  plate._modDepthStep = new Float64Array(points);
+  plate._modExcursion = new Float64Array(TANK_DELAYS.length);
+  plate._modSpeed = NaN;
+  plate._modSpeed = 0;
+  resetModulation(plate);
+}
+function resetModulation(plate) {
+  for (let p = 0; p < MOD_LINES.length; p++) {
+    const first = p * MOD_DRAW_LENGTH;
+    plate._modRising[p] = 1;
+    plate._modCursor[p] = DRAWS_PER_SEGMENT;
+    plate._modFrom[p] = 0;
+    plate._modSpan[p] = MOD_HALF + MOD_HALF * MOD_DRAWS[first];
+    plate._modPhase[p] = 0;
+    plate._modWidth[p] = MOD_WIDTH_MIN + MOD_DRAWS[first + 1];
+    plate._modDt[p] = 0;
+    plate._modOffset[p] = 0;
+    plate._modDepth[p] = 0;
+    plate._modDepthTarget[p] = 0;
+    plate._modDepthStep[p] = 0;
+  }
+}
+function configureModulation(plate, parameters) {
+  plate._modSpeed = SEGMENTS_PER_CYCLE * parameters.modRate[0] / sampleRate;
+  const asked = parameters.modDepth[0] * sampleRate / MS;
+  const length = plate._length;
+  const lengthTarget = plate._lengthTarget;
+  for (let p = 0; p < MOD_LINES.length; p++) {
+    const line = MOD_LINES[p];
+    const shortest = Math.min(length[line], lengthTarget[line]);
+    plate._modDt[p] = plate._modSpeed / plate._modWidth[p];
+    plate._modDepth[p] = plate._modDepthTarget[p];
+    plate._modDepthTarget[p] = Math.max(0, Math.min(asked, shortest - MIN_LENGTH));
+    plate._modDepthStep[p] = (plate._modDepthTarget[p] - plate._modDepth[p]) / QUANTUM2;
+    const a = plate._modPhase[p];
+    const place = plate._modSpeed > 0 ? MOD_MEAN : plate._modFrom[p] + plate._modSpan[p] * a * a * (SMOOTHSTEP - 2 * a);
+    plate._modExcursion[line - FIRST_TANK_LINE] = plate._modDepthTarget[p] * place;
+  }
+}
+
 // packages/engine/src/worklet/reverb/reverbDecayTables.ts
 var DECAY_TABLE_SIZES = [0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3, 4];
 var DECAY_TABLE_DECAYS = [
@@ -320,313 +407,313 @@ var DECAY_TABLE_FACTORS = [
   1,
   1,
   1,
-  1.0422,
-  1.0802,
-  1.0929,
-  1.1033,
-  1.1187,
-  1.1309,
-  1.1509,
-  1.1852,
-  1.228,
-  1.274,
-  1.3788,
-  1.5013,
-  1.8397,
-  2.3903,
-  5.58,
-  16.7052,
-  11.0863,
-  7.3783,
-  5.5258,
-  // Size 0.05
-  1.048,
-  1.048,
-  1.048,
-  1.048,
-  1.048,
-  1.0867,
+  1.0338,
+  1.074,
+  1.0881,
   1.0979,
-  1.1056,
-  1.1191,
-  1.1299,
-  1.1481,
-  1.1792,
-  1.2155,
-  1.2514,
-  1.3261,
-  1.4067,
-  1.5906,
-  1.8417,
-  2.6892,
-  4.9309,
-  15.2051,
-  10.1941,
-  7.6145,
-  // Size 0.075
-  1.055,
-  1.055,
-  1.055,
-  1.055,
-  1.055,
-  1.0735,
-  1.0834,
-  1.0914,
-  1.1038,
-  1.1136,
-  1.1298,
-  1.1565,
-  1.1869,
-  1.2159,
-  1.2722,
-  1.3286,
-  1.4482,
-  1.5826,
-  1.9543,
-  2.5773,
-  7.0464,
-  14.3161,
-  10.7808,
-  // Size 0.1
-  1.0559,
-  1.0559,
-  1.0559,
-  1.0559,
-  1.0559,
-  1.0559,
-  1.0732,
-  1.0829,
-  1.0958,
-  1.1042,
-  1.1177,
-  1.1385,
-  1.1602,
-  1.1801,
-  1.2185,
-  1.2572,
-  1.3384,
-  1.4268,
-  1.6303,
-  1.9145,
-  2.9097,
-  12.2747,
-  15.1971,
-  // Size 0.15
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0806,
-  1.0927,
-  1.1009,
-  1.1125,
-  1.1293,
-  1.1461,
-  1.1611,
-  1.1895,
-  1.2174,
-  1.2752,
-  1.3366,
-  1.473,
-  1.6301,
-  2.11,
-  3.6728,
-  14.3072,
-  // Size 0.2
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0661,
-  1.0782,
-  1.0854,
-  1.0975,
+  1.1142,
+  1.1276,
+  1.1505,
+  1.1891,
+  1.2332,
+  1.2762,
+  1.3647,
+  1.4601,
+  1.6798,
+  2.0152,
+  3.2023,
+  7.8642,
+  14.1854,
+  9.5153,
+  7.1112,
+  // Size 0.05
+  1.0266,
+  1.0266,
+  1.0266,
+  1.0266,
+  1.0266,
+  1.0738,
+  1.0885,
+  1.0978,
   1.1113,
-  1.1243,
-  1.135,
-  1.154,
-  1.1718,
-  1.2065,
-  1.2415,
-  1.3151,
-  1.395,
-  1.5779,
-  1.9883,
-  2.621,
-  // Size 0.3
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0636,
-  1.0731,
-  1.0844,
-  1.0989,
-  1.1099,
-  1.1184,
-  1.1318,
-  1.1433,
-  1.1642,
-  1.1842,
-  1.2245,
-  1.2661,
-  1.356,
-  1.5112,
-  1.715,
-  // Size 0.5
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0729,
-  1.0867,
-  1.099,
-  1.1074,
-  1.1199,
-  1.1295,
-  1.1459,
-  1.1606,
-  1.189,
-  1.2173,
-  1.2761,
-  1.3724,
-  1.4805,
-  // Size 0.7
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0663,
-  1.0823,
-  1.0929,
-  1.1017,
-  1.1133,
   1.1224,
-  1.1367,
-  1.1487,
-  1.1705,
-  1.1911,
-  1.2324,
-  1.2973,
-  1.3671,
-  // Size 1
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0704,
-  1.0835,
-  1.0904,
-  1.1021,
-  1.1103,
-  1.1229,
-  1.1329,
-  1.1499,
-  1.165,
-  1.1931,
-  1.2344,
-  1.2767,
-  // Size 1.5
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0738,
-  1.0821,
-  1.0925,
-  1.1012,
-  1.1129,
-  1.1221,
-  1.1368,
-  1.1494,
-  1.172,
-  1.2038,
-  1.2354,
-  // Size 2
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
-  1.0717,
+  1.1407,
+  1.1709,
+  1.2052,
+  1.2387,
+  1.3072,
+  1.3795,
+  1.5389,
+  1.7428,
+  2.3124,
+  3.4532,
+  19.2488,
+  12.7641,
+  9.6179,
+  // Size 0.075
+  1,
+  1,
+  1,
+  1,
+  1,
+  1.0572,
+  1.0747,
   1.0846,
-  1.0914,
-  1.1031,
-  1.1111,
-  1.1235,
-  1.1334,
-  1.1502,
-  1.1726,
-  1.194,
-  // Size 3
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0742,
-  1.0824,
+  1.0984,
+  1.1093,
+  1.1256,
+  1.1485,
+  1.1714,
+  1.1929,
+  1.236,
+  1.2812,
+  1.379,
+  1.4881,
+  1.7709,
+  2.1715,
+  3.9571,
+  17.7413,
+  13.2186,
+  // Size 0.1
+  1.0501,
+  1.0501,
+  1.0501,
+  1.0501,
+  1.0501,
+  1.0501,
+  1.0642,
+  1.0724,
+  1.0839,
+  1.0921,
+  1.1039,
+  1.1219,
+  1.1403,
+  1.157,
+  1.188,
+  1.2182,
+  1.28,
+  1.3463,
+  1.4959,
+  1.6891,
+  2.2332,
+  4.3839,
+  18.6424,
+  // Size 0.15
+  1.0677,
+  1.0677,
+  1.0677,
+  1.0677,
+  1.0677,
+  1.0677,
+  1.0677,
+  1.0761,
+  1.0883,
+  1.0962,
+  1.1084,
+  1.1236,
+  1.1372,
+  1.1489,
+  1.1706,
+  1.1923,
+  1.2376,
+  1.2863,
+  1.3944,
+  1.5172,
+  1.8434,
+  2.7008,
+  4.8608,
+  // Size 0.2
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0639,
+  1.0763,
+  1.0832,
+  1.0954,
+  1.11,
+  1.1222,
+  1.1319,
+  1.149,
+  1.1651,
+  1.1976,
+  1.2314,
+  1.303,
+  1.3803,
+  1.5548,
+  1.9157,
+  2.4945,
+  // Size 0.3
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0527,
+  1.0613,
+  1.0712,
+  1.086,
+  1.0974,
+  1.1063,
+  1.1201,
+  1.1315,
+  1.1515,
+  1.1699,
+  1.2058,
+  1.242,
+  1.3182,
+  1.4459,
+  1.5931,
+  // Size 0.5
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0595,
+  1.0732,
+  1.0851,
+  1.0936,
+  1.1066,
+  1.1167,
+  1.1332,
+  1.1474,
+  1.1733,
+  1.1983,
+  1.249,
+  1.3297,
+  1.4182,
+  // Size 0.7
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0591,
+  1.0743,
+  1.0851,
+  1.0937,
+  1.1055,
+  1.1146,
+  1.1288,
+  1.1406,
+  1.1615,
+  1.1809,
+  1.2186,
+  1.2766,
+  1.3383,
+  // Size 1
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0563,
+  1.0691,
+  1.0761,
+  1.0879,
+  1.0961,
+  1.1083,
+  1.1177,
+  1.1332,
+  1.1465,
+  1.171,
+  1.2065,
+  1.2425,
+  // Size 1.5
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0603,
+  1.0685,
+  1.079,
+  1.0878,
+  1.0998,
+  1.1088,
+  1.1228,
+  1.1343,
+  1.154,
+  1.181,
+  1.2075,
+  // Size 2
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0613,
+  1.0738,
+  1.0809,
   1.0928,
-  1.1014,
-  1.113,
-  1.1221,
-  1.1365,
-  1.1545,
-  1.171
+  1.101,
+  1.1133,
+  1.1228,
+  1.1383,
+  1.1582,
+  1.1767,
+  // Size 3
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0622,
+  1.0707,
+  1.0814,
+  1.0901,
+  1.102,
+  1.111,
+  1.1249,
+  1.1416,
+  1.1563
   // Size 4
 ];
 
@@ -726,7 +813,7 @@ function tanInPlace(values, at) {
 }
 
 // packages/engine/src/worklet/reverb/plateLowBand.ts
-var QUANTUM2 = 128;
+var QUANTUM3 = 128;
 function configureLowBand(plate, parameters, held, immediate) {
   const extra = plate._lowExtra;
   const target = plate._lowExtraTarget;
@@ -756,14 +843,14 @@ function configureLowBand(plate, parameters, held, immediate) {
   for (let p = 0; p < extra.length; p++) {
     target[p] = on && !held ? Math.exp(-perSample * plate._lengthTarget[p + FIRST_TANK_LINE]) - gains[p] : 0;
     if (immediate) extra[p] = target[p];
-    step[p] = (target[p] - extra[p]) / QUANTUM2;
+    step[p] = (target[p] - extra[p]) / QUANTUM3;
     if (step[p] !== 0) ramping = true;
   }
   return ramping;
 }
 
 // packages/engine/src/worklet/reverb/tankGains.ts
-var QUANTUM3 = 128;
+var QUANTUM4 = 128;
 function makeGainPoints(plate) {
   plate._gain = new Float64Array(TANK_DELAYS.length);
   plate._gainTarget = new Float64Array(TANK_DELAYS.length);
@@ -793,9 +880,9 @@ function configureGains(plate, parameters, held) {
   let ramping = false;
   for (let p = 0; p < gain.length; p++) {
     gain[p] = target[p];
-    target[p] = held ? HOLD_GAINS[p] : Math.exp(-perSample * plate._lengthTarget[p + FIRST_TANK_LINE]);
+    target[p] = held ? HOLD_GAINS[p] : Math.exp(-perSample * (plate._lengthTarget[p + FIRST_TANK_LINE] - plate._modExcursion[p]));
     if (immediate) gain[p] = target[p];
-    step[p] = (target[p] - gain[p]) / QUANTUM3;
+    step[p] = (target[p] - gain[p]) / QUANTUM4;
     if (step[p] !== 0) ramping = true;
   }
   plate._gainsPrimed = true;
@@ -835,6 +922,7 @@ function _renderBlock(inputs, outputs, parameters) {
   const dampHp = poles[3];
   const diffuse1 = parameters.diffusionIn1[0];
   const diffuse2 = parameters.diffusionIn2[0];
+  configureModulation(this, parameters);
   configureGains(this, parameters, held);
   const band = this._band;
   const ramping = this._ramping;
@@ -870,18 +958,16 @@ function _renderBlock(inputs, outputs, parameters) {
   let position;
   let whole;
   let a;
-  const excRate = parameters.modRate[0] / sampleRate;
-  const shortest = Math.min(
-    this._length[4],
-    this._length[8],
-    this._lengthTarget[4],
-    this._lengthTarget[8]
-  );
   const stepping = this._stepping || !this._settledSkip;
-  const excDepth = Math.min(
-    parameters.modDepth[0] * sampleRate / 1e3,
-    (shortest - MIN_LENGTH) / 2
-  );
+  const modCursor = this._modCursor;
+  const modFrom = this._modFrom;
+  const modSpan = this._modSpan;
+  const modPhase = this._modPhase;
+  const modDt = this._modDt;
+  const modOffset = this._modOffset;
+  const modDepth = this._modDepth;
+  const modDepthStep = this._modDepthStep;
+  let draw;
   for (let i = 0; i < 128; i++) {
     const delayedAt = (this._preDelayLength + this._preDelayWrite - preDelaySamples + i) % this._preDelayLength;
     const delayed = this._preDelay[delayedAt];
@@ -949,8 +1035,24 @@ function _renderBlock(inputs, outputs, parameters) {
     this._denormal = -this._denormal;
     const splitLeft = buildRight + this._denormal;
     const splitRight = buildLeft + this._denormal;
-    const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
-    const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
+    for (let p = 0; p < 4; p++) {
+      a = modPhase[p] + modDt[p];
+      if (a >= 1) {
+        a = (a - 1) / modDt[p];
+        modFrom[p] += modSpan[p];
+        this._modRising[p] = 1 - this._modRising[p];
+        whole = p * MOD_DRAW_LENGTH + modCursor[p];
+        modCursor[p] = modCursor[p] + 2 & MOD_DRAW_LENGTH - 1;
+        draw = MOD_HALF * MOD_DRAWS[whole];
+        modSpan[p] = (this._modRising[p] === 1 ? MOD_HALF + draw : draw) - modFrom[p];
+        this._modWidth[p] = MOD_WIDTH_MIN + MOD_DRAWS[whole + 1];
+        modDt[p] = this._modSpeed / this._modWidth[p];
+        a *= modDt[p];
+      }
+      modPhase[p] = a;
+      modOffset[p] = modDepth[p] * (modFrom[p] + modSpan[p] * a * a * (3 - 2 * a));
+      modDepth[p] += modDepthStep[p];
+    }
     this._read(11, 0);
     if (band) {
       x = this._value;
@@ -961,7 +1063,7 @@ function _renderBlock(inputs, outputs, parameters) {
       this._value = gain[7] * x + extra[7] * low;
     } else this._value *= gain[7];
     first = this._value;
-    this._offset = exc;
+    this._offset = modOffset[0];
     this._readCubic(4);
     if (band) {
       x = this._value;
@@ -990,7 +1092,8 @@ function _renderBlock(inputs, outputs, parameters) {
       this._value = gain[1] * x + extra[1] * low;
     } else this._value *= gain[1];
     first = this._value;
-    this._read(6, 0);
+    this._offset = modOffset[1];
+    this._readCubic(6);
     if (band) {
       x = this._value;
       if (seed) lowState[2] = x;
@@ -1014,7 +1117,7 @@ function _renderBlock(inputs, outputs, parameters) {
       this._value = gain[3] * x + extra[3] * low;
     } else this._value *= gain[3];
     first = this._value;
-    this._offset = exc2;
+    this._offset = modOffset[2];
     this._readCubic(8);
     if (band) {
       x = this._value;
@@ -1043,7 +1146,8 @@ function _renderBlock(inputs, outputs, parameters) {
       this._value = gain[5] * x + extra[5] * low;
     } else this._value *= gain[5];
     first = this._value;
-    this._read(10, 0);
+    this._offset = modOffset[3];
+    this._readCubic(10);
     if (band) {
       x = this._value;
       if (seed) lowState[6] = x;
@@ -1088,10 +1192,6 @@ function _renderBlock(inputs, outputs, parameters) {
       }
       direct += buildDirect[2];
     }
-    this._excPhase += excRate;
-    if (this._excPhase >= 1) this._excPhase -= 1;
-    this._excPhase2 += excRate * 1.0007;
-    if (this._excPhase2 >= 1) this._excPhase2 -= 1;
     for (let line2 = 0; line2 < LINE_COUNT; line2++) {
       this._write[line2] = this._write[line2] + 1 & this._mask[line2];
     }
@@ -1131,8 +1231,8 @@ var DattorroReverb = class extends AudioWorkletProcessor {
       ["diffusionTank2", 0.5, 0, MAX_TANK_DIFFUSION],
       ["tankLowCut", 20, 10, 1e3],
       ["tankHighCut", 8e3, 200, 2e4],
-      ["modRate", 0.5, 0, 8],
-      ["modDepth", 0.7, 0, 4],
+      ["modRate", 3, 0, 8],
+      ["modDepth", 0.35, 0, 4],
       ["hold", 0, 0, 1],
       ["wet", 1, 0, 1],
       ["dry", 0, 0, 1],
@@ -1149,7 +1249,6 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     super(options);
     this._inputLp = this._inputHp = NaN;
     this._inputLpRight = this._inputHpRight = NaN;
-    this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = this._build = NaN;
     this._value = this._offset = NaN;
     this._cross = this._rt60 = this._cellAt = NaN;
@@ -1177,9 +1276,8 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._dampLp = new Float64Array(2);
     this._dampHp = new Float64Array(2);
     this._poles = new Float64Array(4);
-    this._excPhase = 0;
-    this._excPhase2 = 0;
     this._denormal = ANTI_DENORMAL;
+    makeModulation(this);
     this._size = 1;
     this._inputGain = 1;
     this._applySize(true);
@@ -1240,7 +1338,7 @@ var DattorroReverb = class extends AudioWorkletProcessor {
   }
   /**
    * Empty the tank, once, on the way to sleep: every delay line, the pre-delay,
-   * the filter states, the write heads and the modulation phases go back to where a new
+   * the filter states, the write heads and the modulation's sources and cursors go back to where a new
    * processor starts, so the first sound after waking renders exactly as it
    * would from a fresh plate. Allocation-free: `fill` writes in place.
    */
@@ -1256,8 +1354,7 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._inputHpRight = 0;
     this._dampLp[0] = this._dampLp[1] = 0;
     this._dampHp[0] = this._dampHp[1] = 0;
-    this._excPhase = 0;
-    this._excPhase2 = 0;
+    resetModulation(this);
     this._denormal = ANTI_DENORMAL;
     this._gainsPrimed = false;
     this._band = false;

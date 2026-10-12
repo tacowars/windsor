@@ -267,6 +267,26 @@ are written out in the tank's sample loop, not called; each side's sum feeds
 the opposite loop and goes to its own side of the wet output at the direct
 level. `mixer/reverbBuild.test.ts` holds the onset, the tail, the live moves
 and the rates.
+The modulation (windsor#764) moves all four tank all-passes (lines 4, 6, 8
+and 10, `MOD_LINES`, each read cubic), each from its own smoothed noise: a
+glide along `3a² − 2a³` from one drawn knot to the next, the knots
+alternating between the upper and lower half of the range, each segment a
+drawn width. `modRate` is its average rate in Hz and `modDepth` each point's
+peak excursion in ms, the read moving from its line's length to that much
+shorter. `plateModulation.ts` draws every point's knots and widths once, at
+load, from `fm/prng.ts`'s generator at the fixed seeds in
+`reverbModulationTables.ts` into `MOD_DRAWS`, which every plate shares and
+reads through cursors of its own that sleep resets, so a woken plate renders
+as a fresh one; once a block it sets the speed and each point's depth,
+clamped against the shortest its own line reaches and ramped across the
+block, and leaves each moving line's excursion (half its depth while the
+sources move, where each rests at `modRate` 0), for which `tankGains.ts` cuts
+that line's gain point, so a deep setting keeps its Decay; it runs before
+`configureGains`. The source, the knots and the excursions are written out in the tank's
+sample loop, with no call and no `Math` transcendental, so the golden gives
+the same bits on arm64 and x64. `mixer/reverbModulation.test.ts` holds the
+spread, the held tone, the tail, the live moves, the rates and the
+determinism.
 
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. The map of `fm/` (#644):
@@ -338,8 +358,9 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    which is why the file must be one self-contained script) and the harness
    (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
-   `TANK_DELAYS`, `MAX_PRE_DELAY`, the sleep floors, `BUILD_TAP_TIME` and
-   `BUILD_SPREAD` the same way).
+   `TANK_DELAYS`, `MAX_PRE_DELAY`, the sleep floors, `BUILD_TAP_TIME`,
+   `BUILD_SPREAD`, `MOD_LINES`, `MOD_DRAW_LENGTH`, `MOD_WIDTH_MIN` and
+   `MOD_DRAWS` the same way).
    The harness reaches internals by their **top-level names** (`ALGORITHMS`,
    `WAVE`, `Envelope`, `ST_SUSTAIN`, …), so a name stays unique across every
    module under `fm/`: esbuild renames a collision (`WAVE2`) and the harness
@@ -418,7 +439,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
-   twenty-four scenarios in the default, `sleep: false` and `settledSkip: false`
+   twenty-six scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

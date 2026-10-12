@@ -10,6 +10,11 @@
  * r = 10^(−3 / (Decay × rate)). With all the loss at one point, energy held in
  * the all-passes would skip it and outlast the setting.
  *
+ * A moving all-pass (windsor#764, `plateModulation.ts`) is read about
+ * `_modExcursion` samples shorter than its length, so its gain is cut for
+ * that shorter length: 0 at `modDepth` 0, where the measured correction was
+ * read.
+ *
  * `configureGains` runs once a block, before the sample loop: it lands the last
  * block's ramp on its targets, aims each gain at this block's Decay and Size
  * through the measured correction (`decayCorrection.ts`; HOLD's `HOLD_GAINS`
@@ -83,7 +88,7 @@ function configureGains(
     gain[p] = target[p];
     target[p] = held
       ? HOLD_GAINS[p]
-      : Math.exp(-perSample * plate._lengthTarget[p + FIRST_TANK_LINE]);
+      : Math.exp(-perSample * (plate._lengthTarget[p + FIRST_TANK_LINE] - plate._modExcursion[p]));
     if (immediate) gain[p] = target[p];
     step[p] = (target[p] - gain[p]) / QUANTUM;
     if (step[p] !== 0) ramping = true;

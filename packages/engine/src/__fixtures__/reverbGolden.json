@@ -3,49 +3,49 @@
   "sampleRate": 48000,
   "hashes": {
     "anti-phase": {
-      "default": "174bce2891411b1b032e5491ec84a5f2ff6ee5c14894936c4cd91181736e03e2",
-      "noSleep": "174bce2891411b1b032e5491ec84a5f2ff6ee5c14894936c4cd91181736e03e2",
-      "noSettledSkip": "174bce2891411b1b032e5491ec84a5f2ff6ee5c14894936c4cd91181736e03e2"
+      "default": "3fb9edde79323920e200ca01bd2f70125f62d5e6c570194f69c15124648998d3",
+      "noSleep": "3fb9edde79323920e200ca01bd2f70125f62d5e6c570194f69c15124648998d3",
+      "noSettledSkip": "3fb9edde79323920e200ca01bd2f70125f62d5e6c570194f69c15124648998d3"
     },
     "build-moves": {
-      "default": "07efb510ca0a87352c1bef3183dcb15db7e9e159dcf46ae3f4ecb13facd426b5",
-      "noSleep": "07efb510ca0a87352c1bef3183dcb15db7e9e159dcf46ae3f4ecb13facd426b5",
-      "noSettledSkip": "07efb510ca0a87352c1bef3183dcb15db7e9e159dcf46ae3f4ecb13facd426b5"
+      "default": "d3778e3b33623e082cd1cd7236aeba541f61f001cd753b21b27c56076c75091a",
+      "noSleep": "d3778e3b33623e082cd1cd7236aeba541f61f001cd753b21b27c56076c75091a",
+      "noSettledSkip": "d3778e3b33623e082cd1cd7236aeba541f61f001cd753b21b27c56076c75091a"
     },
     "build-one": {
-      "default": "13a92725a287cfcebddc3f6f86e94b1763391eb43a11e10151eaa297fef1b30e",
-      "noSleep": "13a92725a287cfcebddc3f6f86e94b1763391eb43a11e10151eaa297fef1b30e",
-      "noSettledSkip": "13a92725a287cfcebddc3f6f86e94b1763391eb43a11e10151eaa297fef1b30e"
+      "default": "e145381ff1c109adec9d1281fe89d7d5bf1aa946f21054e10fffee52d028e38a",
+      "noSleep": "e145381ff1c109adec9d1281fe89d7d5bf1aa946f21054e10fffee52d028e38a",
+      "noSettledSkip": "e145381ff1c109adec9d1281fe89d7d5bf1aa946f21054e10fffee52d028e38a"
     },
     "build-zero": {
-      "default": "a1d177dd5edfce1393e8135ffe4c5b9440e8767cb11c3c8fd387a729d5c6af97",
-      "noSleep": "a1d177dd5edfce1393e8135ffe4c5b9440e8767cb11c3c8fd387a729d5c6af97",
-      "noSettledSkip": "a1d177dd5edfce1393e8135ffe4c5b9440e8767cb11c3c8fd387a729d5c6af97"
+      "default": "bba1308f54336dbd79bd10a496f53a1c21b88858be3c639bf67f7342a9e17ccc",
+      "noSleep": "bba1308f54336dbd79bd10a496f53a1c21b88858be3c639bf67f7342a9e17ccc",
+      "noSettledSkip": "bba1308f54336dbd79bd10a496f53a1c21b88858be3c639bf67f7342a9e17ccc"
     },
     "click-left": {
-      "default": "fed91a694da34cd56f72e9f2ddeaee398fbf75f39fe292c09b17c020f165417f",
-      "noSleep": "fed91a694da34cd56f72e9f2ddeaee398fbf75f39fe292c09b17c020f165417f",
-      "noSettledSkip": "fed91a694da34cd56f72e9f2ddeaee398fbf75f39fe292c09b17c020f165417f"
+      "default": "8d9d29f26f754698022238117e43e6951a0fd19d260144e0883ea05cb0dbff86",
+      "noSleep": "8d9d29f26f754698022238117e43e6951a0fd19d260144e0883ea05cb0dbff86",
+      "noSettledSkip": "8d9d29f26f754698022238117e43e6951a0fd19d260144e0883ea05cb0dbff86"
     },
     "click-right": {
-      "default": "1611559bce468cff828df780d1b017823bd25a50fec50c6ba45ed695688c4b42",
-      "noSleep": "1611559bce468cff828df780d1b017823bd25a50fec50c6ba45ed695688c4b42",
-      "noSettledSkip": "1611559bce468cff828df780d1b017823bd25a50fec50c6ba45ed695688c4b42"
+      "default": "e08f531b90ae1c26aee20de41fc8906f853e94e48d6afbd3706a8d8d53e32ed3",
+      "noSleep": "e08f531b90ae1c26aee20de41fc8906f853e94e48d6afbd3706a8d8d53e32ed3",
+      "noSettledSkip": "e08f531b90ae1c26aee20de41fc8906f853e94e48d6afbd3706a8d8d53e32ed3"
     },
     "decay-long": {
-      "default": "41c10bb30b893be4ec3cf8401b7ba077c163887a0ecfaf6a572c44e561530847",
-      "noSleep": "41c10bb30b893be4ec3cf8401b7ba077c163887a0ecfaf6a572c44e561530847",
-      "noSettledSkip": "41c10bb30b893be4ec3cf8401b7ba077c163887a0ecfaf6a572c44e561530847"
+      "default": "5a2611768c67f31f9736f271c52159640c9290311a8b6c55fbc10c04ec961e92",
+      "noSleep": "5a2611768c67f31f9736f271c52159640c9290311a8b6c55fbc10c04ec961e92",
+      "noSettledSkip": "5a2611768c67f31f9736f271c52159640c9290311a8b6c55fbc10c04ec961e92"
     },
     "decay-short": {
-      "default": "9ff728598f9696eb61d445790c77db37cca391bfdfd9551caff7b663ec9c1e78",
-      "noSleep": "9ff728598f9696eb61d445790c77db37cca391bfdfd9551caff7b663ec9c1e78",
-      "noSettledSkip": "9ff728598f9696eb61d445790c77db37cca391bfdfd9551caff7b663ec9c1e78"
+      "default": "6ada3aff760cab0b2b43ddc5fe48de07121635154200e7584a583749fc99979f",
+      "noSleep": "6ada3aff760cab0b2b43ddc5fe48de07121635154200e7584a583749fc99979f",
+      "noSettledSkip": "6ada3aff760cab0b2b43ddc5fe48de07121635154200e7584a583749fc99979f"
     },
     "decay-step": {
-      "default": "081277527b2d817d145c00df71685916be23883bf286dc74217a5e469fc00e2e",
-      "noSleep": "081277527b2d817d145c00df71685916be23883bf286dc74217a5e469fc00e2e",
-      "noSettledSkip": "081277527b2d817d145c00df71685916be23883bf286dc74217a5e469fc00e2e"
+      "default": "9ba2c7d9d0f6db774fcac622f5d476d4246318eaba3508e420fc4efda74ee018",
+      "noSleep": "9ba2c7d9d0f6db774fcac622f5d476d4246318eaba3508e420fc4efda74ee018",
+      "noSettledSkip": "9ba2c7d9d0f6db774fcac622f5d476d4246318eaba3508e420fc4efda74ee018"
     },
     "dry-only": {
       "default": "bf473185d05676e7898737dbfcab0c2c67ccb9f65a9659945eeb50bfb4108fd3",
@@ -53,74 +53,84 @@
       "noSettledSkip": "bf473185d05676e7898737dbfcab0c2c67ccb9f65a9659945eeb50bfb4108fd3"
     },
     "filters-and-modulation": {
-      "default": "001d734ca9969847c70576bd577744ff2446dc1cac645b0ccab8d2cf3aecb77c",
-      "noSleep": "001d734ca9969847c70576bd577744ff2446dc1cac645b0ccab8d2cf3aecb77c",
-      "noSettledSkip": "001d734ca9969847c70576bd577744ff2446dc1cac645b0ccab8d2cf3aecb77c"
+      "default": "1c7fdc9c73d1754427553e66e43b04e33f67fb29be6b3870179d8eb27addb733",
+      "noSleep": "1c7fdc9c73d1754427553e66e43b04e33f67fb29be6b3870179d8eb27addb733",
+      "noSettledSkip": "1c7fdc9c73d1754427553e66e43b04e33f67fb29be6b3870179d8eb27addb733"
     },
     "hold": {
-      "default": "c108a04626cc5a7d5125c4561853ce2e18d42cee09a5d6ab2a7b5c2db694d02f",
-      "noSleep": "c108a04626cc5a7d5125c4561853ce2e18d42cee09a5d6ab2a7b5c2db694d02f",
-      "noSettledSkip": "c108a04626cc5a7d5125c4561853ce2e18d42cee09a5d6ab2a7b5c2db694d02f"
+      "default": "4b2c264d8809b560d71afe0b306814a0dcb42f77cf4e8da35f8443d90447055e",
+      "noSleep": "4b2c264d8809b560d71afe0b306814a0dcb42f77cf4e8da35f8443d90447055e",
+      "noSettledSkip": "4b2c264d8809b560d71afe0b306814a0dcb42f77cf4e8da35f8443d90447055e"
     },
     "hold-released": {
-      "default": "bd299e249f9b0382342c39e496a8bdef345abeda90da440d3a4ac7dd924edd3c",
-      "noSleep": "bd299e249f9b0382342c39e496a8bdef345abeda90da440d3a4ac7dd924edd3c",
-      "noSettledSkip": "bd299e249f9b0382342c39e496a8bdef345abeda90da440d3a4ac7dd924edd3c"
+      "default": "0518eb3e6c191250924219528bde32228cb475a14487a08ad325ce74caa6bdec",
+      "noSleep": "0518eb3e6c191250924219528bde32228cb475a14487a08ad325ce74caa6bdec",
+      "noSettledSkip": "0518eb3e6c191250924219528bde32228cb475a14487a08ad325ce74caa6bdec"
     },
     "impulse": {
-      "default": "8fe48e1308d1daa4de8991352ae50afd28a91d773b3c069d3d0b677cabb2a227",
-      "noSleep": "8fe48e1308d1daa4de8991352ae50afd28a91d773b3c069d3d0b677cabb2a227",
-      "noSettledSkip": "8fe48e1308d1daa4de8991352ae50afd28a91d773b3c069d3d0b677cabb2a227"
+      "default": "4c98320b510e7eb78ba508f5f2f22f175c6b588ec6e7728e5d6c9cb52b536211",
+      "noSleep": "4c98320b510e7eb78ba508f5f2f22f175c6b588ec6e7728e5d6c9cb52b536211",
+      "noSettledSkip": "4c98320b510e7eb78ba508f5f2f22f175c6b588ec6e7728e5d6c9cb52b536211"
     },
     "low-band": {
-      "default": "322e000f7f86015f79d401c60df7c4ae7f94dbccbcabf1a7059479146c600060",
-      "noSleep": "322e000f7f86015f79d401c60df7c4ae7f94dbccbcabf1a7059479146c600060",
-      "noSettledSkip": "322e000f7f86015f79d401c60df7c4ae7f94dbccbcabf1a7059479146c600060"
+      "default": "7e0cec16ee944f635762d5653bc725f4d2b329bb84f5eb8d385a04f456b9b006",
+      "noSleep": "7e0cec16ee944f635762d5653bc725f4d2b329bb84f5eb8d385a04f456b9b006",
+      "noSettledSkip": "7e0cec16ee944f635762d5653bc725f4d2b329bb84f5eb8d385a04f456b9b006"
     },
     "low-band-moves": {
-      "default": "bb062f5ed179429c4fc649fef74b152a2133c4f0266e5630b0d42b4c1a39fe4d",
-      "noSleep": "bb062f5ed179429c4fc649fef74b152a2133c4f0266e5630b0d42b4c1a39fe4d",
-      "noSettledSkip": "bb062f5ed179429c4fc649fef74b152a2133c4f0266e5630b0d42b4c1a39fe4d"
+      "default": "b00a838a120721ebe942e0b4dabc53c1998435c86e327d79f80bc7853d952e17",
+      "noSleep": "b00a838a120721ebe942e0b4dabc53c1998435c86e327d79f80bc7853d952e17",
+      "noSettledSkip": "b00a838a120721ebe942e0b4dabc53c1998435c86e327d79f80bc7853d952e17"
     },
     "max-diffusion": {
-      "default": "ea0a0248d840bf1df39c37337698ab08abf1c95854f4d864daba3a87f1399370",
-      "noSleep": "ea0a0248d840bf1df39c37337698ab08abf1c95854f4d864daba3a87f1399370",
-      "noSettledSkip": "ea0a0248d840bf1df39c37337698ab08abf1c95854f4d864daba3a87f1399370"
+      "default": "783baee5d024890f2ddf7a5976fd91a93d527768db8dc00712258c189c034056",
+      "noSleep": "783baee5d024890f2ddf7a5976fd91a93d527768db8dc00712258c189c034056",
+      "noSettledSkip": "783baee5d024890f2ddf7a5976fd91a93d527768db8dc00712258c189c034056"
+    },
+    "mod-deep-fast": {
+      "default": "52797c2b888a8c44602ac341b5d5c51199237c1a96f8f9a1f4696782e6c3a1b9",
+      "noSleep": "52797c2b888a8c44602ac341b5d5c51199237c1a96f8f9a1f4696782e6c3a1b9",
+      "noSettledSkip": "52797c2b888a8c44602ac341b5d5c51199237c1a96f8f9a1f4696782e6c3a1b9"
+    },
+    "mod-held": {
+      "default": "26205c7dc522b759766b6f4fee0f7341b0bedccb2f57bda7f2e12738703881a8",
+      "noSleep": "26205c7dc522b759766b6f4fee0f7341b0bedccb2f57bda7f2e12738703881a8",
+      "noSettledSkip": "26205c7dc522b759766b6f4fee0f7341b0bedccb2f57bda7f2e12738703881a8"
     },
     "size-and-decay": {
-      "default": "b3dfaa7a58633e34db4da935c35ba16dc1fb52d1309f25e6c4083ffc55dded58",
-      "noSleep": "b3dfaa7a58633e34db4da935c35ba16dc1fb52d1309f25e6c4083ffc55dded58",
-      "noSettledSkip": "b3dfaa7a58633e34db4da935c35ba16dc1fb52d1309f25e6c4083ffc55dded58"
+      "default": "250591905db70b2bf42f3117588af4695d8eedc6fc490bb30d0b8823bfdc4dfe",
+      "noSleep": "250591905db70b2bf42f3117588af4695d8eedc6fc490bb30d0b8823bfdc4dfe",
+      "noSettledSkip": "250591905db70b2bf42f3117588af4695d8eedc6fc490bb30d0b8823bfdc4dfe"
     },
     "size-box": {
-      "default": "c9fcebb46caf3dc992b13bd96b13f50a00ce6180be85a7131658b595e5aa75a6",
-      "noSleep": "c9fcebb46caf3dc992b13bd96b13f50a00ce6180be85a7131658b595e5aa75a6",
-      "noSettledSkip": "c9fcebb46caf3dc992b13bd96b13f50a00ce6180be85a7131658b595e5aa75a6"
+      "default": "a4cc99d15806c835c399d588066ebb0421c5a44250d69121b8191bdf58eba011",
+      "noSleep": "a4cc99d15806c835c399d588066ebb0421c5a44250d69121b8191bdf58eba011",
+      "noSettledSkip": "a4cc99d15806c835c399d588066ebb0421c5a44250d69121b8191bdf58eba011"
     },
     "size-cathedral": {
-      "default": "6e944861b54fbd477ff870f3356697543417e69530284e4420b4e3782a1c9e7d",
-      "noSleep": "6e944861b54fbd477ff870f3356697543417e69530284e4420b4e3782a1c9e7d",
-      "noSettledSkip": "6e944861b54fbd477ff870f3356697543417e69530284e4420b4e3782a1c9e7d"
+      "default": "09b55199a80cda8fb933c7a1dbaebccd69aeb4aacf9823b66ba351514ef5c2a2",
+      "noSleep": "09b55199a80cda8fb933c7a1dbaebccd69aeb4aacf9823b66ba351514ef5c2a2",
+      "noSettledSkip": "09b55199a80cda8fb933c7a1dbaebccd69aeb4aacf9823b66ba351514ef5c2a2"
     },
     "size-glide": {
-      "default": "4630f6da2f9124c0a8fabd7fca47b312aedbb02be1e3c993edb6132b46016f6f",
-      "noSleep": "4630f6da2f9124c0a8fabd7fca47b312aedbb02be1e3c993edb6132b46016f6f",
-      "noSettledSkip": "4630f6da2f9124c0a8fabd7fca47b312aedbb02be1e3c993edb6132b46016f6f"
+      "default": "54e655899be142dd90f54635f185554d36b11d8b71e9915f259d7db0cede3684",
+      "noSleep": "54e655899be142dd90f54635f185554d36b11d8b71e9915f259d7db0cede3684",
+      "noSettledSkip": "54e655899be142dd90f54635f185554d36b11d8b71e9915f259d7db0cede3684"
     },
     "sleep": {
-      "default": "4e5157c7d14c970ff737b6d4194eb8b3d3ea10cf6c618edf7a8d106664bfca12",
-      "noSleep": "49a264e4cd5f418e739708a1aa9d652334d81036db612df62079883069b82f5e",
-      "noSettledSkip": "4e5157c7d14c970ff737b6d4194eb8b3d3ea10cf6c618edf7a8d106664bfca12"
+      "default": "588f2700e9ffb9c0c22a3d2f9720bf46d174c6f74ed33375934a84235b7b87f2",
+      "noSleep": "c32c63049b4b420c9326eb3a3358a87f71c64111ee05402fd291edce1276c4c9",
+      "noSettledSkip": "588f2700e9ffb9c0c22a3d2f9720bf46d174c6f74ed33375934a84235b7b87f2"
     },
     "sleep-and-wake": {
-      "default": "8098ffaa3afa39190e184e6020dec740214cbf9bea8d908b51a44355c3009756",
-      "noSleep": "e5d93fe24217e56a0768b8becf74f5044d23c8f15a00b29f4fcc348d72e8dccd",
-      "noSettledSkip": "8098ffaa3afa39190e184e6020dec740214cbf9bea8d908b51a44355c3009756"
+      "default": "99b97d4aa651883c1b6cc802106b761322cb8c449db2266128f2134665a032ca",
+      "noSleep": "b884eb43cb0ac0743489f1de0feb331ae101af880d68e073adf27d4b16cfde27",
+      "noSettledSkip": "99b97d4aa651883c1b6cc802106b761322cb8c449db2266128f2134665a032ca"
     },
     "wet-late": {
-      "default": "83cacd0d012ee44860bca4a69028d733cf7b0663702a40a002b431666c9a8587",
-      "noSleep": "83cacd0d012ee44860bca4a69028d733cf7b0663702a40a002b431666c9a8587",
-      "noSettledSkip": "83cacd0d012ee44860bca4a69028d733cf7b0663702a40a002b431666c9a8587"
+      "default": "9d4e8985fa344c085f8d71d87d8089299be9ef23a185ca2572157c6a3d4e88bc",
+      "noSleep": "9d4e8985fa344c085f8d71d87d8089299be9ef23a185ca2572157c6a3d4e88bc",
+      "noSettledSkip": "9d4e8985fa344c085f8d71d87d8089299be9ef23a185ca2572157c6a3d4e88bc"
     }
   }
 }

@@ -177,11 +177,29 @@ describe('PLATE_REVERB_INSERT', () => {
   });
 });
 
-describe('a version-12 song (windsor#748, windsor#761)', () => {
-  const room = { kind: 'plate', decay: 12.5, lowDecay: 2.5, lowCross: 4000, build: 0.85, mix: 1 };
-  const strip = { kind: 'plate', decay: 0.35, lowDecay: 0.3, lowCross: 120, build: 0, mix: 0.6 };
+describe('a version-13 song (windsor#748, windsor#761, windsor#764)', () => {
+  const room = {
+    kind: 'plate',
+    decay: 12.5,
+    lowDecay: 2.5,
+    lowCross: 4000,
+    build: 0.85,
+    modRate: 6.5,
+    modDepth: 3.25,
+    mix: 1,
+  };
+  const strip = {
+    kind: 'plate',
+    decay: 0.35,
+    lowDecay: 0.3,
+    lowCross: 120,
+    build: 0,
+    modRate: 0.25,
+    modDepth: 0.15,
+    mix: 0.6,
+  };
 
-  it('round-trips decay, lowDecay, lowCross and build on a return and on a Plate insert', () => {
+  it('round-trips decay, lowDecay, lowCross, build, modRate and modDepth on a return and on a Plate insert', () => {
     const raw = {
       ...song([{ ...KICK, strip: { inserts: [strip] } }]),
       returns: { a: { inserts: [room] } },
@@ -196,12 +214,12 @@ describe('a version-12 song (windsor#748, windsor#761)', () => {
     expect(again.document).toEqual(first.document);
   });
 
-  it('refuses a version-11 song with the format message, never loading its plates without Build', () => {
-    const raw = { ...song([KICK]), returns: { a: { inserts: [room] } }, version: 11 };
+  it('refuses a version-12 song with the format message, never loading its plates on the old modulation', () => {
+    const raw = { ...song([KICK]), returns: { a: { inserts: [room] } }, version: 12 };
     const result = makeArrangement(raw);
     expect(result.usable).toBe(false);
     expect(result.refused?.message).toBe(
-      `saved with song format 11, this build reads ${ARRANGEMENT_VERSION}`,
+      `saved with song format 12, this build reads ${ARRANGEMENT_VERSION}`,
     );
   });
 });

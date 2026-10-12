@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+  The plate's render cost per quantum on a page's main thread (windsor#764),
+  the loop bench.mjs runs in Node. Serve a folder holding this page and the
+  two bundles, open it in Chrome, and call
+  `await benchPlate('main-reverb.js', { modRate: 8, modDepth: 4 })` from the
+  console or DevTools: the median of seven runs of 20 000 quanta, in
+  microseconds, after two warm-up runs.
+-->
+<meta charset="utf-8" />
+<title>Plate bench</title>
+<script>
+  // Each bundle is evaluated once a page, as a worklet scope evaluates it
+  // once: V8 slows every copy of a function once it has seen many copies of
+  // its source, and `main`'s bundle fell from 41 to 277 µs a quantum by its
+  // tenth evaluation in one Node process.
+  const processors = {};
+  async function benchPlate(file, extra = {}, rounds = 7) {
+    if (!processors[file]) {
+      const source = await (await fetch(file)).text();
+      class Base {
+        constructor() {
+          this.port = { postMessage() {}, onmessage: null };
+        }
+      }
+      new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', source)(
+        Base,
+        48000,
+        (_name, cls) => {
+          processors[file] = cls;
+        },
+      );
+    }
+    const Processor = processors[file];
+    const values = {};
+    for (const d of Processor.parameterDescriptors) {
+      values[d.name] = new Float32Array([extra[d.name] ?? d.defaultValue]);
+    }
+    const proc = new Processor({ processorOptions: { sleep: false } });
+    const BLOCK = 128;
+    const inL = new Float32Array(BLOCK);
+    const inR = new Float32Array(BLOCK);
+    const outL = new Float32Array(BLOCK);
+    const outR = new Float32Array(BLOCK);
+    let seed = 1;
+    const quanta = 20000;
+    const run = () => {
+      for (let q = 0; q < quanta; q++) {
+        for (let i = 0; i < BLOCK; i++) {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          inL[i] = inR[i] = (seed / 0x80000000 - 1) * 0.25;
+        }
+        proc.process([[inL, inR]], [[outL, outR]], values);
+      }
+    };
+    run();
+    run();
+    const times = [];
+    for (let r = 0; r < rounds; r++) {
+      const t0 = performance.now();
+      run();
+      times.push(((performance.now() - t0) * 1000) / quanta);
+    }
+    times.sort((a, b) => a - b);
+    return times[times.length >> 1];
+  }
+</script>

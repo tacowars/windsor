@@ -55,6 +55,14 @@ export interface ReverbTopology {
   /** Build's tap times in seconds at Build 1, and the longest (windsor#761). */
   buildTapTime: number[];
   buildSpread: number;
+  /**
+   * The modulation (windsor#764): the lines it moves, the draws per point, the
+   * shortest segment's width, and every point's draws end to end.
+   */
+  modLines: number[];
+  modDrawLength: number;
+  modWidthMin: number;
+  modDraws: Float32Array;
 }
 
 export interface LoadedReverb {
@@ -88,6 +96,10 @@ export function loadReverb(sampleRate = SAMPLE_RATE): LoadedReverb {
       sleepOutputFloor: SLEEP_OUTPUT_FLOOR,
       buildTapTime: BUILD_TAP_TIME,
       buildSpread: BUILD_SPREAD,
+      modLines: MOD_LINES,
+      modDrawLength: MOD_DRAW_LENGTH,
+      modWidthMin: MOD_WIDTH_MIN,
+      modDraws: MOD_DRAWS,
     };`,
   });
 
@@ -134,6 +146,13 @@ export interface ReverbInternals {
   _buildTime: Float64Array;
   _buildGain: Float64Array;
   _buildDirect: Float64Array;
+  /**
+   * The modulation (windsor#764): each point's excursion this sample, its
+   * depth in samples now, and its cursor into the draws.
+   */
+  _modOffset: Float64Array;
+  _modDepth: Float64Array;
+  _modCursor: Int32Array;
 }
 
 /** White-box access to one processor's delay lines. */

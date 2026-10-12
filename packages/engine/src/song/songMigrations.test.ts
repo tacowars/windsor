@@ -13,9 +13,10 @@
  * values renamed to Windsor's, pinned here); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused. None ships from 10 to 11 (windsor#748, the
- * plate's Decay in seconds) or from 11 to 12 (windsor#761, the plate's
- * Build), so 5 to 11 are refused too, and the steps' own tests read through
- * stand-ins 10 → 11 and 11 → 12 (`PAST_TEN`).
+ * plate's Decay in seconds), from 11 to 12 (windsor#761, the plate's
+ * Build) or from 12 to 13 (windsor#764, the plate's modulation), so 5 to 12
+ * are refused too, and the steps' own tests read through
+ * stand-ins 10 → 11, 11 → 12 and 12 → 13 (`PAST_TEN`).
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
  */
 import { describe, expect, it } from 'vitest';
@@ -54,8 +55,8 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 /**
- * The shipped steps and stand-ins 10 → 11 and 11 → 12: windsor#748 and
- * windsor#761 ship none, so a version-10 or version-11 song is refused, and
+ * The shipped steps and stand-ins 10 → 11, 11 → 12 and 12 → 13: windsor#748,
+ * windsor#761 and windsor#764 ship none, so a version-10, 11 or 12 song is refused, and
  * this reads a step's own work through to a version this build loads.
  */
 const PAST_TEN = {
@@ -63,12 +64,13 @@ const PAST_TEN = {
     ...SONG_MIGRATIONS,
     10: (doc: Record<string, unknown>) => doc,
     11: (doc: Record<string, unknown>) => doc,
+    12: (doc: Record<string, unknown>) => doc,
   },
   patches: PATCH_MIGRATIONS,
 };
 
 describe('upgradeSong', () => {
-  it('ships five upgrades, 5 → 6 to 9 → 10, and none to 11 or 12: versions 2, 3 and 4 were retired without one', () => {
+  it('ships five upgrades, 5 → 6 to 9 → 10, and none to 11, 12 or 13: versions 2, 3 and 4 were retired without one', () => {
     expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9']);
   });
 

@@ -1,4 +1,4 @@
-/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the line indices and the modulation's detune are the algorithm; the tunables are reverbConstants.ts (#671) */
+/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the line indices, the modulation's four points and its smoothstep are the algorithm; the tunables are reverbConstants.ts (#671) and reverbModulationTables.ts (windsor#764) */
 /**
  * The plate's awake render (#671): one quantum, after `plateInput.ts` has
  * written each input channel into its own pre-delay ring, through the
@@ -13,7 +13,11 @@
  * 8) and R's the left loop (line 4), because table 2's left output takes four
  * of its seven taps from the right loop's lines, and each sum goes to its own
  * side of the wet output at the direct level. Its reads and sums are written
- * out in the sample loop too, never called (`mixer/reverbBuild.test.ts`). Decay reaches the tank as a gain point on
+ * out in the sample loop too, never called (`mixer/reverbBuild.test.ts`). The
+ * modulation (windsor#764, `plateModulation.ts`) moves all four tank
+ * all-passes (lines 4, 6, 8 and 10, each read cubic), each point's smoothed
+ * noise and excursion written out here too, its knots read from the shared
+ * draws with no call and no `Math` transcendental. Decay reaches the tank as a gain point on
  * each of its eight lines (windsor#748): `tankGains.ts` sets them once a block, the loop
  * ramps them a sample at a time, and while the low band runs
  * (`plateLowBand.ts`) each point is its first-order shelf, written out here at
@@ -36,7 +40,6 @@
 import {
   FIRST_TANK_LINE,
   LINE_COUNT,
-  MIN_LENGTH,
   OUTPUT_TRIM,
   SLEEP_OUTPUT_FLOOR,
   SMOOTH_SECONDS,
@@ -49,6 +52,8 @@ import { configureBuild } from './plateBuild';
 import { BUILD_TAPS_PER_SIDE } from './reverbBuildTables';
 import type { DattorroReverb } from './reverbProcessor';
 import { configureGains } from './tankGains';
+import { configureModulation, MOD_DRAWS } from './plateModulation';
+import { MOD_DRAW_LENGTH, MOD_HALF, MOD_WIDTH_MIN } from './reverbModulationTables';
 
 /** The parameters the block's one-pole coefficients are cut from, in `_poles` order. */
 const POLE_CUTS = ['inputHighCut', 'inputLowCut', 'tankHighCut', 'tankLowCut'];
@@ -121,6 +126,10 @@ function _renderBlock(
 
   const diffuse1 = parameters.diffusionIn1[0];
   const diffuse2 = parameters.diffusionIn2[0];
+  // The modulation (`plateModulation.ts`): this block's speed and each
+  // point's depth, clamped against its own line and ramped across the block;
+  // set first, since each all-pass's gain is cut for its excursion.
+  configureModulation(this, parameters);
   // Decay, Size and HOLD as each tank line's gain, ramped across the block.
   configureGains(this, parameters, held);
   const band = this._band;
@@ -164,22 +173,17 @@ function _renderBlock(
   let whole: number;
   let a: number;
 
-  const excRate = parameters.modRate[0] / sampleRate;
-  // Depth is in milliseconds, but must stay inside the line it modulates or
-  // the interpolator would read across the write head.
-  // Clamp against the shortest the two modulated lines reach at any point in
-  // this block, since they are mid-ramp.
-  const shortest = Math.min(
-    this._length[4],
-    this._length[8],
-    this._lengthTarget[4],
-    this._lengthTarget[8],
-  );
   const stepping = this._stepping || !this._settledSkip;
-  const excDepth = Math.min(
-    (parameters.modDepth[0] * sampleRate) / 1000,
-    (shortest - MIN_LENGTH) / 2,
-  );
+  // Each modulation point's source, written out below.
+  const modCursor = this._modCursor;
+  const modFrom = this._modFrom;
+  const modSpan = this._modSpan;
+  const modPhase = this._modPhase;
+  const modDt = this._modDt;
+  const modOffset = this._modOffset;
+  const modDepth = this._modDepth;
+  const modDepthStep = this._modDepthStep;
+  let draw: number;
 
   for (let i = 0; i < 128; i++) {
     const delayedAt =
@@ -274,8 +278,28 @@ function _renderBlock(
     const splitLeft = buildRight + this._denormal;
     const splitRight = buildLeft + this._denormal;
 
-    const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
-    const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
+    // The modulation (`plateModulation.ts`): each point's smoothed noise, one
+    // drawn knot to the next along 3a² − 2a³, and its excursion. At a knot the
+    // point turns, draws the next knot in the other half of its range and the
+    // next segment's width, and carries the sample's leftover time across.
+    for (let p = 0; p < 4; p++) {
+      a = modPhase[p] + modDt[p];
+      if (a >= 1) {
+        a = (a - 1) / modDt[p];
+        modFrom[p] += modSpan[p];
+        this._modRising[p] = 1 - this._modRising[p];
+        whole = p * MOD_DRAW_LENGTH + modCursor[p];
+        modCursor[p] = (modCursor[p] + 2) & (MOD_DRAW_LENGTH - 1);
+        draw = MOD_HALF * MOD_DRAWS[whole];
+        modSpan[p] = (this._modRising[p] === 1 ? MOD_HALF + draw : draw) - modFrom[p];
+        this._modWidth[p] = MOD_WIDTH_MIN + MOD_DRAWS[whole + 1];
+        modDt[p] = this._modSpeed / this._modWidth[p];
+        a *= modDt[p];
+      }
+      modPhase[p] = a;
+      modOffset[p] = modDepth[p] * (modFrom[p] + modSpan[p] * a * a * (3 - 2 * a));
+      modDepth[p] += modDepthStep[p];
+    }
 
     // Left loop. Line 11 is the right loop's output, and vice versa: the
     // cross-feed is what makes this a figure of eight rather than two tanks.
@@ -294,7 +318,7 @@ function _renderBlock(
       this._value = gain[7] * x + extra[7] * low;
     } else this._value *= gain[7];
     first = this._value;
-    this._offset = exc;
+    this._offset = modOffset[0];
     this._readCubic(4);
     if (band) {
       x = this._value;
@@ -323,7 +347,8 @@ function _renderBlock(
       this._value = gain[1] * x + extra[1] * low;
     } else this._value *= gain[1];
     first = this._value;
-    this._read(6, 0);
+    this._offset = modOffset[1];
+    this._readCubic(6);
     if (band) {
       x = this._value;
       if (seed) lowState[2] = x;
@@ -349,7 +374,7 @@ function _renderBlock(
       this._value = gain[3] * x + extra[3] * low;
     } else this._value *= gain[3];
     first = this._value;
-    this._offset = exc2;
+    this._offset = modOffset[2];
     this._readCubic(8);
     if (band) {
       x = this._value;
@@ -378,7 +403,8 @@ function _renderBlock(
       this._value = gain[5] * x + extra[5] * low;
     } else this._value *= gain[5];
     first = this._value;
-    this._read(10, 0);
+    this._offset = modOffset[3];
+    this._readCubic(10);
     if (band) {
       x = this._value;
       if (seed) lowState[6] = x;
@@ -427,12 +453,6 @@ function _renderBlock(
       }
       direct += buildDirect[2];
     }
-
-    this._excPhase += excRate;
-    if (this._excPhase >= 1) this._excPhase -= 1;
-    // Detuned from the first so the two loops never modulate in lockstep.
-    this._excPhase2 += excRate * 1.0007;
-    if (this._excPhase2 >= 1) this._excPhase2 -= 1;
 
     for (let line = 0; line < LINE_COUNT; line++) {
       this._write[line] = (this._write[line] + 1) & this._mask[line];
