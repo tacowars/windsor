@@ -205,14 +205,15 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 11 since windsor#748 (the plate's
- * `decay` is an RT60 in seconds, with `lowDecay` and `lowCross`, and the
- * Plate insert's Mix is equal-power). There is no upgrade to 11, so every
- * earlier version is refused (record
+ * A document's document-format version: 12 since windsor#761 (the plate's
+ * `build`, which changes how every plate renders), after 11 (windsor#748:
+ * the plate's `decay` is an RT60 in seconds, with `lowDecay` and
+ * `lowCross`, and the Plate insert's Mix is equal-power). There is no
+ * upgrade to 11 or to 12, so every earlier version is refused (record
  * `2026-09-28-format-versions-refuse-never-destroy`); `SONG_MIGRATIONS`
  * still carries the steps 5 → 6 to 9 → 10, which no longer reach this one.
  */
-export const ARRANGEMENT_VERSION = 11;
+export const ARRANGEMENT_VERSION = 12;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
@@ -288,6 +289,7 @@ export const REVERB_SPACE_RANGES = {
   inputHighCut: [200, 20000],
   diffusionIn1: [0, 1],
   diffusionIn2: [0, 1],
+  build: [0, 1],
   size: [0.05, 4],
   decay: [0.2, 60],
   lowDecay: [0.25, 4],

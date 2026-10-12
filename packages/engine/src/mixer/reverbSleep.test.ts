@@ -31,9 +31,15 @@ const COMPARE_S = 0.5;
 
 const blockAt = (seconds: number): number => Math.round((seconds * SR) / BLOCK);
 
-/** The recirculation span: the longest tank line at MAX_SIZE plus the longest pre-delay. */
+/**
+ * The recirculation span: the longest tank line at MAX_SIZE plus the longest
+ * pre-delay, plus Build's longest tap (windsor#761).
+ */
 const recirculationSamples = (): number =>
-  (Math.max(...topology.tankDelays) * topology.maxSize + topology.maxPreDelay) * SR;
+  (Math.max(...topology.tankDelays) * topology.maxSize +
+    topology.maxPreDelay +
+    topology.buildSpread) *
+  SR;
 
 /** Records the first block after which the plate reports asleep, or -1. */
 const sleepWatch = (): {

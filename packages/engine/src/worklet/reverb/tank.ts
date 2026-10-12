@@ -2,16 +2,21 @@
 /**
  * The plate's awake render (#671): the input's mono sum into the pre-delay
  * ring with the dry output (`_writeInput`), and one quantum through the
- * pre-delay, the input filters, the four diffusers, the figure-of-eight tank
- * and the fourteen output taps (`_renderBlock`), with the sleep bookkeeping
- * (#547) at its end. Decay reaches the tank as a gain point on each of its
- * eight lines (windsor#748): `tankGains.ts` sets them once a block, the loop
+ * pre-delay, the input filters, the four diffusers, Build's multi-tap delay,
+ * the figure-of-eight tank and the fourteen output taps (`_renderBlock`), with
+ * the sleep bookkeeping (#547) at its end. Build (windsor#761, `plateBuild.ts`)
+ * writes the diffused sample into its line and reads each side's taps back,
+ * linear between samples: the left sum feeds the left loop and the right sum
+ * the right loop, and both go to the wet output at the direct level. Its
+ * reads and sums are written out in the sample loop too, never called
+ * (`mixer/reverbBuild.test.ts`). Decay reaches the tank as a gain point on
+ * each of its eight lines (windsor#748): `tankGains.ts` sets them once a block, the loop
  * ramps them a sample at a time, and while the low band runs
  * (`plateLowBand.ts`) each point is its first-order shelf, written out here at
  * all eight points: no helper is called per sample (worklet rule 6, fix round
  * 2 of PR windsor#750), and `mixer/reverbLowBand.test.ts` reads the sample
  * loop's calls off the bundle. `_renderBlock` stays one function read top to bottom --
- * its eleven stages' order is the algorithm. Both are functions over the
+ * its stages' order is the algorithm. Both are functions over the
  * processor, installed on its prototype by `reverbProcessor.ts`, so each body
  * is the method it was in the hand-written `reverb-processor.js`, line for
  * line, but for how a sample crosses a call (windsor#227): the reads leave
@@ -35,6 +40,8 @@ import {
   TAP_TIME,
   TAPS_PER_SIDE,
 } from './reverbConstants';
+import { configureBuild } from './plateBuild';
+import { BUILD_TAPS_PER_SIDE } from './reverbBuildTables';
 import type { DattorroReverb } from './reverbProcessor';
 import { configureGains } from './tankGains';
 
@@ -113,6 +120,7 @@ function _renderBlock(
   const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
   this._size += smooth * (parameters.size[0] - this._size);
   this._inputGain += smooth * ((held ? 0 : 1) - this._inputGain);
+  this._build += smooth * (parameters.build[0] - this._build);
   this._applySize(false);
 
   const preDelaySamples = Math.min(
@@ -154,6 +162,23 @@ function _renderBlock(
   let low: number;
   const tank1 = parameters.diffusionTank1[0];
   const tank2 = parameters.diffusionTank2[0];
+
+  // Build (`plateBuild.ts`): the taps' times and gains and the direct level,
+  // ramped across the block; the reads are written out below.
+  configureBuild(this, parameters);
+  const buildLine = this._buildLine;
+  const buildMask = this._buildMask;
+  const buildTime = this._buildTime;
+  const buildTimeStep = this._buildTimeStep;
+  const buildGain = this._buildGain;
+  const buildGainStep = this._buildGainStep;
+  const buildDirect = this._buildDirect;
+  const buildRamping = this._buildRamping;
+  let buildWrite = this._buildWrite;
+  let direct = buildDirect[0];
+  let position: number;
+  let whole: number;
+  let a: number;
 
   const excRate = parameters.modRate[0] / sampleRate;
   // Depth is in milliseconds, but must stay inside the line it modulates or
@@ -208,9 +233,25 @@ function _renderBlock(
     this._write1(3);
     pre = this._value;
 
-    this._denormal = -this._denormal;
     this._read(3, 0);
-    const split = diffuse2 * pre + this._value + this._denormal;
+    // Build: the diffused sample into the Build line, then each side's taps
+    // read back from it, linear between samples as the tank's reads are, and
+    // summed at their gains. The left sum feeds the left loop (line 4) and the
+    // right the right loop (line 8), where the diffused sample fed both.
+    buildLine[buildWrite] = diffuse2 * pre + this._value;
+    let buildLeft = 0;
+    let buildRight = 0;
+    for (let t = 0; t < buildTime.length; t++) {
+      position = buildWrite - buildTime[t];
+      whole = Math.floor(position);
+      a = buildLine[whole & buildMask];
+      a = (a + (buildLine[(whole + 1) & buildMask] - a) * (position - whole)) * buildGain[t];
+      if (t < BUILD_TAPS_PER_SIDE) buildLeft += a;
+      else buildRight += a;
+    }
+    this._denormal = -this._denormal;
+    const splitLeft = buildLeft + this._denormal;
+    const splitRight = buildRight + this._denormal;
 
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
@@ -243,7 +284,7 @@ function _renderBlock(
       this._value = gain[0] * x + extra[0] * low;
     } else this._value *= gain[0];
     let tapped = this._value;
-    this._value = split + first + tank1 * tapped;
+    this._value = splitLeft + first + tank1 * tapped;
     this._write1(4);
     this._value = tapped - tank1 * this._value;
     this._write1(5);
@@ -298,7 +339,7 @@ function _renderBlock(
       this._value = gain[4] * x + extra[4] * low;
     } else this._value *= gain[4];
     tapped = this._value;
-    this._value = split + first + tank1 * tapped;
+    this._value = splitRight + first + tank1 * tapped;
     this._write1(8);
     this._value = tapped - tank1 * this._value;
     this._write1(9);
@@ -339,6 +380,9 @@ function _renderBlock(
       if (t < TAPS_PER_SIDE) left += sample;
       else right += sample;
     }
+    // Build's direct path: each side's tap sum, ahead of the tail.
+    left += buildLeft * direct;
+    right += buildRight * direct;
 
     output[0][i] += left * wet;
     output[1][i] += right * wet;
@@ -354,6 +398,14 @@ function _renderBlock(
       }
     }
     seed = false;
+    buildWrite = (buildWrite + 1) & buildMask;
+    if (buildRamping) {
+      for (let t = 0; t < buildTime.length; t++) {
+        buildTime[t] += buildTimeStep[t];
+        buildGain[t] += buildGainStep[t];
+      }
+      direct += buildDirect[2];
+    }
 
     this._excPhase += excRate;
     if (this._excPhase >= 1) this._excPhase -= 1;
@@ -375,6 +427,7 @@ function _renderBlock(
   }
 
   if (band) this._seedBand = false;
+  this._buildWrite = buildWrite;
   this._preDelayWrite = (this._preDelayWrite + 128) % this._preDelayLength;
 
   if (inputQuiet && loudest <= SLEEP_OUTPUT_FLOOR) this._quiet += 128;

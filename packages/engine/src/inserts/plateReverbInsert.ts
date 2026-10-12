@@ -47,7 +47,7 @@ export interface PlateReverbSpec extends Readonly<ReverbSpace> {
   readonly enabled: boolean;
 }
 
-/** The 15 space fields, in the plate's own order. */
+/** The 16 space fields, in the plate's own order. */
 export const PLATE_SPACE_FIELDS = Object.keys(REVERB_SPACE_RANGES) as (keyof ReverbSpace)[];
 
 export const DEFAULT_PLATE_REVERB: PlateReverbSpec = {

@@ -298,6 +298,7 @@ const PLATE_ROWS = [
   row('inputHighCut', 'Input high cut', V.inputHighCut, 'log', 'Hz'),
   row('diffusionIn1', 'Input diffusion 1', V.diffusionIn1),
   row('diffusionIn2', 'Input diffusion 2', V.diffusionIn2),
+  row('build', 'Build', V.build),
   row('size', 'Size', V.size, 'log'),
   row('decay', 'Decay', V.decay, 'log', 's'),
   row('lowDecay', 'Low decay', V.lowDecay, 'log'),

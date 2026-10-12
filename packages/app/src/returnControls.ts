@@ -1,6 +1,6 @@
 /**
  * The controls the returns and the inserts that run their DSP share
- * (windsor#171): the plate's 15 space knobs and its Starting point picker,
+ * (windsor#171): the plate's 16 space knobs and its Starting point picker,
  * the delay line's Time, Regen, Damp and Q, and the tempo buttons. The
  * Mixer tab's returns (`returnsPanel.ts`) and the Plate reverb and Echo
  * cards bind them to their own fields, so the two cannot drift apart.
@@ -32,10 +32,11 @@ export type SpaceKnob = { f: keyof ReverbSpace; label: string; o: Partial<KnobSp
 const fmtTimes = (v: number): string => `×${v.toFixed(2)}`;
 
 /**
- * The 15 plate parameters, in signal order; ranges come from the worklet's
+ * The 16 plate parameters, in signal order; ranges come from the worklet's
  * table. Decay is seconds on a log curve, and the low band follows it
  * (windsor#748): `Low ×`, whose range is symmetric in its log so ×1 sits at
- * mid-travel, and `Low Hz`.
+ * mid-travel, and `Low Hz`. `Build` (windsor#761) sits between the input
+ * diffusers and the tank, as its delay does.
  */
 export const SPACE_KNOBS: readonly SpaceKnob[] = [
   { f: 'preDelay', label: 'Pre', o: { fmt: fmtMs } },
@@ -43,6 +44,7 @@ export const SPACE_KNOBS: readonly SpaceKnob[] = [
   { f: 'inputHighCut', label: 'In HC', o: { curve: 'log', fmt: fmtHz } },
   { f: 'diffusionIn1', label: 'Diff 1', o: { fmt: fmt2 } },
   { f: 'diffusionIn2', label: 'Diff 2', o: { fmt: fmt2 } },
+  { f: 'build', label: 'Build', o: { fmt: fmt2 } },
   { f: 'size', label: 'Size', o: { curve: 'log', fmt: fmt2 } },
   { f: 'decay', label: 'Decay', o: { curve: 'log', fmt: fmtMs } },
   { f: 'lowDecay', label: 'Low ×', o: { curve: 'log', fmt: fmtTimes } },

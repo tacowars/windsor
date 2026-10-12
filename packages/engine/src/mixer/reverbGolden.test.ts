@@ -6,8 +6,9 @@
  * gate, in the shape of `fmProcessorGolden.test.ts`: every scenario the reverb
  * tests exercise (an impulse and a noise burst from the harness's PRNG, the
  * decay and SIZE extremes, HOLD, the runaway ceiling, a SIZE glide, a wet
- * turned up late, the filters and modulation off their defaults, and since
- * windsor#748 the low band, its moves and a Decay step) plus the
+ * turned up late, the filters and modulation off their defaults, since
+ * windsor#748 the low band, its moves and a Decay step, and since
+ * windsor#761 Build at 0 and at 1 and moved with HOLD) plus the
  * sleep path (#547) -- a tail that falls asleep, and one that is woken -- is
  * rendered in three paths and hashed against `__fixtures__/reverbGolden.json`:
  * the default, `sleep: false` and `settledSkip: false`. The settled-SIZE skip
@@ -157,6 +158,17 @@ const SCENARIOS: Record<string, () => Scenario> = {
     feed: clicks(blockAt(0.3)),
     automate: (block, values) => {
       values.decay![0] = block < blockAt(1) ? 0.4 : block < blockAt(2) ? 15 : 0.4;
+    },
+  }),
+  // Build (windsor#761): its ends, and moved across its range with HOLD.
+  'build-zero': () => ({ seconds: 2, feed: impulse, params: { build: 0 } }),
+  'build-one': () => ({ seconds: 2, feed: noiseBurst(0.3), params: { build: 1 } }),
+  'build-moves': () => ({
+    seconds: 3,
+    feed: clicks(blockAt(0.25)),
+    automate: (block, values) => {
+      values.build![0] = block < blockAt(0.6) ? 0 : block < blockAt(1.8) ? 1 : 0.4;
+      values.hold![0] = block >= blockAt(2) && block < blockAt(2.4) ? 1 : 0;
     },
   }),
   'wet-late': () => ({
