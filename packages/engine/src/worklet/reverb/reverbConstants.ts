@@ -1,8 +1,8 @@
 /**
  * The plate's tunables and topology (#671): Dattorro's table 1 delays, the
- * output taps (table 2, read as delays -- see TAP_TIME), the SIZE, HOLD and
- * diffusion limits, Decay in seconds and the low band's ranges (windsor#748),
- * and the sleep floors (#547). Import-free and scope-free:
+ * SIZE, HOLD and diffusion limits, Decay in seconds and the low band's ranges (windsor#748),
+ * and the sleep floors (#547). The output taps and the trim on their sum are
+ * `reverbTapTables.ts` (windsor#766). Import-free and scope-free:
  * nothing here reads `sampleRate`. Every value before windsor#748's is the
  * one the hand-written `reverb-processor.js` carried;
  * `mixer/reverbGolden.test.ts` pins the render
@@ -38,31 +38,6 @@ const TANK_DELAYS = [
   0.022579886, 0.149625349, 0.060481839, 0.1249958, 0.030509727, 0.141695508, 0.089244313,
   0.106280031,
 ];
-
-/**
- * Output taps: delay in seconds from where a line is written, which line, and
- * the sign of the sum.
- *
- * These are Dattorro's Table 2 values (at his 29.761 kHz reference: 266, 2974,
- * 1913 ... samples). His notation is `node48_54[266]` -- a delay line spanning
- * node 48 to node 54, indexed from node 48. Node numbers increase along the
- * signal path (node31_33 feeds node33_39, sharing node 33 as output then
- * input), so the index counts from the line's *input*: it is a delay.
- *
- * khoin/DattorroReverbNode reads them from the opposite end, so its tap of 266
- * on a 4217-sample line is a delay of 3950 rather than 266. That inverts the
- * whole output tap structure, which 1.3.6 calls "characteristic of the plate
- * emulation class". `_readTap` reads back from the write head instead.
- */
-const TAP_TIME = [
-  0.008937872, 0.099929438, 0.064278754, 0.067067639, 0.066866033, 0.006283391, 0.035818689,
-  0.011861161, 0.121870905, 0.041262054, 0.08981553, 0.070931756, 0.011256342, 0.004065724,
-];
-const TAP_LINE = [9, 9, 10, 11, 5, 6, 7, 5, 5, 6, 7, 9, 10, 11];
-const TAP_SIGN = [1, 1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1];
-
-/** First seven taps sum to the left output, the rest to the right. */
-const TAPS_PER_SIDE = 7;
 
 const FIRST_TANK_LINE = 4;
 /** One past the tank's last line, and the right input's first diffuser (windsor#763). */
@@ -126,9 +101,6 @@ const SMOOTH_SECONDS = 0.05;
 
 const MAX_PRE_DELAY = 1;
 
-/** Compensates the fourteen-tap sum, which is well above unity. */
-const OUTPUT_TRIM = 0.6;
-
 /**
  * Sleep (#547). An input sample within SLEEP_INPUT_FLOOR of 0 is silence; a wet
  * sample within SLEEP_OUTPUT_FLOOR (about -140 dBFS) is an inaudible tail. Both
@@ -146,10 +118,6 @@ export {
   INPUT_DELAYS,
   INPUT_DELAYS_RIGHT,
   TANK_DELAYS,
-  TAP_TIME,
-  TAP_LINE,
-  TAP_SIGN,
-  TAPS_PER_SIDE,
   FIRST_TANK_LINE,
   TANK_LINE_END,
   LINE_COUNT,
@@ -165,7 +133,6 @@ export {
   MAX_TANK_DIFFUSION,
   SMOOTH_SECONDS,
   MAX_PRE_DELAY,
-  OUTPUT_TRIM,
   SLEEP_INPUT_FLOOR,
   SLEEP_OUTPUT_FLOOR,
 };

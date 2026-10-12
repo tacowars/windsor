@@ -63,6 +63,14 @@ export interface ReverbTopology {
   modDrawLength: number;
   modWidthMin: number;
   modDraws: Float32Array;
+  /**
+   * The output taps (windsor#766): each tap's time in seconds at Size 1, its
+   * line and its signed gain, the left side's first, and how many a side.
+   */
+  tapTime: number[];
+  tapLine: number[];
+  tapGain: number[];
+  tapsPerSide: number;
 }
 
 export interface LoadedReverb {
@@ -100,6 +108,10 @@ export function loadReverb(sampleRate = SAMPLE_RATE): LoadedReverb {
       modDrawLength: MOD_DRAW_LENGTH,
       modWidthMin: MOD_WIDTH_MIN,
       modDraws: MOD_DRAWS,
+      tapTime: TAP_TIME,
+      tapLine: TAP_LINE,
+      tapGain: TAP_GAIN,
+      tapsPerSide: TAPS_PER_SIDE,
     };`,
   });
 
@@ -120,6 +132,15 @@ export interface ReverbInternals {
   _buffers: Float32Array[];
   _write: Int32Array;
   _length: Float32Array;
+  /**
+   * The Size ramp (windsor#766): each line's per-sample length step, each
+   * output tap's delay in samples and its step, whether the block steps them,
+   * and the call that aims them at `_size` once a block.
+   */
+  _lengthStep: Float32Array;
+  _tap: Float32Array;
+  _tapStep: Float32Array;
+  _applySize(immediate: boolean): void;
   /** Each read leaves its sample in `_value` (windsor#227). */
   _read(index: number, offset: number): void;
   /** Reads `_offset` samples forward of the line's read point. */

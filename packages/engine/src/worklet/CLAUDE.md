@@ -231,8 +231,10 @@ this generated processor, including its second input and telemetry.
 sampler, `process`, the sleep, `registerProcessor`), `delayLines.ts` (allocation,
 the SIZE-scaled lengths and taps, the reads), `plateInput.ts` (`_writeInput`,
 each input channel into its pre-delay ring), `tank.ts` (`_renderBlock`, the
-awake render) and `reverbConstants.ts` (the tunables and the
-delay and tap tables). The delay lines, the input write and the tank are `this`-typed functions
+awake render), `platePoles.ts` (the block's one-pole coefficients),
+`reverbConstants.ts` (the tunables and the delay tables) and
+`reverbTapTables.ts` (the output taps and `OUTPUT_TRIM`). The delay
+lines, the input write and the tank are `this`-typed functions
 installed on the processor's prototype, so each body is still the method the
 hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
 The input is stereo (windsor#763): L and R each have a pre-delay ring, input
@@ -245,6 +247,14 @@ output. R's chain is written out in the sample loop beside L's.
 `mixer/reverbStereo.test.ts` holds the sides, the mirror, the centre, the
 anti-phase ring, the live moves and the rates, and
 `mixer/plateStereoGraph.test.ts` two hard-panned parts through a group's Plate.
+The output taps are Windsor's own (windsor#766, `reverbTapTables.ts`): twelve
+a side over all eight tank lines, interleaved around the loop, at full and
+three-quarter gain, each output weighing most the half its own input feeds,
+and the slots that input reaches inside 52 ms at Size 1 read by that side
+alone. Their reads are written out in the sample loop, each a table read of
+line, delay and signed gain, with no call. `mixer/reverbTaps.test.ts` holds
+the share and every tap inside its line, behind the head, through Size moves
+at every rate.
 Decay is an RT60 in seconds (windsor#748): `tankGains.ts` gives each tank
 line a gain point, set once a block from Decay and Size and ramped a sample at
 a time by the tank, through the measured correction in `reverbDecayTables.ts`,
@@ -359,8 +369,9 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
    `TANK_DELAYS`, `MAX_PRE_DELAY`, the sleep floors, `BUILD_TAP_TIME`,
-   `BUILD_SPREAD`, `MOD_LINES`, `MOD_DRAW_LENGTH`, `MOD_WIDTH_MIN` and
-   `MOD_DRAWS` the same way).
+   `BUILD_SPREAD`, `MOD_LINES`, `MOD_DRAW_LENGTH`, `MOD_WIDTH_MIN`,
+   `MOD_DRAWS`, `TAP_TIME`, `TAP_LINE`, `TAP_GAIN` and `TAPS_PER_SIDE` the
+   same way).
    The harness reaches internals by their **top-level names** (`ALGORITHMS`,
    `WAVE`, `Envelope`, `ST_SUSTAIN`, …), so a name stays unique across every
    module under `fm/`: esbuild renames a collision (`WAVE2`) and the harness

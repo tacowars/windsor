@@ -129,7 +129,10 @@ describe('the onset follows Build', () => {
  * Build 0 at d627d18): its 0.6 s lines lose 18 dB a pass, so few passes span
  * the fit. Since windsor#763 a centred click reaches the two halves through
  * different diffusers and reads −9.4 % to −10.4 % there (record
- * `2026-10-12-plate-stereo-input`); a hard-left one reads −4 %.
+ * `2026-10-12-plate-stereo-input`); a hard-left one reads −4 %. Where the
+ * output taps sit along the loop moves this cell too: windsor#766's table was
+ * chosen to hold it, and reads −9.8 % to −9.9 % (record
+ * `2026-10-12-plate-output-taps`).
  */
 const T30_TOLERANCE = (decay: number, size: number): number =>
   decay === 2 && size === 4 ? 0.11 : 0.1;
