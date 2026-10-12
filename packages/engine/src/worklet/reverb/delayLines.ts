@@ -1,7 +1,8 @@
 /* eslint-disable no-magic-numbers -- DSP: the interpolators' polynomial, the quantum of 128 and the cubic's four-sample reach are the algorithm; the tunables are reverbConstants.ts (#671) */
 /**
  * The plate's delay lines (#671): allocation (`_makeDelay`), the SIZE-scaled
- * lengths and taps and their per-sample ramp (`_applySize`), the write, and the
+ * lengths and taps and their per-sample ramp (`_applySize`, the taps and the
+ * input lengths the voicing's: windsor#746), the write, and the
  * two fractional reads -- linear from the read point, cubic for the four
  * modulated tank all-passes (windsor#764). The output taps' reads, linear back
  * from the write head, are written out in the tank's sample loop (windsor#766).
@@ -20,8 +21,7 @@
  * `mixer/reverbAllocation.test.ts` holds the render to no allocation on V8.
  */
 
-import { FIRST_TANK_LINE, MIN_LENGTH, TANK_LINE_END } from './reverbConstants';
-import { TAP_LINE, TAP_TIME } from './reverbTapTables';
+import { FIRST_TANK_LINE, LINE_COUNT, MIN_LENGTH, TANK_LINE_END } from './reverbConstants';
 import type { DattorroReverb } from './reverbProcessor';
 
 /**
@@ -50,19 +50,34 @@ function _makeDelay(this: DattorroReverb, seconds: number, headroom: number): vo
  * every boundary -- measured at ten times the signal's own slew, and plainly
  * audible. Ramping across the block leaves only the Doppler shift, which is
  * what sweeping a delay line is supposed to sound like.
+ *
+ * The tank lines (4..11) scale with Size in every voicing; the input lines
+ * (0..3 and 12..15) scale with its square root, only where the voicing's row
+ * says so (`_inputFollowsSize`, windsor#746), and ramp the same way.
  */
 function _applySize(this: DattorroReverb, immediate: boolean): void {
   const size = this._size;
-  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
-    this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * size);
+  // A voicing just applied (windsor#746, `plateVoicing.ts`) lands its taps
+  // and input lengths outright, at silence; the tank's own lines keep their
+  // ramp, since the tail runs on through them.
+  const landed = immediate || this._landVoicing;
+  this._landVoicing = false;
+  // A voicing's input lines follow Size as its square root, where its row
+  // says they follow it at all (`INPUT_CAPACITY` allocates for the same law).
+  const inputSize = this._inputFollowsSize ? Math.sqrt(size) : 1;
+  for (let i = 0; i < LINE_COUNT; i++) {
+    const tank = i >= FIRST_TANK_LINE && i < TANK_LINE_END;
+    this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * (tank ? size : inputSize));
   }
-  for (let t = 0; t < TAP_TIME.length; t++) {
+  const tapTime = this._tapTime;
+  const tapLine = this._tapLine;
+  for (let t = 0; t < tapTime.length; t++) {
     // Every tap is shorter than its own line, so scaling both keeps it inside
     // the valid history. The margin keeps the interpolator's second sample
     // behind the write head even at the longest tap.
-    const target = Math.min(this._lengthTarget[TAP_LINE[t]] - 2, TAP_TIME[t] * sampleRate * size);
-    if (immediate) this._tap[t] = target;
-    this._tapStep[t] = immediate ? 0 : (target - this._tap[t]) / 128;
+    const target = Math.min(this._lengthTarget[tapLine[t]] - 2, tapTime[t] * sampleRate * size);
+    if (landed) this._tap[t] = target;
+    this._tapStep[t] = landed ? 0 : (target - this._tap[t]) / 128;
   }
   // Whether this block's per-sample length and tap bookkeeping moves anything.
   // A step is not 0 just because SIZE is still: `_tap` is Float32 and its
@@ -70,12 +85,13 @@ function _applySize(this: DattorroReverb, immediate: boolean): void {
   // matters is whether one add changes the stored value -- if it does not,
   // none of the block's identical adds will, and skipping them is exact.
   let stepping = false;
-  for (let t = 0; t < TAP_TIME.length; t++) {
+  for (let t = 0; t < tapTime.length; t++) {
     if (Math.fround(this._tap[t] + this._tapStep[t]) !== this._tap[t]) stepping = true;
   }
-  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
-    if (immediate) this._length[i] = this._lengthTarget[i];
-    this._lengthStep[i] = immediate ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
+  for (let i = 0; i < LINE_COUNT; i++) {
+    const outright = i >= FIRST_TANK_LINE && i < TANK_LINE_END ? immediate : landed;
+    if (outright) this._length[i] = this._lengthTarget[i];
+    this._lengthStep[i] = outright ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
     if (Math.fround(this._length[i] + this._lengthStep[i]) !== this._length[i]) stepping = true;
   }
   this._stepping = stepping;

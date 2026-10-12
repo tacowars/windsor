@@ -26,7 +26,21 @@ import {
   TEMPO_MATCH_TOLERANCE,
 } from './mixerTables';
 
-export type SpaceKnob = { f: keyof ReverbSpace; label: string; o: Partial<KnobSpec> };
+/** The plate's voicing (windsor#746): a space field set by a switch, not a knob. */
+export type PlateVoicing = ReverbSpace['voicing'];
+
+/** The space's numeric fields, each a knob: all but the voicing. */
+export type SpaceKnob = {
+  f: Exclude<keyof ReverbSpace, 'voicing'>;
+  label: string;
+  o: Partial<KnobSpec>;
+};
+
+/** The voicing switch's two options, in the order it shows them (windsor#746). */
+export const VOICING_OPTIONS: readonly { value: PlateVoicing; label: string }[] = [
+  { value: 'plate', label: 'Plate' },
+  { value: 'room', label: 'Room' },
+];
 
 /** Low decay reads as a multiple of Decay. */
 const fmtTimes = (v: number): string => `×${v.toFixed(2)}`;

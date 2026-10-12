@@ -10,16 +10,18 @@
  * and Build 1 swells in.
  *
  * This file is the block-rate half. `makeBuild` allocates the lines once, at
- * construction, for the longest spread (`BUILD_SPREAD`) at the running
- * sample rate, so a read never wraps short at any rate. `configureBuild`
+ * construction, for the longest tap in either voicing (`BUILD_LINE_SPREAD`,
+ * windsor#746) at the running sample rate, so a read never wraps short at
+ * any rate. The tap times, gain rows and direct levels are the voicing's
+ * (`reverbVoicingTables.ts`), read through the plate's fields. `configureBuild`
  * runs once a block, after the tank has smoothed `build` as it smooths Size
  * (`SMOOTH_SECONDS`): it lands the last block's ramps on their targets and
  * aims each tap's time (in samples), each tap's gain and the direct level
  * at this block's Build, from `reverbBuildTables.ts`, each ramped across the
  * block a sample at a time, so a sweep moves the reads in sub-sample steps.
- * The direct level is its row times `BUILD_DIRECT_TRIM / OUTPUT_TRIM`, since
- * the tank trims the direct sum with the taps' (windsor#766): the burst keeps
- * `main`'s gain.
+ * The direct level is its row times `BUILD_DIRECT_TRIM` over the voicing's
+ * output trim, since the tank trims the direct sum with the taps'
+ * (windsor#766): the burst keeps its gain whatever the taps' trim.
  * The tap reads, their linear interpolation (the tank's own reads') and the
  * sums are written out in the tank's sample loop (`tank.ts`), never called
  * per sample (worklet rule 6).
@@ -30,15 +32,10 @@
  * `mixer/reverbGolden.test.ts` pins the render.
  */
 
-import {
-  BUILD_DIRECT_ROWS,
-  BUILD_GAIN_ROWS,
-  BUILD_SPREAD,
-  BUILD_STRETCH_MIN,
-  BUILD_TAP_TIME,
-} from './reverbBuildTables';
+import { BUILD_STRETCH_MIN, BUILD_TAP_TIME } from './reverbBuildTables';
 import type { DattorroReverb } from './reverbProcessor';
-import { BUILD_DIRECT_TRIM, OUTPUT_TRIM } from './reverbTapTables';
+import { BUILD_DIRECT_TRIM } from './reverbTapTables';
+import { BUILD_LINE_SPREAD } from './reverbVoicingTables';
 
 /** Samples a quantum: each ramp crosses one. */
 const QUANTUM = 128;
@@ -46,12 +43,6 @@ const QUANTUM = 128;
 const READ_REACH = 2;
 /** The direct level's slots: now, this block's target, its per-sample step. */
 const DIRECT_SLOTS = 3;
-/**
- * The direct row's scale (windsor#766): the tank multiplies the direct sum by
- * OUTPUT_TRIM with the taps', so the row is aimed at BUILD_DIRECT_TRIM over it
- * and the direct path's gain is `main`'s.
- */
-const DIRECT_SCALE = BUILD_DIRECT_TRIM / OUTPUT_TRIM;
 
 /**
  * The Build lines and their ramps, from the processor's constructor, after its
@@ -59,7 +50,7 @@ const DIRECT_SCALE = BUILD_DIRECT_TRIM / OUTPUT_TRIM;
  * sets every ramp outright.
  */
 function makeBuild(plate: DattorroReverb): void {
-  const capacity = Math.ceil(BUILD_SPREAD * sampleRate) + READ_REACH;
+  const capacity = Math.ceil(BUILD_LINE_SPREAD * sampleRate) + READ_REACH;
   const size = 2 ** Math.ceil(Math.log2(capacity));
   plate._buildLine = new Float32Array(size);
   plate._buildLineRight = new Float32Array(size);
@@ -89,11 +80,15 @@ function configureBuild(plate: DattorroReverb, parameters: Record<string, Float3
   if (immediate) plate._build = parameters.build[0];
   const build = Math.min(1, Math.max(0, plate._build));
   const stretch = (BUILD_STRETCH_MIN + (1 - BUILD_STRETCH_MIN) * build) * sampleRate;
-  const position = build * (BUILD_GAIN_ROWS.length - 1);
-  const lower = Math.min(Math.floor(position), BUILD_GAIN_ROWS.length - 2);
+  // The voicing's table (windsor#746, `plateVoicing.ts`).
+  const tapTime = plate._buildTapTime;
+  const rows = plate._buildGainRows;
+  const directRows = plate._buildDirectRows;
+  const position = build * (rows.length - 1);
+  const lower = Math.min(Math.floor(position), rows.length - 2);
   const along = position - lower;
-  const below = BUILD_GAIN_ROWS[lower];
-  const above = BUILD_GAIN_ROWS[lower + 1];
+  const below = rows[lower];
+  const above = rows[lower + 1];
   const time = plate._buildTime;
   const timeTarget = plate._buildTimeTarget;
   const timeStep = plate._buildTimeStep;
@@ -105,7 +100,7 @@ function configureBuild(plate: DattorroReverb, parameters: Record<string, Float3
     // The last block's ramps end on their targets exactly, not on 128 rounded adds.
     time[t] = timeTarget[t];
     gain[t] = gainTarget[t];
-    timeTarget[t] = BUILD_TAP_TIME[t] * stretch;
+    timeTarget[t] = tapTime[t] * stretch;
     gainTarget[t] = below[t] + (above[t] - below[t]) * along;
     if (immediate) {
       time[t] = timeTarget[t];
@@ -117,9 +112,13 @@ function configureBuild(plate: DattorroReverb, parameters: Record<string, Float3
   }
   const direct = plate._buildDirect;
   direct[0] = direct[1];
+  // The tank multiplies the direct sum by the voicing's output trim with the
+  // taps' (windsor#766), so the row is aimed at BUILD_DIRECT_TRIM over that
+  // trim: the direct path's gain is its row's times BUILD_DIRECT_TRIM in
+  // either voicing, whatever its taps' trim.
   direct[1] =
-    (BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along) *
-    DIRECT_SCALE;
+    (directRows[lower] + (directRows[lower + 1] - directRows[lower]) * along) *
+    (BUILD_DIRECT_TRIM / plate._outputTrim);
   if (immediate) direct[0] = direct[1];
   direct[2] = (direct[1] - direct[0]) / QUANTUM;
   if (direct[2] !== 0) ramping = true;

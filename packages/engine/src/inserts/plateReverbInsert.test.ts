@@ -177,7 +177,7 @@ describe('PLATE_REVERB_INSERT', () => {
   });
 });
 
-describe('a version-13 song (windsor#748, windsor#761, windsor#764)', () => {
+describe('a version-14 song (windsor#748, windsor#761, windsor#764, windsor#746)', () => {
   const room = {
     kind: 'plate',
     decay: 12.5,
@@ -186,6 +186,7 @@ describe('a version-13 song (windsor#748, windsor#761, windsor#764)', () => {
     build: 0.85,
     modRate: 6.5,
     modDepth: 3.25,
+    voicing: 'room',
     mix: 1,
   };
   const strip = {
@@ -196,10 +197,11 @@ describe('a version-13 song (windsor#748, windsor#761, windsor#764)', () => {
     build: 0,
     modRate: 0.25,
     modDepth: 0.15,
+    voicing: 'room',
     mix: 0.6,
   };
 
-  it('round-trips decay, lowDecay, lowCross, build, modRate and modDepth on a return and on a Plate insert', () => {
+  it('round-trips decay, lowDecay, lowCross, build, modRate, modDepth and voicing on a return and on a Plate insert', () => {
     const raw = {
       ...song([{ ...KICK, strip: { inserts: [strip] } }]),
       returns: { a: { inserts: [room] } },
@@ -214,12 +216,33 @@ describe('a version-13 song (windsor#748, windsor#761, windsor#764)', () => {
     expect(again.document).toEqual(first.document);
   });
 
-  it('refuses a version-12 song with the format message, never loading its plates on the old modulation', () => {
-    const raw = { ...song([KICK]), returns: { a: { inserts: [room] } }, version: 12 };
+  it('loads a plate with no voicing as plate-voiced, on a return and on a Plate insert, with no correction', () => {
+    const bare = (spec: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(spec).filter(([field]) => field !== 'voicing'));
+    const [bareRoom, bareStrip] = [bare(room), bare(strip)];
+    const raw = {
+      ...song([{ ...KICK, strip: { inserts: [bareStrip] } }]),
+      returns: { a: { inserts: [bareRoom] } },
+    };
+    const result = makeArrangement(raw);
+    expect(result.corrections).toEqual([]);
+    expect(result.document.returns?.a?.inserts[0]).toMatchObject({ voicing: 'plate' });
+    expect(result.document.parts[0]!.strip!.inserts[0]).toMatchObject({ voicing: 'plate' });
+  });
+
+  it('replaces a voicing it does not know with the plate, and says so', () => {
+    const n = new FieldNormaliser();
+    const spec = PLATE_REVERB_INSERT.normalise({ kind: 'plate', voicing: 'hall' }, 'x', n);
+    expect(spec.voicing).toBe('plate');
+    expect(n.corrections).toHaveLength(1);
+  });
+
+  it('refuses a version-13 song with the format message, never loading its plates on the old diffusers', () => {
+    const raw = { ...song([KICK]), returns: { a: { inserts: [room] } }, version: 13 };
     const result = makeArrangement(raw);
     expect(result.usable).toBe(false);
     expect(result.refused?.message).toBe(
-      `saved with song format 12, this build reads ${ARRANGEMENT_VERSION}`,
+      `saved with song format 13, this build reads ${ARRANGEMENT_VERSION}`,
     );
   });
 });

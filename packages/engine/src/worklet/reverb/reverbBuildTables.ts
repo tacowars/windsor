@@ -1,8 +1,10 @@
 /**
  * The plate's Build tables (windsor#761): the multi-tap delay between the
  * input diffusers and the tank, which shapes how the reverb's onset forms.
- * Import-free and scope-free: nothing here reads `sampleRate`, and
- * `plateBuild.ts` reads every value per block.
+ * Since windsor#746 they are the plate voicing's (`reverbVoicingTables.ts`;
+ * the room voicing's are `reverbRoomTables.ts`); `BUILD_STRETCH_MIN` and
+ * `BUILD` serve both. Import-free and scope-free: nothing here reads
+ * `sampleRate`, and `plateBuild.ts` reads the playing voicing's per block.
  *
  * Windsor's own values, voiced by measurement and then by ear
  * (`docs/research/2026-10-12-plate-build/`): with one click in, the wet
@@ -11,7 +13,7 @@
  * steps of 0.1, for the `hall`, `plate` and default spaces.
  *
  * - **Tap times** are seconds at Build 1, fixed, never following Size (as
- *   `INPUT_DELAYS` do not). Each side's six are spaced unevenly, with gaps
+ *   the plate voicing's diffusers do not). Each side's six are spaced unevenly, with gaps
  *   that widen along the line so no two taps beat at one comb spacing, and
  *   the two sides interleave so the halves of the tank hear different
  *   onsets from the one diffused signal. Build stretches every time by
@@ -41,7 +43,10 @@ const BUILD_TAP_TIME = [
   0, 0.0191, 0.0412, 0.0671, 0.0973, 0.1311, 0.0007, 0.0289, 0.0531, 0.0809, 0.1129, 0.149,
 ];
 
-/** The longest tap at Build 1, seconds: what the Build line is allocated for. */
+/**
+ * The longest tap at Build 1, seconds. The Build lines are allocated for the
+ * longest tap in either voicing (`BUILD_LINE_SPREAD`, windsor#746).
+ */
 const BUILD_SPREAD = 0.149;
 
 /** The stretch on every tap time at Build 0; it rises linearly to 1 at Build 1. */

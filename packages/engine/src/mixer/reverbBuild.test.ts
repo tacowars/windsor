@@ -18,6 +18,7 @@ import {
   internals,
   loadReverb,
   renderReverb,
+  spaceParams,
   t30,
 } from '../__fixtures__/reverbHarness';
 import type { ReverbSpace } from './reverbSpace';
@@ -61,10 +62,7 @@ function onset(space: ReverbSpace, build: number): Onset {
     loaded,
     0.5 + space.preDelay + 1.1,
     impulseAt(SETTLE),
-    {
-      ...space,
-      build,
-    },
+    spaceParams({ ...space, build }),
     { collectSamples: true },
   );
   const from = SETTLE * BLOCK + Math.round(space.preDelay * SR);

@@ -7,9 +7,17 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { loadReverb } from '../__fixtures__/reverbHarness';
+import { loadReverb, spaceParams } from '../__fixtures__/reverbHarness';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
-import { DEFAULT_SPACE, SPACES, SPACE_NAMES, type SpaceName, makeSpace } from './reverbSpace';
+import {
+  DEFAULT_SPACE,
+  PLATE_VOICINGS,
+  SPACES,
+  SPACE_NAMES,
+  type SpaceName,
+  VOICING_PARAM,
+  makeSpace,
+} from './reverbSpace';
 
 const loaded = loadReverb();
 const byName = new Map(loaded.descriptors.map((d) => [d.name, d]));
@@ -37,17 +45,27 @@ describe('ReverbSpace mirrors the worklet parameters', () => {
   });
 
   it('agrees with the processor on every default', () => {
-    for (const [name, value] of Object.entries(DEFAULT_SPACE)) {
+    for (const [name, value] of Object.entries(spaceParams(DEFAULT_SPACE))) {
       expect(byName.get(name)?.defaultValue, `default for ${name}`).toBe(value);
     }
   });
 
   it('agrees with the processor on every range (REVERB_SPACE_RANGES, the document clamp)', () => {
-    expect(Object.keys(REVERB_SPACE_RANGES).sort()).toEqual(Object.keys(DEFAULT_SPACE).sort());
+    const numbers = Object.keys(DEFAULT_SPACE).filter((name) => name !== 'voicing');
+    expect(Object.keys(REVERB_SPACE_RANGES).sort()).toEqual(numbers.sort());
     for (const [name, [min, max]] of Object.entries(REVERB_SPACE_RANGES)) {
       expect(byName.get(name)?.minValue, `min for ${name}`).toBe(min);
       expect(byName.get(name)?.maxValue, `max for ${name}`).toBe(max);
     }
+  });
+
+  it('reads each voicing as the processor does: plate 0, room 1, 0.5 and up room (windsor#746)', () => {
+    const voicing = byName.get('voicing')!;
+    expect([voicing.minValue, voicing.maxValue]).toEqual([0, 1]);
+    expect(PLATE_VOICINGS.map((v) => VOICING_PARAM[v])).toEqual([0, 1]);
+    const [plate, room] = loaded.topology.voicings;
+    expect(plate!.inputFollowsSize).toBe(false);
+    expect(room!.inputFollowsSize).toBe(true);
   });
 
   it('keeps every parameter k-rate, as the block-rate DSP assumes', () => {
@@ -60,7 +78,7 @@ describe('ReverbSpace mirrors the worklet parameters', () => {
 describe('the shipped spaces', () => {
   it('are all in range, so no preset is silently clamped', () => {
     for (const key of SPACE_NAMES) {
-      const space = SPACES[key];
+      const space = spaceParams(SPACES[key]);
       for (const [name, value] of Object.entries(space)) {
         const d = byName.get(name);
         expect(d, `${key}.${name}`).toBeDefined();
@@ -88,6 +106,11 @@ describe('the shipped spaces', () => {
     for (const key of SPACE_NAMES) {
       expect([SPACES[key].modRate, SPACES[key].modDepth], key).toEqual(before[key]);
     }
+  });
+
+  it('are all plate-voiced, stated in each, until item 8 brings room-voiced ones (windsor#746)', () => {
+    expect(DEFAULT_SPACE.voicing).toBe('plate');
+    for (const key of SPACE_NAMES) expect(SPACES[key].voicing, key).toBe('plate');
   });
 
   it('order by size from the smallest room to the largest', () => {

@@ -10,7 +10,10 @@
  * alone. Off closes `send`
  * and `gate` and opens `bypass`: the input passes unchanged. The plate is
  * built by `mixer/returnEffects.ts`, the return's own builder. A switch lane
- * (windsor#628) writes the same gains.
+ * (windsor#628) writes the same gains. The space's `voicing` (windsor#746)
+ * is a field like the knobs', written as the processor's number by
+ * `writePlate`, normalised from the voicings' list (a missing one is
+ * `plate`), and never a lane: the plate ducks across a change itself.
  *
  * The switch crosses `INSERT_SWITCH_FADE_S` (windsor#629): `gate` and
  * `bypass` read its fade, so the plate's whole output, its own dry path
@@ -25,7 +28,7 @@ import { RENDER_QUANTUM_FRAMES, REVERB_SPACE_RANGES } from '../audioConstants';
 import type { PlateMix } from '../mixer/returnEffects';
 import { createPlate, writePlate } from '../mixer/returnEffects';
 import type { ReverbSpace } from '../mixer/reverbSpace';
-import { SPACES } from '../mixer/reverbSpace';
+import { PLATE_VOICINGS, SPACES } from '../mixer/reverbSpace';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { KnobTarget } from '../automation/automationHandles';
 import { sameValue } from '../automation/automationHandles';
@@ -47,8 +50,16 @@ export interface PlateReverbSpec extends Readonly<ReverbSpace> {
   readonly enabled: boolean;
 }
 
-/** The 16 space fields, in the plate's own order. */
-export const PLATE_SPACE_FIELDS = Object.keys(REVERB_SPACE_RANGES) as (keyof ReverbSpace)[];
+/** The space's numeric fields: the 16 with a range (`REVERB_SPACE_RANGES`), in the plate's own order. */
+const PLATE_NUMBER_FIELDS = Object.keys(
+  REVERB_SPACE_RANGES,
+) as (keyof typeof REVERB_SPACE_RANGES)[];
+
+/** The 17 space fields: the 16 numbers, then the voicing (windsor#746). */
+export const PLATE_SPACE_FIELDS: readonly (keyof ReverbSpace)[] = [
+  ...PLATE_NUMBER_FIELDS,
+  'voicing',
+];
 
 export const DEFAULT_PLATE_REVERB: PlateReverbSpec = {
   kind: 'plate',
@@ -59,10 +70,10 @@ export const DEFAULT_PLATE_REVERB: PlateReverbSpec = {
 
 const FIELDS = ['kind', ...PLATE_SPACE_FIELDS, 'mix', 'enabled'];
 
-/** The spec's space, without its kind, mix or switch. */
+/** The spec's space, without its kind, mix or switch: its voicing included. */
 export function plateSpace(spec: PlateReverbSpec): ReverbSpace {
-  const space = {} as ReverbSpace;
-  for (const field of PLATE_SPACE_FIELDS) space[field] = spec[field];
+  const space = { voicing: spec.voicing } as ReverbSpace;
+  for (const field of PLATE_NUMBER_FIELDS) space[field] = spec[field];
   return space;
 }
 
@@ -89,10 +100,12 @@ function normalise(
   n.dropUnknown(raw, FIELDS, path);
   const base = DEFAULT_PLATE_REVERB;
   const space = plateSpace(base);
-  for (const field of PLATE_SPACE_FIELDS) {
+  for (const field of PLATE_NUMBER_FIELDS) {
     const [min, max] = REVERB_SPACE_RANGES[field];
     space[field] = n.num(raw[field], base[field], min, max, `${path}.${field}`);
   }
+  // A missing voicing is the plate's (windsor#746): every song before it was plate-voiced.
+  space.voicing = n.pick(raw.voicing, PLATE_VOICINGS, base.voicing, `${path}.voicing`);
   return {
     kind: 'plate',
     ...space,
@@ -104,8 +117,9 @@ function normalise(
 /** The plate's param that empties its tank (`worklet/reverb/reverbProcessor.ts`). */
 const CLEAR_PARAM = 'clear';
 
-const isSpaceField = (field: string): field is keyof ReverbSpace =>
-  (PLATE_SPACE_FIELDS as readonly string[]).includes(field);
+/** A field a knob, and so a lane, moves: every numeric space field. `voicing` is not automatable. */
+const isSpaceField = (field: string): field is (typeof PLATE_NUMBER_FIELDS)[number] =>
+  (PLATE_NUMBER_FIELDS as readonly string[]).includes(field);
 
 /** The params the switch moves: what `set` writes for `enabled`. */
 interface PlateSwitch {
@@ -165,7 +179,7 @@ function plateHandles(
       if (field === SWITCH_FIELD) {
         return { params: [], write: () => [], resting: () => switchOf(spec()) };
       }
-      const resting = (): number => spec()[field as keyof ReverbSpace | 'mix'];
+      const resting = (): number => spec()[field as (typeof PLATE_NUMBER_FIELDS)[number] | 'mix'];
       if (field === 'mix') {
         const params = [plate.parameters.get('wet')!, plate.parameters.get('dry')!];
         const write = (v: number) => {

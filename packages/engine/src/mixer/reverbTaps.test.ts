@@ -96,18 +96,20 @@ describe("Build's direct path", () => {
 });
 
 describe('each output leads with its own input', () => {
-  it("puts the larger share of each side's tap weight on the half its own input feeds", () => {
+  it("puts the larger share of each side's tap weight on the half its own input feeds, in each voicing", () => {
     // L's chain feeds the right loop (lines 8 to 11), R's the left (4 to 7).
-    const { tapLine, tapGain, tapsPerSide } = loadReverb().topology;
+    const { voicings, tapsPerSide } = loadReverb().topology;
     const fed = [(line: number) => line >= 8, (line: number) => line < 8];
-    for (const side of [0, 1]) {
-      let own = 0;
-      let other = 0;
-      for (let t = side * tapsPerSide; t < (side + 1) * tapsPerSide; t++) {
-        if (fed[side]!(tapLine[t]!)) own += Math.abs(tapGain[t]!);
-        else other += Math.abs(tapGain[t]!);
+    for (const [voicing, { tapLine, tapGain }] of voicings.entries()) {
+      for (const side of [0, 1]) {
+        let own = 0;
+        let other = 0;
+        for (let t = side * tapsPerSide; t < (side + 1) * tapsPerSide; t++) {
+          if (fed[side]!(tapLine[t]!)) own += Math.abs(tapGain[t]!);
+          else other += Math.abs(tapGain[t]!);
+        }
+        expect(own, `voicing ${voicing}, side ${side}`).toBeGreaterThan(other);
       }
-      expect(own, `side ${side}`).toBeGreaterThan(other);
     }
   });
 });
@@ -119,7 +121,7 @@ describe('every tap reads inside its line', () => {
    * values `_applySize` leaves at the block's start, and keeps the tightest
    * margin either side.
    */
-  function watch(plate: ReverbInternals, tapLine: number[]) {
+  function watch(plate: ReverbInternals, tapLine: ArrayLike<number>) {
     const margins = { behind: Infinity, inside: Infinity };
     const apply = plate._applySize;
     plate._applySize = function (this: ReverbInternals, immediate: boolean) {
@@ -149,28 +151,30 @@ describe('every tap reads inside its line', () => {
     ],
   ];
 
-  it.each([44100, 48000, 96000])('at %s Hz, through every Size move', (rate) => {
+  it.each([44100, 48000, 96000])('at %s Hz, through every Size move, in each voicing', (rate) => {
     const loaded = loadReverb(rate);
-    const { tapLine } = loaded.topology;
-    for (const [name, size] of moves) {
-      let margins = { behind: NaN, inside: NaN };
-      renderReverb(
-        loaded,
-        3,
-        () => {},
-        { size: size(0, rate) },
-        {
-          create: { sleep: false },
-          automate: (block, values) => {
-            values.size![0] = size(block, rate);
+    for (const [voicing, { tapLine }] of loaded.topology.voicings.entries()) {
+      for (const [name, size] of moves) {
+        let margins = { behind: NaN, inside: NaN };
+        renderReverb(
+          loaded,
+          3,
+          () => {},
+          { size: size(0, rate), voicing },
+          {
+            create: { sleep: false },
+            automate: (block, values) => {
+              values.size![0] = size(block, rate);
+            },
+            afterBlock: (block, processor) => {
+              if (block === 0) margins = watch(internals(processor), tapLine);
+            },
           },
-          afterBlock: (block, processor) => {
-            if (block === 0) margins = watch(internals(processor), tapLine);
-          },
-        },
-      );
-      expect(margins.behind, `${name}: behind the head`).toBeGreaterThanOrEqual(0);
-      expect(margins.inside, `${name}: inside the line`).toBeGreaterThanOrEqual(0);
+        );
+        const cell = `voicing ${voicing}, ${name}`;
+        expect(margins.behind, `${cell}: behind the head`).toBeGreaterThanOrEqual(0);
+        expect(margins.inside, `${cell}: inside the line`).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 });

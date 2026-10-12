@@ -47,7 +47,22 @@ export interface ReverbSpace {
   /** Hz, and milliseconds, of the delay modulation that breaks up ringing. */
   modRate: number;
   modDepth: number;
+  /**
+   * Which tables the one tank reads (windsor#746): `plate`, an instant,
+   * dense onset, or `room`, distinct early reflections that grow with Size.
+   * The processor reads it as its `voicing` parameter, 0 or 1
+   * (`VOICING_PARAM`); a switch ducks the wet output rather than step. Not
+   * automatable.
+   */
+  voicing: PlateVoicing;
 }
+
+/** The plate's voicings (windsor#746), in the switch's order. */
+export type PlateVoicing = 'plate' | 'room';
+export const PLATE_VOICINGS: readonly PlateVoicing[] = ['plate', 'room'];
+
+/** The processor's `voicing` parameter for each voicing: 0 and 1, where 0.5 and up reads as room. */
+export const VOICING_PARAM: Readonly<Record<PlateVoicing, number>> = { plate: 0, room: 1 };
 
 export const DEFAULT_SPACE: ReverbSpace = {
   preDelay: 0,
@@ -66,6 +81,7 @@ export const DEFAULT_SPACE: ReverbSpace = {
   tankHighCut: 8000,
   modRate: 3,
   modDepth: 0.35,
+  voicing: 'plate',
 };
 
 /**
@@ -78,8 +94,10 @@ export const DEFAULT_SPACE: ReverbSpace = {
  * value `shimmer`'s 250 Hz tank low cut took its T30 13 % short, so it takes
  * the Decay that measures its old T30 (record
  * `2026-10-12-plate-decay-in-seconds`). Every row takes `DEFAULT_SPACE`'s
- * `build` (windsor#761). The rows are transitional: item 8 of
- * `docs/research/2026-10-11-plate-reverb-upgrades/` replaces them.
+ * `build` (windsor#761). Every row is plate-voiced (windsor#746), stated in
+ * each so a change to the default voicing cannot move one: item 8's bank
+ * brings the room-voiced starting points. The rows are transitional: item 8
+ * of `docs/research/2026-10-11-plate-reverb-upgrades/` replaces them.
  */
 export const SPACES = {
   plate: makeSpace({
@@ -92,6 +110,7 @@ export const SPACES = {
     tankHighCut: 7000,
     modRate: 1,
     modDepth: 0.5,
+    voicing: 'plate',
   }),
   room: makeSpace({
     size: 0.28,
@@ -103,6 +122,7 @@ export const SPACES = {
     tankHighCut: 5500,
     modRate: 0.4,
     modDepth: 0.3,
+    voicing: 'plate',
   }),
   hall: makeSpace({
     size: 1.4,
@@ -113,6 +133,7 @@ export const SPACES = {
     tankHighCut: 6500,
     modRate: 0.5,
     modDepth: 0.8,
+    voicing: 'plate',
   }),
   cathedral: makeSpace({
     size: 3,
@@ -124,6 +145,7 @@ export const SPACES = {
     tankHighCut: 4200,
     modRate: 0.3,
     modDepth: 1.2,
+    voicing: 'plate',
   }),
   wash: makeSpace({
     size: 2.2,
@@ -134,6 +156,7 @@ export const SPACES = {
     tankHighCut: 5000,
     modRate: 1.6,
     modDepth: 2.5,
+    voicing: 'plate',
   }),
   shimmer: makeSpace({
     size: 0.7,
@@ -145,6 +168,7 @@ export const SPACES = {
     tankHighCut: 11000,
     modRate: 2.4,
     modDepth: 1.8,
+    voicing: 'plate',
   }),
 } satisfies Record<string, ReverbSpace>;
 

@@ -229,7 +229,9 @@ this generated processor, including its second input and telemetry.
 `generated/reverb-processor.js` and checked by its own `reverb/tsconfig.json`:
 `reverbProcessor.ts` (the entry: `DattorroReverb`, its fields, the load
 sampler, `process`, the sleep, `registerProcessor`), `delayLines.ts` (allocation,
-the SIZE-scaled lengths and taps, the reads), `plateInput.ts` (`_writeInput`,
+the SIZE-scaled lengths and taps, the reads), `plateVoicing.ts` (the voicing
+and its duck), `reverbVoicingTables.ts` and `reverbRoomTables.ts` (the
+voicings' rows), `plateInput.ts` (`_writeInput`,
 each input channel into its pre-delay ring), `tank.ts` (`_renderBlock`, the
 awake render), `platePoles.ts` (the block's one-pole coefficients),
 `reverbConstants.ts` (the tunables and the delay tables) and
@@ -240,10 +242,27 @@ hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
 The input is stereo (windsor#763): L and R each have a pre-delay ring, input
 filter states, four diffusers and a Build line, at one set of controls. Lines
 0..3 are L's diffusers, 4..11 the tank (`FIRST_TANK_LINE` to `TANK_LINE_END`,
-the only lines Size scales) and 12..15 R's (`INPUT_DELAYS_RIGHT`). L's chain
+which Size scales in every voicing) and 12..15 R's (the voicing's lengths,
+which only the room's scale). L's chain
 feeds the right loop (line 8) and R's the left (line 4), the half each side's
 output taps read most, and each Build sum goes to its own side of the wet
-output. R's chain is written out in the sample loop beside L's.
+output. Both chains are written out in the sample loop (L's since windsor#746).
+The voicing (windsor#746) is a row of data, not a second processor:
+`reverbVoicingTables.ts` holds `plate` (row 0: diffusers under 1 ms, fixed,
+with windsor#761's Build table and windsor#766's taps) and `room` (row 1,
+`reverbRoomTables.ts`: diffusers around Dattorro's that follow Size's square
+root, a Build table with no direct path, sparser taps), both of one shape.
+The processor reads `voicing` (0 or 1, 0.5 and up the room) and
+`plateVoicing.ts` swaps the arrays the tank and Build read at a block
+boundary. A change ducks the wet output and the tank's feed over
+`INSERT_SWITCH_FADE_S` while the block renders with a snapshot of every
+parameter as it stood; at silence the new row and fields apply together, both
+chains and both Build lines are emptied, the taps and input lengths land
+outright (`_landVoicing`), and it fades back in; the tank is never cleared. A
+fresh or woken plate applies the asked row at once. Every buffer is sized for
+the longer voicing (`INPUT_CAPACITY`, `BUILD_LINE_SPREAD`), and the sleep span
+counts `INPUT_SPAN`. The duck's gain is written out in the sample loop.
+`mixer/reverbVoicing.test.ts` holds the switch, the sleep and the rows.
 `mixer/reverbStereo.test.ts` holds the sides, the mirror, the centre, the
 anti-phase ring, the live moves and the rates, and
 `mixer/plateStereoGraph.test.ts` two hard-panned parts through a group's Plate.
@@ -370,8 +389,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
    `TANK_DELAYS`, `MAX_PRE_DELAY`, the sleep floors, `BUILD_TAP_TIME`,
    `BUILD_SPREAD`, `MOD_LINES`, `MOD_DRAW_LENGTH`, `MOD_WIDTH_MIN`,
-   `MOD_DRAWS`, `TAP_TIME`, `TAP_LINE`, `TAP_GAIN` and `TAPS_PER_SIDE` the
-   same way).
+   `MOD_DRAWS`, `TAP_TIME`, `TAP_LINE`, `TAP_GAIN`, `TAPS_PER_SIDE`,
+   `VOICING_ROWS`, `BUILD_LINE_SPREAD` and `INPUT_SPAN` the same way).
    The harness reaches internals by their **top-level names** (`ALGORITHMS`,
    `WAVE`, `Envelope`, `ST_SUSTAIN`, …), so a name stays unique across every
    module under `fm/`: esbuild renames a collision (`WAVE2`) and the harness
@@ -450,7 +469,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
-   twenty-six scenarios in the default, `sleep: false` and `settledSkip: false`
+   thirty scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

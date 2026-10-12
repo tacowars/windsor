@@ -1,5 +1,5 @@
 /**
- * The plate's tunables and topology (#671): Dattorro's table 1 delays, the
+ * The plate's tunables and topology (#671): Dattorro's table 1 tank delays, the
  * SIZE, HOLD and diffusion limits, Decay in seconds and the low band's ranges (windsor#748),
  * and the sleep floors (#547). The output taps and the trim on their sum are
  * `reverbTapTables.ts` (windsor#766). Import-free and scope-free:
@@ -18,20 +18,12 @@
 const MAX_SIZE = 4;
 
 /**
- * Pre-tank diffusers, lines 0..3: the left input's chain. Not scaled by SIZE:
- * input smear is not room size.
+ * Diffusers per input chain (windsor#763): L's are lines 0..3, R's lines
+ * 12..15, after the tank so the tank keeps its numbers. Their lengths are a
+ * voicing's (windsor#746, `reverbVoicingTables.ts`): the plate voicing's
+ * short and fixed, the room's around Dattorro's and scaled by Size.
  */
-const INPUT_DELAYS = [0.004771345, 0.003595309, 0.012734787, 0.009307483];
-
-/**
- * The right input's diffusers (windsor#763), lines 12..15, after the tank so
- * the tank keeps its numbers. Windsor's own lengths, chosen by measurement
- * (`docs/research/2026-10-12-plate-stereo-input/`): each a little off its
- * left counterpart, so the two chains decorrelate a centred source without
- * changing how fast either one smears. Not scaled by SIZE, as INPUT_DELAYS
- * are not.
- */
-const INPUT_DELAYS_RIGHT = [0.005312, 0.003825, 0.011459, 0.008022];
+const INPUT_DIFFUSERS = 4;
 
 /** Tank, as [diffuse, long, diffuse, long] per loop. Lines 4..11. */
 const TANK_DELAYS = [
@@ -42,7 +34,7 @@ const TANK_DELAYS = [
 const FIRST_TANK_LINE = 4;
 /** One past the tank's last line, and the right input's first diffuser (windsor#763). */
 const TANK_LINE_END = FIRST_TANK_LINE + TANK_DELAYS.length;
-const LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length + INPUT_DELAYS_RIGHT.length;
+const LINE_COUNT = INPUT_DIFFUSERS + TANK_DELAYS.length + INPUT_DIFFUSERS;
 
 /** Shortest a scaled tank line may become, leaving room for the interpolators. */
 const MIN_LENGTH = 8;
@@ -115,8 +107,7 @@ const SLEEP_OUTPUT_FLOOR = 1e-7;
 
 export {
   MAX_SIZE,
-  INPUT_DELAYS,
-  INPUT_DELAYS_RIGHT,
+  INPUT_DIFFUSERS,
   TANK_DELAYS,
   FIRST_TANK_LINE,
   TANK_LINE_END,
