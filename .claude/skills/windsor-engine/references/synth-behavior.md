@@ -105,10 +105,13 @@ drive and the filter (windsor#656, record `2026-10-09-sync-voice-at-2x`):
 MIDI 72 and 84), its top end within 1.3 dB of it, for about twice the
 direct shape's CPU per voice (about 200 ns a sample on an M1 under Node).
 It sounds 16 samples (0.33 ms) behind the same patch at 1×; an operator
-sent late for its reset's correction is half a sample late there, not one. The rate is chosen at the note-on and kept for the note: a
-live edit or a lane that turns sync off or feedback on plays at the note's
-rate, and the next note takes the new one. A fed synced voice stays at the
-part's rate, since feedback sounds different at another rate. Factory examples: `lead-sync-sweep`, `lead-sync-detune`.
+sent late for its reset's correction is half a sample late there, not one.
+The rate is chosen at the note-on and kept for the note: a live edit or a
+lane that turns sync off or feedback on plays at the note's rate, and the
+next note takes the new one. A fed synced voice stays at the part's rate,
+since feedback sounds different at another rate. Factory examples:
+`lead-sync-sweep`, `lead-sync-detune`.
+
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,
@@ -217,6 +220,11 @@ beat synchronization. A pulsing amplitude LFO does not emit note events.
 
 `mono` means one note with **retrigger**: new notes fade existing voices.
 It is not legato envelope suppression. `glide` can still move between notes.
+The exception is a note-on flagged `slide` (`NoteOnMessage.slide`): a mono
+patch retargets the sounding voice, its envelopes untouched. A step's slide
+sends it, and so does a Roll note that starts while a note of
+another pitch is still held (windsor#739, record `2026-10-11-bounce-to-roll`
+decision 7); a poly patch plays the overlap as two notes.
 Positive `spread` runs a detuned voice pair even in mono. Inspect lifecycle
 tests for late note-off, stealing and cut fades before changing these paths.
 Long release tails and repeated chords can consume the finite voice pool.
