@@ -2,8 +2,8 @@
  * The plate's run for `workletAllocationProbe.ts` (windsor#227): every path
  * its render takes, over and over. A cycle is noise in, with one parameter
  * changed every `period` quanta (a SIZE glide each way, HOLD on and off, the
- * decay, the filters, the modulation, the pre-delay, the diffusions, wet and
- * dry), then silence at a short decay until the plate falls asleep, `asleep`
+ * decay, the low band on and off and its crossover (windsor#748), the
+ * filters, the modulation, the pre-delay, the diffusions, wet and dry), then silence at a short decay until the plate falls asleep, `asleep`
  * quanta asleep, and the noise again, which wakes it. The probe imports it by
  * path in its child Node, which runs it directly (its types are stripped), so
  * it imports nothing at run time.
@@ -40,7 +40,8 @@ interface PlateState {
 const TOGGLES: [string, number][] = [
   ['size', 2.5],
   ['hold', 1],
-  ['decay', 0.9],
+  ['decay', 12],
+  ['lowDecay', 3],
   ['tankHighCut', 2500],
   ['size', 2.5],
   ['modRate', 3],
@@ -54,6 +55,7 @@ const TOGGLES: [string, number][] = [
   ['diffusionIn2', 0.4],
   ['diffusionTank1', 0.8],
   ['diffusionTank2', 0.8],
+  ['lowCross', 2000],
   ['wet', 0.4],
   ['dry', 0.5],
 ];

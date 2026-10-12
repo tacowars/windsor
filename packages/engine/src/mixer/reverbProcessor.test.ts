@@ -31,6 +31,8 @@ describe('the tail', () => {
     expect(rmsAt(result, 1)).toBeGreaterThan(0);
   });
 
+  // Decay is seconds (windsor#748), so Size no longer lengthens the tail:
+  // `reverbDecay.test.ts` holds the T30 to Decay at every Size.
   it('lengthens with decay', () => {
     const short = tailSeconds(renderReverb(loaded, 30, impulse, { decay: 0.3 }));
     const medium = tailSeconds(renderReverb(loaded, 30, impulse, { decay: 0.7 }));
@@ -38,18 +40,6 @@ describe('the tail', () => {
 
     expect(short).toBeLessThan(medium);
     expect(medium).toBeLessThan(long);
-  });
-
-  it('lengthens with size, which is what makes one plate cover every room', () => {
-    const box = tailSeconds(renderReverb(loaded, 30, impulse, { size: 0.1 }));
-    const room = tailSeconds(renderReverb(loaded, 30, impulse, { size: 1 }));
-    const cathedral = tailSeconds(renderReverb(loaded, 30, impulse, { size: 4 }));
-
-    expect(box).toBeLessThan(room);
-    expect(room).toBeLessThan(cathedral);
-    // The advertised range: a tight box under half a second, a cathedral past ten.
-    expect(box).toBeLessThan(0.5);
-    expect(cathedral).toBeGreaterThan(10);
   });
 });
 
@@ -111,7 +101,7 @@ describe('stability', () => {
    */
   it('does not run away at maximum diffusion and decay', () => {
     const result = renderReverb(loaded, 45, noiseBurst(2), {
-      decay: 1,
+      decay: 60,
       diffusionTank1: 0.8,
       diffusionTank2: 0.8,
       tankLowCut: 10,

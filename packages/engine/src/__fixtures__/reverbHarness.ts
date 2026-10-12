@@ -41,6 +41,8 @@ export interface ReverbCreateOptions {
   sleep?: boolean;
   /** `false` runs the per-sample length and tap bookkeeping even when SIZE is still. */
   settledSkip?: boolean;
+  /** `false` keeps the low band's code out of the path whatever `lowDecay` (windsor#748). */
+  lowBand?: boolean;
 }
 
 /** The topology constants a sleep test derives its span from, read out of the worklet. */
@@ -107,6 +109,12 @@ export interface ReverbInternals {
   _sleepSpan: number;
   /** Whether the last block ran the per-sample SIZE bookkeeping (#547). */
   _stepping: boolean;
+  /** Whether the low band ran the last block, and its lowpasses' states (windsor#748). */
+  _band: boolean;
+  _lowState: Float64Array;
+  /** Each tank line's gain point, and the low band's extra gain on it (windsor#748). */
+  _gain: Float64Array;
+  _lowExtra: Float64Array;
 }
 
 /** White-box access to one processor's delay lines. */
@@ -255,4 +263,77 @@ export function noiseBurst(seconds: number): Feed {
       right[i] = v;
     }
   };
+}
+
+/** A single full-scale impulse at the start of block `at`, as a plate settled at its Size hears it. */
+export function impulseAt(at: number): Feed {
+  return (block, left, right) => {
+    if (block !== at) return;
+    left[0] = 1;
+    right[0] = 1;
+  };
+}
+
+/** One channel of an interleaved stereo render, from sample `from`. */
+export function channel(samples: Float32Array, side: 0 | 1, from = 0): Float64Array {
+  const out = new Float64Array(samples.length / 2 - from);
+  for (let i = 0; i < out.length; i++) out[i] = samples[(from + i) * 2 + side] ?? 0;
+  return out;
+}
+
+/** An RBJ second-order lowpass or highpass at `hz`, Q 1/√2, over `x` (a fresh array). */
+function biquad(x: Float64Array, kind: 'lp' | 'hp', hz: number): Float64Array {
+  const w = (2 * Math.PI * hz) / SAMPLE_RATE;
+  const cos = Math.cos(w);
+  const alpha = Math.sin(w) / Math.SQRT2;
+  const edge = kind === 'lp' ? (1 - cos) / 2 : (1 + cos) / 2;
+  const b = [edge, kind === 'lp' ? 2 * edge : -2 * edge, edge].map((v) => v / (1 + alpha));
+  const a1 = (-2 * cos) / (1 + alpha);
+  const a2 = (1 - alpha) / (1 + alpha);
+  const y = new Float64Array(x.length);
+  let z1 = 0;
+  let z2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    const input = x[i] ?? 0;
+    const out = b[0]! * input + z1;
+    z1 = b[1]! * input - a1 * out + z2;
+    z2 = b[2]! * input - a2 * out;
+    y[i] = out;
+  }
+  return y;
+}
+
+/** The octave band around `hz`: fourth-order Linkwitz–Riley edges an half-octave either side. */
+export function octaveBand(x: Float64Array, hz: number): Float64Array {
+  const low = hz / Math.SQRT2;
+  const high = hz * Math.SQRT2;
+  return biquad(biquad(biquad(biquad(x, 'lp', high), 'lp', high), 'hp', low), 'hp', low);
+}
+
+/**
+ * T30 in seconds (windsor#748): the Schroeder integral of left² + right², a
+ * least-squares line through its −5 to −35 dB span, extrapolated to 60 dB.
+ * NaN when the integral never reaches −35 dB in the render.
+ */
+export function t30(left: Float64Array, right: Float64Array): number {
+  const n = left.length;
+  const decay = new Float64Array(n);
+  let sum = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    sum += (left[i] ?? 0) ** 2 + (right[i] ?? 0) ** 2;
+    decay[i] = sum;
+  }
+  const total = decay[0] ?? 0;
+  let [st, sd, stt, std, count] = [0, 0, 0, 0, 0];
+  for (let i = 0; i < n; i++) {
+    const db = 10 * Math.log10((decay[i] ?? 0) / total);
+    if (db > -5) continue;
+    if (db < -35) {
+      const slope = (count * std - st * sd) / (count * stt - st * st);
+      return -60 / slope;
+    }
+    const t = i / SAMPLE_RATE;
+    [st, sd, stt, std, count] = [st + t, sd + db, stt + t * t, std + t * db, count + 1];
+  }
+  return NaN;
 }

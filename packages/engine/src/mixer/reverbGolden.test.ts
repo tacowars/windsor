@@ -6,7 +6,8 @@
  * gate, in the shape of `fmProcessorGolden.test.ts`: every scenario the reverb
  * tests exercise (an impulse and a noise burst from the harness's PRNG, the
  * decay and SIZE extremes, HOLD, the runaway ceiling, a SIZE glide, a wet
- * turned up late, the filters and modulation off their defaults) plus the
+ * turned up late, the filters and modulation off their defaults, and since
+ * windsor#748 the low band, its moves and a Decay step) plus the
  * sleep path (#547) -- a tail that falls asleep, and one that is woken -- is
  * rendered in three paths and hashed against `__fixtures__/reverbGolden.json`:
  * the default, `sleep: false` and `settledSkip: false`. The settled-SIZE skip
@@ -89,16 +90,16 @@ const clicks = (every: number): Feed => {
 const SCENARIOS: Record<string, () => Scenario> = {
   impulse: () => ({ seconds: 3, feed: impulse }),
   'decay-short': () => ({ seconds: 2, feed: impulse, params: { decay: 0.3 } }),
-  'decay-long': () => ({ seconds: 3, feed: impulse, params: { decay: 0.9 } }),
+  'decay-long': () => ({ seconds: 3, feed: impulse, params: { decay: 12 } }),
   'size-box': () => ({ seconds: 2, feed: impulse, params: { size: 0.1 } }),
   'size-cathedral': () => ({ seconds: 3, feed: impulse, params: { size: 4 } }),
-  'size-and-decay': () => ({ seconds: 3, feed: impulse, params: { size: 1.4, decay: 0.78 } }),
+  'size-and-decay': () => ({ seconds: 3, feed: impulse, params: { size: 1.4, decay: 6.35 } }),
   'dry-only': () => ({ seconds: 0.5, feed: impulse, params: { dry: 1, wet: 0 } }),
   'max-diffusion': () => ({
     seconds: 3,
     feed: noiseBurst(0.5),
     params: {
-      decay: 1,
+      decay: 20,
       diffusionTank1: 0.8,
       diffusionTank2: 0.8,
       tankLowCut: 10,
@@ -136,6 +137,27 @@ const SCENARIOS: Record<string, () => Scenario> = {
       values.size![0] = block < blockAt(0.5) ? 1 : block < blockAt(1) ? 2.5 : 0.6;
     },
     visits: 'settled and stepping',
+  }),
+  // The low band (windsor#748): running, under HOLD, and moved off 1 and back.
+  'low-band': () => ({
+    seconds: 3,
+    feed: noiseBurst(0.3),
+    params: { decay: 2, lowDecay: 3, lowCross: 600 },
+  }),
+  'low-band-moves': () => ({
+    seconds: 3,
+    feed: clicks(blockAt(0.25)),
+    automate: (block, values) => {
+      values.lowDecay![0] = block < blockAt(0.5) ? 1 : block < blockAt(2) ? 0.3 : 1;
+      values.hold![0] = block >= blockAt(1) && block < blockAt(1.5) ? 1 : 0;
+    },
+  }),
+  'decay-step': () => ({
+    seconds: 3,
+    feed: clicks(blockAt(0.3)),
+    automate: (block, values) => {
+      values.decay![0] = block < blockAt(1) ? 0.4 : block < blockAt(2) ? 15 : 0.4;
+    },
   }),
   'wet-late': () => ({
     seconds: 3,
