@@ -64,8 +64,8 @@ export const DEFAULT_SPACE: ReverbSpace = {
   diffusionTank2: 0.5,
   tankLowCut: 20,
   tankHighCut: 8000,
-  modRate: 0.5,
-  modDepth: 0.7,
+  modRate: 3,
+  modDepth: 0.35,
 };
 
 /**
@@ -111,6 +111,7 @@ export const SPACES = {
     inputLowCut: 60,
     tankLowCut: 60,
     tankHighCut: 6500,
+    modRate: 0.5,
     modDepth: 0.8,
   }),
   cathedral: makeSpace({

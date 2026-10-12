@@ -9,7 +9,9 @@
  * turned up late, the filters and modulation off their defaults, since
  * windsor#748 the low band, its moves and a Decay step, since
  * windsor#761 Build at 0 and at 1 and moved with HOLD, and since
- * windsor#763 a click on L alone, on R alone and in anti-phase) plus the
+ * windsor#763 a click on L alone, on R alone and in anti-phase, and since
+ * windsor#764 the modulation at its deepest and fastest and a tone held under
+ * HOLD for ten seconds while all four points move) plus the
  * sleep path (#547) -- a tail that falls asleep, and one that is woken -- is
  * rendered in three paths and hashed against `__fixtures__/reverbGolden.json`:
  * the default, `sleep: false` and `settledSkip: false`. The settled-SIZE skip
@@ -99,6 +101,27 @@ const click =
     r[0] = right;
   };
 
+/**
+ * A 220 Hz sine at 0.3 for `blocks` blocks, then silence (at 48 kHz). The
+ * oscillator's recursion, y[n] = 2cos(w) y[n-1] - y[n-2], starts from written
+ * constants, so its samples take no `Math` transcendental and are the same
+ * bits on arm64 and x64, as the hashes must be.
+ */
+const tone220 = (blocks: number): Feed => {
+  const twoCos = 1.9991707363874793;
+  let previous = 0;
+  let current = 0.028793952368263469;
+  return (block, left, right) => {
+    if (block >= blocks) return;
+    for (let i = 0; i < BLOCK; i++) {
+      left[i] = right[i] = previous * 0.3;
+      const next = twoCos * current - previous;
+      previous = current;
+      current = next;
+    }
+  };
+};
+
 const SCENARIOS: Record<string, () => Scenario> = {
   impulse: () => ({ seconds: 3, feed: impulse }),
   'decay-short': () => ({ seconds: 2, feed: impulse, params: { decay: 0.3 } }),
@@ -187,6 +210,21 @@ const SCENARIOS: Record<string, () => Scenario> = {
   'click-left': () => ({ seconds: 2, feed: click(1, 0) }),
   'click-right': () => ({ seconds: 2, feed: click(0, 1) }),
   'anti-phase': () => ({ seconds: 2, feed: click(1, -1) }),
+  // The modulation (windsor#764): all four points at the deepest depth and
+  // the fastest rate, and a tone held under HOLD for ten seconds at the
+  // defaults, the four sources moving under a lossless tank.
+  'mod-deep-fast': () => ({
+    seconds: 3,
+    feed: noiseBurst(0.3),
+    params: { modRate: 8, modDepth: 4 },
+  }),
+  'mod-held': () => ({
+    seconds: 11,
+    feed: tone220(blockAt(1)),
+    automate: (block, values) => {
+      values.hold![0] = block >= blockAt(0.9) ? 1 : 0;
+    },
+  }),
   'wet-late': () => ({
     seconds: 3,
     feed: impulse,
