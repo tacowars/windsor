@@ -5133,7 +5133,7 @@ body.chord-dragging {
   background: color-mix(in srgb, var(--group-accent, var(--modulator)) 16%, transparent);
   pointer-events: none;
 }
-/* A part's row: ▸ over the lane badge, then its mixer strip. */
+/* A part's row: its fold, then its mixer strip. */
 .lane-part {
   display: grid;
   grid-template-columns: var(--fold) minmax(0, 1fr);
@@ -5146,13 +5146,10 @@ body.chord-dragging {
 }
 .lane-fold {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
+  align-self: stretch;
 }
-/* A part's collapsed strip: the compact Level knob and its value, then M
-   and S, on one line, sized for a 40 px row. */
+/* A part's collapsed strip: the compact Level knob, then M and S, on one
+   line, sized for a 40 px row. */
 .mix-cell {
   display: flex;
   align-items: center;
@@ -5160,8 +5157,9 @@ body.chord-dragging {
   gap: 4px;
   min-width: 0;
 }
-/* The header: the arrow and "Mixer" over the number tabs and ▸, then over
-   the strips their column labels (expanded) and the ruler's "bar · beat". */
+/* The header: the arrow and "Mixer" over the number tabs and folds, then
+   over the strips their column labels (expanded) and the ruler's
+   "bar · beat". */
 .mix-head {
   display: grid;
   grid-template-columns: var(--lead) minmax(0, 1fr);
@@ -5188,9 +5186,16 @@ body.chord-dragging {
   min-width: 0;
 }
 /* The arrow that expands every strip (windsor#158), first in the header;
-   it keeps its place in both states, so a second press lands on it. */
+   it keeps its place in both states, so a second press lands on it.
+   Collapsed, the button holds "Mixer" too and spans the lead, so the word
+   is the target (windsor#768 decision 4); expanded, it is the arrow alone
+   in its 22 px box. */
 .mix-toggle {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -5198,14 +5203,25 @@ body.chord-dragging {
   border-radius: var(--r);
   background: none;
   color: var(--ink-dim);
-  font-size: 12px;
-  line-height: 1;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
+}
+.mix-toggle.wide {
+  width: 100%;
+  justify-content: start;
+  padding-left: 1px;
 }
 .mix-toggle:hover,
 .mix-toggle:focus-visible {
   color: var(--ink);
-  border-color: var(--line);
+  border-color: var(--line-bright);
+  background: var(--panel-hi);
+  outline: none;
+}
+.mix-toggle .mix-word {
+  color: var(--ink-dim);
 }
 /* Expanded, the header's labels and every part's strip share one grid: a
    column a knob (--mix-knobs, split evenly), Output, then M and S. The
@@ -5223,11 +5239,14 @@ body.chord-dragging {
 .mix-cell.expanded .knob.compact {
   justify-self: start;
 }
+/* With no number beside a pot the columns are 36 px (windsor#768 decision
+   8), so the labels are 9 px, and "Low cut" wraps onto two lines inside
+   the 22 px header. */
 .mix-label {
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  line-height: 9px;
 }
 select.field.compact {
   max-width: none;
@@ -5923,16 +5942,20 @@ select.field.compact {
 
 /* ---------- the automation lanes (windsor#348): folded out under a part ---------- */
 
-/* The fold, at the top of a part's row with the lane count under it. The
-   panel face draws ▸ and ▾ as the same dot, so the fold uses the system face. */
+/* The fold (windsor#768 decisions 1 to 3; docs/design/song-mixer-mockup.html,
+   arrows option C): the button is the whole fold cell, the SVG triangle
+   with a folded part's lane count beside it, so a press anywhere in the
+   cell folds. A part's cell is the row's 50 x 40 fold column; a group's two
+   folds are as wide as their arrow and caption ("lanes" or the count). */
 .lane-fold button.tri {
-  flex: none;
-  width: 17px;
-  height: 18px;
-  padding: 0;
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  line-height: 1;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 28px;
+  height: 100%;
+  padding: 0 4px;
   color: var(--ink-faint);
   border: 1px solid transparent;
   border-radius: var(--r);
@@ -5942,17 +5965,29 @@ select.field.compact {
 .lane-fold button.tri:hover,
 .lane-fold button.tri:focus-visible {
   border-color: var(--line-bright);
+  background: var(--panel-hi);
   color: var(--ink);
+  outline: none;
 }
 .lane-fold button.tri[aria-expanded='true'] {
   color: var(--carrier);
 }
-/* A group's lanes fold (windsor#616): its ▸ with "lanes", or the lane
-   count while folded, beside it on one line, so it reads "▸ lanes" next to
-   the member fold's bare ▾. */
-.lane-fold.folder-lanes {
-  flex-direction: row;
-  gap: 3px;
+/* The fold arrow (windsor#768 decision 1, disclosureArrow.ts): an SVG
+   triangle pointing right, turned 90 degrees to point down while its button
+   is open, the part folds, the group folds and the mixer header's toggle
+   alike. */
+.disclosure .disclosure-arrow {
+  display: block;
+  flex: none;
+  transition: transform 120ms ease-out;
+}
+.disclosure[aria-expanded='true'] .disclosure-arrow {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .disclosure .disclosure-arrow {
+    transition: none;
+  }
 }
 .lane-fold .fold-caption {
   font-family: var(--f-num);
@@ -6758,16 +6793,69 @@ select.field.auto-snap {
   color: var(--ink);
   pointer-events: none;
 }
-/* The compact knob (windsor#157): a smaller dial with its value to the
-   right and no label under it, for the Song tab's 40 px mixer rows. */
+/* The compact knob (windsor#157): a smaller dial with no value beside it
+   and no label under it, for the Song tab's 40 px mixer rows; its label and
+   value show in the bubble above it (windsor#768, .knob-bubble). */
 .knob.compact {
   width: auto;
   flex-direction: row;
-  gap: 3px;
-  padding: 2px 4px 2px 2px;
+  padding: 2px 3px;
 }
-.knob.compact .knob-val {
-  min-width: 4ch;
+/* The compact knob's value bubble (windsor#768 decisions 6 and 7; the
+   mockup's values option A): one for the page, hung from the body with
+   fixed positioning so no scroll box or frozen column clips it, centred
+   above the dial (knobBubble.ts sets left, top and --tip-x). It shows the
+   knob's label and value, and a lock's tag in the lock's colour. */
+.knob-bubble {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px 4px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--f-num);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.knob-bubble[hidden] {
+  display: none;
+}
+.knob-bubble::after {
+  content: '';
+  position: absolute;
+  left: var(--tip-x, 50%);
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+  transform: translateX(-50%) rotate(45deg);
+}
+.knob-bubble .bubble-label {
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.knob-bubble .bubble-tag {
+  align-self: center;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--tag-color);
+  color: var(--ground);
+  font-family: var(--f-panel);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 12px;
 }
 
 /* The combined ratio beside the Coarse / Fine pair (#587): a knob's
@@ -6849,22 +6937,8 @@ select.field.auto-snap {
   transform: rotate(180deg);
   padding: 4px 0;
 }
-/* The compact knob keeps its 40 px row: the dial spans two lines, the value
-   above the tag beside it. */
-.knob.compact.locked {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  justify-items: start;
-  column-gap: 3px;
-  row-gap: 1px;
-}
-.knob.compact.locked svg {
-  grid-row: span 2;
-}
-.knob.compact.locked .knob-val {
-  line-height: 12px;
-}
+/* The compact knob draws no tag: the lit ring marks the lock at rest, and
+   its bubble carries the tag (windsor#768 decision 7). */
 
 /* ---------- the env ring (windsor#725) ---------- */
 /* A knob a Roll clip envelope moves (knobLock.ts sets .env) stays live: its

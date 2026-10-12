@@ -4,9 +4,11 @@
  * row of the one frozen column (windsor#534), which stays put while the
  * timeline scrolls. The ruler row holds the column's header, led by the
  * arrow that expands every strip at once. A part's strip, collapsed, is a
- * compact Level knob with its value, then M and S; expanded, Level, Pan,
- * Low cut, a send per return, the Output select, M and S, under the
- * header's column labels. The arrow's
+ * compact Level knob, then M and S; expanded, Level, Pan, Low cut, a send
+ * per return, the Output select, M and S, under the header's column
+ * labels. No pot carries a number: each shows its label and value in a
+ * bubble above it while it is hovered, pressed or dragged (windsor#768,
+ * `knobBubble.ts`), which let each knob column narrow. The arrow's
  * state is the view's (`SongViewState.mixerExpanded`), and a toggle draws
  * the cells again, so one set of strip controls exists at a time.
  *
@@ -26,6 +28,7 @@ import type { MusicPart, StripTargetId } from '@windsor/engine';
 import { RETURN_NAMES, partAt } from '@windsor/engine';
 import { RETURN_COLOR, STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
+import { disclosureArrow } from './disclosureArrow';
 import { el } from './dom';
 import type { KnobElement, KnobSpec } from './knob';
 import { makeKnob } from './knob';
@@ -59,6 +62,12 @@ const SWITCH_TEXT: Readonly<Record<StripSwitch, string>> = { mute: 'M', solo: 'S
 /** The expanded header's label over the Output select; the knobs' come from their specs. */
 const OUTPUT_HEADING = 'Out';
 
+/** The word beside the collapsed header's arrow, inside its button. */
+const MIXER_WORD = 'Mixer';
+
+/** The unit Low cut's bubble reads after its value (windsor#768 decision 6). */
+const LOW_CUT_UNIT = 'Hz';
+
 /** The expanded strip's knobs, in order: Level, Pan, Low cut, then a send per return. */
 const EXPANDED_KNOBS: readonly string[] = [
   STRIP_LEVEL_KNOB.label,
@@ -76,9 +85,19 @@ export interface MixerToggle {
   toggle(): void;
 }
 
-/** The arrow that expands or collapses every strip (windsor#158 decision 1). */
+/**
+ * The arrow that expands or collapses every strip (windsor#158 decision 1):
+ * the SVG triangle (windsor#768 decisions 1 and 4), with "Mixer" inside the
+ * button while collapsed, so the word is the target too, and alone in its
+ * 22 px box while expanded, before the column labels.
+ */
 function toggleButton({ expanded, toggle }: MixerToggle): HTMLButtonElement {
-  const button = el('button', 'mix-toggle', expanded ? '▾' : '▸') as HTMLButtonElement;
+  const button = el(
+    'button',
+    expanded ? 'mix-toggle disclosure' : 'mix-toggle disclosure wide',
+  ) as HTMLButtonElement;
+  button.appendChild(disclosureArrow('header'));
+  if (!expanded) button.appendChild(el('span', 'mix-word', MIXER_WORD));
   button.type = 'button';
   button.setAttribute('aria-expanded', String(expanded));
   button.setAttribute('aria-label', 'Mixer strips');
@@ -91,7 +110,7 @@ function toggleButton({ expanded, toggle }: MixerToggle): HTMLButtonElement {
 
 /**
  * The column's header, in the ruler row (windsor#534 decision 5): the
- * arrow, then "Mixer" collapsed, over the parts' number tabs and `▸`; over
+ * arrow, with "Mixer" collapsed, over the parts' number tabs and folds; over
  * the strips, expanded, each column's label over its control (windsor#158
  * decision 3); and `corner`, the ruler's "bar · beat", at the right.
  */
@@ -99,7 +118,6 @@ export function mixerHeaderCell(toggle: MixerToggle, corner: HTMLElement): HTMLE
   const cell = el('div', 'mix-head');
   const lead = el('div', 'mix-lead');
   lead.appendChild(toggleButton(toggle));
-  if (!toggle.expanded) lead.appendChild(el('span', '', 'Mixer'));
   const labels = el('div', toggle.expanded ? 'mix-labels expanded' : 'mix-labels');
   if (toggle.expanded) {
     for (const label of [...EXPANDED_KNOBS, OUTPUT_HEADING]) {
@@ -186,7 +204,7 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
       (v) => setStripPan(ctx, slot, v),
     ),
     stripKnob(
-      STRIP_LOW_CUT_KNOB,
+      { ...STRIP_LOW_CUT_KNOB, unit: LOW_CUT_UNIT },
       () => strip().lowCut,
       (v) => setStripLowCut(ctx, slot, v),
     ),
@@ -205,7 +223,7 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
 }
 
 /**
- * A part's strip: collapsed, Level and its value, M, S; expanded, every
+ * A part's strip: collapsed, Level, M, S; expanded, every
  * knob, the Output select, M, S. Its redraw re-reads every control; an
  * Output change re-syncs M and S at once, since whether they apply follows
  * it (windsor#157's rule as amended on PR #168).

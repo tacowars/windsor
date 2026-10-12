@@ -42,14 +42,17 @@ export interface SongViewScale {
   readonly partTabGapPx: number;
   /** The padding each side of a part's row, inside the frozen column. */
   readonly partRowPadPx: number;
-  /** The part row's first column: `▸` with the "n lanes" badge stacked under it. */
+  /**
+   * The part row's first column: the fold, its button the whole cell, with
+   * the "n lanes" badge inside it beside the arrow (windsor#768 decision 2).
+   */
   readonly partFoldPx: number;
   /** The gap between that column and the mixer strip. */
   readonly partFoldGapPx: number;
   /**
-   * The part's mixer strip in its row (windsor#157): Level and its value, M
-   * and S on one line, collapsed, with S at the strip's right edge
-   * (windsor#554, measured in Chrome).
+   * The part's mixer strip in its row (windsor#157): Level, M and S on one
+   * line, collapsed, with S at the strip's right edge (windsor#554). Level
+   * shows no number since windsor#768, so 114 became 84.
    */
   readonly mixerWidthPx: number;
   /**
@@ -58,7 +61,11 @@ export interface SongViewScale {
    * `console.css`'s `.mix-cell.expanded` sizes them.
    */
   readonly mixerExpandedBasePx: number;
-  /** Each knob column of the expanded mixer, with the gap after it: a compact dial and a five-character value. */
+  /**
+   * Each knob column of the expanded mixer, with the gap after it: a compact
+   * dial and its padding, with no value beside it (windsor#768 decision 8;
+   * 70 before), so the expanded column is 315 px, not 485.
+   */
   readonly mixerKnobColumnPx: number;
   /** The gap between the frozen column and the timeline. */
   readonly laneGapPx: number;
@@ -91,9 +98,9 @@ export const SONG_VIEW: SongViewScale = {
   partRowPadPx: 2,
   partFoldPx: 50,
   partFoldGapPx: 4,
-  mixerWidthPx: 114,
+  mixerWidthPx: 84,
   mixerExpandedBasePx: 135,
-  mixerKnobColumnPx: 70,
+  mixerKnobColumnPx: 36,
   laneGapPx: 8,
   partLanePx: 40,
   rowGapPx: 4,
@@ -132,7 +139,7 @@ type ColumnScale = Pick<
 
 /**
  * Px from the frozen column's left edge to a part's mixer strip
- * (windsor#534): the number tab and its gap, the row's padding, the `▸`
+ * (windsor#534): the number tab and its gap, the row's padding, the fold
  * column and its gap. The ruler row's header puts the strip's column
  * labels there too.
  */

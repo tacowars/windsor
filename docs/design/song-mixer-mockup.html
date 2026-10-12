@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Song tab's arrows and numberless mixer, as tacowars approved them on
+     2026-10-12 (record 2026-10-12-song-mixer-arrows-and-value-bubbles):
+     arrows option C (an SVG triangle in a box grown to the whole free cell)
+     and values option A (a bubble above the knob on hover, press, drag and
+     focus). Today, A, B and the other readout are kept for comparison.
+     Static and self-contained: open it in a browser. The controls above the
+     lane block are the mockup's own switches, not part of the console. -->
+<title>Song Mixer Mockups</title>
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a reading column of notes, with the console's own pieces drawn at
+   real size in framed specimens. Tokens copied from
+   packages/app/src/console.css. The app is dark only. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --seq: #cc7a9c;
+  --part-blue: #86a3d6;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 28px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+h1, h2, h3 {
+  font-family: var(--f-panel);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-wrap: balance;
+  margin: 0;
+}
+h1 { font-size: 22px; }
+h2 { font-size: 17px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink); }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; }
+p { margin: 0; max-width: 68ch; color: var(--ink-dim); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow {
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.notes {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: var(--ink-dim);
+  max-width: 72ch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rec {
+  border: 1px solid var(--line-bright);
+  border-left: 3px solid var(--carrier);
+  border-radius: var(--r);
+  background: var(--panel);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rec p { max-width: none; }
+
+/* ---------- section 1: arrow specimens ---------- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  min-width: 0;
+}
+.card.pick { border-color: var(--carrier); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.tag {
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--carrier);
+  color: var(--ground);
+}
+.card p { font-size: 12.5px; }
+.spec {
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px;
+  overflow: hidden;
+}
+.spec.zoom { padding: 4px; }
+.spec.zoom > .spec-body { zoom: 2.6; }
+.spec-label { font-size: 10px; color: var(--ink-faint); font-family: var(--f-num); }
+
+/* The frozen column's pieces, as console.css draws them. */
+.mix-head {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.part-row {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  margin-top: 4px;
+  background: var(--panel);
+  border-radius: var(--r);
+  width: max-content;
+}
+.ptab {
+  width: 20px;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r) 0 0 var(--r);
+  background: var(--pc, var(--part-blue));
+  color: var(--ground);
+  font-family: var(--f-num);
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 6px;
+}
+.fold-col {
+  width: 50px;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+.badge {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid rgba(224, 164, 78, 0.45);
+  border-radius: 8px;
+  font-family: var(--f-num);
+  font-size: 9px;
+  line-height: 14px;
+  color: var(--carrier);
+}
+.stub { display: flex; align-items: center; gap: 4px; padding-right: 6px; }
+
+/* Arrow buttons. Every variant keeps today's box unless it says otherwise. */
+.arrow {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.arrow:hover, .arrow:focus-visible { color: var(--ink); border-color: var(--line-bright); outline: none; }
+.arrow[aria-expanded='true'] { color: var(--carrier); }
+.arrow svg { display: block; transition: transform 120ms ease-out; }
+.arrow[aria-expanded='true'] svg { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .arrow svg { transition: none; } }
+/* Today: a font character in a box. */
+.arrow.today-head { width: 22px; height: 22px; font-size: 12px; line-height: 1; font-family: var(--f-panel); }
+.arrow.today-fold { width: 17px; height: 18px; font-size: 10px; line-height: 1; font-family: system-ui, sans-serif; color: var(--ink-faint); }
+/* A and B: the same boxes, the glyph drawn to the box's edges. */
+.arrow.box-head { width: 22px; height: 22px; }
+.arrow.box-fold { width: 17px; height: 18px; color: var(--ink-faint); }
+/* C: the box is the whole free cell; the header's covers the arrow and "Mixer". */
+.arrow.cell-head {
+  height: 22px;
+  width: 78px;
+  justify-content: start;
+  grid-auto-flow: column;
+  gap: 5px;
+  padding-left: 2px;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.arrow.cell-head:hover, .arrow.cell-head:focus-visible { background: var(--panel-hi); }
+.arrow.cell-fold {
+  width: 50px;
+  height: 38px;
+  grid-auto-flow: column;
+  gap: 3px;
+  color: var(--ink-faint);
+}
+.arrow.cell-fold:hover, .arrow.cell-fold:focus-visible { background: var(--panel-hi); }
+
+/* ---------- section 2: the lane block ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg button {
+  font-family: var(--f-panel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  background: var(--panel);
+  color: var(--ink-dim);
+  border: 0;
+  border-right: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed='true'] { background: var(--carrier); color: var(--ground); }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.option-note { min-height: 3em; }
+.frame-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); }
+.frame {
+  position: relative;
+  width: 960px;
+  overflow: hidden;
+  background: var(--ground);
+  padding: 6px 0 8px 6px;
+  user-select: none;
+}
+.metric {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  font-family: var(--f-num);
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.metric b { color: var(--ink); font-weight: 500; }
+.metric .gain { color: var(--carrier); }
+.lrow { display: flex; gap: 8px; height: 40px; margin-bottom: 4px; }
+.lrow.ruler { height: 22px; }
+.frozen { flex: none; display: flex; align-items: center; background: var(--ground); }
+.lrow:not(.ruler) .frozen { background: var(--panel); border-radius: var(--r); padding-right: 2px; }
+.lrow:not(.ruler) .frozen.sel { box-shadow: inset 0 0 0 1px var(--part-blue); }
+.lead { width: 80px; flex: none; display: flex; align-items: center; height: 100%; }
+.lead .ptab { margin-right: 6px; }
+.mix-labels {
+  flex: 1;
+  display: grid;
+  align-items: center;
+  column-gap: 4px;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  min-width: 0;
+}
+.mix-labels .ml { white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.mix-labels.narrow { font-size: 9px; letter-spacing: 0.06em; }
+.mix-labels.narrow .ml { white-space: normal; line-height: 9px; }
+.mix-labels .ml.live {
+  color: var(--carrier);
+  font-family: var(--f-num);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: visible;
+}
+.corner { justify-self: end; font-family: var(--f-panel); font-size: 10px; letter-spacing: 0.16em; color: var(--ink-faint); white-space: nowrap; }
+.mix-cell { flex: 1; display: grid; align-items: center; column-gap: 4px; }
+.mix-cell.collapsed { display: flex; justify-content: space-between; gap: 4px; }
+.knob { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px 2px 2px; border-radius: var(--r); cursor: ns-resize; touch-action: none; justify-self: start; }
+.knob:hover, .knob.active { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .val { font-family: var(--f-num); font-size: 10px; min-width: 4ch; font-variant-numeric: tabular-nums; }
+.dial-face { fill: var(--inset); stroke: var(--line); }
+.dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-arc { stroke: var(--kc, var(--modulator)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.out { font-family: var(--f-ui); font-size: 11px; padding: 3px 4px; background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); width: 84px; }
+.ms { display: flex; gap: 3px; }
+.ms span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); font-family: var(--f-panel); font-size: 10px; color: var(--ink-dim); background: var(--panel-hi); }
+.tl { flex: none; position: relative; width: 1600px; border-radius: var(--r); background:
+  repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 96px), var(--inset); }
+.ruler .tl { background: none; font-family: var(--f-num); font-size: 10px; color: var(--ink-faint); }
+.ruler .tl span { position: absolute; top: 4px; }
+.region { position: absolute; top: 4px; bottom: 4px; border-radius: var(--r); background: color-mix(in srgb, var(--pc) 70%, var(--ground)); color: var(--ground); font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; padding: 2px 6px; overflow: hidden; white-space: nowrap; }
+
+/* The value bubble (option A). */
+.bubble {
+  position: absolute;
+  z-index: 5;
+  transform: translate(-50%, calc(-100% - 6px));
+  padding: 3px 8px 4px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--f-num);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.bubble[hidden] { display: none; }
+.bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+  transform: translateX(-50%) rotate(45deg);
+}
+.bubble small {
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.open-q { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.open-q div { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.open-q p { font-size: 13px; }
+</style>
+
+<div class="page">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <div class="eyebrow">Song tab · approved mockup · 2026-10-12</div>
+    <h1>Bigger arrows, and a mixer without numbers</h1>
+    <p>Two changes to the Song tab's frozen column. Everything below is drawn at the console's real sizes (the 40 px part row, the 50 px fold column, the 26 px compact dial). Click the arrows, and drag the knobs up and down.</p>
+  </header>
+
+  <div class="rec">
+    <div class="eyebrow">Approved by tacowars, 2026-10-12</div>
+    <p><strong>Arrows: option C.</strong> Draw the arrow as a shape that fills its box, and make the box the whole empty cell around it: the 50 × 40 px fold column on a part row, and arrow plus "Mixer" in the header. No new space is used.</p>
+    <p><strong>Values: option A.</strong> No numbers beside any pot. While you hover a knob, or as soon as you press it, a bubble above it shows the parameter's name and value, Low cut in Hz. Expanded, the mixer column drops from 485 px to 315 px and the timeline gains 170 px, about 1.8 bars at the default zoom.</p>
+  </div>
+
+  <!-- ===================== 1. Arrows ===================== -->
+  <section>
+    <h2>1 · The arrows</h2>
+    <p>A UI designer would make three points about today's arrows:</p>
+    <ul class="notes">
+      <li><strong>A font character never fills its box.</strong> ▸ sits on a text baseline with side bearings, so a 12 px glyph draws as about 6 px of ink. In the panel face it can come out as a dot, which is why the part fold already falls back to the system font. An SVG shape can run to the box's edges, and looks the same in every font and browser.</li>
+      <li><strong>The target is the box, and the box can grow into free space.</strong> The fold column is 50 × 40 px, but its button is 17 × 18 px. By Fitts's law a bigger target is quicker to hit, which matters on touch. It costs no layout space.</li>
+      <li><strong>The label belongs to the target.</strong> In the header, "Mixer" next to the arrow should be clickable too, as in a disclosure triangle in Finder or Logic's track list.</li>
+    </ul>
+    <div class="cards" id="arrowCards"></div>
+  </section>
+
+  <!-- ===================== 2. Values ===================== -->
+  <section>
+    <h2>2 · Mixer values</h2>
+    <p>Today every pot carries its value to its right, which makes each expanded column 70 px wide. With the numbers gone, a column only needs the 26 px dial plus a gap, so I've used 36 px. The readout has to go somewhere else:</p>
+    <ul class="notes">
+      <li><strong>Show the value at the control, while it moves.</strong> The eye is on the knob while you turn it, so that is where the number should appear. A readout somewhere else on screen makes you look away mid-gesture.</li>
+      <li><strong>Above, not beside.</strong> On touch the finger covers the knob and whatever sits to either side of it, so the readout goes above. That is the pattern of a phone keyboard's key preview.</li>
+      <li><strong>Say what it is.</strong> On a part three rows down, the column label is far away, so the bubble names the parameter: "Low cut 120 Hz".</li>
+      <li><strong>Reading without moving.</strong> Hovering for a moment shows the value without changing it. On touch, a press shows it straight away.</li>
+    </ul>
+
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Option">
+        <button id="m-today" data-mode="today" aria-pressed="false">Today</button>
+        <button id="m-bubble" data-mode="bubble" aria-pressed="true">A · Bubble (approved)</button>
+        <button id="m-header" data-mode="header" aria-pressed="false">B · Header readout</button>
+      </div>
+      <div class="seg" role="group" aria-label="Mixer">
+        <button id="x-col" data-exp="0" aria-pressed="false">Collapsed</button>
+        <button id="x-exp" data-exp="1" aria-pressed="true">Expanded</button>
+      </div>
+    </div>
+    <p class="option-note" id="modeNote"></p>
+    <div class="frame-wrap"><div class="frame" id="frame"></div></div>
+    <div class="metric" id="metric"></div>
+
+    <div class="open-q">
+      <div>
+        <h3>Header labels at 36 px</h3>
+        <p>Decided: "Level", "Pan", "→ A" and "→ B" at 9 px, and "Low cut" on two lines in the 22 px header, as shown.</p>
+      </div>
+      <div>
+        <h3>Collapsed strip</h3>
+        <p>Decided: the collapsed strip loses its number too, and its width drops from 114 px to 84 px. Its Level gets the same bubble.</p>
+      </div>
+      <div>
+        <h3>Automation locks</h3>
+        <p>Decided: with no value beside the dial, the AUTO tag moves into the bubble. The lit ring marks the lock at rest.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const NS = 'http://www.w3.org/2000/svg';
+  const TRI = '<path d="M4 2.5 L13.5 8 L4 13.5 Z" fill="currentColor"/>';
+  const CHEV = '<polyline points="5.5,2.5 11,8 5.5,13.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+  const svg = (shape, px) =>
+    `<svg width="${px}" height="${px}" viewBox="0 0 16 16" aria-hidden="true">${shape}</svg>`;
+
+  /* ---------- section 1 ---------- */
+  const VARIANTS = [
+    {
+      key: 'today', name: 'Today',
+      note: 'A font ▸ in a 22 px box (header) and a 17 × 18 px box (part fold). The ink is a few px across.',
+      head: (open) => `<button class="arrow today-head" aria-expanded="${open}" aria-label="Mixer strips">${open ? '▾' : '▸'}</button><span style="margin-left:6px">Mixer</span>`,
+      fold: (open) => `<button class="arrow today-fold" aria-expanded="${open}" aria-label="Automation">${open ? '▾' : '▸'}</button>${open ? '' : '<span class="badge">2</span>'}`,
+      rotate: false,
+    },
+    {
+      key: 'a', name: 'A · Fill the box',
+      note: 'The same boxes, with an SVG triangle drawn to their edges: 18 px in the header, 15 px on the row. It turns 90° to open.',
+      head: (open) => `<button class="arrow box-head" aria-expanded="${open}" aria-label="Mixer strips">${svg(TRI, 18)}</button><span style="margin-left:6px">Mixer</span>`,
+      fold: (open) => `<button class="arrow box-fold" aria-expanded="${open}" aria-label="Automation">${svg(TRI, 15)}</button>${open ? '' : '<span class="badge">2</span>'}`,
+    },
+    {
+      key: 'b', name: 'B · Chevron',
+      note: 'As A, drawn as a 2.4 px stroked chevron. Lighter on the page; at this size it reads a little less like a button.',
+      head: (open) => `<button class="arrow box-head" aria-expanded="${open}" aria-label="Mixer strips">${svg(CHEV, 18)}</button><span style="margin-left:6px">Mixer</span>`,
+      fold: (open) => `<button class="arrow box-fold" aria-expanded="${open}" aria-label="Automation">${svg(CHEV, 15)}</button>${open ? '' : '<span class="badge">2</span>'}`,
+    },
+    {
+      key: 'c', name: 'C · The whole cell', pick: true,
+      note: 'A\'s triangle, 20 px on the row, with the box grown to the free cell: the whole 50 × 40 px fold column, lane count beside the arrow, and arrow plus "Mixer" in the header. Hover lights the whole target.',
+      head: (open) => `<button class="arrow cell-head" aria-expanded="${open}" aria-label="Mixer strips">${svg(TRI, 18)}<span style="color:var(--ink-dim)">Mixer</span></button>`,
+      fold: (open) => `<button class="arrow cell-fold" aria-expanded="${open}" aria-label="Automation">${svg(TRI, 20)}${open ? '' : '<span class="badge">2</span>'}</button>`,
+      foldIsCell: true,
+    },
+  ];
+  const arrowState = {};
+  const stubKnob = () => knobSvg(0.5, 'var(--modulator)');
+
+  function specimen(v) {
+    const s = arrowState[v.key] || { head: false, fold: false };
+    const fold = v.foldIsCell
+      ? `<div class="fold-col" style="justify-content:center">${v.fold(s.fold)}</div>`
+      : `<div class="fold-col">${v.fold(s.fold)}</div>`;
+    return `<div class="spec-body">
+      <div class="mix-head">${v.head(s.head)}</div>
+      <div class="part-row"><div class="ptab">1</div>${fold}<div class="stub">${stubKnob()}<span class="ms"><span>M</span><span>S</span></span></div></div>
+    </div>`;
+  }
+
+  function renderCards() {
+    const host = document.getElementById('arrowCards');
+    host.innerHTML = VARIANTS.map((v) => `
+      <div class="card${v.pick ? ' pick' : ''}" data-key="${v.key}">
+        <div class="card-head"><h3>${v.name}</h3>${v.pick ? '<span class="tag">Approved</span>' : ''}</div>
+        <div class="spec"><div class="spec-label">actual size</div>${specimen(v)}</div>
+        <div class="spec zoom"><div class="spec-label" style="padding:0 4px">2.6× for inspection</div>${specimen(v)}</div>
+        <p>${v.note}</p>
+      </div>`).join('');
+    host.querySelectorAll('.card').forEach((card) => {
+      const key = card.dataset.key;
+      card.querySelectorAll('.mix-head .arrow').forEach((b) => b.addEventListener('click', () => toggleArrow(key, 'head')));
+      card.querySelectorAll('.fold-col .arrow').forEach((b) => b.addEventListener('click', () => toggleArrow(key, 'fold')));
+    });
+  }
+  function toggleArrow(key, which) {
+    const s = arrowState[key] || (arrowState[key] = { head: false, fold: false });
+    s[which] = !s[which];
+    renderCards();
+    document.querySelector(`.card[data-key="${key}"] .spec:not(.zoom) ${which === 'head' ? '.mix-head' : '.fold-col'} .arrow`)?.focus();
+  }
+
+  /* ---------- knobs ---------- */
+  const A0 = -135, A1 = 135, R = 10, C = 13;
+  const pt = (deg) => {
+    const a = (deg - 90) * Math.PI / 180;
+    return [C + R * Math.cos(a), C + R * Math.sin(a)];
+  };
+  const arc = (d0, d1) => {
+    if (Math.abs(d1 - d0) < 0.5) return '';
+    const [x0, y0] = pt(d0), [x1, y1] = pt(d1);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 ${d1 - d0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+  function knobSvg(n, color, bipolar) {
+    const deg = A0 + n * (A1 - A0);
+    const from = bipolar ? Math.min(0, deg) : A0;
+    const to = bipolar ? Math.max(0, deg) : deg;
+    const [px, py] = pt(deg);
+    const pin = [C + (px - C) * 0.65, C + (py - C) * 0.65];
+    return `<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" style="--kc:${color}">
+      <circle class="dial-face" cx="${C}" cy="${C}" r="${R - 2}"/>
+      <path class="dial-track" d="${arc(A0, A1)}"/>
+      <path class="dial-arc" d="${arc(from, to)}"/>
+      <line class="dial-pin" x1="${C}" y1="${C}" x2="${pin[0].toFixed(2)}" y2="${pin[1].toFixed(2)}"/>
+    </svg>`;
+  }
+
+  const LEVEL_MAX = 1.995;
+  const KNOBS = [
+    { key: 'level', label: 'Level', head: 'Level', color: 'var(--modulator)', def: 1 / LEVEL_MAX,
+      fmt: (n) => (n * LEVEL_MAX).toFixed(2), unit: () => '' },
+    { key: 'pan', label: 'Pan', head: 'Pan', color: 'var(--modulator)', def: 0.5, bipolar: true,
+      fmt: (n) => { const v = n * 2 - 1; return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); }, unit: () => '' },
+    { key: 'cut', label: 'Low cut', head: 'Low cut', color: 'var(--modulator)', def: 0,
+      fmt: (n) => String(Math.round(20 * Math.pow(25, n))),
+      bubble: (n) => `${Math.round(20 * Math.pow(25, n))} Hz` },
+    { key: 'a', label: 'Send A', head: '→ A', color: 'var(--return)', def: 0,
+      fmt: (n) => n.toFixed(2) },
+    { key: 'b', label: 'Send B', head: '→ B', color: 'var(--return)', def: 0,
+      fmt: (n) => n.toFixed(2) },
+  ];
+  const PARTS = [
+    { name: 'Harmony', color: '#86a3d6', regions: [[0, 4, 'Chords'], [4, 4, 'Chords'], [8, 8, 'Chords B']], cut: 0, sel: true },
+    { name: 'Acid A', color: '#e0a44e', regions: [[2, 6, 'Acid A'], [10, 6, 'Acid A']], cut: 0.45 },
+    { name: 'Kick', color: '#d2643c', regions: [[0, 16, 'Kick 4/4']], cut: 0.12 },
+    { name: 'Pad', color: '#cc7a9c', regions: [[4, 12, 'Pad wash']], cut: 0.62 },
+  ];
+  const values = PARTS.map((p) => KNOBS.map((k) => (k.key === 'cut' ? p.cut : k.def)));
+  values[0][3] = 0.22; values[1][3] = 0.4; values[3][4] = 0.55; values[1][1] = 0.38; values[3][1] = 0.66;
+
+  /* ---------- section 2: the lane block ---------- */
+  const SIZES = {
+    lead: 80, pad: 2, gap: 8, bar: 96, frame: 960,
+    today: { collapsed: 114, base: 135, col: 70 },
+    proposed: { collapsed: 84, base: 135, col: 36 },
+  };
+  const NOTES = {
+    today: 'Today: every pot has its value beside it, and each expanded column is 70 px wide.',
+    bubble: 'A · Bubble. Hover a knob for a moment, or press it, and its name and value appear above it, staying while you drag. Low cut reads in Hz. The bubble is anchored to the knob, so it stays put while the pointer moves.',
+    header: 'B · Header readout. The knob\'s column label turns into its value while you hover or drag, and nothing covers the timeline. On a part several rows down, the readout is a long way from your hand and eye. Collapsed, "Mixer" becomes the readout.',
+  };
+  const view = { mode: 'bubble', expanded: true, active: null };
+
+  function mixWidth() {
+    const s = view.mode === 'today' ? SIZES.today : SIZES.proposed;
+    return view.expanded ? s.base + KNOBS.length * s.col : s.collapsed;
+  }
+  const cols = () => {
+    const s = view.mode === 'today' ? SIZES.today : SIZES.proposed;
+    return `repeat(${KNOBS.length}, ${s.col - 4}px) 84px 47px`;
+  };
+
+  function headCell() {
+    const open = view.expanded;
+    const arrow = `<button class="arrow cell-head" id="mixToggle" aria-expanded="${open}" aria-label="Mixer strips" style="width:${open ? 22 : 78}px">${svg(TRI, 18)}${open ? '' : '<span id="mixWord" style="color:var(--ink-dim)">Mixer</span>'}</button>`;
+    let labels = '';
+    if (open) {
+      const narrow = view.mode !== 'today';
+      labels = `<div class="mix-labels${narrow ? ' narrow' : ''}" style="grid-template-columns:${cols()}">` +
+        KNOBS.map((k, i) => `<span class="ml" data-col="${i}">${k.head}</span>`).join('') +
+        `<span class="ml">Out</span><span class="corner">bar · beat</span></div>`;
+    } else {
+      labels = `<div class="mix-labels" style="display:flex;justify-content:flex-end"><span class="corner">bar · beat</span></div>`;
+    }
+    return `<div class="lead" style="padding-left:2px">${arrow}</div>${labels}`;
+  }
+
+  function knobHtml(pi, ki) {
+    const k = KNOBS[ki];
+    const n = values[pi][ki];
+    const val = view.mode === 'today' ? `<span class="val">${k.fmt(n)}</span>` : '';
+    return `<div class="knob" data-p="${pi}" data-k="${ki}" role="slider" tabindex="0" aria-label="${k.label} ${PARTS[pi].name}">${knobSvg(n, k.color, k.bipolar)}${val}</div>`;
+  }
+
+  function partCell(pi) {
+    const ms = '<span class="ms"><span>M</span><span>S</span></span>';
+    if (!view.expanded) return `<div class="mix-cell collapsed">${knobHtml(pi, 0)}${ms}</div>`;
+    return `<div class="mix-cell" style="grid-template-columns:${cols()}">` +
+      KNOBS.map((_, ki) => knobHtml(pi, ki)).join('') +
+      `<select class="out" aria-label="Output" tabindex="-1"><option>Master</option></select>${ms}</div>`;
+  }
+
+  function renderFrame() {
+    const frozen = SIZES.lead + mixWidth() + SIZES.pad;
+    const ruler = Array.from({ length: 16 }, (_, b) => `<span style="left:${b * SIZES.bar + 4}px">${b + 1}</span>`).join('');
+    let html = `<div class="lrow ruler"><div class="frozen" style="width:${frozen}px">${headCell()}</div><div class="tl">${ruler}</div></div>`;
+    PARTS.forEach((p, pi) => {
+      const regions = p.regions.map(([s, l, t]) =>
+        `<div class="region" style="--pc:${p.color};left:${s * SIZES.bar + 1}px;width:${l * SIZES.bar - 3}px">${t}</div>`).join('');
+      html += `<div class="lrow"><div class="frozen${p.sel ? ' sel' : ''}" style="width:${frozen}px">
+        <div class="lead"><div class="ptab" style="--pc:${p.color}">${pi + 1}</div>
+          <div class="fold-col" style="width:46px;margin-right:4px"><button class="arrow cell-fold" style="width:46px" aria-expanded="false" aria-label="Automation">${svg(TRI, 20)}${pi === 1 ? '<span class="badge">2</span>' : ''}</button></div></div>
+        ${partCell(pi)}</div><div class="tl">${regions}</div></div>`;
+    });
+    html += '<div class="bubble" id="bubble" hidden></div>';
+    const frame = document.getElementById('frame');
+    frame.innerHTML = html;
+    frame.querySelector('#mixToggle').addEventListener('click', () => setExpanded(!view.expanded, true));
+    frame.querySelectorAll('.knob').forEach(wireKnob);
+    renderMetric();
+  }
+
+  function renderMetric() {
+    const bars = (mix) => (SIZES.frame - SIZES.lead - mix - SIZES.pad - SIZES.gap - 6) / SIZES.bar;
+    const t = view.expanded ? SIZES.today.base + KNOBS.length * SIZES.today.col : SIZES.today.collapsed;
+    const p = view.expanded ? SIZES.proposed.base + KNOBS.length * SIZES.proposed.col : SIZES.proposed.collapsed;
+    const state = view.expanded ? 'Expanded' : 'Collapsed';
+    document.getElementById('metric').innerHTML =
+      `<span>${state} mixer column: <b>${t} px</b> today → <b>${p} px</b> without numbers <span class="gain">(−${t - p} px)</span></span>` +
+      `<span>Timeline in this 960 px frame: <b>${bars(t).toFixed(1)} bars</b> → <b>${bars(p).toFixed(1)} bars</b> at 96 px a bar</span>`;
+  }
+
+  /* ---------- readouts ---------- */
+  let hoverTimer = 0, hideTimer = 0;
+  const bubbleText = (k, n) => (k.bubble ? k.bubble(n) : k.fmt(n));
+
+  function showReadout(knob) {
+    const pi = +knob.dataset.p, ki = +knob.dataset.k;
+    const k = KNOBS[ki], n = values[pi][ki];
+    clearTimeout(hideTimer);
+    if (view.mode === 'bubble') {
+      const b = document.getElementById('bubble');
+      const frame = document.getElementById('frame').getBoundingClientRect();
+      const svgBox = knob.querySelector('svg').getBoundingClientRect();
+      b.innerHTML = `<small>${k.label}</small><span>${bubbleText(k, n)}</span>`;
+      b.style.left = `${svgBox.left - frame.left + svgBox.width / 2}px`;
+      b.style.top = `${svgBox.top - frame.top}px`;
+      b.hidden = false;
+    } else if (view.mode === 'header') {
+      clearHeader();
+      const text = bubbleText(k, n);
+      if (view.expanded) {
+        const cell = document.querySelector(`.mix-labels .ml[data-col="${ki}"]`);
+        if (cell) { cell.textContent = text; cell.classList.add('live'); }
+      } else {
+        const w = document.getElementById('mixWord');
+        if (w) { w.textContent = `${k.label} ${text}`; w.style.color = 'var(--carrier)'; w.style.letterSpacing = '0.04em'; }
+      }
+    }
+  }
+  function clearHeader() {
+    document.querySelectorAll('.mix-labels .ml.live').forEach((c) => {
+      c.classList.remove('live');
+      c.textContent = KNOBS[+c.dataset.col].head;
+    });
+    const w = document.getElementById('mixWord');
+    if (w) { w.textContent = 'Mixer'; w.style.color = 'var(--ink-dim)'; w.style.letterSpacing = ''; }
+  }
+  function hideReadout(delay) {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      const b = document.getElementById('bubble');
+      if (b) b.hidden = true;
+      clearHeader();
+    }, delay);
+  }
+
+  function redrawKnob(knob) {
+    const pi = +knob.dataset.p, ki = +knob.dataset.k;
+    const k = KNOBS[ki];
+    const n = values[pi][ki];
+    knob.querySelector('svg').outerHTML = knobSvg(n, k.color, k.bipolar);
+    const val = knob.querySelector('.val');
+    if (val) val.textContent = k.fmt(n);
+  }
+
+  function wireKnob(knob) {
+    let drag = null;
+    knob.addEventListener('pointerenter', () => {
+      if (view.mode === 'today') return;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => showReadout(knob), 350);
+    });
+    knob.addEventListener('pointerleave', () => {
+      clearTimeout(hoverTimer);
+      if (!drag) hideReadout(150);
+    });
+    knob.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      knob.setPointerCapture(e.pointerId);
+      clearTimeout(hoverTimer);
+      drag = { y: e.clientY, n: values[+knob.dataset.p][+knob.dataset.k] };
+      knob.classList.add('active');
+      if (view.mode !== 'today') showReadout(knob);
+    });
+    knob.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const scale = e.shiftKey ? 600 : 150;
+      const n = Math.min(1, Math.max(0, drag.n + (drag.y - e.clientY) / scale));
+      values[+knob.dataset.p][+knob.dataset.k] = n;
+      redrawKnob(knob);
+      if (view.mode !== 'today') showReadout(knob);
+    });
+    const end = () => {
+      if (!drag) return;
+      drag = null;
+      knob.classList.remove('active');
+      hideReadout(700);
+    };
+    knob.addEventListener('pointerup', end);
+    knob.addEventListener('pointercancel', end);
+    knob.addEventListener('dblclick', () => {
+      values[+knob.dataset.p][+knob.dataset.k] = KNOBS[+knob.dataset.k].def;
+      redrawKnob(knob);
+      if (view.mode !== 'today') { showReadout(knob); hideReadout(900); }
+    });
+    knob.addEventListener('focus', () => { if (view.mode !== 'today') showReadout(knob); });
+    knob.addEventListener('blur', () => hideReadout(0));
+  }
+
+  /* ---------- controls ---------- */
+  function setMode(mode) {
+    view.mode = mode;
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+    document.getElementById('modeNote').textContent = NOTES[mode];
+    renderFrame();
+  }
+  function setExpanded(open, focusToggle) {
+    view.expanded = open;
+    document.querySelectorAll('[data-exp]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.exp === '1') === open)));
+    renderFrame();
+    if (focusToggle) document.getElementById('mixToggle')?.focus();
+  }
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  document.querySelectorAll('[data-exp]').forEach((b) => b.addEventListener('click', () => setExpanded(b.dataset.exp === '1')));
+
+  renderCards();
+  setMode('bubble');
+})();
+</script>
+</html>

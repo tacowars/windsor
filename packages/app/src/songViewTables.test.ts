@@ -234,19 +234,27 @@ describe('the one frozen column (windsor#534)', () => {
     expect(timelineLeftCss(2.5)).toBe('calc(var(--frozen) + var(--gap) + var(--bar) * 2.5)');
   });
 
-  it('is the tab, ▸ and the strip, and gives the timeline back 64 px', () => {
+  it('is the tab, the fold and the strip, and gives the timeline back 94 px', () => {
     expect(mixerLeadPx()).toBe(80);
-    expect(frozenColumnPx(false, KNOBS)).toBe(196);
+    expect(frozenColumnPx(false, KNOBS)).toBe(166);
     const left = frozenColumnPx(false, KNOBS) + SONG_VIEW.laneGapPx;
-    expect(TWO_COLUMNS_LEFT_PX - left).toBe(64);
+    expect(TWO_COLUMNS_LEFT_PX - left).toBe(94);
   });
 
-  it('ends the strip at S, with no lights after it (windsor#554)', () => {
-    expect(SONG_VIEW.mixerWidthPx).toBe(114);
+  it('draws no number beside a pot, collapsed or expanded (windsor#768 decision 8)', () => {
+    expect(SONG_VIEW.mixerWidthPx).toBe(84);
+    expect(SONG_VIEW.mixerKnobColumnPx).toBe(36);
     expect(SONG_VIEW.mixerExpandedBasePx).toBe(135);
+    // 485 px before, so the timeline gains 170 px: about 1.8 bars at the default zoom.
+    expect(mixerColumnPx(true, KNOBS)).toBe(315);
+    // A column holds the compact dial and its padding, with the grid's gap after it.
+    const knobPx =
+      knobGeometry({ compact: true }).size + 2 * cssWordPx('.knob.compact', 'padding', 1);
+    const gapPx = cssWordPx('.mix-cell.expanded', 'column-gap', 0);
+    expect(knobPx + gapPx).toBe(SONG_VIEW.mixerKnobColumnPx);
   });
 
-  it('grows by the strip’s knob columns when ▸ Mixer expands it (windsor#158)', () => {
+  it('grows by the strip’s knob columns when the Mixer arrow expands it (windsor#158)', () => {
     expect(mixerColumnPx(false, KNOBS)).toBe(SONG_VIEW.mixerWidthPx);
     expect(mixerColumnPx(true, KNOBS)).toBe(
       SONG_VIEW.mixerExpandedBasePx + KNOBS * SONG_VIEW.mixerKnobColumnPx,

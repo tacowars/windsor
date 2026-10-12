@@ -9,9 +9,9 @@
  * - **the head**: the mixer's header with the ruler's "bar · beat", and
  *   "loop", beside the ruler and the loop strip;
  * - **HARMONY · chords**, beside the harmony lane;
- * - **a part**: its number tab in its colour, its row (`▸`, the lane badge,
- *   its mixer strip), and while it is folded open a label per automation
- *   lane and the add row; beside them its lane of regions, its curves and
+ * - **a part**: its number tab in its colour, its row (the fold with the
+ *   lane badge, its mixer strip), and while it is folded open a label per
+ *   automation lane and the add row; beside them its lane of regions, its curves and
  *   the add row's empty stretch.
  *
  * - **a group** (windsor#615): its folder header (`songGroupRow.ts`) beside
@@ -51,8 +51,8 @@ const CONTROLS = 'button, select, input, .knob';
 /**
  * Set the column's sizes on the lanes as custom properties, from the
  * table: what `console.css` lays the blocks out with. `expanded` is
- * whether ▸ Mixer shows every strip's knobs (windsor#158), which widens
- * the column and moves the timeline right (decision 6).
+ * whether the Mixer arrow shows every strip's knobs (windsor#158), which
+ * widens the column and moves the timeline right (decision 6).
  */
 export function sizeLaneColumn(lanes: HTMLElement, expanded: boolean): void {
   const px: Readonly<Record<string, number>> = {
