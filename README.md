@@ -4,9 +4,10 @@ A browser-based sequencer and DAW built on a custom four-operator FM engine:
 
 - **Synthesis:** FM, harmonic waveforms and subtractive filtering in
   AudioWorklets.
-- **Sequencers:** Euclidean, grid, chord, arpeggiator, bass/drone, figure
-  and piano roll, driven by a harmony timeline. Bounce to Roll turns a
-  generated part into notes you can edit.
+- **Sequencers:** Euclidean, grid, chord, arpeggiator, bass/drone and
+  figure, driven by a harmony timeline, and a piano roll whose notes keep
+  their pitch. Bounce to Roll turns a generated part into notes you can
+  edit.
 - **Mixer:** channel strips with up to eight inserts each (compressor,
   classic and advanced drive, tape, filter, parametric EQ, chorus, ensemble,
   phaser, dub delay, echo, plate and retro reverbs, and bloom, a harmonic
