@@ -6,7 +6,7 @@
  * multi-tap delay, the figure-of-eight tank and the output taps
  * (`_renderBlock`, the taps' reads written out: `reverbTapTables.ts`, windsor#766), with the sleep bookkeeping (#547) at its end. The input
  * is stereo (windsor#763): L runs through lines 0..3 and R through lines
- * 12..15, at the same pre-delay, filter coefficients and diffusions, so a
+ * 12..15, both written out, at the same pre-delay, filter coefficients and diffusions, so a
  * panned source keeps its side. Build (windsor#761, `plateBuild.ts`) writes
  * each chain's diffused sample into its own line and reads one side's taps
  * back from each, linear between samples: L's sum feeds the right loop (line
@@ -23,7 +23,13 @@
  * (`plateLowBand.ts`) each point is its first-order shelf, written out here at
  * all eight points: no helper is called per sample (worklet rule 6, fix round
  * 2 of PR windsor#750), and `mixer/reverbLowBand.test.ts` reads the sample
- * loop's calls off the bundle. `_renderBlock` stays one function read top to bottom --
+ * loop's calls off the bundle. The voicing (windsor#746, `plateVoicing.ts`)
+ * picks the rows the loop reads: the output taps' lines and signed gains,
+ * their trim, Build's table and the input lines' lengths, swapped at a block
+ * boundary; while a switch ducks, `voicingBlock` hands the block the
+ * parameters as they stood, and the duck's gain on the tank's feed and the
+ * wet output is ramped a sample at a time here, written out
+ * (`mixer/reverbVoicing.test.ts`). `_renderBlock` stays one function read top to bottom --
  * its stages' order is the algorithm. Both are functions over the
  * processor, installed on its prototype by `reverbProcessor.ts`, so each body
  * is the method it was in the hand-written `reverb-processor.js`, line for
@@ -37,13 +43,7 @@
  * behaviour, and `mixer/reverbAllocation.test.ts` its allocation on V8.
  */
 
-import {
-  FIRST_TANK_LINE,
-  LINE_COUNT,
-  SLEEP_OUTPUT_FLOOR,
-  SMOOTH_SECONDS,
-  TANK_LINE_END,
-} from './reverbConstants';
+import { LINE_COUNT, SLEEP_OUTPUT_FLOOR, SMOOTH_SECONDS } from './reverbConstants';
 import { configureBuild } from './plateBuild';
 import { poleCoefficients } from './platePoles';
 import { BUILD_TAPS_PER_SIDE } from './reverbBuildTables';
@@ -51,7 +51,8 @@ import type { DattorroReverb } from './reverbProcessor';
 import { configureGains } from './tankGains';
 import { configureModulation, MOD_DRAWS } from './plateModulation';
 import { MOD_DRAW_LENGTH, MOD_HALF, MOD_WIDTH_MIN } from './reverbModulationTables';
-import { OUTPUT_TRIM, TAP_GAIN, TAP_LINE, TAP_TIME, TAPS_PER_SIDE } from './reverbTapTables';
+import { TAPS_PER_SIDE } from './reverbTapTables';
+import { DUCK_IDLE, endVoicingBlock, voicingBlock } from './plateVoicing';
 
 /* eslint-disable-next-line max-lines-per-function -- Block-rate setup and
    the tank are one unit. The tank itself is eleven all-pass and delay stages
@@ -64,10 +65,15 @@ function _renderBlock(
   this: DattorroReverb,
   inputs: Float32Array[][],
   outputs: Float32Array[][],
-  parameters: Record<string, Float32Array>,
+  live: Record<string, Float32Array>,
 ): boolean {
   const output = outputs[0];
-  const wet = parameters.wet[0] * OUTPUT_TRIM;
+  // The voicing (windsor#746, `plateVoicing.ts`): the row the tank reads and
+  // its duck. While the duck goes down, the block renders with every
+  // parameter as it stood before the change.
+  const parameters = voicingBlock(this, live);
+  const trim = this._outputTrim;
+  const wet = parameters.wet[0] * trim;
   const held = parameters.hold[0] >= 0.5;
   const input = inputs[0] ?? [];
 
@@ -140,7 +146,9 @@ function _renderBlock(
   const writes = this._write;
   const masks = this._mask;
   const lengths = this._length;
+  const leftReads = this._leftReads;
   const rightReads = this._rightReads;
+  let first: number;
   let line: Float32Array;
   let v: number;
   const buildMask = this._buildMask;
@@ -155,8 +163,16 @@ function _renderBlock(
   let position: number;
   let whole: number;
   let a: number;
-  // The output taps' delays in samples, read in the loop below.
+  // The output taps' delays in samples, and the voicing's lines and signed
+  // gains, read in the loop below.
   const taps = this._tap;
+  const tapLines = this._tapLine;
+  const tapGains = this._tapGain;
+  // The duck's gain on the tank's feed and the wet output, ramped a sample at
+  // a time while a switch of voicing runs.
+  const ducking = this._duckState !== DUCK_IDLE;
+  const duckStep = this._duckStep;
+  let duck = this._duck;
 
   const stepping = this._stepping || !this._settledSkip;
   // Each modulation point's source, written out below.
@@ -185,50 +201,36 @@ function _renderBlock(
     this._inputHpRight += inputHp * (this._inputLpRight - this._inputHpRight);
     const shapedRight = this._inputLpRight - this._inputHpRight;
 
-    // Pre-tank, L's chain (lines 0..3): four all-passes, the first pair at
-    // diffusion 1, second at 2. Each read leaves its sample in `_value`, and
-    // `_write1` stores `_value`; every expression is the one the returning
-    // reads were summed in.
-    this._read(0, 0);
-    this._value = shaped - diffuse1 * this._value;
-    this._write1(0);
-    let pre = this._value;
-    this._read(1, 0);
-    let first = this._value;
-    this._read(0, 0);
-    this._value = diffuse1 * (pre - first) + this._value;
-    this._write1(1);
-    pre = this._value;
-    this._read(1, 0);
-    first = this._value;
-    this._read(2, 0);
-    this._value = diffuse1 * pre + first - diffuse2 * this._value;
-    this._write1(2);
-    pre = this._value;
-    this._read(3, 0);
-    first = this._value;
-    this._read(2, 0);
-    this._value = diffuse2 * (pre - first) + this._value;
-    this._write1(3);
-    pre = this._value;
-
-    this._read(3, 0);
-    // L's diffused sample into its Build line.
-    buildLine[buildWrite] = diffuse2 * pre + this._value;
-
-    // R's chain (lines 12..15): the same four all-passes at the same
-    // diffusions, on lines of their own lengths (INPUT_DELAYS_RIGHT). Its
-    // reads are written out, not called: each line is read once, linear
-    // between samples as `_read` reads it, since a line's sample is not
-    // written before both its reads (its length is over one sample), and the
-    // stages are L's expressions on those reads.
+    // Pre-tank, both chains (L's lines 0..3, R's 12..15, of the voicing's
+    // lengths): four all-passes each, the first pair at diffusion 1, the
+    // second at 2. The reads are written out, not called: each line is read
+    // once, linear between samples as `_read` reads it, since a line's sample
+    // is not written before both its reads (its length is over one sample),
+    // and the stages are the expressions the hand-written file summed its
+    // returning reads in. L's chain went from `_read` and `_write1` to this
+    // form with windsor#746, to the bit.
     for (let k = 0; k < 4; k++) {
+      line = buffers[k];
+      position = writes[k] - lengths[k];
+      whole = Math.floor(position);
+      a = line[whole & masks[k]];
+      leftReads[k] = a + (line[(whole + 1) & masks[k]] - a) * (position - whole);
       line = buffers[k + 12];
       position = writes[k + 12] - lengths[k + 12];
       whole = Math.floor(position);
       a = line[whole & masks[k + 12]];
       rightReads[k] = a + (line[(whole + 1) & masks[k + 12]] - a) * (position - whole);
     }
+    v = shaped - diffuse1 * leftReads[0];
+    buffers[0][writes[0]] = v;
+    v = diffuse1 * (v - leftReads[1]) + leftReads[0];
+    buffers[1][writes[1]] = v;
+    v = diffuse1 * v + leftReads[1] - diffuse2 * leftReads[2];
+    buffers[2][writes[2]] = v;
+    v = diffuse2 * (v - leftReads[3]) + leftReads[2];
+    buffers[3][writes[3]] = v;
+    // Each chain's diffused sample into its Build line.
+    buildLine[buildWrite] = diffuse2 * v + leftReads[3];
     v = shapedRight - diffuse1 * rightReads[0];
     buffers[12][writes[12]] = v;
     v = diffuse1 * (v - rightReads[1]) + rightReads[0];
@@ -259,9 +261,15 @@ function _renderBlock(
       buildRight +=
         (a + (buildLineRight[(whole + 1) & buildMask] - a) * (position - whole)) * buildGain[t];
     }
+    // The duck (`plateVoicing.ts`), written out: down to 0 or up to 1, and
+    // held there, on the feed and on the wet output alike.
+    if (ducking) {
+      duck += duckStep;
+      duck = duck < 0 ? 0 : duck > 1 ? 1 : duck;
+    }
     this._denormal = -this._denormal;
-    const splitLeft = buildRight + this._denormal;
-    const splitRight = buildLeft + this._denormal;
+    const splitLeft = buildRight * duck + this._denormal;
+    const splitRight = buildLeft * duck + this._denormal;
 
     // The modulation (`plateModulation.ts`): each point's smoothed noise, one
     // drawn knot to the next along 3a² − 2a³, and its excursion. At a knot the
@@ -410,30 +418,31 @@ function _renderBlock(
     // out, never called (windsor#766), as R's chain is.
     let left = 0;
     for (let t = 0; t < TAPS_PER_SIDE; t++) {
-      const tapLine = TAP_LINE[t];
+      const tapLine = tapLines[t];
       line = buffers[tapLine];
       position = writes[tapLine] - taps[t];
       whole = Math.floor(position);
       a = line[whole & masks[tapLine]];
-      left += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
+      left += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * tapGains[t];
     }
     let right = 0;
-    for (let t = TAPS_PER_SIDE; t < TAP_TIME.length; t++) {
-      const tapLine = TAP_LINE[t];
+    for (let t = TAPS_PER_SIDE; t < taps.length; t++) {
+      const tapLine = tapLines[t];
       line = buffers[tapLine];
       position = writes[tapLine] - taps[t];
       whole = Math.floor(position);
       a = line[whole & masks[tapLine]];
-      right += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
+      right += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * tapGains[t];
     }
     // Build's direct path: each input's tap sum on its own side, ahead of the tail.
     left += buildLeft * direct;
     right += buildRight * direct;
 
-    output[0][i] += left * wet;
-    output[1][i] += right * wet;
+    output[0][i] += left * wet * duck;
+    output[1][i] += right * wet * duck;
     if (inputQuiet) {
-      const magnitude = Math.max(Math.abs(left), Math.abs(right)) * OUTPUT_TRIM;
+      // Read at wet 1 and before the duck, so a ducked tail is not taken for silence.
+      const magnitude = Math.max(Math.abs(left), Math.abs(right)) * trim;
       if (magnitude > loudest) loudest = magnitude;
     }
 
@@ -457,10 +466,11 @@ function _renderBlock(
       this._write[line] = (this._write[line] + 1) & this._mask[line];
     }
     if (stepping) {
-      for (let line = FIRST_TANK_LINE; line < TANK_LINE_END; line++) {
+      // Every line: the room voicing's input lines follow Size too (windsor#746).
+      for (let line = 0; line < LINE_COUNT; line++) {
         this._length[line] += this._lengthStep[line];
       }
-      for (let t = 0; t < TAP_TIME.length; t++) {
+      for (let t = 0; t < taps.length; t++) {
         this._tap[t] += this._tapStep[t];
       }
     }
@@ -469,6 +479,8 @@ function _renderBlock(
   if (band) this._seedBand = false;
   this._buildWrite = buildWrite;
   this._preDelayWrite = (this._preDelayWrite + 128) % this._preDelayLength;
+  this._duck = duck;
+  endVoicingBlock(this);
 
   if (inputQuiet && loudest <= SLEEP_OUTPUT_FLOOR) this._quiet += 128;
   else this._quiet = 0;

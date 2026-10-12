@@ -33,12 +33,14 @@ const blockAt = (seconds: number): number => Math.round((seconds * SR) / BLOCK);
 
 /**
  * The recirculation span: the longest tank line at MAX_SIZE plus the longest
- * pre-delay, plus Build's longest tap (windsor#761).
+ * pre-delay, plus either input chain at its longest and Build's longest tap,
+ * in whichever voicing holds them longer (windsor#761, windsor#746).
  */
 const recirculationSamples = (): number =>
   (Math.max(...topology.tankDelays) * topology.maxSize +
     topology.maxPreDelay +
-    topology.buildSpread) *
+    topology.inputSpan +
+    topology.buildLineSpread) *
   SR;
 
 /** Records the first block after which the plate reports asleep, or -1. */

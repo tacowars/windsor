@@ -205,17 +205,19 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 13 since windsor#764 (the plate's
- * `modRate` and `modDepth` now drive four irregular sources, and `modDepth`
- * is each point's peak excursion), after 12 (windsor#761: the plate's
- * `build`, which changes how every plate renders) and 11 (windsor#748: the
- * plate's `decay` is an RT60 in seconds, with `lowDecay` and `lowCross`, and
- * the Plate insert's Mix is equal-power). There is no upgrade to 11, 12 or
- * 13, so every earlier version is refused (record
- * `2026-09-28-format-versions-refuse-never-destroy`); `SONG_MIGRATIONS`
- * still carries the steps 5 → 6 to 9 → 10, which no longer reach this one.
+ * A document's document-format version: 14 since windsor#746 (the plate's
+ * `voicing`, whose plate row's shorter input diffusers change how every
+ * plate renders), after 13 (windsor#764: the plate's `modRate` and
+ * `modDepth` drive four irregular sources, and `modDepth` is each point's
+ * peak excursion), 12 (windsor#761: the plate's `build`, which changes how
+ * every plate renders) and 11 (windsor#748: the plate's `decay` is an RT60
+ * in seconds, with `lowDecay` and `lowCross`, and the Plate insert's Mix is
+ * equal-power). There is no upgrade to 11, 12, 13 or 14, so every earlier
+ * version is refused (record `2026-09-28-format-versions-refuse-never-destroy`);
+ * `SONG_MIGRATIONS` still carries the steps 5 → 6 to 9 → 10, which no
+ * longer reach this one.
  */
-export const ARRANGEMENT_VERSION = 13;
+export const ARRANGEMENT_VERSION = 14;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

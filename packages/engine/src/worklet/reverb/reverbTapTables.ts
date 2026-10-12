@@ -1,8 +1,10 @@
 /**
  * The plate's output taps (windsor#766): Windsor's own table, replacing
- * Dattorro's table 2. Import-free and scope-free: nothing here reads
- * `sampleRate`. The tank's sample loop reads every tap (`tank.ts`), and
- * `_applySize` (`delayLines.ts`) scales each time by Size, as table 2's were.
+ * Dattorro's table 2, and since windsor#746 the plate voicing's
+ * (`reverbVoicingTables.ts`; the room voicing's are `reverbRoomTables.ts`).
+ * Import-free and scope-free: nothing here reads `sampleRate`. The tank's
+ * sample loop reads the playing voicing's taps (`tank.ts`), and `_applySize`
+ * (`delayLines.ts`) scales each time by Size, as table 2's were.
  *
  * Each tap is a delay in seconds at Size 1, read back from where its line is
  * written, linear between samples; the line it reads (4 to 11, the tank); and
@@ -69,9 +71,10 @@ const OUTPUT_TRIM = 0.4781;
 /**
  * The trim Build's direct path keeps: `main`'s output trim, from before the
  * new taps. The tank adds each side's Build sum into its tap sum before both
- * are scaled by the wet level and OUTPUT_TRIM, so `plateBuild.ts` aims the
- * direct level at BUILD_DIRECT_TRIM / OUTPUT_TRIM of its row, once a block:
- * the burst ahead of the tail keeps its old gain while the taps' trim moves.
+ * are scaled by the wet level and the playing voicing's trim (OUTPUT_TRIM
+ * here, ROOM_OUTPUT_TRIM in the room), so `plateBuild.ts` aims the direct
+ * level at BUILD_DIRECT_TRIM over that trim, once a block: the burst ahead of
+ * the tail keeps its old gain while the taps' trim moves, in either voicing.
  */
 const BUILD_DIRECT_TRIM = 0.6;
 

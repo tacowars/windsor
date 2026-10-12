@@ -23,7 +23,8 @@ import {
   DELAY_MAX_SECONDS,
 } from '../audioConstants';
 import { REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
-import type { ReverbSpace } from './reverbSpace';
+import type { PlateVoicing, ReverbSpace } from './reverbSpace';
+import { VOICING_PARAM } from './reverbSpace';
 import { tanhCurve } from './tanhCurve';
 
 /** What the delay loop is set by: the echo return's and the Echo insert's shared fields. */
@@ -153,9 +154,17 @@ export function createPlate(
   });
   const now = context.currentTime;
   for (const [name, value] of Object.entries({ ...space, ...mix })) {
-    plate.parameters.get(name)?.setValueAtTime(value, now);
+    plate.parameters.get(name)?.setValueAtTime(plateParamValue(name, value), now);
   }
   return plate;
+}
+
+/**
+ * A field's value as the plate's param of its name reads it: `voicing` as
+ * its number (windsor#746, `VOICING_PARAM`), every other field as it is.
+ */
+function plateParamValue(name: string, value: number | PlateVoicing): number {
+  return name === 'voicing' ? VOICING_PARAM[value as PlateVoicing] : (value as number);
 }
 
 /** Param writes onto the plate: any space field, `wet` or `dry`; an absent one is left as it is. */
@@ -165,6 +174,6 @@ export function writePlate(
 ): void {
   for (const [param, value] of Object.entries(values)) {
     const target = plate.parameters.get(param);
-    if (target && value !== undefined) target.value = value as number;
+    if (target && value !== undefined) target.value = plateParamValue(param, value);
   }
 }

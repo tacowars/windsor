@@ -10,6 +10,8 @@
  * Node-only, by design: excluded from the engine's tsc build (see
  * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
+import type { PlateVoicing, ReverbSpace } from '../mixer/reverbSpace';
+import { VOICING_PARAM } from '../mixer/reverbSpace';
 import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 
 const SAMPLE_RATE = 48000;
@@ -71,6 +73,29 @@ export interface ReverbTopology {
   tapLine: number[];
   tapGain: number[];
   tapsPerSide: number;
+  /**
+   * The voicings (windsor#746): each row's tables as the tank reads them, 0
+   * the plate and 1 the room; the longest Build tap in either, which the
+   * Build lines hold; and the longest either input chain holds a sample,
+   * seconds, which the sleep span counts.
+   */
+  voicings: VoicingRow[];
+  buildLineSpread: number;
+  inputSpan: number;
+}
+
+/** One voicing's tables (`worklet/reverb/reverbVoicingTables.ts`). */
+export interface VoicingRow {
+  /** L's four diffusers then R's, seconds (at Size 1 where they follow Size). */
+  inputDelays: Float64Array;
+  inputFollowsSize: boolean;
+  buildTapTime: Float64Array;
+  buildGainRows: Float64Array[];
+  buildDirectRows: Float64Array;
+  tapTime: Float64Array;
+  tapLine: Int32Array;
+  tapGain: Float64Array;
+  outputTrim: number;
 }
 
 export interface LoadedReverb {
@@ -112,6 +137,9 @@ export function loadReverb(sampleRate = SAMPLE_RATE): LoadedReverb {
       tapLine: TAP_LINE,
       tapGain: TAP_GAIN,
       tapsPerSide: TAPS_PER_SIDE,
+      voicings: VOICING_ROWS,
+      buildLineSpread: BUILD_LINE_SPREAD,
+      inputSpan: INPUT_SPAN,
     };`,
   });
 
@@ -174,6 +202,14 @@ export interface ReverbInternals {
   _modOffset: Float64Array;
   _modDepth: Float64Array;
   _modCursor: Int32Array;
+  /**
+   * The voicing (windsor#746): the row playing (0 plate, 1 room), its output
+   * taps' lines, and the duck's gain and state (0 none, 1 down, 2 up).
+   */
+  _voicing: number;
+  _tapLine: Int32Array;
+  _duck: number;
+  _duckState: number;
 }
 
 /** White-box access to one processor's delay lines. */
@@ -283,6 +319,19 @@ export function renderReverb(
   }
 
   return { samples, trace, peak, nonFinite, maxStep, stereo };
+}
+
+/**
+ * A space's fields as the processor's parameters: `voicing` as its number
+ * (windsor#746, `VOICING_PARAM`), every other field as it is, the way
+ * `writePlate` writes them.
+ */
+export function spaceParams(space: Partial<ReverbSpace>): Record<string, number> {
+  const params: Record<string, number> = {};
+  for (const [name, value] of Object.entries(space)) {
+    params[name] = name === 'voicing' ? VOICING_PARAM[value as PlateVoicing] : (value as number);
+  }
+  return params;
 }
 
 /** Seconds until the trace falls to `floor` of its peak; the render length if never. */

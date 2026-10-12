@@ -19,6 +19,7 @@ import {
   noiseBurst,
   renderReverb,
   rmsAt,
+  spaceParams,
   t30,
 } from '../__fixtures__/reverbHarness';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
@@ -34,7 +35,7 @@ const OPEN = { tankLowCut: 10, tankHighCut: 20000, modDepth: 0, lowDecay: 1 };
 
 /** The broadband T30 of an impulse into the plate at `params`, rendered for `seconds` after it. */
 function measure(params: Partial<ReverbSpace>, seconds: number): number {
-  const { samples } = renderReverb(loaded, seconds + 0.5, impulseAt(SETTLE), params, {
+  const { samples } = renderReverb(loaded, seconds + 0.5, impulseAt(SETTLE), spaceParams(params), {
     collectSamples: true,
   });
   const from = SETTLE * BLOCK;

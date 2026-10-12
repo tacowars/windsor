@@ -181,7 +181,9 @@ describe('ENSEMBLE_KNOBS (#695)', () => {
 
 describe('PLATE_REVERB_KNOBS (windsor#171)', () => {
   it("covers every plate number, spanning the plate's ranges from DEFAULT_PLATE_REVERB", () => {
-    const fields = INSERT_KINDS.plate.fields.filter((f) => f !== 'kind' && f !== 'enabled');
+    // The voicing (windsor#746) is a switch, not a number.
+    const notKnobs = ['kind', 'enabled', 'voicing'];
+    const fields = INSERT_KINDS.plate.fields.filter((f) => !notKnobs.includes(f));
     expect(PLATE_REVERB_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of PLATE_REVERB_KNOBS) {
       expect(o.def, f).toBe(DEFAULT_PLATE_REVERB[f]);

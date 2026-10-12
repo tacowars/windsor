@@ -11,7 +11,9 @@
  * windsor#761 Build at 0 and at 1 and moved with HOLD, and since
  * windsor#763 a click on L alone, on R alone and in anti-phase, and since
  * windsor#764 the modulation at its deepest and fastest and a tone held under
- * HOLD for ten seconds while all four points move) plus the
+ * HOLD for ten seconds while all four points move, and since windsor#746 the
+ * room voicing's impulse and Size glide and a switch of voicing with a tail
+ * ringing, each way) plus the
  * sleep path (#547) -- a tail that falls asleep, and one that is woken -- is
  * rendered in three paths and hashed against `__fixtures__/reverbGolden.json`:
  * the default, `sleep: false` and `settledSkip: false`. The settled-SIZE skip
@@ -223,6 +225,35 @@ const SCENARIOS: Record<string, () => Scenario> = {
     feed: tone220(blockAt(1)),
     automate: (block, values) => {
       values.hold![0] = block >= blockAt(0.9) ? 1 : 0;
+    },
+  }),
+  // The voicing (windsor#746): an impulse into the room, the room's input
+  // lines gliding with Size, and a switch with a tail ringing each way: the
+  // duck, the snapshot, the swap at silence and the fade back in.
+  'room-impulse': () => ({ seconds: 3, feed: impulse, params: { voicing: 1 } }),
+  'room-size-glide': () => ({
+    seconds: 2,
+    feed: clicks(blockAt(0.3)),
+    params: { voicing: 1 },
+    automate: (block, values) => {
+      values.size![0] = block < blockAt(0.5) ? 1 : block < blockAt(1) ? 3 : 0.3;
+    },
+    visits: 'settled and stepping',
+  }),
+  'switch-to-room': () => ({
+    seconds: 3,
+    feed: noiseBurst(0.5),
+    params: { decay: 10, voicing: 0 },
+    automate: (block, values) => {
+      values.voicing![0] = block < blockAt(1) ? 0 : 1;
+    },
+  }),
+  'switch-to-plate': () => ({
+    seconds: 3,
+    feed: noiseBurst(0.5),
+    params: { decay: 10, voicing: 1 },
+    automate: (block, values) => {
+      values.voicing![0] = block < blockAt(1) ? 1 : 0;
     },
   }),
   'wet-late': () => ({

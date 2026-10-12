@@ -1,7 +1,14 @@
-import { DEFAULT_PLATE_REVERB, SPACES, SPACE_NAMES, plateSpace } from '@windsor/engine';
+import {
+  DEFAULT_PLATE_REVERB,
+  SPACES,
+  SPACE_NAMES,
+  makeArrangement,
+  plateSpace,
+} from '@windsor/engine';
+import { KICK, song } from '@windsor/engine/__fixtures__/documentCases';
 import { describe, expect, it } from 'vitest';
 import { TEMPO_DIVISIONS } from './mixerTables';
-import { matchingSpace, tempoMatches, tempoSeconds } from './returnControls';
+import { VOICING_OPTIONS, matchingSpace, tempoMatches, tempoSeconds } from './returnControls';
 
 describe('matchingSpace', () => {
   it('names every shipped space from its own numbers', () => {
@@ -25,6 +32,28 @@ describe('matchingSpace', () => {
 
   it('matches nothing for no space', () => {
     expect(matchingSpace(undefined)).toBeUndefined();
+  });
+});
+
+describe('VOICING_OPTIONS (windsor#746)', () => {
+  it('offers Plate then Room, each a voicing a song keeps, and starts on the plate', () => {
+    expect(VOICING_OPTIONS.map((o) => o.label)).toEqual(['Plate', 'Room']);
+    expect(VOICING_OPTIONS[0]!.value).toBe(DEFAULT_PLATE_REVERB.voicing);
+    for (const { value } of VOICING_OPTIONS) {
+      const plate = { ...DEFAULT_PLATE_REVERB, voicing: value };
+      const result = makeArrangement({ ...song([KICK]), returns: { a: { inserts: [plate] } } });
+      expect(
+        result.corrections.filter((c) => c.includes('voicing')),
+        value,
+      ).toEqual([]);
+      expect(result.document.returns?.a?.inserts[0], value).toMatchObject({ voicing: value });
+    }
+  });
+
+  it('leaves a space flipped to the room matching no starting point, and the plate one its own', () => {
+    const hall = plateSpace(DEFAULT_PLATE_REVERB);
+    expect(matchingSpace(hall)).toBe('hall');
+    expect(matchingSpace({ ...hall, voicing: 'room' })).toBeUndefined();
   });
 });
 

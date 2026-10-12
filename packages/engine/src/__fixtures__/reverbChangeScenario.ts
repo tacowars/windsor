@@ -4,7 +4,7 @@
  * changed every `period` quanta (a SIZE glide each way, HOLD on and off, the
  * decay, the low band on and off and its crossover (windsor#748), the
  * filters, the modulation, the pre-delay, the diffusions, Build
- * (windsor#761), wet and dry), then silence at a short decay until the plate falls asleep, `asleep`
+ * (windsor#761), the voicing (windsor#746), wet and dry), then silence at a short decay until the plate falls asleep, `asleep`
  * quanta asleep, and the noise again, which wakes it. The probe imports it by
  * path in its child Node, which runs it directly (its types are stripped), so
  * it imports nothing at run time.
@@ -55,6 +55,9 @@ const TOGGLES: [string, number][] = [
   ['diffusionIn1', 0.5],
   ['diffusionIn2', 0.4],
   ['build', 1],
+  // The voicing (windsor#746): each toggle ducks, swaps the rows at silence
+  // and fades back in, over the next quanta.
+  ['voicing', 1],
   ['diffusionTank1', 0.8],
   ['diffusionTank2', 0.8],
   ['lowCross', 2000],
