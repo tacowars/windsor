@@ -14,7 +14,8 @@ import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { DEFAULT_FILTER } from '../inserts/filterSpec';
 import type { InsertSpec } from '../inserts/insertRegistry';
 import { makeArrangement } from './arrangementDocument';
-import { upgradeSong } from './songMigrations';
+import { PATCH_MIGRATIONS } from '../patch/patchMigrations';
+import { SONG_MIGRATIONS, upgradeSong } from './songMigrations';
 
 const FILTER = { ...DEFAULT_FILTER, id: 'filt1' } as InsertSpec;
 const END = 384;
@@ -31,16 +32,30 @@ const versionSeven = (): Record<string, unknown> => ({
   version: 7,
 });
 
+/**
+ * The shipped steps and stand-ins 10 → 11 and 11 → 12: windsor#748 and
+ * windsor#761 ship none, so a version-10 or version-11 song is refused, and
+ * this reads a step's own work through to a version this build loads.
+ */
+const PAST_TEN = {
+  songs: {
+    ...SONG_MIGRATIONS,
+    10: (doc: Record<string, unknown>) => doc,
+    11: (doc: Record<string, unknown>) => doc,
+  },
+  patches: PATCH_MIGRATIONS,
+};
+
 describe('a version-7 song with a Filter Reso lane (windsor#626)', () => {
   it("upgrades to this build's version with nothing but its version changed", () => {
     const raw = versionSeven();
-    const { document, refused } = upgradeSong(raw);
+    const { document, refused } = upgradeSong(raw, PAST_TEN);
     expect(refused).toBeUndefined();
     expect(document).toEqual({ ...raw, version: ARRANGEMENT_VERSION });
   });
 
   it('plays its lane along the log curve: the midpoint is the geometric mean', () => {
-    const result = makeArrangement(versionSeven());
+    const result = makeArrangement(upgradeSong(versionSeven(), PAST_TEN).document);
     expect(result.refused).toBeUndefined();
     const hat = result.document.parts.find((part) => part.automation?.length)!;
     const saved = hat.automation![0]!;

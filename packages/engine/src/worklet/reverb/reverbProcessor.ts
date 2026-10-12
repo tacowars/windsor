@@ -13,9 +13,10 @@
  * `mixer/reverbAllocation.test.ts` its allocation on V8.
  *
  * The topology is Jon Dattorro's 1997 figure 1: a pre-delay, an input
- * bandwidth filter, four cascaded all-pass diffusers, and a figure-of-eight
- * "tank" of two coupled loops, each holding two all-passes, two long delays and
- * a damping filter. Stereo output is taken from fourteen fixed taps inside the
+ * bandwidth filter, four cascaded all-pass diffusers, Windsor's Build delay
+ * (windsor#761, `plateBuild.ts`: a tap set per side, so each loop hears its
+ * own onset), and a figure-of-eight "tank" of two coupled loops, each holding
+ * two all-passes, two long delays and a damping filter. Stereo output is taken from fourteen fixed taps inside the
  * tank rather than from its loop signals, which is what gives the late field its
  * density without further delay lines.
  *
@@ -44,7 +45,10 @@ import { LoadSampler } from '../loadSampler';
 import { _applySize, _makeDelay, _read, _readCubic, _readTap, _write1 } from './delayLines';
 import {
   ANTI_DENORMAL,
+  DECAY_SECONDS,
   INPUT_DELAYS,
+  LOW_CROSS,
+  LOW_DECAY,
   MAX_PRE_DELAY,
   MAX_SIZE,
   MAX_TANK_DIFFUSION,
@@ -54,7 +58,10 @@ import {
   TANK_DELAYS,
   TAP_TIME,
 } from './reverbConstants';
+import { makeBuild } from './plateBuild';
+import { BUILD, BUILD_SPREAD } from './reverbBuildTables';
 import { _renderBlock, _writeInput } from './tank';
+import { makeGainPoints } from './tankGains';
 
 class DattorroReverb extends AudioWorkletProcessor {
   // Declared, never initialised: the constructor writes each one (worklet/CLAUDE.md
@@ -92,6 +99,64 @@ class DattorroReverb extends AudioWorkletProcessor {
   _quiet: number;
   _asleep: boolean;
   _stepping: boolean;
+  /**
+   * Written by `makeGainPoints` (`tankGains.ts`) from the constructor, hence
+   * the `!`; like every field here, declared and never initialised.
+   *
+   * Each tank line's gain point (windsor#748, `tankGains.ts`), lines 4 to 11:
+   * the gain now, this block's target, and its per-sample step.
+   */
+  _gain!: Float64Array;
+  _gainTarget!: Float64Array;
+  _gainStep!: Float64Array;
+  /** False until the first block after construction or sleep sets the gains outright. */
+  _gainsPrimed!: boolean;
+  /** Whether any gain point moves this block. */
+  _ramping!: boolean;
+  /**
+   * An RT60 in seconds on its way through the measured correction
+   * (`decayCorrection.ts`): the RT60 asked in, the one the gains are cut from out.
+   */
+  _rt60!: number;
+  /** A table lookup's point in, its cell and its fraction across it out (`decayCorrection.ts`). */
+  _cell!: number;
+  _cellAt!: number;
+  /**
+   * The low band (`plateLowBand.ts`): whether it may run at all (`lowBand:
+   * false` is a test's), whether it runs this block, whether its lowpasses
+   * start from the circulating sample on this sample; per point, the extra
+   * low gain now, its target and step, and the lowpass's state; the
+   * lowpass's coefficient, and the prewarp's scratch.
+   */
+  _lowBandEnabled: boolean;
+  _band!: boolean;
+  _seedBand!: boolean;
+  _lowExtra!: Float64Array;
+  _lowExtraTarget!: Float64Array;
+  _lowExtraStep!: Float64Array;
+  _lowState!: Float64Array;
+  _cross!: number;
+  _tangent!: Float64Array;
+  /**
+   * Build (`plateBuild.ts`, windsor#761), written by `makeBuild` from the
+   * constructor: `build` smoothed per block like Size; the Build line, its
+   * mask and write head; each tap's time in samples and gain, now, this
+   * block's target and per-sample step; the direct level's now, target and
+   * step; whether the first block has set them, and whether any moves.
+   */
+  _build: number;
+  _buildLine!: Float32Array;
+  _buildMask!: number;
+  _buildWrite!: number;
+  _buildTime!: Float64Array;
+  _buildTimeTarget!: Float64Array;
+  _buildTimeStep!: Float64Array;
+  _buildGain!: Float64Array;
+  _buildGainTarget!: Float64Array;
+  _buildGainStep!: Float64Array;
+  _buildDirect!: Float64Array;
+  _buildPrimed!: boolean;
+  _buildRamping!: boolean;
   _load: LoadSampler;
 
   // The delay lines and the awake render, installed on the prototype below.
@@ -112,8 +177,11 @@ class DattorroReverb extends AudioWorkletProcessor {
       ['inputHighCut',  10000, 200,  20000],
       ['diffusionIn1',  0.75,  0,    1],
       ['diffusionIn2',  0.625, 0,    1],
+      ['build',         ...BUILD],
       ['size',          1,     0.05, MAX_SIZE],
-      ['decay',         0.7,   0,    1],
+      ['decay',         ...DECAY_SECONDS],
+      ['lowDecay',      ...LOW_DECAY],
+      ['lowCross',      ...LOW_CROSS],
       ['diffusionTank1', 0.7,  0,    MAX_TANK_DIFFUSION],
       ['diffusionTank2', 0.5,  0,    MAX_TANK_DIFFUSION],
       ['tankLowCut',    20,    10,   1000],
@@ -138,8 +206,9 @@ class DattorroReverb extends AudioWorkletProcessor {
     // generalise it, deprecating the map and deoptimising the render.
     this._inputLp = this._inputHp = NaN;
     this._excPhase = this._excPhase2 = NaN;
-    this._size = this._inputGain = NaN;
+    this._size = this._inputGain = this._build = NaN;
     this._value = this._offset = NaN;
+    this._cross = this._rt60 = this._cellAt = NaN;
 
     // Pre-delay is a plain ring, always a full second, rounded up to a whole
     // number of render quanta so a block write never straddles the wrap.
@@ -177,14 +246,23 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._inputGain = 1;
     this._applySize(true);
 
+    makeGainPoints(this);
+    this._build = BUILD[0];
+    makeBuild(this);
+
     // Sleep (#547): samples of continuous silence in and out, the span that has
     // to exceed, and whether the tank is asleep. `sleep: false` and
     // `settledSkip: false` exist so a test can render the plate without either
-    // saving and prove the renders agree; nothing else sets them.
+    // saving and prove the renders agree, and `lowBand: false` (windsor#748)
+    // so one can render it with the low band's code out of the path; nothing
+    // else sets them.
     const opts = (options && options.processorOptions) || {};
     this._sleepEnabled = opts.sleep !== false;
     this._settledSkip = opts.settledSkip !== false;
-    this._sleepSpan = Math.ceil((Math.max(...TANK_DELAYS) * MAX_SIZE + MAX_PRE_DELAY) * sampleRate);
+    this._lowBandEnabled = opts.lowBand !== false;
+    this._sleepSpan = Math.ceil(
+      (Math.max(...TANK_DELAYS) * MAX_SIZE + MAX_PRE_DELAY + BUILD_SPREAD) * sampleRate,
+    );
     this._quiet = 0;
     this._asleep = false;
     this._stepping = false;
@@ -267,6 +345,17 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._excPhase = 0;
     this._excPhase2 = 0;
     this._denormal = ANTI_DENORMAL;
+    // An empty tank cannot step, so the next block sets its gains outright.
+    this._gainsPrimed = false;
+    this._band = false;
+    this._lowExtra.fill(0);
+    this._lowExtraTarget.fill(0);
+    this._lowState.fill(0);
+    // The Build line's contents were written before the silence: empty, and
+    // its ramps set outright on waking.
+    this._buildLine.fill(0);
+    this._buildWrite = 0;
+    this._buildPrimed = false;
     this._quiet = 0;
     this._asleep = true;
   }

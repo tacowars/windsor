@@ -158,7 +158,7 @@ export const ENSEMBLE_KNOBS: readonly InsertKnobEntry<EnsembleSpec>[] = ENSEMBLE
   }),
 );
 
-/** The Plate reverb's knobs (windsor#171): the return's 13 space knobs, then Mix. */
+/** The Plate reverb's knobs (windsor#171): the return's 16 space knobs, then Mix. */
 export const PLATE_REVERB_KNOBS: readonly InsertKnobEntry<PlateReverbSpec>[] = [
   ...SPACE_KNOBS.map(({ f, label, o }) => ({
     f,
