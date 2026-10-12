@@ -1,9 +1,9 @@
 # Accents and ratchets on Roll notes
 
 - **Date:** 2026-10-12
-- **Status:** proposed (decisions agreed with tacowars on 2026-10-11 and
-  2026-10-12; the mockup awaits approval)
-- **Links:** the discussion on windsor#735 (closed: mod-wheel and
+- **Status:** accepted (decisions agreed with tacowars on 2026-10-11 and
+  2026-10-12; tacowars approved the mockup on 2026-10-12)
+- **Links:** this record's issue, windsor#751 · the discussion on windsor#735 (closed: mod-wheel and
   pitch-bend lanes are dropped) · the mockup,
   `docs/research/2026-10-11-roll-accent-ratchet-mockup/mockup.html` · the
   Roll record `2026-10-04-roll-sequencer` · `2026-10-11-bounce-to-roll`,
@@ -123,7 +123,7 @@ new.
 
 ## Consequences
 
-- Build tickets, written once the mockup is approved:
+- Build tickets, written now the mockup is approved:
   1. The format and engine: the two note fields and the roll's two
      amounts, the normaliser's rules (decisions 5 and 6), the accent and
      ratchet in the Roll's playback, and the engine index.
