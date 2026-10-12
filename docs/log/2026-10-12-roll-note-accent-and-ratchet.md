@@ -3,8 +3,9 @@
 - **Date:** 2026-10-12
 - **Status:** accepted (decisions agreed with tacowars on 2026-10-11 and
   2026-10-12; tacowars approved the mockup on 2026-10-12)
-- **Links:** this record's issue, windsor#751 · the discussion on windsor#735 (closed: mod-wheel and
-  pitch-bend lanes are dropped) · the mockup,
+- **Links:** this record's issue, windsor#751 · the discussion on
+  windsor#735 (closed: mod-wheel and pitch-bend lanes are dropped) · the
+  mockup,
   `docs/research/2026-10-11-roll-accent-ratchet-mockup/mockup.html` · the
   Roll record `2026-10-04-roll-sequencer` · `2026-10-11-bounce-to-roll`,
   which this record amends · ratchets in
