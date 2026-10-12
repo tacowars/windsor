@@ -1,9 +1,11 @@
 /**
  * The plate's tunables and topology (#671): Dattorro's table 1 delays, the
  * output taps (table 2, read as delays -- see TAP_TIME), the SIZE, HOLD and
- * diffusion limits, and the sleep floors (#547). Import-free and scope-free:
- * nothing here reads `sampleRate`. Every value is the one the hand-written
- * `reverb-processor.js` carried; `mixer/reverbGolden.test.ts` pins the render
+ * diffusion limits, Decay in seconds and the low band's ranges (windsor#748),
+ * and the sleep floors (#547). Import-free and scope-free:
+ * nothing here reads `sampleRate`. Every value before windsor#748's is the
+ * one the hand-written `reverb-processor.js` carried;
+ * `mixer/reverbGolden.test.ts` pins the render
  * they produce, and `__fixtures__/reverbHarness.ts` reads MAX_SIZE,
  * TANK_DELAYS, MAX_PRE_DELAY and the sleep floors by their top-level names.
  */
@@ -62,6 +64,35 @@ const ANTI_DENORMAL = 1e-20;
 const HOLD_DECAY = 0.9999;
 
 /**
+ * Decay is an RT60 in seconds (windsor#748), and the low band's multiplier and
+ * crossover: each `[default, min, max]`, as the descriptors declare them.
+ * DECAY's default is the measured T30 of the plate's old default (decay gain
+ * 0.7 at Size 1): `docs/research/2026-10-12-plate-decay-seconds/`.
+ */
+const DECAY_SECONDS = [3.35, 0.2, 20];
+const LOW_DECAY = [1, 0.25, 4];
+const LOW_CROSS = [300, 80, 10000];
+
+/**
+ * 60 dB as a natural log of amplitude, 3 ln 10: a segment `L` samples long
+ * takes the gain exp(−RT60_LOG × L / (Decay × rate)), which is
+ * 10^(−3L / (Decay × rate)), so a signal loses 60 dB over Decay seconds
+ * whichever segments it spends them in.
+ */
+const RT60_LOG = 3 * Math.LN10;
+
+/**
+ * Each tank line's gain point under HOLD, lines 4 to 11: the long lines (5, 7,
+ * 9, 11) take HOLD_DECAY, where the old feedback gain sat, and the all-pass
+ * lines (4, 6, 8, 10) pass their loop untouched, as they did before Decay
+ * became a time. So a held tank renders as it did.
+ */
+const HOLD_GAINS = [1, HOLD_DECAY, 1, HOLD_DECAY, 1, HOLD_DECAY, 1, HOLD_DECAY];
+
+/** Highest one-pole cutoff, as a fraction of the sample rate: below Nyquist with a margin. */
+const CUTOFF_CEILING = 0.49;
+
+/**
  * Ceiling on the tank all-pass coefficients.
  *
  * The reference node exposes these to 0.999999, where the tank stops decaying
@@ -106,6 +137,12 @@ export {
   MIN_LENGTH,
   ANTI_DENORMAL,
   HOLD_DECAY,
+  DECAY_SECONDS,
+  LOW_DECAY,
+  LOW_CROSS,
+  RT60_LOG,
+  HOLD_GAINS,
+  CUTOFF_CEILING,
   MAX_TANK_DIFFUSION,
   SMOOTH_SECONDS,
   MAX_PRE_DELAY,

@@ -2,11 +2,12 @@
  * The Plate reverb insert (windsor#171): the Dattorro plate the `room` return
  * runs, on a strip, with a Mix knob and an on/off switch.
  *
- *   input ─┬─▶ send ─▶ plate (wet = mix, dry = 1 − mix) ─▶ gate ─┬─▶ output
+ *   input ─┬─▶ send ─▶ plate (wet = sin, dry = cos of mix·π/2) ─▶ gate ─┬─▶ output
  *          └─▶ bypass ─────────────────────────────────────────┘
  *
- * Mix drives the processor's own `wet` and `dry`, so Mix 1 is the return
- * exactly (wet 1, dry 0) and Mix 0 is its dry path alone. Off closes `send`
+ * Mix drives the processor's own `wet` and `dry`, equal-power (windsor#748),
+ * so Mix 1 is the return exactly (wet 1, dry 0) and Mix 0 is its dry path
+ * alone. Off closes `send`
  * and `gate` and opens `bypass`: the input passes unchanged. The plate is
  * built by `mixer/returnEffects.ts`, the return's own builder. A switch lane
  * (windsor#628) writes the same gains.
@@ -46,7 +47,7 @@ export interface PlateReverbSpec extends Readonly<ReverbSpace> {
   readonly enabled: boolean;
 }
 
-/** The 13 space fields, in the plate's own order. */
+/** The 15 space fields, in the plate's own order. */
 export const PLATE_SPACE_FIELDS = Object.keys(REVERB_SPACE_RANGES) as (keyof ReverbSpace)[];
 
 export const DEFAULT_PLATE_REVERB: PlateReverbSpec = {
@@ -65,8 +66,20 @@ export function plateSpace(spec: PlateReverbSpec): ReverbSpace {
   return space;
 }
 
-/** Mix as the plate's own `wet` and `dry`: Mix 1 is the return's wet 1, dry 0. */
-export const plateMix = (spec: PlateReverbSpec): PlateMix => ({ wet: spec.mix, dry: 1 - spec.mix });
+/** A quarter turn: Mix 0 to 1 sweeps the equal-power pair from dry to wet. */
+const QUARTER_TURN = Math.PI / 2;
+
+/**
+ * Mix as the plate's own `wet` and `dry`, equal-power (windsor#748): wet
+ * sin(mix·π/2) and dry cos(mix·π/2), so Mix 1 is the return's wet 1, dry 0,
+ * Mix 0 the dry path alone, and Mix 0.5 is 0.7071 each rather than 0.5. The
+ * cosine is written sin((1 − mix)·π/2), which is exactly 0 at Mix 1 where
+ * cos(π/2) is 6e−17.
+ */
+export const plateMix = (spec: PlateReverbSpec): PlateMix => ({
+  wet: Math.sin(spec.mix * QUARTER_TURN),
+  dry: Math.sin((1 - spec.mix) * QUARTER_TURN),
+});
 
 function normalise(
   raw: Record<string, unknown>,
@@ -136,9 +149,10 @@ function switched(gains: PlateSwitch, sampleRate: number): SharedParam[] {
 /**
  * Each knob's lane (windsor#345): a space field on the plate's param of its
  * name, Mix on the plate's own `wet` and `dry`, the switch on the send, gate,
- * bypass and clear (windsor#628, windsor#629). The plate reads `decay` and
- * `wet` once per block, unsmoothed, so a fast lane there steps every 128
- * samples.
+ * bypass and clear (windsor#628, windsor#629). The plate reads `wet` once per
+ * block, unsmoothed, so a fast lane there steps every 128 samples; `decay`,
+ * `lowDecay` and `size` move the tank's gains in a ramp across each block
+ * (windsor#748).
  */
 function plateHandles(
   plate: AudioWorkletNode,

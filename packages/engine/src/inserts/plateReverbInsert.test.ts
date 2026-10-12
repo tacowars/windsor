@@ -2,7 +2,7 @@
  * The Plate reverb insert (windsor#171) is the `room` return's plate on a
  * strip: at Mix 1 in the hall space it renders what the return renders, at
  * Mix 0 or switched off it passes its input unchanged, and a settings change
- * is param writes on one fixed graph.
+ * is param writes on one fixed graph. Its Mix is equal-power (windsor#748).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -15,13 +15,20 @@ import {
   renderGraph,
 } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
-import { REVERB_SPACE_RANGES } from '../audioConstants';
+import { KICK, song } from '../__fixtures__/documentCases';
+import { ARRANGEMENT_VERSION, REVERB_SPACE_RANGES } from '../audioConstants';
 import { PLATE_FULLY_WET, createPlate } from '../mixer/returnEffects';
 import { SPACES } from '../mixer/reverbSpace';
+import { makeArrangement } from '../song/arrangementDocument';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import type { PlateReverbSpec } from './plateReverbInsert';
-import { DEFAULT_PLATE_REVERB, PLATE_REVERB_INSERT, plateSpace } from './plateReverbInsert';
+import {
+  DEFAULT_PLATE_REVERB,
+  PLATE_REVERB_INSERT,
+  plateMix,
+  plateSpace,
+} from './plateReverbInsert';
 
 const SECONDS = 1.5;
 const BURST_SECONDS = 0.1;
@@ -94,8 +101,9 @@ describe('the Plate reverb graph', () => {
     const stage = PLATE_REVERB_INSERT.create(c.asAudioContext(), DEFAULT_PLATE_REVERB);
     const plate = c.workletNodes.find((n) => n.name === REVERB_PROCESSOR_NAME);
     expect(stage.processor).toBe(plate);
-    expect(plate?.parameters.get('wet')?.value).toBeCloseTo(DEFAULT_PLATE_REVERB.mix, 6);
-    expect(plate?.parameters.get('dry')?.value).toBeCloseTo(1 - DEFAULT_PLATE_REVERB.mix, 6);
+    const { wet, dry } = plateMix(DEFAULT_PLATE_REVERB);
+    expect(plate?.parameters.get('wet')?.value).toBeCloseTo(wet, 6);
+    expect(plate?.parameters.get('dry')?.value).toBeCloseTo(dry, 6);
     expect(plate?.parameters.get('size')?.value).toBe(SPACES.hall.size);
   });
 
@@ -107,7 +115,7 @@ describe('the Plate reverb graph', () => {
     expect(c.nodes.map((n) => [...n.outbound])).toEqual(before);
     const plate = c.workletNodes.find((n) => n.name === REVERB_PROCESSOR_NAME);
     expect(plate?.parameters.get('size')?.value).toBe(SPACES.cathedral.size);
-    expect(plate?.parameters.get('wet')?.value).toBeCloseTo(0.8, 6);
+    expect(plate?.parameters.get('wet')?.value).toBeCloseTo(Math.sin(0.4 * Math.PI), 6);
   });
 
   it('disconnects what it built and leaves the edge out of its output to the strip', async () => {
@@ -118,6 +126,23 @@ describe('the Plate reverb graph', () => {
     stage.dispose();
     expect(c.nodes.filter((n) => n !== fake(stage.output) && n.outbound.length > 0)).toEqual([]);
     expect(fake(stage.output).outbound.map((conn) => conn.to)).toEqual([next]);
+  });
+});
+
+describe('plateMix (windsor#748)', () => {
+  it.each([
+    [0, 0, 1],
+    [0.5, 0.7071, 0.7071],
+    [1, 1, 0],
+  ])('is equal-power: Mix %f is wet %f and dry %f', (mix, wet, dry) => {
+    const gains = plateMix({ ...DEFAULT_PLATE_REVERB, mix });
+    expect(gains.wet).toBeCloseTo(wet, 4);
+    expect(gains.dry).toBeCloseTo(dry, 4);
+  });
+
+  it('keeps its ends exact', () => {
+    expect(plateMix({ ...DEFAULT_PLATE_REVERB, mix: 0 })).toEqual({ wet: 0, dry: 1 });
+    expect(plateMix({ ...DEFAULT_PLATE_REVERB, mix: 1 })).toEqual({ wet: 1, dry: 0 });
   });
 });
 
@@ -149,5 +174,25 @@ describe('PLATE_REVERB_INSERT', () => {
       mix: 0.5,
     });
     expect(n.corrections).toEqual([]);
+  });
+});
+
+describe('a version-11 song (windsor#748)', () => {
+  const room = { kind: 'plate', decay: 12.5, lowDecay: 2.5, lowCross: 4000, mix: 1 };
+  const strip = { kind: 'plate', decay: 0.35, lowDecay: 0.3, lowCross: 120, mix: 0.6 };
+
+  it('round-trips decay, lowDecay and lowCross on a return and on a Plate insert', () => {
+    const raw = {
+      ...song([{ ...KICK, strip: { inserts: [strip] } }]),
+      returns: { a: { inserts: [room] } },
+    };
+    const first = makeArrangement(raw);
+    expect(first.corrections).toEqual([]);
+    expect(first.document.version).toBe(ARRANGEMENT_VERSION);
+    expect(first.document.returns?.a?.inserts[0]).toMatchObject(room);
+    expect(first.document.parts[0]!.strip!.inserts[0]).toMatchObject(strip);
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.corrections).toEqual([]);
+    expect(again.document).toEqual(first.document);
   });
 });

@@ -14,7 +14,8 @@ import { ARRANGEMENT_VERSION } from '../audioConstants';
 import type { InsertSpec } from '../inserts/insertRegistry';
 import { DEFAULT_RETRO_REVERB } from '../inserts/retroReverbSpec';
 import { makeArrangement } from './arrangementDocument';
-import { upgradeSong } from './songMigrations';
+import { PATCH_MIGRATIONS } from '../patch/patchMigrations';
+import { SONG_MIGRATIONS, upgradeSong } from './songMigrations';
 
 const RETRO = { ...DEFAULT_RETRO_REVERB, id: 'retro1' } as InsertSpec;
 const END = 384;
@@ -31,16 +32,26 @@ const versionEight = (): Record<string, unknown> => ({
   version: 8,
 });
 
+/**
+ * The shipped steps and a stand-in 10 → 11: windsor#748 ships none, so a
+ * version-10 song is refused, and this reads a step's own work through to a
+ * version this build loads.
+ */
+const PAST_TEN = {
+  songs: { ...SONG_MIGRATIONS, 10: (doc: Record<string, unknown>) => doc },
+  patches: PATCH_MIGRATIONS,
+};
+
 describe('a version-8 song with a Retro Reverb Size lane (RV-4)', () => {
   it("upgrades to this build's version with nothing but its version changed", () => {
     const raw = versionEight();
-    const { document, refused } = upgradeSong(raw);
+    const { document, refused } = upgradeSong(raw, PAST_TEN);
     expect(refused).toBeUndefined();
     expect(document).toEqual({ ...raw, version: ARRANGEMENT_VERSION });
   });
 
   it('plays its lane along the log curve: the midpoint is the geometric mean', () => {
-    const result = makeArrangement(versionEight());
+    const result = makeArrangement(upgradeSong(versionEight(), PAST_TEN).document);
     expect(result.refused).toBeUndefined();
     const hat = result.document.parts.find((part) => part.automation?.length)!;
     const saved = hat.automation![0]!;

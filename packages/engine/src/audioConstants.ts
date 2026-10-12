@@ -205,17 +205,14 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 10 since windsor#728 (bloom's
- * Scale values are Windsor's `SCALE_NAMES`). Version 9 (RV-4: a Retro
- * Reverb's Size lane on a log scale), version 8 (windsor#626: a
- * Filter insert's Reso lane on a log scale), version 7 (windsor#590: the
- * embedded patches are patch format 4, the operators' `opLp` and `opHp`),
- * version 6 (windsor#300: patch format 3, the drive out of the filter) and
- * version 5 (windsor#224: Tape's Drive feeds the magnetic core) upgrade to 10
- * through `SONG_MIGRATIONS`; versions 2 to 4 are refused (record
- * `2026-09-28-format-versions-refuse-never-destroy`).
+ * A document's document-format version: 11 since windsor#748 (the plate's
+ * `decay` is an RT60 in seconds, with `lowDecay` and `lowCross`, and the
+ * Plate insert's Mix is equal-power). There is no upgrade to 11, so every
+ * earlier version is refused (record
+ * `2026-09-28-format-versions-refuse-never-destroy`); `SONG_MIGRATIONS`
+ * still carries the steps 5 → 6 to 9 → 10, which no longer reach this one.
  */
-export const ARRANGEMENT_VERSION = 10;
+export const ARRANGEMENT_VERSION = 11;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
@@ -292,7 +289,9 @@ export const REVERB_SPACE_RANGES = {
   diffusionIn1: [0, 1],
   diffusionIn2: [0, 1],
   size: [0.05, 4],
-  decay: [0, 1],
+  decay: [0.2, 20],
+  lowDecay: [0.25, 4],
+  lowCross: [80, 10000],
   diffusionTank1: [0, 0.8],
   diffusionTank2: [0, 0.8],
   tankLowCut: [10, 1000],

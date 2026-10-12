@@ -234,6 +234,14 @@ the SIZE-scaled lengths and taps, the reads), `tank.ts` (`_writeInput` and
 delay and tap tables). The delay lines and the tank are `this`-typed functions
 installed on the processor's prototype, so each body is still the method the
 hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
+Decay is an RT60 in seconds (windsor#748): `tankGains.ts` gives each tank
+line a gain point, set once a block from Decay and Size and ramped a sample at
+a time by the tank, through the measured correction in `reverbDecayTables.ts`;
+`plateLowBand.ts` is the low band's shelf at each point, off at `lowDecay` 1.
+Both are functions over the plate (rule 6), not prototype methods. The band's
+prewarp is `fm/portableTangent.ts`'s `tanInPlace`, so an edit there rebuilds
+`reverb-processor.js` too. `mixer/reverbDecay.test.ts` holds the T30 to Decay
+and `mixer/reverbLowBand.test.ts` the band and the live moves.
 
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. The map of `fm/` (#644):
@@ -271,7 +279,7 @@ build output. The map of `fm/` (#644):
 | `voiceDrive.ts` | `VoiceDrive` and `updateVoiceDrive` (windsor#300): the voice's drive stage between the carriers and the filter, heard with the filter on or off. Its state, its five curves by `DRIVE_SHAPE` id (`soft`, the filter's former soft clip to the bit, then Advanced Drive's `hard`, `diode`, `tube` and `fold` in portable arithmetic) and its control-rate half (the bypass, which is the patch's `drive.on` switch or unity gain with no bias, windsor#309; the bias's offset; the tone pole's coefficient). Both render loops write the per-sample stage out, `soft` and the tone inline. |
 | `portablePowers.ts` | `log2InPlace` and `exp2InPlace` (windsor#300): base-2 log and power in place, from `+ − × ÷` and a double's bits, so the diode curve and the tone's cutoff give the same bits on arm64 and x64. `bloom/` imports both (windsor#712), so an edit here rebuilds `bloom-processor.js` too |
 | `operatorFilter.ts` | `OperatorFilter` and `bindOperatorFilter` (windsor#362; every wave since windsor#590, record `2026-10-04-operator-filters-on-every-wave`): an operator's own two-pole Butterworth lowpass and highpass on its wave, from its `opLp` and `opHp` (0 off), each moved by `opTrack` octaves an octave of the played note from middle C (`2^(opTrack (note − 60) / 12)` through `exp2InPlace`), held to 20 Hz..0.45 fs. Four to a voice; `bindVoiceConstants` tunes them when the voice binds a patch or its note (a note-on, a rebind, a slide's `retarget`), retuning a section only when its effective cutoff changed. The filter sits after the operator's feedback tap: `fb1`/`fb2` take the raw wave, `out` the filtered one. The generic loop calls `process` through `point` while one is on; the kernel writes `process` out per operator, its operations in its order, and never skips an operator whose filter is on |
-| `portableTangent.ts` | `tanInPlace` (windsor#362): the tangent in place over `tapePortableMathTables.ts`, for the operator filters' prewarp, the same bits on arm64 and x64 |
+| `portableTangent.ts` | `tanInPlace` (windsor#362): the tangent in place over `tapePortableMathTables.ts`, for the operator filters' prewarp, the same bits on arm64 and x64. The plate's low band (`reverb/plateLowBand.ts`, windsor#748) imports it too, so an edit here rebuilds `reverb-processor.js` |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
 | `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
@@ -384,7 +392,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
-   fifteen scenarios in the default, `sleep: false` and `settledSkip: false`
+   eighteen scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

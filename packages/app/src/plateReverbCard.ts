@@ -1,10 +1,11 @@
 /**
  * The Plate reverb insert's card (windsor#171): the `room` return's Starting
- * point picker and 13 space knobs, then Mix. Picking a space writes its
+ * point picker and 15 space knobs, then Mix. Picking a space writes its
  * numbers into the insert; the knobs edit them from there. Three pages
  * (windsor#173): Space (the picker, pre-delay and size, then decay and mix
  * at the rack's big dial), Diffusion (the four diffusion knobs and the
- * modulation) and Tone (the four cuts). The on/off switch is the rack's
+ * modulation) and Tone (the four cuts, then the low band's `Low ×` and
+ * `Low Hz`, windsor#748). The on/off switch is the rack's
  * rail.
  */
 import type { PlateReverbSpec } from '@windsor/engine';
@@ -65,7 +66,10 @@ export const plateReverbCard: InsertCard = (ctx, slot, index) => {
     {
       name: 'Tone',
       build: () =>
-        insertPage(...knobs(['inputLowCut', 'inputHighCut', 'tankLowCut', 'tankHighCut'])),
+        insertPage(
+          ...knobs(['inputLowCut', 'inputHighCut', 'tankLowCut', 'tankHighCut']),
+          ...knobs(['lowDecay', 'lowCross']),
+        ),
     },
   ];
 };

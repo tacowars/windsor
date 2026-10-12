@@ -24,8 +24,15 @@ export interface ReverbSpace {
   diffusionIn2: number;
   /** Scales every tank delay: 0.05 is a box, 4 is a cathedral. */
   size: number;
-  /** Tank feedback, 0..1. Sets the tail length together with `size`. */
+  /**
+   * Seconds, 0.2..20: the tail's RT60, the time it takes to fall 60 dB,
+   * whatever the `size` (windsor#748).
+   */
   decay: number;
+  /** The low band's RT60 as a multiple of `decay`, 0.25..4: 1 is one decay for every band. */
+  lowDecay: number;
+  /** Hz, 80..10000: where the low band hands over to `decay`. */
+  lowCross: number;
   /** All-pass coefficients inside the tank. Capped below 1 by the processor. */
   diffusionTank1: number;
   diffusionTank2: number;
@@ -44,7 +51,9 @@ export const DEFAULT_SPACE: ReverbSpace = {
   diffusionIn1: 0.75,
   diffusionIn2: 0.625,
   size: 1,
-  decay: 0.7,
+  decay: 3.35,
+  lowDecay: 1,
+  lowCross: 300,
   diffusionTank1: 0.7,
   diffusionTank2: 0.5,
   tankLowCut: 20,
@@ -56,11 +65,18 @@ export const DEFAULT_SPACE: ReverbSpace = {
 /**
  * Starting points. `satisfies` rather than an annotation so the key names
  * survive: `SPACES.hall` is a `ReverbSpace`, not a possibly-undefined lookup.
+ *
+ * Each `decay` is the broadband T30 the space measured before Decay became
+ * seconds (windsor#748), rounded to 0.05 s, and `DEFAULT_SPACE`'s likewise:
+ * `docs/research/2026-10-12-plate-decay-seconds/`. Two exceptions: at that
+ * value `shimmer`'s 250 Hz tank low cut took its T30 13 % short, so it takes
+ * the Decay that measures its old T30; and `cathedral` and `wash` measured
+ * about 30 s, past the 20 s ceiling, so they sit at 20.
  */
 export const SPACES = {
   plate: makeSpace({
     size: 0.5,
-    decay: 0.62,
+    decay: 1.25,
     preDelay: 0.005,
     inputLowCut: 100,
     inputHighCut: 12000,
@@ -71,7 +87,7 @@ export const SPACES = {
   }),
   room: makeSpace({
     size: 0.28,
-    decay: 0.45,
+    decay: 0.4,
     preDelay: 0.008,
     inputLowCut: 120,
     inputHighCut: 11000,
@@ -82,7 +98,7 @@ export const SPACES = {
   }),
   hall: makeSpace({
     size: 1.4,
-    decay: 0.78,
+    decay: 6.35,
     preDelay: 0.025,
     inputLowCut: 60,
     tankLowCut: 60,
@@ -91,7 +107,7 @@ export const SPACES = {
   }),
   cathedral: makeSpace({
     size: 3,
-    decay: 0.9,
+    decay: 20,
     preDelay: 0.05,
     inputLowCut: 45,
     inputHighCut: 8000,
@@ -102,7 +118,7 @@ export const SPACES = {
   }),
   wash: makeSpace({
     size: 2.2,
-    decay: 0.95,
+    decay: 20,
     inputLowCut: 90,
     inputHighCut: 6000,
     tankLowCut: 200,
@@ -112,7 +128,7 @@ export const SPACES = {
   }),
   shimmer: makeSpace({
     size: 0.7,
-    decay: 0.85,
+    decay: 5.05,
     preDelay: 0.012,
     inputLowCut: 200,
     inputHighCut: 16000,
