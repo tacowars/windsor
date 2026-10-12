@@ -16,14 +16,14 @@
 ## Context
 
 A Grid, Arp, Euclid or Figure step can carry an accent and a ratchet. A
-Roll note can carry neither, so Bounce to Roll (shipped in #744, #745 and
-#747) loses both. It drops an accent's mod and raises the part's Vel to fit
+Roll note can carry neither, so Bounce to Roll (shipped in windsor#744,
+windsor#745 and windsor#747) loses both. It drops an accent's mod and raises the part's Vel to fit
 the accent's velocity bump. It writes a ratchet's hits as separate notes
 rounded to 24 PPQ, which can lose a hit. The toast counts each loss.
 
 windsor#735 proposed mod-wheel and pitch-bend lanes partly to carry the
 accent's mod. tacowars preferred to put accents and ratchets on the note
-itself. With that, the lanes have no demand and #735 is closed.
+itself. With that, the lanes have no demand and windsor#735 is closed.
 
 ## Decisions
 
@@ -97,12 +97,15 @@ itself. With that, the lanes have no demand and #735 is closed.
       generator's Acc vel and Acc mod onto the roll, and the note's
       velocity is the event's own, with no bump. The part's Vel is kept,
       not raised.
-    - A ratcheted step writes one note with its `ratchet`, where that note
-      plays the same hits: its length is the ratchet's span, and each hit
-      is held to the next. Where it would not (a tie past the step, an Arp
-      gate under 1, a Euclid hold shorter than the spacing), the bounce
-      writes the hits as notes, as today. The render's parity test
-      (`bounceRenderParity.test.ts`) holds both cases.
+    - A ratcheted step writes one note with its `ratchet` only where that
+      note plays exactly the hits the generator played: each hit's onset
+      and hold, from `rollHits` over the note's length with the last hit
+      open, matches the captured one. Anything else writes the hits as
+      notes, as today. That covers a tie past the step, a slide out of the
+      ratchet's last hit (the bounce lengthens it past the next onset, which
+      would respace the hits), a roll gated under 1 (Arp, Figure and
+      Basslead all can be), and a Euclid hold shorter than the spacing. The
+      render's parity test (`bounceRenderParity.test.ts`) holds each case.
     - Decision 5 applies to the bounced notes, as to any write.
     - The toast loses "accents lost their mod" and "ratchet hits lost"
       except in that fallback. "Ticks rounded" counts only the fallback's
