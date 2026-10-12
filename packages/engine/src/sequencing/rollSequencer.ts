@@ -43,13 +43,39 @@
  * still sends its note-off when it ends, which finds its handle no longer
  * bound to a voice and releases nothing.
  *
+ * **Accents and ratchets** (windsor#753, record
+ * `2026-10-12-roll-note-accent-and-ratchet`). A note may carry `accent` and
+ * `ratchet`, and plays them as a Grid step does (`gridSequencer.ts`). An
+ * accented note-on carries the roll's `accentVelocity` and `accentMod`
+ * (the Grid's defaults when absent), which `partNoteOn` turns into the
+ * velocity bump and the voice's mod; the note's own `velocity` is
+ * unchanged. A ratcheted note-on carries a `roll` of `ratchet` hits over
+ * the note's length as it plays (cut at the loop's end, as its release
+ * is), at gate 1 and open: the player spends the later hits evenly across
+ * that span in seconds, under swing (`pitchedRoll.ts`, `rollSpan.ts`). Hit
+ * 0 is the note-on, slide and all; each later hit is a note-off then a
+ * note-on with the accent and no slide; the last is held open and this
+ * performer releases it at the note's end, so slide by overlap into the
+ * next note works as for a plain note. The normaliser keeps both marks off
+ * a note sharing its onset (a chord), and a ratchet off a note shorter than
+ * `ROLL_RATCHET_MIN_TICKS`; the performer plays what it is given.
+ *
  * A live edit keeps every held note on its scheduled release, unless its
  * note (known by its onset and pitch) is gone, which releases it on the
- * next tick. The position is read from the clock at every tick, so a new
- * `loopTicks` plays on without a restart. Nothing is drawn at random, and a
- * tick that starts and releases nothing allocates nothing.
+ * next tick. A ratcheted note is the exception: its hits are already
+ * queued, so it keeps its scheduled release, which ends its open last hit
+ * after that hit has started. The position is read from the clock at every
+ * tick, so a new `loopTicks` plays on without a restart. Nothing is drawn
+ * at random, and a tick that starts and releases nothing allocates nothing.
  */
-import { BARS_MAX, MIDI_NOTE_MAX, ROLL_NOTES_MAX } from '../audioConstants';
+import {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
+  BARS_MAX,
+  MIDI_NOTE_MAX,
+  ROLL_NOTES_MAX,
+} from '../audioConstants';
+import { assertRatchet } from './gridSequencer';
 import { ticksPerBar } from './meter';
 import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
@@ -69,6 +95,14 @@ export interface RollNote {
   readonly pitch: number;
   /** Scales the part's velocity, 0–1; absent is 1. */
   readonly velocity?: number;
+  /** Played with the roll's accent amounts (windsor#753); absent is a plain note. */
+  readonly accent?: true;
+  /**
+   * Hits across the note's length, 2..`RATCHET_MAX` (windsor#753); absent is
+   * one. The check accepts 1 as the same as absent; the normaliser writes it
+   * as no key.
+   */
+  readonly ratchet?: number;
 }
 
 export interface RollSequencerConfig {
@@ -76,6 +110,10 @@ export interface RollSequencerConfig {
   loopTicks: number;
   /** 0..`ROLL_NOTES_MAX` notes, sorted by `tick` then `pitch`. */
   notes: readonly RollNote[];
+  /** The bump an accented note adds to the part's velocity, 0..1; absent is `ACCENT_VELOCITY_DEFAULT`. */
+  accentVelocity?: number;
+  /** The per-note mod an accented note sends, 0..1; absent is `ACCENT_MOD_DEFAULT`. */
+  accentMod?: number;
   /**
    * 0..`ROLL_ENVELOPES_MAX` clip envelopes, each on its own voice target;
    * absent is none, and the normaliser writes an empty list as absent.
@@ -89,6 +127,41 @@ export function defaultRollConfig(meter?: Meter): RollSequencerConfig {
 }
 
 export const DEFAULT_ROLL_CONFIG: RollSequencerConfig = defaultRollConfig();
+
+/** A note's fields, writable: what the setters below copy and change. */
+type EditedNote = { -readonly [K in keyof RollNote]: RollNote[K] };
+
+/** `note` accented or plain (windsor#753); plain leaves no key, as the normaliser writes it. */
+export function withRollNoteAccent(note: RollNote, accent: boolean): RollNote {
+  const next: EditedNote = { ...note };
+  if (accent) next.accent = true;
+  else delete next.accent;
+  return next;
+}
+
+/** `note` with `ratchet` hits (windsor#753); one leaves no key, as the normaliser writes it. */
+export function withRollNoteRatchet(note: RollNote, ratchet: number): RollNote {
+  const next: EditedNote = { ...note };
+  if (ratchet > 1) next.ratchet = ratchet;
+  else delete next.ratchet;
+  return next;
+}
+
+/**
+ * The onset ticks two or more of `notes` share, in any order: where a chord
+ * starts. A note on one of them carries no accent and no ratchet (record
+ * `2026-10-12-roll-note-accent-and-ratchet` decision 5): the normaliser
+ * clears them, and the lane draws no cell there.
+ */
+export function rollSharedOnsets(notes: readonly RollNote[]): ReadonlySet<number> {
+  const seen = new Set<number>();
+  const shared = new Set<number>();
+  for (const { tick } of notes) {
+    if (seen.has(tick)) shared.add(tick);
+    else seen.add(tick);
+  }
+  return shared;
+}
 
 const isIntIn = (value: number, min: number, max: number): boolean =>
   Number.isInteger(value) && value >= min && value <= max;
@@ -108,7 +181,14 @@ function assertRollNote(note: RollNote, index: number): void {
   if (velocity !== undefined && !(velocity >= 0 && velocity <= 1)) {
     throw new RangeError(`${at}.velocity must be in [0, 1], got ${velocity}`);
   }
+  if (note.accent !== undefined && note.accent !== true) {
+    throw new RangeError(`${at}.accent must be true or absent, got ${String(note.accent)}`);
+  }
+  assertRatchet(note.ratchet, at);
 }
+
+const isUnitOrAbsent = (value: number | undefined): boolean =>
+  value === undefined || (value >= 0 && value <= 1);
 
 /**
  * The ranges of every field. The order of the notes and their overlaps are
@@ -122,6 +202,10 @@ export function assertRollConfig(config: RollSequencerConfig): void {
     throw new RangeError(`notes must be a list of at most ${ROLL_NOTES_MAX}`);
   }
   config.notes.forEach(assertRollNote);
+  for (const key of ['accentVelocity', 'accentMod'] as const) {
+    const value = config[key];
+    if (!isUnitOrAbsent(value)) throw new RangeError(`${key} must be in [0, 1], got ${value}`);
+  }
   if (config.envelopes !== undefined) assertRollEnvelopes(config.envelopes);
 }
 
@@ -168,6 +252,8 @@ export class RollSequencer {
   private readonly heldOnset = new Int32Array(MIDI_NOTE_MAX + 1);
   /** Per pitch, the local tick its held note started on, to tell an earlier note from a chord's. */
   private readonly heldSince = new Int32Array(MIDI_NOTE_MAX + 1);
+  /** Per pitch, 1 while its held note is ratcheted: its hits are queued, so an edit never cuts it. */
+  private readonly heldRolled = new Uint8Array(MIDI_NOTE_MAX + 1);
   private heldCount = 0;
 
   constructor(config: RollSequencerConfig) {
@@ -186,14 +272,15 @@ export class RollSequencer {
   /**
    * A new `notes` or `loopTicks`, live. A held note keeps its scheduled
    * release unless its note is gone (removed, moved or re-pitched): then
-   * the next tick releases it.
+   * the next tick releases it. A ratcheted one always keeps it, since the
+   * player has queued its hits up to then.
    */
   reconfigure(config: RollSequencerConfig): void {
     assertRollConfig(config);
     this.current = config;
     this.onsets = byOnset(config.notes);
     for (let pitch = 0; pitch <= MIDI_NOTE_MAX; pitch++) {
-      if (this.releaseAt[pitch] === NOT_HELD) continue;
+      if (this.releaseAt[pitch] === NOT_HELD || this.heldRolled[pitch] === 1) continue;
       if (!hasNote(this.onsets, this.heldOnset[pitch] as number, pitch)) this.releaseAt[pitch] = 0;
     }
   }
@@ -228,7 +315,7 @@ export class RollSequencer {
         if ((this.heldSince[note.pitch] as number) < tick) heldEarlier--;
         events.push(this.off(note.pitch, tick, time));
       }
-      const on = this.start(note, tick, time, loopTicks);
+      const on = this.start(note, event, loopTicks);
       if (heldEarlier > 0) on.slide = true;
       events.push(on);
     }
@@ -264,14 +351,33 @@ export class RollSequencer {
     return { kind: 'noteOff', tick, time, note: pitch };
   }
 
-  /** The note-on of `note` on local tick `tick`, held to the loop's end at most. */
-  private start(note: RollNote, tick: number, time: number, loopTicks: number): NoteOnEvent {
-    this.releaseAt[note.pitch] = tick + Math.min(note.ticks, loopTicks - note.tick);
+  /**
+   * The note-on of `note` on the event's local tick, held to the loop's end
+   * at most, with its accent and its ratchet's roll over that hold.
+   */
+  private start(note: RollNote, event: PartTickEvent, loopTicks: number): NoteOnEvent {
+    const { tick, time, secondsPerTick } = event;
+    const held = Math.min(note.ticks, loopTicks - note.tick);
+    const hits = note.ratchet ?? 1;
+    this.releaseAt[note.pitch] = tick + held;
     this.heldOnset[note.pitch] = note.tick;
     this.heldSince[note.pitch] = tick;
+    this.heldRolled[note.pitch] = hits > 1 ? 1 : 0;
     this.heldCount++;
     const on: NoteOnEvent = { kind: 'noteOn', tick, time, note: note.pitch, degree: 0 };
     if (note.velocity !== undefined && note.velocity !== 1) on.velocity = note.velocity;
+    if (note.accent === true) on.accent = this.accent();
+    // As a Grid step's: every hit but the last runs to the next, and the last is held open.
+    if (hits > 1) on.roll = { hits, ticks: held, secondsPerTick, gate: 1, open: true };
     return on;
+  }
+
+  /** The roll's accent amounts, the Grid's defaults where absent. */
+  private accent(): { velocity: number; mod: number } {
+    const { accentVelocity, accentMod } = this.current;
+    return {
+      velocity: accentVelocity ?? ACCENT_VELOCITY_DEFAULT,
+      mod: accentMod ?? ACCENT_MOD_DEFAULT,
+    };
   }
 }

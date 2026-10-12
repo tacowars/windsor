@@ -78,6 +78,8 @@ const PURE_FILES = [
   // `rollEnvelopeValue.ts`, reads the automation curve and is not here.
   'rollEnvelope.ts',
   'rollEnvelopeTables.ts',
+  // A note's tunables (windsor#753): the shortest note a ratchet plays on.
+  'rollNoteTables.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',

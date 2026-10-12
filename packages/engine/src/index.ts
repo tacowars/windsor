@@ -566,14 +566,20 @@ export type {
   FigureStage,
 } from './sequencing/figureSequencer';
 export { figureNote } from './harmony/figureTones';
-// The Roll (windsor#599): its config, defaults, bound and check.
+// The Roll (windsor#599): its config, defaults, bound and check; a note's accent and
+// ratchet setters, and the chord onsets that take neither (windsor#753).
 export {
   DEFAULT_ROLL_CONFIG,
   ROLL_LOOP_TICKS_MAX,
   assertRollConfig,
   defaultRollConfig,
+  rollSharedOnsets,
+  withRollNoteAccent,
+  withRollNoteRatchet,
 } from './sequencing/rollSequencer';
 export type { RollNote, RollSequencerConfig } from './sequencing/rollSequencer';
+// The shortest Roll note a ratchet plays on (windsor#753).
+export { ROLL_RATCHET_MIN_TICKS } from './sequencing/rollNoteTables';
 // The Roll's clip envelopes (windsor#701): their type, cap, check, row and evaluator.
 export { ROLL_ENVELOPES_MAX, assertRollEnvelopes } from './sequencing/rollEnvelope';
 export type { RollEnvelope, RollEnvelopePoint } from './sequencing/rollEnvelope';
