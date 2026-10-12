@@ -128,6 +128,13 @@ export function defaultRollConfig(meter?: Meter): RollSequencerConfig {
 
 export const DEFAULT_ROLL_CONFIG: RollSequencerConfig = defaultRollConfig();
 
+/**
+ * The config keys a normalised roll omits at their defaults (windsor#753),
+ * which a live partial may still add: `arrangement.ts` lets a merge reach
+ * them though the current roll lacks them.
+ */
+export const ROLL_OPTIONAL_KEYS = ['accentVelocity', 'accentMod'] as const;
+
 /** A note's fields, writable: what the setters below copy and change. */
 type EditedNote = { -readonly [K in keyof RollNote]: RollNote[K] };
 

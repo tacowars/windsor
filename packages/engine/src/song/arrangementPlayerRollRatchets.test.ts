@@ -9,7 +9,13 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT, FULL_PARTS, onlyParts, withPart } from '../__fixtures__/fullArrangement';
+import {
+  FULL_ARRANGEMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  onlyParts,
+  withPart,
+} from '../__fixtures__/fullArrangement';
 import { rig } from '../__fixtures__/playerRig';
 import type { Call } from '../__fixtures__/recordingPart';
 import type { RollNote, RollSequencerConfig } from '../sequencing/rollSequencer';
@@ -148,5 +154,23 @@ describe('a Roll ratchet through the player (windsor#753)', () => {
       ['noteOn', 6, undefined],
       ['noteOffByNote', 9, undefined],
     ]);
+  });
+});
+
+describe("a live edit of a Roll's accent amounts (windsor#753)", () => {
+  it('reaches a roll that names none, and the next accent plays it', () => {
+    const base = { ...FULL_ARRANGEMENT, transport: { ...FULL_ARRANGEMENT.transport, bpm: BPM } };
+    const notes: RollNote[] = [{ tick: 0, ticks: 24, pitch: 60, velocity: 0.5, accent: true }];
+    const sequencer = { kind: 'roll' as const, loopTicks: BAR, notes };
+    const regions = [{ start: 0, duration: 4 * BAR }];
+    const r = rig(onlyParts(withPart(base, 'drone', { regions, sequencer }), 'drone'));
+    const roll = { kind: 'roll' as const, accentVelocity: 0.4, accentMod: 0.5 };
+    const result = r.player.apply({ parts: { [FULL_SLOT.drone]: { sequencer: roll } } });
+    expect(result.ok).toBe(true);
+    expect(result.ignored).toEqual([]);
+    r.run(1);
+    const [hit] = sounding(r.parts.drone.calls);
+    expect(hit!.velocity).toBeCloseTo(VELOCITY * 0.5 + 0.4, 12);
+    expect(hit!.extras).toEqual({ mod: 0.5, slide: false });
   });
 });
