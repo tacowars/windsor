@@ -9,15 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadReverb, spaceParams } from '../__fixtures__/reverbHarness';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
-import {
-  DEFAULT_SPACE,
-  PLATE_VOICINGS,
-  SPACES,
-  SPACE_NAMES,
-  type SpaceName,
-  VOICING_PARAM,
-  makeSpace,
-} from './reverbSpace';
+import { DEFAULT_SPACE, PLATE_VOICINGS, VOICING_PARAM, makeSpace } from './reverbSpace';
 
 const loaded = loadReverb();
 const byName = new Map(loaded.descriptors.map((d) => [d.name, d]));
@@ -72,51 +64,6 @@ describe('ReverbSpace mirrors the worklet parameters', () => {
     for (const d of loaded.descriptors) {
       expect(d.automationRate, `automation rate of ${d.name}`).toBe('k-rate');
     }
-  });
-});
-
-describe('the shipped spaces', () => {
-  it('are all in range, so no preset is silently clamped', () => {
-    for (const key of SPACE_NAMES) {
-      const space = spaceParams(SPACES[key]);
-      for (const [name, value] of Object.entries(space)) {
-        const d = byName.get(name);
-        expect(d, `${key}.${name}`).toBeDefined();
-        if (!d) continue;
-        expect(value, `${key}.${name} below minimum`).toBeGreaterThanOrEqual(d.minValue);
-        expect(value, `${key}.${name} above maximum`).toBeLessThanOrEqual(d.maxValue);
-      }
-    }
-  });
-
-  it('are distinct rooms, not copies of one another', () => {
-    const seen = new Set(SPACE_NAMES.map((k) => JSON.stringify(SPACES[k])));
-    expect(seen.size).toBe(SPACE_NAMES.length);
-  });
-
-  it('keep the modulation numbers they had before windsor#764', () => {
-    const before: Record<SpaceName, [number, number]> = {
-      plate: [1, 0.5],
-      room: [0.4, 0.3],
-      hall: [0.5, 0.8],
-      cathedral: [0.3, 1.2],
-      wash: [1.6, 2.5],
-      shimmer: [2.4, 1.8],
-    };
-    for (const key of SPACE_NAMES) {
-      expect([SPACES[key].modRate, SPACES[key].modDepth], key).toEqual(before[key]);
-    }
-  });
-
-  it('are all plate-voiced, stated in each, until item 8 brings room-voiced ones (windsor#746)', () => {
-    expect(DEFAULT_SPACE.voicing).toBe('plate');
-    for (const key of SPACE_NAMES) expect(SPACES[key].voicing, key).toBe('plate');
-  });
-
-  it('order by size from the smallest room to the largest', () => {
-    expect(SPACES.room.size).toBeLessThan(SPACES.plate.size);
-    expect(SPACES.plate.size).toBeLessThan(SPACES.hall.size);
-    expect(SPACES.hall.size).toBeLessThan(SPACES.cathedral.size);
   });
 });
 

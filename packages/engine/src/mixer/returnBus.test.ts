@@ -38,7 +38,7 @@ import type { ReturnSpec } from './mix';
 import { RETURNS, onSendBus } from './mix';
 import { createReturn, delayClipCurve } from './returnBus';
 import { PLATE_FULLY_WET, attachDelay, createPlate } from './returnEffects';
-import { SPACES } from './reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 
 const ECHO = RETURNS.b.inserts[0] as EchoSpec;
@@ -113,7 +113,7 @@ async function renderOldReturn(
   const output = context.createGain();
   output.gain.value = kind === 'room' ? RETURNS.a.level : RETURNS.b.level;
   if (kind === 'room') {
-    const plate = createPlate(context, SPACES.hall, PLATE_FULLY_WET);
+    const plate = createPlate(context, SPACE_ROWS.hall, PLATE_FULLY_WET);
     input.connect(plate);
     plate.connect(output);
   } else {

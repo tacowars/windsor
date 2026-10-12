@@ -1,31 +1,30 @@
-import { DEFAULT_REVERB, SPACES, SPACE_NAMES, makeArrangement, plateSpace } from '@windsor/engine';
+import {
+  DEFAULT_REVERB,
+  REVERB_PRESETS,
+  REVERB_PRESET_DEFAULT,
+  REVERB_PRESET_GROUPS,
+  makeArrangement,
+  matchingReverbPreset,
+  plateSpace,
+} from '@windsor/engine';
 import { KICK, song } from '@windsor/engine/__fixtures__/documentCases';
 import { describe, expect, it } from 'vitest';
 import { TEMPO_DIVISIONS } from './mixerTables';
-import { VOICING_OPTIONS, matchingSpace, tempoMatches, tempoSeconds } from './returnControls';
+import { PRESET_GROUPS, VOICING_OPTIONS, tempoMatches, tempoSeconds } from './returnControls';
 
-describe('matchingSpace', () => {
-  it('names every shipped space from its own numbers', () => {
-    for (const name of SPACE_NAMES) expect(matchingSpace({ ...SPACES[name] })).toBe(name);
+describe('PRESET_GROUPS (windsor#774)', () => {
+  it('lists the bank under its four groups in order, each preset by its number, and nothing else', () => {
+    expect(PRESET_GROUPS.map((g) => g.group)).toEqual(REVERB_PRESET_GROUPS);
+    const listed = PRESET_GROUPS.flatMap((g) => g.options);
+    expect(listed).toEqual(
+      REVERB_PRESETS.map((p) => ({ value: String(p.number), label: p.label })),
+    );
   });
 
-  it('matches whatever order the fields come in', () => {
-    const reversed = Object.fromEntries(Object.entries(SPACES.hall).reverse());
-    expect(matchingSpace(reversed as typeof SPACES.hall)).toBe('hall');
-  });
-
-  it('reads a new Reverb insert as its starting space, and none after a Size change', () => {
-    const start = plateSpace(DEFAULT_REVERB);
-    const name = matchingSpace(start);
-    expect(name).toBeDefined();
+  it('reads a new Reverb insert as its default preset, and custom after a Size change', () => {
+    expect(matchingReverbPreset(plateSpace(DEFAULT_REVERB))).toBe(REVERB_PRESET_DEFAULT);
     const edited = { ...DEFAULT_REVERB, size: DEFAULT_REVERB.size * 1.1 };
-    expect(matchingSpace(plateSpace(edited))).toBeUndefined();
-    const reset = { ...edited, ...SPACES[name!] };
-    expect(matchingSpace(plateSpace(reset))).toBe(name);
-  });
-
-  it('matches nothing for no space', () => {
-    expect(matchingSpace(undefined)).toBeUndefined();
+    expect(matchingReverbPreset(plateSpace(edited))).toBeUndefined();
   });
 });
 
@@ -44,10 +43,9 @@ describe('VOICING_OPTIONS (windsor#746)', () => {
     }
   });
 
-  it('leaves a space flipped to the room matching no starting point, and the plate one its own', () => {
-    const hall = plateSpace(DEFAULT_REVERB);
-    expect(matchingSpace(hall)).toBe('hall');
-    expect(matchingSpace({ ...hall, voicing: 'room' })).toBeUndefined();
+  it('leaves the default preset flipped to the room matching no preset', () => {
+    const resident = plateSpace(DEFAULT_REVERB);
+    expect(matchingReverbPreset({ ...resident, voicing: 'room' })).toBeUndefined();
   });
 });
 

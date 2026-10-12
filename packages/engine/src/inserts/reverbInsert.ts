@@ -28,7 +28,7 @@ import { RENDER_QUANTUM_FRAMES, REVERB_SPACE_RANGES } from '../audioConstants';
 import type { PlateMix } from '../mixer/returnEffects';
 import { createPlate, writePlate } from '../mixer/returnEffects';
 import type { ReverbSpace } from '../mixer/reverbSpace';
-import { PLATE_VOICINGS, SPACES } from '../mixer/reverbSpace';
+import { PLATE_VOICINGS } from '../mixer/reverbSpace';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { KnobTarget } from '../automation/automationHandles';
 import { sameValue } from '../automation/automationHandles';
@@ -38,8 +38,9 @@ import type { InsertKind, InsertStage } from './insertKind';
 import {
   PLATE_CLEAR_QUANTA,
   REVERB_MIX_DEFAULT,
-  REVERB_SPACE_DEFAULT,
+  REVERB_PRESET_DEFAULT,
 } from './reverbInsertConstants';
+import { reverbPreset } from './reverbPresets';
 import type { SharedParam } from './sharedParamSchedule';
 import type { SwitchView } from './switchTimeline';
 
@@ -61,9 +62,10 @@ export const PLATE_SPACE_FIELDS: readonly (keyof ReverbSpace)[] = [
   'voicing',
 ];
 
+/** A new Reverb: the default preset's space (windsor#774), at the insert's Mix, switched on. */
 export const DEFAULT_REVERB: ReverbInsertSpec = {
   kind: 'reverb',
-  ...SPACES[REVERB_SPACE_DEFAULT],
+  ...reverbPreset(REVERB_PRESET_DEFAULT)!.settings,
   mix: REVERB_MIX_DEFAULT,
   enabled: true,
 };

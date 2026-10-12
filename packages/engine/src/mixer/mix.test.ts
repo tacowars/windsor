@@ -10,7 +10,7 @@ import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, onSendBus, stripFor } from './mix';
-import { SPACES } from './reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
 
 const strips = Object.entries(MIX);
@@ -67,7 +67,7 @@ describe('RETURNS', () => {
   it('holds the hall plate on Send A at 0.90 and the echo on Send B at 0.60, both fully wet', () => {
     expect(RETURNS.a).toEqual({
       level: 0.9,
-      inserts: [{ ...DEFAULT_REVERB, ...SPACES.hall, mix: 1 }],
+      inserts: [{ ...DEFAULT_REVERB, ...SPACE_ROWS.hall, mix: 1 }],
     });
     expect(RETURNS.b).toEqual({ level: 0.6, inserts: [{ ...DEFAULT_ECHO, mix: 1 }] });
   });

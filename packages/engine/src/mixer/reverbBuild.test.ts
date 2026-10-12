@@ -22,7 +22,7 @@ import {
   t30,
 } from '../__fixtures__/reverbHarness';
 import type { ReverbSpace } from './reverbSpace';
-import { SPACES } from './reverbSpace';
+import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 
 const loaded = loadReverb();
 const SR = loaded.sampleRate;
@@ -96,7 +96,7 @@ describe('the onset follows Build', () => {
   it.each(['hall', 'plate'] as const)(
     'the time to the peak rises with Build on %s, never falling by more than one window',
     (name) => {
-      const rise = BUILDS.map((build) => onset(SPACES[name], build).riseMs);
+      const rise = BUILDS.map((build) => onset(SPACE_ROWS[name], build).riseMs);
       for (let i = 1; i < rise.length; i++)
         expect(rise[i], `${rise}`).toBeGreaterThanOrEqual(rise[i - 1]! - 10);
       expect(rise.at(-1)! - rise[0]!, `${rise}`).toBeGreaterThanOrEqual(100);
@@ -107,7 +107,7 @@ describe('the onset follows Build', () => {
   it.each(['hall', 'plate'] as const)(
     'Build 0 arrives no later than main and with at least its early energy on %s',
     (name) => {
-      const at0 = onset(SPACES[name], 0);
+      const at0 = onset(SPACE_ROWS[name], 0);
       expect(at0.firstMs).toBeLessThanOrEqual(MAIN[name].firstMs);
       expect(at0.e20).toBeGreaterThanOrEqual(MAIN[name].e20);
     },
@@ -116,7 +116,7 @@ describe('the onset follows Build', () => {
   it.each([0, 0.5, 1])(
     'keeps the default space within 3 dB of main over the first second at Build %f',
     (build) => {
-      const { rms1s } = onset(SPACES.hall, build);
+      const { rms1s } = onset(SPACE_ROWS.hall, build);
       expect(Math.abs(20 * Math.log10(rms1s / MAIN.hall.rms1s))).toBeLessThan(3);
     },
   );
