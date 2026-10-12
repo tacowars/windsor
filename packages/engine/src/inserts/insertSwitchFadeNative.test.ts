@@ -61,7 +61,7 @@ const SINE_HZ = 440;
 const OFF_AT = 0.1006;
 const ON_AT = 0.2506;
 const SECONDS = 0.4;
-const KINDS = ['drive', 'echo', 'chorus', 'ensemble', 'plate'] as const;
+const KINDS = ['drive', 'echo', 'chorus', 'ensemble', 'reverb'] as const;
 type Kind = (typeof KINDS)[number];
 type How = 'spec' | 'lane';
 const HOWS: readonly How[] = ['spec', 'lane'];
@@ -159,8 +159,8 @@ describe('switching on again after a long off', () => {
   it.each([
     { kind: 'echo' as const, how: 'spec' as const },
     { kind: 'echo' as const, how: 'lane' as const },
-    { kind: 'plate' as const, how: 'spec' as const },
-    { kind: 'plate' as const, how: 'lane' as const },
+    { kind: 'reverb' as const, how: 'spec' as const },
+    { kind: 'reverb' as const, how: 'lane' as const },
   ])('$kind by $how: plays none of the tail from before the off', async (c) => {
     const held = await render(c.kind, hit, seconds);
     const switched = await render(c.kind, hit, seconds, { how: c.how, off, on });
@@ -205,7 +205,7 @@ describe('switching on again one sample after the fade out ends (fix round 1 for
   /** Past the old repeats' second pass through the Echo's loop. */
   const seconds = on + 3 * DEFAULT_ECHO.delayTime;
 
-  it.each(cases.filter((c) => c.kind === 'echo' || c.kind === 'plate'))(
+  it.each(cases.filter((c) => c.kind === 'echo' || c.kind === 'reverb'))(
     '$kind by $how: plays none of the old tail',
     async (c) => {
       const held = await render(c.kind, hit, seconds);

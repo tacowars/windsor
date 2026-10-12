@@ -1,5 +1,5 @@
 /**
- * The Plate reverb insert's card (windsor#171): the `room` return's Starting
+ * The Reverb insert's card (windsor#171): the `room` return's Starting
  * point picker and 16 space knobs, then Mix. Picking a space writes its
  * numbers into the insert; the knobs edit them from there. Three pages
  * (windsor#173): Space (the picker, pre-delay and size, then decay and mix
@@ -10,12 +10,12 @@
  * `Low Hz`, windsor#748). The on/off switch is the rack's
  * rail.
  */
-import type { PlateReverbSpec } from '@windsor/engine';
-import { DEFAULT_PLATE_REVERB, SPACES, plateSpace } from '@windsor/engine';
+import type { ReverbInsertSpec } from '@windsor/engine';
+import { DEFAULT_REVERB, SPACES, plateSpace } from '@windsor/engine';
 import { STRIP_COLOR } from './consoleColors';
 import { el, seg } from './dom';
 import type { InsertCard } from './insertCards';
-import { PLATE_REVERB_KNOBS } from './insertKnobTables';
+import { REVERB_KNOBS } from './insertKnobTables';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
 import { fitColumn, insertPage, wideColumn } from './insertLayout';
 import { targetChange } from './insertTarget';
@@ -37,21 +37,21 @@ function voicingSwitch(read: () => PlateVoicing, pick: (value: PlateVoicing) => 
   return fitColumn(wrap);
 }
 
-export const plateReverbCard: InsertCard = (ctx, slot, index) => {
-  const current = (): PlateReverbSpec => {
+export const reverbCard: InsertCard = (ctx, slot, index) => {
+  const current = (): ReverbInsertSpec => {
     const spec = insertsOf(ctx, slot)[index];
-    return spec?.kind === 'plate' ? spec : DEFAULT_PLATE_REVERB;
+    return spec?.kind === 'reverb' ? spec : DEFAULT_REVERB;
   };
-  const commit = (spec: PlateReverbSpec): void => {
+  const commit = (spec: ReverbInsertSpec): void => {
     const inserts = [...insertsOf(ctx, slot)];
-    if (inserts[index]?.kind !== 'plate') return;
+    if (inserts[index]?.kind !== 'reverb') return;
     inserts[index] = spec;
     if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const knobs = (
-    fields: Parameters<typeof pickKnobs<PlateReverbSpec>>[1],
+    fields: Parameters<typeof pickKnobs<ReverbInsertSpec>>[1],
     refresh?: () => void,
-  ): HTMLElement[] => insertKnobs(ctx, slot, index, pickKnobs(PLATE_REVERB_KNOBS, fields), refresh);
+  ): HTMLElement[] => insertKnobs(ctx, slot, index, pickKnobs(REVERB_KNOBS, fields), refresh);
   const space = (): HTMLElement => {
     const picker = spacePicker(
       () => plateSpace(current()),
@@ -64,7 +64,7 @@ export const plateReverbCard: InsertCard = (ctx, slot, index) => {
         ctx,
         slot,
         index,
-        pickKnobs(PLATE_REVERB_KNOBS, ['decay', 'mix']),
+        pickKnobs(REVERB_KNOBS, ['decay', 'mix']),
         picker.refresh,
       ),
     );

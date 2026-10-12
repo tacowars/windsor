@@ -292,7 +292,7 @@ const TAPE_ROWS: InsertFieldRow<TapeSpec>[] = [
 ];
 
 const V = REVERB_SPACE_RANGES;
-const PLATE_ROWS = [
+const REVERB_ROWS = [
   row('preDelay', 'Pre-delay', V.preDelay, 'linear', 's'),
   row('inputLowCut', 'Input low cut', V.inputLowCut, 'log', 'Hz'),
   row('inputHighCut', 'Input high cut', V.inputHighCut, 'log', 'Hz'),
@@ -409,7 +409,7 @@ const KIND_ROWS: KindRows = {
   delay: DELAY_ROWS,
   ensemble: ENSEMBLE_ROWS,
   tape: TAPE_ROWS,
-  plate: PLATE_ROWS,
+  reverb: REVERB_ROWS,
   echo: ECHO_ROWS,
   eq: EQ_ROWS,
   filter: FILTER_ROWS,

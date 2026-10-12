@@ -21,7 +21,7 @@ import {
   DEFAULT_ENSEMBLE,
   DEFAULT_EQ,
   DEFAULT_FILTER,
-  DEFAULT_PLATE_REVERB,
+  DEFAULT_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
@@ -50,7 +50,7 @@ import {
   FILTER_INSERT_KNOBS,
   INSERT_GROUPS,
   INSERT_LABELS,
-  PLATE_REVERB_KNOBS,
+  REVERB_KNOBS,
   fmtBloomDensity,
   bloomBandLimit,
   fmtBloomShape,
@@ -122,8 +122,8 @@ describe('INSERT_CARDS', () => {
     expect(INSERT_LABELS.filter).toBe('Filter');
   });
 
-  it('calls the return-derived kinds Plate reverb and Echo (windsor#171)', () => {
-    expect(INSERT_LABELS.plate).toBe('Plate reverb');
+  it('calls the return-derived kinds Reverb and Echo (windsor#171, windsor#771)', () => {
+    expect(INSERT_LABELS.reverb).toBe('Reverb');
     expect(INSERT_LABELS.echo).toBe('Echo');
   });
 });
@@ -179,14 +179,14 @@ describe('ENSEMBLE_KNOBS (#695)', () => {
   });
 });
 
-describe('PLATE_REVERB_KNOBS (windsor#171)', () => {
-  it("covers every plate number, spanning the plate's ranges from DEFAULT_PLATE_REVERB", () => {
+describe('REVERB_KNOBS (windsor#171)', () => {
+  it("covers every plate number, spanning the plate's ranges from DEFAULT_REVERB", () => {
     // The voicing (windsor#746) is a switch, not a number.
     const notKnobs = ['kind', 'enabled', 'voicing'];
-    const fields = INSERT_KINDS.plate.fields.filter((f) => !notKnobs.includes(f));
-    expect(PLATE_REVERB_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
-    for (const { f, o } of PLATE_REVERB_KNOBS) {
-      expect(o.def, f).toBe(DEFAULT_PLATE_REVERB[f]);
+    const fields = INSERT_KINDS.reverb.fields.filter((f) => !notKnobs.includes(f));
+    expect(REVERB_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of REVERB_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_REVERB[f]);
       const range =
         f === 'mix' ? [0, 1] : REVERB_SPACE_RANGES[f as keyof typeof REVERB_SPACE_RANGES];
       expect([o.min, o.max], f).toEqual([...range]);

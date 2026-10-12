@@ -14,7 +14,7 @@ import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { MAX_INSERTS } from '../inserts/insertConstants';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { withInsertIds } from '../inserts/insertIds';
 import { withoutInsertIds } from '../__fixtures__/insertIds';
 import { RETURNS } from '../mixer/mix';
@@ -140,7 +140,7 @@ describe('the patches section', () => {
 });
 
 describe('the returns section: the send buses (windsor#172)', () => {
-  const plate = { ...DEFAULT_PLATE_REVERB, mix: 1 };
+  const plate = { ...DEFAULT_REVERB, mix: 1 };
   const echo = { ...DEFAULT_ECHO, mix: 1 };
 
   it("fills a bus from the code's: a named level, and the default chain when none is given", () => {
@@ -182,13 +182,13 @@ describe('the returns section: the send buses (windsor#172)', () => {
     const r = makeArrangement({
       ...SONG,
       returns: {
-        a: { level: 3, inserts: [{ kind: 'plate', size: 99, mix: 2 }, { kind: 'wah' }] },
+        a: { level: 3, inserts: [{ kind: 'reverb', size: 99, mix: 2 }, { kind: 'wah' }] },
         b: { inserts: over, wet: 1 },
       },
     });
     expect(withoutInsertIds(r.document.returns?.a)).toEqual({
       level: 1,
-      inserts: [{ ...DEFAULT_PLATE_REVERB, size: REVERB_SPACE_RANGES.size[1], mix: 1 }],
+      inserts: [{ ...DEFAULT_REVERB, size: REVERB_SPACE_RANGES.size[1], mix: 1 }],
     });
     expect(r.document.returns?.b?.inserts).toHaveLength(MAX_INSERTS);
     expect(r.corrections).toEqual([
@@ -256,7 +256,7 @@ describe('the returns section: the send buses (windsor#172)', () => {
     const first = makeArrangement({
       ...SONG,
       patches: { ...PARTS_PATCHES, lead: { volume: 0.3 } },
-      returns: { a: { inserts: [{ kind: 'plate', decay: 0.5, mix: 1 }] } },
+      returns: { a: { inserts: [{ kind: 'reverb', decay: 0.5, mix: 1 }] } },
     });
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
     expect(again.corrections).toEqual([]);

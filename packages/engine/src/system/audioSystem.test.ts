@@ -30,7 +30,7 @@ import { FmEngine } from '../synth/fmEngine';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { RETURNS, onSendBus } from '../mixer/mix';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { SPACES } from '../mixer/reverbSpace';
 import { REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { PRESETS } from '../patch/presets';
@@ -234,7 +234,7 @@ describe('returns', () => {
   it('takes a third bus as one more RETURNS entry, with no change to the types or routing', async () => {
     const returns = {
       ...RETURNS,
-      short: { level: 0.5, inserts: [onSendBus({ ...DEFAULT_PLATE_REVERB, ...SPACES.plate })] },
+      short: { level: 0.5, inserts: [onSendBus({ ...DEFAULT_REVERB, ...SPACES.plate })] },
     } satisfies Record<string, ReturnSpec>;
     const mix = {
       p: strip({ short: 0.5 }),

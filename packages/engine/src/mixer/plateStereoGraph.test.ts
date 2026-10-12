@@ -18,7 +18,7 @@ import {
 } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { makePatch } from '../patch/patch';
 import { AudioPart } from '../synth/audioPart';
 import type { Feed } from '../__fixtures__/reverbHarness';
@@ -60,7 +60,7 @@ async function render(left: boolean, right: boolean): Promise<Capture> {
   master.connect(context.destination);
   const bus = createGroupBus(
     ctx,
-    { id: 1, name: 'Drums', level: 1, pan: 0, inserts: [{ ...DEFAULT_PLATE_REVERB, mix: 1 }] },
+    { id: 1, name: 'Drums', level: 1, pan: 0, inserts: [{ ...DEFAULT_REVERB, mix: 1 }] },
     master as unknown as AudioNode,
     { defer: NOW },
   );

@@ -1,5 +1,5 @@
 /**
- * The Plate reverb insert (windsor#171): the Dattorro plate the `room` return
+ * The Reverb insert (windsor#171): the Dattorro plate the `room` return
  * runs, on a strip, with a Mix knob and an on/off switch.
  *
  *   input ─┬─▶ send ─▶ plate (wet = sin, dry = cos of mix·π/2) ─▶ gate ─┬─▶ output
@@ -37,14 +37,14 @@ import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import {
   PLATE_CLEAR_QUANTA,
-  PLATE_REVERB_MIX_DEFAULT,
-  PLATE_REVERB_SPACE_DEFAULT,
-} from './plateReverbConstants';
+  REVERB_MIX_DEFAULT,
+  REVERB_SPACE_DEFAULT,
+} from './reverbInsertConstants';
 import type { SharedParam } from './sharedParamSchedule';
 import type { SwitchView } from './switchTimeline';
 
-export interface PlateReverbSpec extends Readonly<ReverbSpace> {
-  readonly kind: 'plate';
+export interface ReverbInsertSpec extends Readonly<ReverbSpace> {
+  readonly kind: 'reverb';
   /** 0 dry .. 1 the plate alone. */
   readonly mix: number;
   readonly enabled: boolean;
@@ -61,17 +61,17 @@ export const PLATE_SPACE_FIELDS: readonly (keyof ReverbSpace)[] = [
   'voicing',
 ];
 
-export const DEFAULT_PLATE_REVERB: PlateReverbSpec = {
-  kind: 'plate',
-  ...SPACES[PLATE_REVERB_SPACE_DEFAULT],
-  mix: PLATE_REVERB_MIX_DEFAULT,
+export const DEFAULT_REVERB: ReverbInsertSpec = {
+  kind: 'reverb',
+  ...SPACES[REVERB_SPACE_DEFAULT],
+  mix: REVERB_MIX_DEFAULT,
   enabled: true,
 };
 
 const FIELDS = ['kind', ...PLATE_SPACE_FIELDS, 'mix', 'enabled'];
 
 /** The spec's space, without its kind, mix or switch: its voicing included. */
-export function plateSpace(spec: PlateReverbSpec): ReverbSpace {
+export function plateSpace(spec: ReverbInsertSpec): ReverbSpace {
   const space = { voicing: spec.voicing } as ReverbSpace;
   for (const field of PLATE_NUMBER_FIELDS) space[field] = spec[field];
   return space;
@@ -87,7 +87,7 @@ const QUARTER_TURN = Math.PI / 2;
  * cosine is written sin((1 − mix)·π/2), which is exactly 0 at Mix 1 where
  * cos(π/2) is 6e−17.
  */
-export const plateMix = (spec: PlateReverbSpec): PlateMix => ({
+export const plateMix = (spec: ReverbInsertSpec): PlateMix => ({
   wet: Math.sin(spec.mix * QUARTER_TURN),
   dry: Math.sin((1 - spec.mix) * QUARTER_TURN),
 });
@@ -96,9 +96,9 @@ function normalise(
   raw: Record<string, unknown>,
   path: string,
   n: FieldNormaliser,
-): PlateReverbSpec {
+): ReverbInsertSpec {
   n.dropUnknown(raw, FIELDS, path);
-  const base = DEFAULT_PLATE_REVERB;
+  const base = DEFAULT_REVERB;
   const space = plateSpace(base);
   for (const field of PLATE_NUMBER_FIELDS) {
     const [min, max] = REVERB_SPACE_RANGES[field];
@@ -107,7 +107,7 @@ function normalise(
   // A missing voicing is the plate's (windsor#746): every song before it was plate-voiced.
   space.voicing = n.pick(raw.voicing, PLATE_VOICINGS, base.voicing, `${path}.voicing`);
   return {
-    kind: 'plate',
+    kind: 'reverb',
     ...space,
     mix: n.num(raw.mix, base.mix, 0, 1, `${path}.mix`),
     enabled: n.bool(raw.enabled, base.enabled, `${path}.enabled`),
@@ -171,7 +171,7 @@ function switched(gains: PlateSwitch, sampleRate: number): SharedParam[] {
 function plateHandles(
   plate: AudioWorkletNode,
   gains: PlateSwitch,
-  spec: () => PlateReverbSpec,
+  spec: () => ReverbInsertSpec,
 ): FieldHandles {
   const now = (): number => plate.context.currentTime;
   return fieldHandles(
@@ -204,7 +204,7 @@ function unheld<T extends object>(values: T, knobs: FieldHandles): Partial<T> {
   return out;
 }
 
-function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<PlateReverbSpec> {
+function create(context: BaseAudioContext, spec: ReverbInsertSpec): InsertStage<ReverbInsertSpec> {
   const input = context.createGain();
   const send = context.createGain();
   const plate = createPlate(context, plateSpace(spec), plateMix(spec));
@@ -226,7 +226,7 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
     { send: send.gain, gate: gate.gain, bypass: bypass.gain, clear },
     () => current,
   );
-  const set = (next: PlateReverbSpec): void => {
+  const set = (next: ReverbInsertSpec): void => {
     current = next;
     writePlate(plate, unheld(plateSpace(next), knobs));
     if (!knobs.automated('mix')) writePlate(plate, plateMix(next));
@@ -235,7 +235,7 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
   set(spec);
 
   return {
-    kind: 'plate',
+    kind: 'reverb',
     input,
     output,
     processor: plate,
@@ -248,9 +248,9 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
   };
 }
 
-export const PLATE_REVERB_INSERT: InsertKind<PlateReverbSpec> = {
+export const REVERB_INSERT: InsertKind<ReverbInsertSpec> = {
   fields: FIELDS,
-  defaults: DEFAULT_PLATE_REVERB,
+  defaults: DEFAULT_REVERB,
   normalise,
   create,
 };

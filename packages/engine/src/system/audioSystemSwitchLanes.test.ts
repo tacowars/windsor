@@ -28,7 +28,7 @@ import type { AutomationLane } from '../automation/automationLane';
 import { DEFAULT_FILTER } from '../inserts/filterSpec';
 import { INSERT_SWITCH_FADE_S } from '../inserts/insertConstants';
 import type { InsertSpec, InsertStage } from '../inserts/insertRegistry';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { renderPass } from '../render/renderPass';
 import { planFor } from '../render/renderSong';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
@@ -45,7 +45,7 @@ const BAR = TICKS_PER_BAR;
 const time = (tick: number): number => GROUP_FIRST + tick * GROUP_TICK;
 
 const FILTER = { ...DEFAULT_FILTER, id: 'filt1' } as InsertSpec;
-const PLATE = { ...DEFAULT_PLATE_REVERB, id: 'plate1' } as InsertSpec;
+const PLATE = { ...DEFAULT_REVERB, id: 'plate1' } as InsertSpec;
 const INSERTS = [FILTER, PLATE];
 /** On from the start, off over bar 2, on again at bar 3. */
 const toggle = (insertId: string): AutomationLane =>
@@ -61,7 +61,7 @@ interface Switches {
 
 function switchesOf(stages: readonly InsertStage<InsertSpec>[]): Switches {
   const filter = stages.find((s) => s.kind === 'filter')!;
-  const plate = stages.find((s) => s.kind === 'plate')!;
+  const plate = stages.find((s) => s.kind === 'reverb')!;
   // The Plate's output hears its gate, then its bypass.
   const [gate, bypass] = sources(plate.output) as unknown as { gain: FakeParam }[];
   return {

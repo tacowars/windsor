@@ -77,7 +77,7 @@ describe('automatableInsertFields', () => {
       'compressor',
       'phaser',
       'ensemble',
-      'plate',
+      'reverb',
       'echo',
     ] as const) {
       // An empty slot reads none of a host's slot rows.

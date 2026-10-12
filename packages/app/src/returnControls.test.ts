@@ -1,10 +1,4 @@
-import {
-  DEFAULT_PLATE_REVERB,
-  SPACES,
-  SPACE_NAMES,
-  makeArrangement,
-  plateSpace,
-} from '@windsor/engine';
+import { DEFAULT_REVERB, SPACES, SPACE_NAMES, makeArrangement, plateSpace } from '@windsor/engine';
 import { KICK, song } from '@windsor/engine/__fixtures__/documentCases';
 import { describe, expect, it } from 'vitest';
 import { TEMPO_DIVISIONS } from './mixerTables';
@@ -20,11 +14,11 @@ describe('matchingSpace', () => {
     expect(matchingSpace(reversed as typeof SPACES.hall)).toBe('hall');
   });
 
-  it('reads a new Plate insert as its starting space, and none after a Size change', () => {
-    const start = plateSpace(DEFAULT_PLATE_REVERB);
+  it('reads a new Reverb insert as its starting space, and none after a Size change', () => {
+    const start = plateSpace(DEFAULT_REVERB);
     const name = matchingSpace(start);
     expect(name).toBeDefined();
-    const edited = { ...DEFAULT_PLATE_REVERB, size: DEFAULT_PLATE_REVERB.size * 1.1 };
+    const edited = { ...DEFAULT_REVERB, size: DEFAULT_REVERB.size * 1.1 };
     expect(matchingSpace(plateSpace(edited))).toBeUndefined();
     const reset = { ...edited, ...SPACES[name!] };
     expect(matchingSpace(plateSpace(reset))).toBe(name);
@@ -38,9 +32,9 @@ describe('matchingSpace', () => {
 describe('VOICING_OPTIONS (windsor#746)', () => {
   it('offers Plate then Room, each a voicing a song keeps, and starts on the plate', () => {
     expect(VOICING_OPTIONS.map((o) => o.label)).toEqual(['Plate', 'Room']);
-    expect(VOICING_OPTIONS[0]!.value).toBe(DEFAULT_PLATE_REVERB.voicing);
+    expect(VOICING_OPTIONS[0]!.value).toBe(DEFAULT_REVERB.voicing);
     for (const { value } of VOICING_OPTIONS) {
-      const plate = { ...DEFAULT_PLATE_REVERB, voicing: value };
+      const plate = { ...DEFAULT_REVERB, voicing: value };
       const result = makeArrangement({ ...song([KICK]), returns: { a: { inserts: [plate] } } });
       expect(
         result.corrections.filter((c) => c.includes('voicing')),
@@ -51,7 +45,7 @@ describe('VOICING_OPTIONS (windsor#746)', () => {
   });
 
   it('leaves a space flipped to the room matching no starting point, and the plate one its own', () => {
-    const hall = plateSpace(DEFAULT_PLATE_REVERB);
+    const hall = plateSpace(DEFAULT_REVERB);
     expect(matchingSpace(hall)).toBe('hall');
     expect(matchingSpace({ ...hall, voicing: 'room' })).toBeUndefined();
   });

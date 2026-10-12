@@ -11,7 +11,7 @@ import type {
   EnsembleSpec,
   FilterSpec,
   InsertKindName,
-  PlateReverbSpec,
+  ReverbInsertSpec,
 } from '@windsor/engine';
 import {
   BLOOM_BOUNDS,
@@ -28,7 +28,7 @@ import {
   DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
   DEFAULT_FILTER,
-  DEFAULT_PLATE_REVERB,
+  DEFAULT_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
@@ -56,7 +56,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   tape: 'Tape',
   delay: 'Dub delay',
   ensemble: 'Ensemble',
-  plate: 'Plate reverb',
+  reverb: 'Reverb',
   echo: 'Echo',
   eq: 'Parametric EQ',
   filter: 'Filter',
@@ -78,7 +78,7 @@ export const INSERT_GROUPS: readonly {
   { label: 'Dynamics', kinds: ['compressor'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
   { label: 'Time', kinds: ['echo', 'delay'] },
-  { label: 'Space', kinds: ['plate', 'retro-reverb'] },
+  { label: 'Space', kinds: ['reverb', 'retro-reverb'] },
   // Bloom adds a layer rather than processing the sound (windsor#711).
   { label: 'Generate', kinds: ['bloom'] },
 ];
@@ -158,8 +158,8 @@ export const ENSEMBLE_KNOBS: readonly InsertKnobEntry<EnsembleSpec>[] = ENSEMBLE
   }),
 );
 
-/** The Plate reverb's knobs (windsor#171): the return's 16 space knobs, then Mix. */
-export const PLATE_REVERB_KNOBS: readonly InsertKnobEntry<PlateReverbSpec>[] = [
+/** The Reverb's knobs (windsor#171): the return's 16 space knobs, then Mix. */
+export const REVERB_KNOBS: readonly InsertKnobEntry<ReverbInsertSpec>[] = [
   ...SPACE_KNOBS.map(({ f, label, o }) => ({
     f,
     label,
@@ -167,10 +167,10 @@ export const PLATE_REVERB_KNOBS: readonly InsertKnobEntry<PlateReverbSpec>[] = [
       ...o,
       min: REVERB_SPACE_RANGES[f][0],
       max: REVERB_SPACE_RANGES[f][1],
-      def: DEFAULT_PLATE_REVERB[f],
+      def: DEFAULT_REVERB[f],
     },
   })),
-  { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_PLATE_REVERB.mix, fmt: fmt2 } },
+  { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_REVERB.mix, fmt: fmt2 } },
 ];
 
 /** The Echo's knobs (windsor#171): the return's Time, Regen, Damp and Q, then Mix. */

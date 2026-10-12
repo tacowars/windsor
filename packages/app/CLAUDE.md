@@ -313,7 +313,7 @@ lane and the part lanes
 
 Send A and Send B are a level and an insert chain each, the song's
 `returns.a` and `returns.b`; a part reaches them through `sends.a` and
-`sends.b`. By default Send A holds a Plate reverb and Send B an Echo, both at
+`sends.b`. By default Send A holds a Reverb and Send B an Echo, both at
 Mix 1 (`RETURNS`, `mix.ts`).
 
 1. **An effect for a bus is an insert kind.** Add it as "Add a strip insert

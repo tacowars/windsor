@@ -33,7 +33,7 @@ import {
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import type { EchoSpec } from '../inserts/echoInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import type { ReturnSpec } from './mix';
 import { RETURNS, onSendBus } from './mix';
 import { createReturn, delayClipCurve } from './returnBus';
@@ -191,7 +191,7 @@ describe('a bus chain edit', () => {
     expect(bus.inserts.map((s) => s.kind)).toEqual(['echo', 'chorus']);
     bus.setInserts([]);
     expect(bus.inserts).toEqual([]);
-    const plate = onSendBus(DEFAULT_PLATE_REVERB);
+    const plate = onSendBus(DEFAULT_REVERB);
     bus.setInserts([plate]);
     expect(bus.spec).toEqual({ level: RETURNS.b.level, inserts: [plate] });
     expect(waits).toHaveLength(3);
@@ -210,7 +210,7 @@ describe('a bus chain edit', () => {
     (later as (() => void) | null)?.();
     expect(fake(bus.output).outbound).toEqual([]);
     expect(fake(bus.input).outbound).toEqual([]);
-    expect(bus.inserts.map((s) => s.kind)).toEqual(['plate']);
+    expect(bus.inserts.map((s) => s.kind)).toEqual(['reverb']);
   });
 });
 

@@ -33,8 +33,9 @@ const versionSeven = (): Record<string, unknown> => ({
 });
 
 /**
- * The shipped steps and stand-ins 10 → 11 to 13 → 14: windsor#748, windsor#761,
- * windsor#764 and windsor#746 ship none, so a version-10 to 13 song is refused, and
+ * The shipped steps and stand-ins 10 → 11 to 14 → 15: windsor#748, windsor#761,
+ * windsor#764, windsor#746 and windsor#771 ship none, so a version-10 to 14 song is
+ * refused, and
  * this reads a step's own work through to a version this build loads.
  */
 const PAST_TEN = {
@@ -44,6 +45,7 @@ const PAST_TEN = {
     11: (doc: Record<string, unknown>) => doc,
     12: (doc: Record<string, unknown>) => doc,
     13: (doc: Record<string, unknown>) => doc,
+    14: (doc: Record<string, unknown>) => doc,
   },
   patches: PATCH_MIGRATIONS,
 };
