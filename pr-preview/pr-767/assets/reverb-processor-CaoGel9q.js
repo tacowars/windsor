@@ -841,7 +841,8 @@ function configureLowBand(plate, parameters, held, immediate) {
   const gains = plate._gainTarget;
   let ramping = false;
   for (let p = 0; p < extra.length; p++) {
-    target[p] = on && !held ? Math.exp(-perSample * plate._lengthTarget[p + FIRST_TANK_LINE]) - gains[p] : 0;
+    const length = plate._lengthTarget[p + FIRST_TANK_LINE] - plate._modExcursion[p];
+    target[p] = on && !held ? Math.exp(-perSample * length) - gains[p] : 0;
     if (immediate) extra[p] = target[p];
     step[p] = (target[p] - extra[p]) / QUANTUM3;
     if (step[p] !== 0) ramping = true;
