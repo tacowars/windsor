@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadReverb } from '../__fixtures__/reverbHarness';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
-import { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
+import { DEFAULT_SPACE, SPACES, SPACE_NAMES, type SpaceName, makeSpace } from './reverbSpace';
 
 const loaded = loadReverb();
 const byName = new Map(loaded.descriptors.map((d) => [d.name, d]));
@@ -74,6 +74,20 @@ describe('the shipped spaces', () => {
   it('are distinct rooms, not copies of one another', () => {
     const seen = new Set(SPACE_NAMES.map((k) => JSON.stringify(SPACES[k])));
     expect(seen.size).toBe(SPACE_NAMES.length);
+  });
+
+  it('keep the modulation numbers they had before windsor#764', () => {
+    const before: Record<SpaceName, [number, number]> = {
+      plate: [1, 0.5],
+      room: [0.4, 0.3],
+      hall: [0.5, 0.8],
+      cathedral: [0.3, 1.2],
+      wash: [1.6, 2.5],
+      shimmer: [2.4, 1.8],
+    };
+    for (const key of SPACE_NAMES) {
+      expect([SPACES[key].modRate, SPACES[key].modDepth], key).toEqual(before[key]);
+    }
   });
 
   it('order by size from the smallest room to the largest', () => {

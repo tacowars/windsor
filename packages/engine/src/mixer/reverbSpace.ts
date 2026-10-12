@@ -111,6 +111,7 @@ export const SPACES = {
     inputLowCut: 60,
     tankLowCut: 60,
     tankHighCut: 6500,
+    modRate: 0.5,
     modDepth: 0.8,
   }),
   cathedral: makeSpace({

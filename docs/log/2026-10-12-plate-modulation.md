@@ -63,6 +63,8 @@ not repeat audibly.
    against −10.9, with no line at the rate. `DEFAULT_SPACE` and the
    processor's descriptors carry it. The other `SPACES` rows keep their
    numbers under the new meaning, each now lighter; item 8 re-voices the bank.
+   `hall` sets `modRate: 0.5` explicitly, because it had inherited the
+   default's rate and would otherwise have moved to 3 Hz with it.
    tacowars's ear decides on the preview.
 6. **The decay table is re-measured.** Lines 6 and 10 read cubic lose less
    on each pass than linearly, so a small tank's long tail ran long against
