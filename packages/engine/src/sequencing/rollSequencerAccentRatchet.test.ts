@@ -148,6 +148,18 @@ describe('a ratcheted note (windsor#753)', () => {
     expect(noteOns(played)[0]?.roll?.ticks).toBe(6);
   });
 
+  it('plays one hit when the loop cut leaves it shorter than ROLL_RATCHET_MIN_TICKS', () => {
+    const roll = new RollSequencer(config([{ tick: 95, ticks: 12, pitch: 60, ratchet: 4 }]));
+    const played = events(roll, 97);
+    expect(played.map(label)).toEqual(['95:on:60', '96:off:60']);
+    expect(noteOns(played)[0]).not.toHaveProperty('roll');
+  });
+
+  it('keeps its ratchet when the loop cut leaves exactly ROLL_RATCHET_MIN_TICKS', () => {
+    const roll = new RollSequencer(config([{ tick: 93, ticks: 12, pitch: 60, ratchet: 4 }]));
+    expect(noteOns(events(roll, 97))[0]?.roll).toMatchObject({ hits: 4, ticks: 3 });
+  });
+
   it('slides into an overlapping note of another pitch as a plain note does', () => {
     const roll = new RollSequencer(
       config([

@@ -51,14 +51,16 @@
  * velocity bump and the voice's mod; the note's own `velocity` is
  * unchanged. A ratcheted note-on carries a `roll` of `ratchet` hits over
  * the note's length as it plays (cut at the loop's end, as its release
- * is), at gate 1 and open: the player spends the later hits evenly across
+ * is; a cut that leaves less than `ROLL_RATCHET_MIN_TICKS` plays one hit),
+ * at gate 1 and open: the player spends the later hits evenly across
  * that span in seconds, under swing (`pitchedRoll.ts`, `rollSpan.ts`). Hit
  * 0 is the note-on, slide and all; each later hit is a note-off then a
  * note-on with the accent and no slide; the last is held open and this
  * performer releases it at the note's end, so slide by overlap into the
  * next note works as for a plain note. The normaliser keeps both marks off
  * a note sharing its onset (a chord), and a ratchet off a note shorter than
- * `ROLL_RATCHET_MIN_TICKS`; the performer plays what it is given.
+ * `ROLL_RATCHET_MIN_TICKS`, and the performer holds the same minimum over
+ * the span a loop cut leaves.
  *
  * A live edit keeps every held note on its scheduled release, unless its
  * note (known by its onset and pitch) is gone, which releases it on the
@@ -81,6 +83,7 @@ import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { assertRollEnvelopes, type RollEnvelope } from './rollEnvelope';
+import { ROLL_RATCHET_MIN_TICKS } from './rollNoteTables';
 import { TICKS_PER_BAR, type Unsubscribe } from './scheduler';
 
 /** The longest loop, and so one past the latest onset: `BARS_MAX` bars of 4/4. */
@@ -365,7 +368,8 @@ export class RollSequencer {
   private start(note: RollNote, event: PartTickEvent, loopTicks: number): NoteOnEvent {
     const { tick, time, secondsPerTick } = event;
     const held = Math.min(note.ticks, loopTicks - note.tick);
-    const hits = note.ratchet ?? 1;
+    // A loop cut can leave a ratcheted note shorter than any ratchet plays on: it plays one hit.
+    const hits = held >= ROLL_RATCHET_MIN_TICKS ? (note.ratchet ?? 1) : 1;
     this.releaseAt[note.pitch] = tick + held;
     this.heldOnset[note.pitch] = note.tick;
     this.heldSince[note.pitch] = tick;
