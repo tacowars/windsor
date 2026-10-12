@@ -206,7 +206,11 @@ export const stemVelocity = (value: number, table = ROLL_EDIT): number =>
   Math.round(clamp(value, table.velocityMin, table.velocityMax) * table.velocitySteps) /
   table.velocitySteps;
 
-/** The notes at `indices` set to `value` (`stemVelocity`); a velocity of 1 leaves no key, as the normaliser writes it. */
+/**
+ * The notes at `indices` set to `value` (`stemVelocity`); a velocity of 1
+ * leaves no key, as the normaliser writes it. Every other field, the
+ * accent and the ratchet among them (windsor#754), is kept.
+ */
 export function setVelocity(
   config: RollSequencerConfig,
   indices: readonly number[],
@@ -218,8 +222,9 @@ export function setVelocity(
     config,
     config.notes.map((note, i) => {
       if (!chosen.has(i)) return note;
-      const { tick, ticks, pitch } = note;
-      return velocity === 1 ? { tick, ticks, pitch } : { tick, ticks, pitch, velocity };
+      const next: { -readonly [K in keyof RollNote]: RollNote[K] } = { ...note, velocity };
+      if (velocity === 1) delete next.velocity;
+      return next;
     }),
   );
 }

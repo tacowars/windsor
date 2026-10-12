@@ -350,6 +350,29 @@ export const FIGURE_KNOBS: readonly SequencerKnobEntry[] = [
 /** The Roll device's table knob (windsor#602): Vel, the part's velocity, which scales every note's own. */
 export const ROLL_KNOBS: readonly SequencerKnobEntry[] = [VELOCITY_KNOB];
 
+/**
+ * The Roll's accent amounts (windsor#754; record
+ * `2026-10-12-roll-note-accent-and-ratchet` decisions 2 and 9): the Grid's
+ * Acc vel and Acc mod, on the roll's `accentVelocity` and `accentMod`. A
+ * roll without them reads the engine's `ACCENT_VELOCITY_DEFAULT` and
+ * `ACCENT_MOD_DEFAULT`, which `DEFAULT_ROLL_CONFIG` leaves out, so they are
+ * their own table, beside Vel in the device's Velocity row.
+ */
+export const ROLL_ACCENT_KNOBS: readonly DriverKnobEntry[] = [
+  {
+    kind: 'driver',
+    f: 'accentVelocity',
+    label: 'Acc vel',
+    o: { min: 0, max: 1, def: ACCENT_VELOCITY_DEFAULT, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'accentMod',
+    label: 'Acc mod',
+    o: { min: 0, max: 1, def: ACCENT_MOD_DEFAULT, fmt: fmt2 },
+  },
+];
+
 /** The Figure's Length: the Grid's range over the Figure's own default, one bar. */
 export const FIGURE_LENGTH_KNOB: CardKnobSpec = {
   ...GRID_LENGTH_KNOB,

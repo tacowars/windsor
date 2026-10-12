@@ -4,7 +4,8 @@
  * velocity lane and loop brace (`rollLaneGestures.ts`), the Loop stepper,
  * Quantise (`rollQuantise.ts`, windsor#661) and Audition on its part
  * (`rollAudition.ts`). The device draws; this hands each gesture the frame
- * it edits in.
+ * it edits in. The lane's Acc and Rat clicks (windsor#754) go through the
+ * same editor.
  */
 import type { AppCtx } from './context';
 import { withGesture } from './gestureHooks';
@@ -79,7 +80,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
     frame,
     audition: (pitch, velocity) => auditionNote(ctx, slot, pitch, velocity),
   });
-  rollLaneGestures({ panes, editor, scene, frame, loopStops: stops });
+  rollLaneGestures({ panes, editor, scene, frame, loopStops: stops, lane: () => view.lane });
   return {
     editor,
     stepLoop: (dir) => {

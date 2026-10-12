@@ -66,6 +66,16 @@ describe('the zooms', () => {
     expect(rollViewOf(3, views).fold).toBe(true);
     expect(rollViewOf(4, views).fold).toBe(false);
   });
+
+  it('opens on the Vel lane, and keeps a part’s lane for the session (windsor#754)', () => {
+    const views = new Map();
+    expect(rollViewOf(1, views).lane).toBe('vel');
+    rollViewOf(1, views).lane = 'rat';
+    rollViewOf(2, views).lane = 'acc';
+    expect(rollViewOf(1, views).lane).toBe('rat');
+    expect(rollViewOf(2, views).lane).toBe('acc');
+    expect(defaultRollView().lane).toBe('vel');
+  });
 });
 
 describe('the summary', () => {

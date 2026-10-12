@@ -10,6 +10,8 @@
  * roll's four panes (`rollPanes.ts`), painted from a `RollScene`
  * (`rollPaint.ts`, `rollNotesPaint.ts`). It edits (windsor#603) through
  * `rollEditing.ts`, whose edit in progress it draws over the document. The
+ * lane under the notes shows Vel, Acc or Rat by the corner's tabs
+ * (`rollLaneTabs.ts`, windsor#754), and the notes carry their marks. The
  * Envelopes tab (windsor#707) is `rollEnvelopeMode.ts`: its column, the
  * picker and the envelope over the notes.
  *
@@ -30,6 +32,7 @@ import { RollEnvelopeMode } from './rollEnvelopeMode';
 import { rollTabs } from './rollEnvelopeTabs';
 import { type RollExpander, rollExpander } from './rollExpand';
 import { chordLabel, tonesAt } from './rollHarmony';
+import { rollLaneTabs } from './rollLaneTabs';
 import { guideTick, playingTick, pointerTick, rollPlayhead, standingTick } from './rollGuide';
 import {
   type DrawnNote,
@@ -132,9 +135,19 @@ class RollDevice {
       },
     });
     this.rec = this.recView();
-    this.controls = rollControls({
-      ctx,
-      slot,
+    this.controls = this.controlsView();
+    this.envelopes = this.envelopeMode();
+    this.wire();
+    this.paint();
+    this.watch();
+  }
+
+  /** The controls, once the editor and Rec are built. */
+  private controlsView(): RollControls {
+    return rollControls({
+      ctx: this.ctx,
+      slot: this.slot,
+      region: this.region,
       view: this.view,
       zoom: () => this.zoom(),
       zoomTime: (dir) =>
@@ -152,10 +165,6 @@ class RollDevice {
       quantise: () => this.editing.quantise(),
       rec: this.rec.control,
     });
-    this.envelopes = this.envelopeMode();
-    this.wire();
-    this.paint();
-    this.watch();
   }
 
   /** Rec on this device (windsor#663). */
@@ -233,6 +242,7 @@ class RollDevice {
       this.hover = null;
       this.updateGuide();
     });
+    rollLaneTabs(panes.vcorner, this.view, () => this.previewNotes());
     // Fit follows the width and Fold the height; the first layout centres the notes.
     new ResizeObserver(() => this.paint()).observe(panes.body);
     const main = el('div', 'seq-section roll-main');
@@ -256,7 +266,8 @@ class RollDevice {
       budget: ROLL_DRAW_BUDGET,
     });
     const selected = new Set(this.editing.editor.selected());
-    const notes = paintNotes(this.panes, notesLayer, scene, { instances, selected });
+    const lane = this.view.lane;
+    const notes = paintNotes(this.panes, notesLayer, scene, { instances, selected, lane });
     this.painted = ticks;
     this.drawn = notes.drawn;
     this.lines = [...this.fixedLines, notes.ph];

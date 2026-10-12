@@ -1,8 +1,9 @@
 /**
  * The Roll's four panes (windsor#602 decision 3; the mockup's `.roll`): the
  * ruler with the chord strip on top, the keyboard on the left, the notes,
- * and the velocity lane under them, with the corner that names the guide's
- * chord and the lane's VEL corner. The notes pane is the one scroller; the
+ * and the lane under them, with the corner that names the guide's chord
+ * and the lane's corner, which holds the Vel · Acc · Rat tabs
+ * (`rollLaneTabs.ts`, windsor#754). The notes pane is the one scroller; the
  * other three are clipped and follow it, and a wheel over any of them
  * scrolls the notes. Their content runs `overhang` px past the notes', so
  * they still line up when the notes pane's scrollbars take room from it.
@@ -21,8 +22,11 @@ export interface RollPanes {
   readonly body: HTMLElement;
   /** The notes pane's content: rows, lines, the repeats' hatch, notes and the playhead. */
   readonly canvas: HTMLElement;
+  /** The lane under the notes: velocity stems, or the Acc or Rat cells. */
   readonly vel: HTMLElement;
   readonly velIn: HTMLElement;
+  /** The lane's corner under the keys, which the lane tabs fill. */
+  readonly vcorner: HTMLElement;
 }
 
 function pane(className: string): { outer: HTMLElement; inner: HTMLElement } {
@@ -55,7 +59,7 @@ export function rollPanes(onScroll: () => void): RollPanes {
   const body = el('div', 'roll-body');
   const canvas = el('div', 'roll-inner roll-canvas');
   body.appendChild(canvas);
-  const vcorner = el('div', 'roll-vcorner', 'VEL');
+  const vcorner = el('div', 'roll-vcorner');
   const vel = pane('roll-vel');
   root.append(corner, head.outer, keys.outer, body, vcorner, vel.outer);
   const panes: RollPanes = {
@@ -69,6 +73,7 @@ export function rollPanes(onScroll: () => void): RollPanes {
     canvas,
     vel: vel.outer,
     velIn: vel.inner,
+    vcorner,
   };
   body.addEventListener('scroll', () => {
     syncPanes(panes);

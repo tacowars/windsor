@@ -1,8 +1,9 @@
 /**
  * The Roll's view settings (windsor#602 decision 2), without the DOM: Snap,
  * Keys, Fold, the two zooms, the last length a note was drawn or resized
- * to (windsor#603), and the Envelopes tab's: the page shown, the tool and
- * the envelope shown (windsor#707 decision 2). They are console state, kept per part by slot
+ * to (windsor#603), the Envelopes tab's: the page shown, the tool and
+ * the envelope shown (windsor#707 decision 2), and what the lane under the
+ * notes shows, Vel, Acc or Rat (windsor#754). They are console state, kept per part by slot
  * for the session and never written to the song. The device and the
  * Expanded view keep separate zooms. The Audition switch is the console's,
  * not a part's (`rollAudition.ts`).
@@ -14,10 +15,12 @@
  */
 import { PPQ } from '@windsor/engine';
 import { type RollPage, ROLL_ENVELOPE_TOOL_DEFAULT } from './rollEnvelopeTables';
+import type { RollLane } from './rollMarks';
 import type { RollKeys } from './rollRows';
 import type { AutomationTool } from './songAutomationTables';
 import { DEFAULT_SHAPE_SETTINGS, type ShapeSettings } from './songShapeTables';
 import {
+  ROLL_LANE_DEFAULT,
   ROLL_ROW_DEFAULT,
   ROLL_ROW_PX,
   ROLL_SNAP_DEFAULT,
@@ -50,6 +53,8 @@ export interface RollViewState {
   /** The tab shown: Notes or Envelopes. */
   page: RollPage;
   envelope: RollEnvelopeView;
+  /** What the lane under the notes shows: the stems, the accents or the ratchets. */
+  lane: RollLane;
   snap: number;
   keys: RollKeys;
   fold: boolean;
@@ -59,13 +64,14 @@ export interface RollViewState {
 }
 
 /**
- * A roll as it first opens: on Notes, 1/16, 12 keys, unfolded, a note a
- * sixteenth long, both zooms at Fit; Envelopes on its default tool, showing
- * the roll's first envelope.
+ * A roll as it first opens: on Notes with the Vel lane, 1/16, 12 keys,
+ * unfolded, a note a sixteenth long, both zooms at Fit; Envelopes on its
+ * default tool, showing the roll's first envelope.
  */
 export const defaultRollView = (): RollViewState => ({
   page: 'notes',
   envelope: { tool: ROLL_ENVELOPE_TOOL_DEFAULT, shown: null, shape: DEFAULT_SHAPE_SETTINGS },
+  lane: ROLL_LANE_DEFAULT,
   snap: ROLL_SNAP_DEFAULT,
   keys: '12',
   fold: false,

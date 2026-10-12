@@ -3115,6 +3115,11 @@ body.chord-dragging {
   flex: 1 1 auto;
   min-width: var(--roll-min-w);
 }
+/* The Roll alone is --roll-h high (windsor#754): the Velocity row's 40 px
+   over every other device's --seq-h. */
+.seq-device.fixed.roll-device {
+  --seq-h: var(--roll-h);
+}
 .roll-device-body {
   display: flex;
   flex-direction: column;
@@ -3178,7 +3183,31 @@ body.chord-dragging {
   min-width: 0;
 }
 
-/* The controls: two columns of fields, each a label over its control. */
+/* The controls: two columns of fields, each a label over its control, over
+   the Velocity row (windsor#754): Vel, Acc vel and Acc mod. The mockup's
+   gaps (5 px between fields, 4 and 3 px over the row) overflow the 284 px
+   device by 10 px and clip the knobs' labels, so the fields sit 3 px apart
+   and the row 2 px under them, which fits with a pixel to spare. */
+.roll-ctl-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+}
+.roll-ctl-stack > .roll-ctl-cols {
+  height: auto;
+}
+.roll-ctl-stack .roll-ctl {
+  gap: 3px;
+}
+.roll-vel-row {
+  border-top: 1px solid var(--line);
+  padding-top: 2px;
+}
+.roll-vel-knobs {
+  display: flex;
+  justify-content: space-around;
+}
 .roll-ctl-cols {
   display: flex;
   gap: var(--roll-ctl-gap);
@@ -3405,9 +3434,6 @@ body.chord-dragging {
   font-style: normal;
   text-align: center;
 }
-.roll-ctl > .knob {
-  align-self: center;
-}
 
 /* The roll: four panes; the notes scroll and the others follow. */
 .roll-grid {
@@ -3471,22 +3497,43 @@ body.chord-dragging {
   scrollbar-width: thin;
   scrollbar-color: var(--line-bright) var(--inset);
 }
+/* The lane switch (windsor#754): Vel · Acc · Rat, three stacked tabs. */
 .roll-vcorner {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 4px;
   background: var(--panel-hi);
   border-top: 1px solid var(--line);
   border-right: 1px solid var(--line);
+}
+.roll-vcorner button {
+  height: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
   color: var(--ink-faint);
-  font-family: var(--f-panel);
-  font-size: 8.5px;
-  font-weight: 600;
+  font: 600 7.5px/10px var(--f-panel);
   letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.roll-vcorner button:hover {
+  color: var(--ink);
+}
+.roll-vcorner button[aria-selected='true'] {
+  background: var(--kc);
+  color: var(--inset);
 }
 .roll-vel {
   border-top: 1px solid var(--line);
   cursor: ns-resize;
   touch-action: none;
+}
+.roll-vel:is([data-lane='acc'], [data-lane='rat']) {
+  cursor: default;
 }
 .roll-vel > .roll-inner {
   height: var(--roll-vel-h);
@@ -3807,6 +3854,107 @@ body.chord-dragging {
   box-shadow: 0 0 0 1px var(--ink);
 }
 
+/* A note's marks (windsor#754), whichever lane shows: an accent's ink top
+   edge, and a ratchet's hits cut apart in the inset colour. */
+.roll-note.accent::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--ink);
+}
+.roll-hit-cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background: var(--inset);
+  pointer-events: none;
+}
+
+/* The Acc lane: a square under each note's onset, the Grid's A cell. */
+.roll-acc-cell,
+.roll-rat-cell {
+  --nc: var(--kc);
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--line-bright);
+  border-radius: 2px;
+  background: var(--inset);
+  overflow: hidden;
+  cursor: pointer;
+}
+.roll-acc-cell {
+  top: 10px;
+  height: 14px;
+  color: var(--ink-faint);
+  font: 600 8px/12px var(--f-panel);
+  text-align: center;
+}
+.roll-acc-cell.on {
+  background: var(--nc);
+  border-color: var(--nc);
+  color: var(--inset);
+}
+/* The Rat lane: a cell as wide as the note, its count over a bar per hit. */
+.roll-rat-cell {
+  top: 3px;
+  height: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 1px 2px 2px;
+}
+.roll-rat-cell b {
+  flex: none;
+  color: var(--ink-faint);
+  font: 600 8px/10px var(--f-num);
+  white-space: nowrap;
+}
+.roll-hits {
+  flex: 1 1 0;
+  display: flex;
+  gap: 1px;
+}
+.roll-hits i {
+  flex: 1 1 0;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--ink-faint) 35%, var(--inset));
+}
+.roll-rat-cell.on {
+  border-color: var(--nc);
+}
+.roll-rat-cell.on b {
+  color: var(--ink);
+}
+.roll-rat-cell.on .roll-hits i {
+  background: var(--nc);
+}
+.roll-rat-cell.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+:is(.roll-acc-cell, .roll-rat-cell).chord {
+  --nc: var(--carrier);
+}
+:is(.roll-acc-cell, .roll-rat-cell).scale {
+  --nc: var(--modulator);
+}
+:is(.roll-acc-cell, .roll-rat-cell).out {
+  --nc: var(--roll-n-out);
+}
+:is(.roll-acc-cell, .roll-rat-cell).ghost {
+  opacity: var(--roll-ghost);
+  pointer-events: none;
+}
+:is(.roll-acc-cell, .roll-rat-cell).sel,
+:is(.roll-acc-cell, .roll-rat-cell):not(.ghost, .disabled):hover {
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
 /* The playhead, across the ruler, the notes and the lane. */
 .roll-ph {
   position: absolute;
@@ -3900,7 +4048,7 @@ body.chord-dragging {
   opacity: 0.3;
   pointer-events: none;
 }
-.roll-ctl-cols[hidden],
+.roll-ctl-stack[hidden],
 .renv-ctl[hidden],
 .renv-layer[hidden] {
   display: none;
