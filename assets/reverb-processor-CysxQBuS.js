@@ -64,25 +64,6 @@ var TANK_DELAYS = [
   0.089244313,
   0.106280031
 ];
-var TAP_TIME = [
-  8937872e-9,
-  0.099929438,
-  0.064278754,
-  0.067067639,
-  0.066866033,
-  6283391e-9,
-  0.035818689,
-  0.011861161,
-  0.121870905,
-  0.041262054,
-  0.08981553,
-  0.070931756,
-  0.011256342,
-  4065724e-9
-];
-var TAP_LINE = [9, 9, 10, 11, 5, 6, 7, 5, 5, 6, 7, 9, 10, 11];
-var TAP_SIGN = [1, 1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1];
-var TAPS_PER_SIDE = 7;
 var FIRST_TANK_LINE = 4;
 var TANK_LINE_END = FIRST_TANK_LINE + TANK_DELAYS.length;
 var LINE_COUNT = INPUT_DELAYS.length + TANK_DELAYS.length + INPUT_DELAYS_RIGHT.length;
@@ -98,9 +79,66 @@ var CUTOFF_CEILING = 0.49;
 var MAX_TANK_DIFFUSION = 0.8;
 var SMOOTH_SECONDS = 0.05;
 var MAX_PRE_DELAY = 1;
-var OUTPUT_TRIM = 0.6;
 var SLEEP_INPUT_FLOOR = 1e-9;
 var SLEEP_OUTPUT_FLOOR = 1e-7;
+
+// packages/engine/src/worklet/reverb/reverbTapTables.ts
+var TAP_TIME = [
+  0.063893,
+  9135e-6,
+  0.024148,
+  0.049371,
+  0.079806,
+  0.010071,
+  6401e-6,
+  0.097009,
+  0.065061,
+  3739e-6,
+  0.038101,
+  0.050746,
+  2177e-6,
+  0.010564,
+  0.016937,
+  0.116655,
+  0.019884,
+  0.032315,
+  0.076755,
+  0.070474,
+  0.114526,
+  0.020705,
+  0.055304,
+  0.046873
+];
+var TAP_LINE = [5, 6, 6, 7, 7, 8, 9, 9, 10, 11, 11, 11, 4, 5, 5, 5, 6, 7, 7, 9, 9, 10, 10, 11];
+var TAP_GAIN = [
+  1,
+  -0.75,
+  -0.75,
+  0.75,
+  -0.75,
+  -1,
+  1,
+  -1,
+  -1,
+  1,
+  -1,
+  -1,
+  -0.75,
+  -0.75,
+  -1,
+  1,
+  1,
+  -1,
+  -1,
+  1,
+  -0.75,
+  1,
+  -0.75,
+  -0.75
+];
+var TAPS_PER_SIDE = 12;
+var OUTPUT_TRIM = 0.4781;
+var BUILD_DIRECT_TRIM = 0.6;
 
 // packages/engine/src/worklet/reverb/delayLines.ts
 function _makeDelay(seconds, headroom) {
@@ -146,18 +184,6 @@ function _read(index, offset) {
 }
 function _write1(index) {
   this._buffers[index][this._write[index]] = this._value;
-}
-function _readTap(t) {
-  const index = TAP_LINE[t];
-  const delay = this._tap[t];
-  const buffer = this._buffers[index];
-  const mask = this._mask[index];
-  const position = this._write[index] - delay;
-  const whole = Math.floor(position);
-  const frac = position - whole;
-  const a = buffer[whole & mask];
-  const b = buffer[whole + 1 & mask];
-  this._value = a + (b - a) * frac;
 }
 function _readCubic(index) {
   const buffer = this._buffers[index];
@@ -206,6 +232,7 @@ var BUILD = [0.1, 0, 1];
 var QUANTUM = 128;
 var READ_REACH = 2;
 var DIRECT_SLOTS = 3;
+var DIRECT_SCALE = BUILD_DIRECT_TRIM / OUTPUT_TRIM;
 function makeBuild(plate) {
   const capacity = Math.ceil(BUILD_SPREAD * sampleRate) + READ_REACH;
   const size = 2 ** Math.ceil(Math.log2(capacity));
@@ -255,7 +282,7 @@ function configureBuild(plate, parameters) {
   }
   const direct = plate._buildDirect;
   direct[0] = direct[1];
-  direct[1] = BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along;
+  direct[1] = (BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along) * DIRECT_SCALE;
   if (immediate) direct[0] = direct[1];
   direct[2] = (direct[1] - direct[0]) / QUANTUM;
   if (direct[2] !== 0) ramping = true;
@@ -372,6 +399,15 @@ function configureModulation(plate, parameters) {
     const a = plate._modPhase[p];
     const place = plate._modSpeed > 0 ? MOD_MEAN : plate._modFrom[p] + plate._modSpan[p] * a * a * (SMOOTHSTEP - 2 * a);
     plate._modExcursion[line - FIRST_TANK_LINE] = plate._modDepthTarget[p] * place;
+  }
+}
+
+// packages/engine/src/worklet/reverb/platePoles.ts
+var POLE_CUTS = ["inputHighCut", "inputLowCut", "tankHighCut", "tankLowCut"];
+function poleCoefficients(parameters, poles) {
+  for (let k = 0; k < POLE_CUTS.length; k++) {
+    const hz = parameters[POLE_CUTS[k]][0];
+    poles[k] = 1 - Math.exp(-(2 * Math.PI * Math.min(hz, sampleRate * CUTOFF_CEILING) / sampleRate));
   }
 }
 
@@ -891,13 +927,6 @@ function configureGains(plate, parameters, held) {
 }
 
 // packages/engine/src/worklet/reverb/tank.ts
-var POLE_CUTS = ["inputHighCut", "inputLowCut", "tankHighCut", "tankLowCut"];
-function poleCoefficients(parameters, poles) {
-  for (let k = 0; k < POLE_CUTS.length; k++) {
-    const hz = parameters[POLE_CUTS[k]][0];
-    poles[k] = 1 - Math.exp(-2 * Math.PI * Math.min(hz, sampleRate * 0.49) / sampleRate);
-  }
-}
 function _renderBlock(inputs, outputs, parameters) {
   const output = outputs[0];
   const wet = parameters.wet[0] * OUTPUT_TRIM;
@@ -959,6 +988,7 @@ function _renderBlock(inputs, outputs, parameters) {
   let position;
   let whole;
   let a;
+  const taps = this._tap;
   const stepping = this._stepping || !this._settledSkip;
   const modCursor = this._modCursor;
   const modFrom = this._modFrom;
@@ -1163,12 +1193,22 @@ function _renderBlock(inputs, outputs, parameters) {
     this._value = tapped + tank2 * this._value;
     this._write1(11);
     let left = 0;
+    for (let t = 0; t < TAPS_PER_SIDE; t++) {
+      const tapLine = TAP_LINE[t];
+      line = buffers[tapLine];
+      position = writes[tapLine] - taps[t];
+      whole = Math.floor(position);
+      a = line[whole & masks[tapLine]];
+      left += (a + (line[whole + 1 & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
+    }
     let right = 0;
-    for (let t = 0; t < TAP_TIME.length; t++) {
-      this._readTap(t);
-      const sample = TAP_SIGN[t] * this._value;
-      if (t < TAPS_PER_SIDE) left += sample;
-      else right += sample;
+    for (let t = TAPS_PER_SIDE; t < TAP_TIME.length; t++) {
+      const tapLine = TAP_LINE[t];
+      line = buffers[tapLine];
+      position = writes[tapLine] - taps[t];
+      whole = Math.floor(position);
+      a = line[whole & masks[tapLine]];
+      right += (a + (line[whole + 1 & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
     }
     left += buildLeft * direct;
     right += buildRight * direct;
@@ -1399,7 +1439,6 @@ DattorroReverb.prototype._makeDelay = _makeDelay;
 DattorroReverb.prototype._applySize = _applySize;
 DattorroReverb.prototype._read = _read;
 DattorroReverb.prototype._write1 = _write1;
-DattorroReverb.prototype._readTap = _readTap;
 DattorroReverb.prototype._readCubic = _readCubic;
 DattorroReverb.prototype._writeInput = _writeInput;
 DattorroReverb.prototype._renderBlock = _renderBlock;
