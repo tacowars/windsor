@@ -19,7 +19,7 @@
  * `mixer/reverbAllocation.test.ts` holds the render to no allocation on V8.
  */
 
-import { FIRST_TANK_LINE, LINE_COUNT, MIN_LENGTH, TAP_LINE, TAP_TIME } from './reverbConstants';
+import { FIRST_TANK_LINE, MIN_LENGTH, TANK_LINE_END, TAP_LINE, TAP_TIME } from './reverbConstants';
 import type { DattorroReverb } from './reverbProcessor';
 
 /**
@@ -51,7 +51,7 @@ function _makeDelay(this: DattorroReverb, seconds: number, headroom: number): vo
  */
 function _applySize(this: DattorroReverb, immediate: boolean): void {
   const size = this._size;
-  for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
+  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
     this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * size);
   }
   for (let t = 0; t < TAP_TIME.length; t++) {
@@ -71,7 +71,7 @@ function _applySize(this: DattorroReverb, immediate: boolean): void {
   for (let t = 0; t < TAP_TIME.length; t++) {
     if (Math.fround(this._tap[t] + this._tapStep[t]) !== this._tap[t]) stepping = true;
   }
-  for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
+  for (let i = FIRST_TANK_LINE; i < TANK_LINE_END; i++) {
     if (immediate) this._length[i] = this._lengthTarget[i];
     this._lengthStep[i] = immediate ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
     if (Math.fround(this._length[i] + this._lengthStep[i]) !== this._length[i]) stepping = true;

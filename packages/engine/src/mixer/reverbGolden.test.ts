@@ -7,8 +7,9 @@
  * tests exercise (an impulse and a noise burst from the harness's PRNG, the
  * decay and SIZE extremes, HOLD, the runaway ceiling, a SIZE glide, a wet
  * turned up late, the filters and modulation off their defaults, since
- * windsor#748 the low band, its moves and a Decay step, and since
- * windsor#761 Build at 0 and at 1 and moved with HOLD) plus the
+ * windsor#748 the low band, its moves and a Decay step, since
+ * windsor#761 Build at 0 and at 1 and moved with HOLD, and since
+ * windsor#763 a click on L alone, on R alone and in anti-phase) plus the
  * sleep path (#547) -- a tail that falls asleep, and one that is woken -- is
  * rendered in three paths and hashed against `__fixtures__/reverbGolden.json`:
  * the default, `sleep: false` and `settledSkip: false`. The settled-SIZE skip
@@ -77,8 +78,9 @@ interface Scenario {
 }
 
 /**
- * A click every `every` blocks, the same sign on both channels: the plate sums
- * its input to mono, so opposite signs would cancel and leave the tank silent.
+ * A click every `every` blocks, the same on both channels: a centred source,
+ * which reaches the two halves of the tank through the two input chains
+ * (windsor#763). The stereo rows below feed one side, or opposite signs.
  */
 const clicks = (every: number): Feed => {
   return (block, left, right) => {
@@ -87,6 +89,15 @@ const clicks = (every: number): Feed => {
     right[0] = 1;
   };
 };
+
+/** One click in block 0, at `left` and `right` on each side. */
+const click =
+  (left: number, right: number): Feed =>
+  (block, l, r) => {
+    if (block !== 0) return;
+    l[0] = left;
+    r[0] = right;
+  };
 
 const SCENARIOS: Record<string, () => Scenario> = {
   impulse: () => ({ seconds: 3, feed: impulse }),
@@ -171,6 +182,11 @@ const SCENARIOS: Record<string, () => Scenario> = {
       values.hold![0] = block >= blockAt(2) && block < blockAt(2.4) ? 1 : 0;
     },
   }),
+  // Stereo input (windsor#763): each side alone, and L = −R, which cancelled
+  // to silence while the plate summed its input to mono.
+  'click-left': () => ({ seconds: 2, feed: click(1, 0) }),
+  'click-right': () => ({ seconds: 2, feed: click(0, 1) }),
+  'anti-phase': () => ({ seconds: 2, feed: click(1, -1) }),
   'wet-late': () => ({
     seconds: 3,
     feed: impulse,

@@ -3,7 +3,8 @@
  * The plate's entry (#671): `DattorroReverb` -- its parameters, its state, the
  * audio-load sampler (#445), `process`, the sleep (#547) -- and
  * `registerProcessor('dattorro-reverb', ...)`. The delay lines
- * (`delayLines.ts`) and the awake render (`tank.ts`) are functions over this
+ * (`delayLines.ts`), the input write (`plateInput.ts`) and the awake render
+ * (`tank.ts`) are functions over this
  * processor, installed on its prototype here, so every method body is the one
  * the hand-written `reverb-processor.js` carried, line for line, but for the
  * samples that now cross those calls in fields (windsor#227). Invariants: no
@@ -12,10 +13,12 @@
  * `mixer/reverbGolden.test.ts` pins the render and
  * `mixer/reverbAllocation.test.ts` its allocation on V8.
  *
- * The topology is Jon Dattorro's 1997 figure 1: a pre-delay, an input
- * bandwidth filter, four cascaded all-pass diffusers, Windsor's Build delay
- * (windsor#761, `plateBuild.ts`: a tap set per side, so each loop hears its
- * own onset), and a figure-of-eight "tank" of two coupled loops, each holding
+ * The topology is Jon Dattorro's 1997 figure 1, with its input stage once per
+ * input channel (windsor#763): a pre-delay, an input bandwidth filter and four
+ * cascaded all-pass diffusers for each of L and R, Windsor's Build delay
+ * (windsor#761, `plateBuild.ts`: a line and a tap set per side, so each loop
+ * hears its own onset; L's feeds the right loop and R's the left, the half
+ * each side's output reads most), and a figure-of-eight "tank" of two coupled loops, each holding
  * two all-passes, two long delays and a damping filter. Stereo output is taken from fourteen fixed taps inside the
  * tank rather than from its loop signals, which is what gives the late field its
  * density without further delay lines.
@@ -47,6 +50,7 @@ import {
   ANTI_DENORMAL,
   DECAY_SECONDS,
   INPUT_DELAYS,
+  INPUT_DELAYS_RIGHT,
   LOW_CROSS,
   LOW_DECAY,
   MAX_PRE_DELAY,
@@ -60,14 +64,17 @@ import {
 } from './reverbConstants';
 import { makeBuild } from './plateBuild';
 import { BUILD, BUILD_SPREAD } from './reverbBuildTables';
-import { _renderBlock, _writeInput } from './tank';
+import { _writeInput } from './plateInput';
+import { _renderBlock } from './tank';
 import { makeGainPoints } from './tankGains';
 
 class DattorroReverb extends AudioWorkletProcessor {
   // Declared, never initialised: the constructor writes each one (worklet/CLAUDE.md
   // rule 7), so no field is emitted as `undefined` before its first number.
   _preDelayLength: number;
+  /** The pre-delay rings, one per input channel (windsor#763), read at the one `preDelay`. */
   _preDelay: Float32Array;
+  _preDelayRight: Float32Array;
   _preDelayWrite: number;
   _buffers: Float32Array[];
   _write: Int32Array;
@@ -80,6 +87,11 @@ class DattorroReverb extends AudioWorkletProcessor {
   _tapStep: Float32Array;
   _inputLp: number;
   _inputHp: number;
+  /** The right input's low-pass and high-pass states, at the left's coefficients (windsor#763). */
+  _inputLpRight: number;
+  _inputHpRight: number;
+  /** R's four diffuser reads this sample, lines 12..15 (windsor#763). */
+  _rightReads: Float64Array;
   _dampLp: Float64Array;
   _dampHp: Float64Array;
   /** The block's one-pole coefficients: input low-pass and high-pass, tank low-pass and high-pass. */
@@ -139,13 +151,15 @@ class DattorroReverb extends AudioWorkletProcessor {
   _tangent!: Float64Array;
   /**
    * Build (`plateBuild.ts`, windsor#761), written by `makeBuild` from the
-   * constructor: `build` smoothed per block like Size; the Build line, its
+   * constructor: `build` smoothed per block like Size; the Build lines, their
    * mask and write head; each tap's time in samples and gain, now, this
    * block's target and per-sample step; the direct level's now, target and
    * step; whether the first block has set them, and whether any moves.
    */
   _build: number;
+  /** One Build line per input (windsor#763): the left's feeds the left tap set, the right's the right. */
   _buildLine!: Float32Array;
+  _buildLineRight!: Float32Array;
   _buildMask!: number;
   _buildWrite!: number;
   _buildTime!: Float64Array;
@@ -205,15 +219,20 @@ class DattorroReverb extends AudioWorkletProcessor {
     // 1 would make it a small-integer field, and its first fraction would
     // generalise it, deprecating the map and deoptimising the render.
     this._inputLp = this._inputHp = NaN;
+    this._inputLpRight = this._inputHpRight = NaN;
     this._excPhase = this._excPhase2 = NaN;
     this._size = this._inputGain = this._build = NaN;
     this._value = this._offset = NaN;
     this._cross = this._rt60 = this._cellAt = NaN;
 
-    // Pre-delay is a plain ring, always a full second, rounded up to a whole
-    // number of render quanta so a block write never straddles the wrap.
-    this._preDelayLength = sampleRate + (128 - (sampleRate % 128));
+    // Pre-delay is a plain ring per input channel: MAX_PRE_DELAY rounded up to
+    // a whole number of render quanta, so a block write never straddles the
+    // wrap, and one quantum more, which the block being written takes. Before
+    // windsor#763 the ring was a second plus a part quantum, and at 44.1 kHz
+    // the read's clamp held the longest pre-delay 68 samples short.
+    this._preDelayLength = Math.ceil((MAX_PRE_DELAY * sampleRate) / 128) * 128 + 128;
     this._preDelay = new Float32Array(this._preDelayLength);
+    this._preDelayRight = new Float32Array(this._preDelayLength);
     this._preDelayWrite = 0;
 
     // One pointer per line; reads are computed backwards from it, which is what
@@ -226,14 +245,20 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._lengthTarget = new Float32Array(LINE_COUNT);
     this._lengthStep = new Float32Array(LINE_COUNT);
 
+    // Lines 0..3 the left input's diffusers, 4..11 the tank, 12..15 the
+    // right input's diffusers (windsor#763).
     INPUT_DELAYS.forEach((seconds) => this._makeDelay(seconds, 1));
     TANK_DELAYS.forEach((seconds) => this._makeDelay(seconds, MAX_SIZE));
+    INPUT_DELAYS_RIGHT.forEach((seconds) => this._makeDelay(seconds, 1));
 
     this._tap = new Float32Array(TAP_TIME.length);
     this._tapStep = new Float32Array(TAP_TIME.length);
 
     this._inputLp = 0;
     this._inputHp = 0;
+    this._inputLpRight = 0;
+    this._inputHpRight = 0;
+    this._rightReads = new Float64Array(INPUT_DELAYS_RIGHT.length);
     this._dampLp = new Float64Array(2);
     this._dampHp = new Float64Array(2);
     this._poles = new Float64Array(4);
@@ -337,9 +362,12 @@ class DattorroReverb extends AudioWorkletProcessor {
     // so a head far from 0 rounds its last bit differently from a fresh plate's.
     this._write.fill(0);
     this._preDelay.fill(0);
+    this._preDelayRight.fill(0);
     this._preDelayWrite = 0;
     this._inputLp = 0;
     this._inputHp = 0;
+    this._inputLpRight = 0;
+    this._inputHpRight = 0;
     this._dampLp[0] = this._dampLp[1] = 0;
     this._dampHp[0] = this._dampHp[1] = 0;
     this._excPhase = 0;
@@ -351,9 +379,10 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._lowExtra.fill(0);
     this._lowExtraTarget.fill(0);
     this._lowState.fill(0);
-    // The Build line's contents were written before the silence: empty, and
-    // its ramps set outright on waking.
+    // The Build lines' contents were written before the silence: empty, and
+    // their ramps set outright on waking.
     this._buildLine.fill(0);
+    this._buildLineRight.fill(0);
     this._buildWrite = 0;
     this._buildPrimed = false;
     this._quiet = 0;
