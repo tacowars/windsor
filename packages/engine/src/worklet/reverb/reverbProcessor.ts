@@ -19,8 +19,9 @@
  * (windsor#761, `plateBuild.ts`: a line and a tap set per side, so each loop
  * hears its own onset; L's feeds the right loop and R's the left, the half
  * each side's output reads most), and a figure-of-eight "tank" of two coupled loops, each holding
- * two all-passes, two long delays and a damping filter. Stereo output is taken from fourteen fixed taps inside the
- * tank rather than from its loop signals, which is what gives the late field its
+ * two all-passes, two long delays and a damping filter. Stereo output is taken from
+ * fixed taps on all eight tank lines (Windsor's own table since windsor#766,
+ * `reverbTapTables.ts`) rather than from its loop signals, which is what gives the late field its
  * density without further delay lines.
  *
  *   Dattorro, "Effect Design Part 1: Reverberator and Other Filters", JAES 1997
@@ -46,7 +47,7 @@
 
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
-import { _applySize, _makeDelay, _read, _readCubic, _readTap, _write1 } from './delayLines';
+import { _applySize, _makeDelay, _read, _readCubic, _write1 } from './delayLines';
 import {
   ANTI_DENORMAL,
   DECAY_SECONDS,
@@ -61,12 +62,12 @@ import {
   SLEEP_INPUT_FLOOR,
   SMOOTH_SECONDS,
   TANK_DELAYS,
-  TAP_TIME,
 } from './reverbConstants';
 import { makeBuild } from './plateBuild';
 import { BUILD, BUILD_SPREAD } from './reverbBuildTables';
 import { _writeInput } from './plateInput';
 import { makeModulation, resetModulation } from './plateModulation';
+import { TAP_TIME } from './reverbTapTables';
 import { _renderBlock } from './tank';
 import { makeGainPoints } from './tankGains';
 
@@ -201,7 +202,6 @@ class DattorroReverb extends AudioWorkletProcessor {
   declare _applySize: typeof _applySize;
   declare _read: typeof _read;
   declare _write1: typeof _write1;
-  declare _readTap: typeof _readTap;
   declare _readCubic: typeof _readCubic;
   declare _writeInput: typeof _writeInput;
   declare _renderBlock: typeof _renderBlock;
@@ -445,7 +445,6 @@ DattorroReverb.prototype._makeDelay = _makeDelay;
 DattorroReverb.prototype._applySize = _applySize;
 DattorroReverb.prototype._read = _read;
 DattorroReverb.prototype._write1 = _write1;
-DattorroReverb.prototype._readTap = _readTap;
 DattorroReverb.prototype._readCubic = _readCubic;
 DattorroReverb.prototype._writeInput = _writeInput;
 DattorroReverb.prototype._renderBlock = _renderBlock;

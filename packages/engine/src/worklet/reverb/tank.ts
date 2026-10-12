@@ -1,17 +1,17 @@
-/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the line indices, the modulation's four points and its smoothstep are the algorithm; the tunables are reverbConstants.ts (#671) and reverbModulationTables.ts (windsor#764) */
+/* eslint-disable no-magic-numbers -- DSP: the quantum of 128, the line indices, the modulation's four points and its smoothstep are the algorithm; the tunables are reverbConstants.ts (#671), reverbModulationTables.ts (windsor#764) and reverbTapTables.ts (windsor#766) */
 /**
  * The plate's awake render (#671): one quantum, after `plateInput.ts` has
  * written each input channel into its own pre-delay ring, through the
  * pre-delays, the input filters, the two chains of four diffusers, Build's
- * multi-tap delay, the figure-of-eight tank and the fourteen output taps
- * (`_renderBlock`), with the sleep bookkeeping (#547) at its end. The input
+ * multi-tap delay, the figure-of-eight tank and the output taps
+ * (`_renderBlock`, the taps' reads written out: `reverbTapTables.ts`, windsor#766), with the sleep bookkeeping (#547) at its end. The input
  * is stereo (windsor#763): L runs through lines 0..3 and R through lines
  * 12..15, at the same pre-delay, filter coefficients and diffusions, so a
  * panned source keeps its side. Build (windsor#761, `plateBuild.ts`) writes
  * each chain's diffused sample into its own line and reads one side's taps
  * back from each, linear between samples: L's sum feeds the right loop (line
- * 8) and R's the left loop (line 4), because table 2's left output takes four
- * of its seven taps from the right loop's lines, and each sum goes to its own
+ * 8) and R's the left loop (line 4), because each output reads the larger
+ * share of its tap weight from the half its own input feeds, and each sum goes to its own
  * side of the wet output at the direct level. Its reads and sums are written
  * out in the sample loop too, never called (`mixer/reverbBuild.test.ts`). The
  * modulation (windsor#764, `plateModulation.ts`) moves all four tank
@@ -30,8 +30,8 @@
  * line, but for how a sample crosses a call (windsor#227): the reads leave
  * theirs in `this._value`, `_write1` stores `this._value`, the cubic reads take
  * their excursion in `this._offset`, and the block's one-pole coefficients
- * land in `this._poles`. V8 boxes a double passed to or returned from a call
- * it does not inline, a heap allocation each (`delayLines.ts`). Invariant: no
+ * land in `this._poles` (`platePoles.ts`). V8 boxes a double passed to or
+ * returned from a call it does not inline, a heap allocation each (`delayLines.ts`). Invariant: no
  * allocation in the render. `mixer/reverbGolden.test.ts` pins every sample;
  * `mixer/reverbProcessor.test.ts` and `mixer/reverbSleep.test.ts` hold its
  * behaviour, and `mixer/reverbAllocation.test.ts` its allocation on V8.
@@ -40,35 +40,18 @@
 import {
   FIRST_TANK_LINE,
   LINE_COUNT,
-  OUTPUT_TRIM,
   SLEEP_OUTPUT_FLOOR,
   SMOOTH_SECONDS,
   TANK_LINE_END,
-  TAP_SIGN,
-  TAP_TIME,
-  TAPS_PER_SIDE,
 } from './reverbConstants';
 import { configureBuild } from './plateBuild';
+import { poleCoefficients } from './platePoles';
 import { BUILD_TAPS_PER_SIDE } from './reverbBuildTables';
 import type { DattorroReverb } from './reverbProcessor';
 import { configureGains } from './tankGains';
 import { configureModulation, MOD_DRAWS } from './plateModulation';
 import { MOD_DRAW_LENGTH, MOD_HALF, MOD_WIDTH_MIN } from './reverbModulationTables';
-
-/** The parameters the block's one-pole coefficients are cut from, in `_poles` order. */
-const POLE_CUTS = ['inputHighCut', 'inputLowCut', 'tankHighCut', 'tankLowCut'];
-
-/**
- * Each one-pole coefficient for this block's cutoffs in Hz, into `poles`. One
- * call for all four, and nothing but arrays crosses it: a coefficient
- * returned from a call V8 does not inline is a new heap number.
- */
-function poleCoefficients(parameters: Record<string, Float32Array>, poles: Float64Array): void {
-  for (let k = 0; k < POLE_CUTS.length; k++) {
-    const hz = parameters[POLE_CUTS[k]][0];
-    poles[k] = 1 - Math.exp((-2 * Math.PI * Math.min(hz, sampleRate * 0.49)) / sampleRate);
-  }
-}
+import { OUTPUT_TRIM, TAP_GAIN, TAP_LINE, TAP_TIME, TAPS_PER_SIDE } from './reverbTapTables';
 
 /* eslint-disable-next-line max-lines-per-function -- Block-rate setup and
    the tank are one unit. The tank itself is eleven all-pass and delay stages
@@ -172,6 +155,8 @@ function _renderBlock(
   let position: number;
   let whole: number;
   let a: number;
+  // The output taps' delays in samples, read in the loop below.
+  const taps = this._tap;
 
   const stepping = this._stepping || !this._settledSkip;
   // Each modulation point's source, written out below.
@@ -257,7 +242,7 @@ function _renderBlock(
     // Build: each side's taps read back from its own line, linear between
     // samples as the tank's reads are, and summed at their gains. L's sum
     // feeds the right loop (line 8) and R's the left loop (line 4), so each
-    // side reaches first the loop its own output taps read most.
+    // side reaches first the loop its own output taps weigh most.
     let buildLeft = 0;
     for (let t = 0; t < BUILD_TAPS_PER_SIDE; t++) {
       position = buildWrite - buildTime[t];
@@ -419,13 +404,27 @@ function _renderBlock(
     this._value = tapped + tank2 * this._value;
     this._write1(11);
 
+    // The output taps (`reverbTapTables.ts`), each read `taps[t]` samples back
+    // from its line's write head, linear between samples, at its signed gain:
+    // the first TAPS_PER_SIDE to the left, the rest to the right. Written
+    // out, never called (windsor#766), as R's chain is.
     let left = 0;
+    for (let t = 0; t < TAPS_PER_SIDE; t++) {
+      const tapLine = TAP_LINE[t];
+      line = buffers[tapLine];
+      position = writes[tapLine] - taps[t];
+      whole = Math.floor(position);
+      a = line[whole & masks[tapLine]];
+      left += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
+    }
     let right = 0;
-    for (let t = 0; t < TAP_TIME.length; t++) {
-      this._readTap(t);
-      const sample = TAP_SIGN[t] * this._value;
-      if (t < TAPS_PER_SIDE) left += sample;
-      else right += sample;
+    for (let t = TAPS_PER_SIDE; t < TAP_TIME.length; t++) {
+      const tapLine = TAP_LINE[t];
+      line = buffers[tapLine];
+      position = writes[tapLine] - taps[t];
+      whole = Math.floor(position);
+      a = line[whole & masks[tapLine]];
+      right += (a + (line[(whole + 1) & masks[tapLine]] - a) * (position - whole)) * TAP_GAIN[t];
     }
     // Build's direct path: each input's tap sum on its own side, ahead of the tail.
     left += buildLeft * direct;
@@ -479,4 +478,4 @@ function _renderBlock(
   return true;
 }
 
-export { poleCoefficients, _renderBlock };
+export { _renderBlock };

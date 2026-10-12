@@ -2,14 +2,15 @@
 /**
  * The plate's delay lines (#671): allocation (`_makeDelay`), the SIZE-scaled
  * lengths and taps and their per-sample ramp (`_applySize`), the write, and the
- * three fractional reads -- linear from the read point, linear back from the
- * write head for the output taps, cubic for the four modulated tank all-passes (windsor#764).
+ * two fractional reads -- linear from the read point, cubic for the four
+ * modulated tank all-passes (windsor#764). The output taps' reads, linear back
+ * from the write head, are written out in the tank's sample loop (windsor#766).
  * Each is a function over the processor (`this: DattorroReverb`), installed on
  * its prototype by `reverbProcessor.ts`, so its body is the method it was in
  * the hand-written `reverb-processor.js`, line for line, but for how a sample
  * crosses the call (windsor#227): a read leaves its sample in `this._value`
  * and `_write1` stores `this._value`, the cubic read's offset is
- * `this._offset`, and a tap is named by its index. V8 boxes a double passed
+ * `this._offset`. V8 boxes a double passed
  * to or returned from a call it does not inline, and it inlined only some of
  * the tank's forty-six reads and writes a sample, so the plate allocated
  * about 41 KB a quantum; a double field is written in place. Invariant: no
@@ -19,7 +20,8 @@
  * `mixer/reverbAllocation.test.ts` holds the render to no allocation on V8.
  */
 
-import { FIRST_TANK_LINE, MIN_LENGTH, TANK_LINE_END, TAP_LINE, TAP_TIME } from './reverbConstants';
+import { FIRST_TANK_LINE, MIN_LENGTH, TANK_LINE_END } from './reverbConstants';
+import { TAP_LINE, TAP_TIME } from './reverbTapTables';
 import type { DattorroReverb } from './reverbProcessor';
 
 /**
@@ -107,27 +109,6 @@ function _write1(this: DattorroReverb, index: number): void {
 }
 
 /**
- * Output tap `t`'s fractional read, `this._tap[t]` samples back from the write
- * head of its line, into `this._value`.
- *
- * The output taps are delays, not offsets from the oldest sample, so they do
- * not go through `_read` -- see the TAP_TIME note above.
- */
-function _readTap(this: DattorroReverb, t: number): void {
-  const index = TAP_LINE[t];
-  const delay = this._tap[t];
-  const buffer = this._buffers[index];
-  const mask = this._mask[index];
-  const position = this._write[index] - delay;
-  const whole = Math.floor(position);
-  const frac = position - whole;
-
-  const a = buffer[whole & mask];
-  const b = buffer[(whole + 1) & mask];
-  this._value = a + (b - a) * frac;
-}
-
-/**
  * Fractional read, `this._offset` samples forward of the line's read point,
  * into `this._value`. The offset is the modulation's excursion, a double, so
  * it comes in a field rather than as an argument.
@@ -162,4 +143,4 @@ function _readCubic(this: DattorroReverb, index: number): void {
   this._value = ((a * frac + b) * frac + c) * frac + x1;
 }
 
-export { _makeDelay, _applySize, _read, _write1, _readTap, _readCubic };
+export { _makeDelay, _applySize, _read, _write1, _readCubic };

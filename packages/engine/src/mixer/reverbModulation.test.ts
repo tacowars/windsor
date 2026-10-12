@@ -257,9 +257,11 @@ describe('live moves (record 2026-08-31-dattorro-reverb-not-plateau §3)', () =>
         ...ends.map((end) => stepFrom1s(drums(), still(end), seconds).step),
       );
       // The loudest step is a kick's, the same sample in the moving render as
-      // in the still ones; a moving tail under it can lift it by a hair (the
-      // `modRate` sweeps read 1.0001 of the still plate's), so 1 % is allowed.
-      expect(stepFrom1s(drums(), automate, seconds).step).toBeLessThanOrEqual(stillStep * 1.01);
+      // in the still ones; a moving tail under it can lift it by a hair. Since
+      // windsor#766's denser early taps more of the tail sits under each kick:
+      // the 1 s `modDepth` sweep reads 1.045 of the still plate's, the others
+      // 0.87 to 0.95, so 5 % is allowed (record `2026-10-12-plate-output-taps`).
+      expect(stepFrom1s(drums(), automate, seconds).step).toBeLessThanOrEqual(stillStep * 1.05);
     },
     120_000,
   );
