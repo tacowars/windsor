@@ -68,6 +68,11 @@ nothing is moved by it.
    pitches, up to the part's voices. Entering a region mid-note (a seek, a
    loop jump) does not start that note: there is no chase. Swing applies
    as the clock applies it to every tick.
+   **Amended (windsor#739):** an overlap of two pitches now slides on a
+   mono patch, by `2026-10-11-bounce-to-roll` decision 7: a note that
+   starts while a note of another pitch from an earlier tick is still
+   held carries `slide`. Notes on one tick and touching notes retrigger
+   as before, and a poly patch still plays the overlap as two notes.
 7. **The device** follows the approved mockup: the 244 px rack device
    with an Expand that opens it wide. Its controls are Snap (1/4 to 1/32,
    the triplets, Off), Loop in bars, Keys (12 or Scale), Fold, Vel, the
@@ -142,4 +147,5 @@ unless this list says it is silent:
   (windsor#603) follows the rule and the device.
 - Not in v1: recording from MIDI or the computer keyboard; quantise;
   per-note accent, slide or ratchet; step-mod lanes; copy and paste
-  between regions.
+  between regions. A slide came later as an overlap rather than a mark
+  on the note (`2026-10-11-bounce-to-roll` decision 7, windsor#739).

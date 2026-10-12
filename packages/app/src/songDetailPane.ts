@@ -12,6 +12,9 @@
  * (windsor#75): a part selected without a region edits its first, and a
  * part with no regions shows a hint in place of the card.
  *
+ * After the header's note, a generated part's Bounce to Roll button
+ * (`bounceButton.ts`, windsor#742).
+ *
  * Under the card, a part's insert chain (`songInsertPanel.ts`, windsor#156).
  * The sequencer section and the insert panel each fold with an arrow
  * (`songPaneFold.ts`): folded, the sequencer keeps its header and hides the
@@ -19,6 +22,7 @@
  */
 import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
+import { bounceButton } from './bounceButton';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
 import { closeRollPopovers } from './rollPopoverLife';
@@ -49,11 +53,15 @@ export interface DetailPane {
 /** Writes the drawn header's title and note, each only when its text changed. */
 type HeadWriter = (text: PaneHeadText) => void;
 
-/** The pane's header: a part's fold arrow, the title, a small note, and the close ×. */
+/**
+ * The pane's header: a part's fold arrow, the title, a small note, a part's
+ * command after it (Bounce to Roll, windsor#742), and the close ×.
+ */
 function head(
   view: SongView,
   text: PaneHeadText,
   fold?: HTMLElement,
+  command?: HTMLElement | null,
 ): { row: HTMLElement; write: HeadWriter } {
   const row = el('div', 'card-head');
   const label = el('span', '');
@@ -62,6 +70,7 @@ function head(
   const note = el('small', '', text.note);
   label.appendChild(title);
   label.appendChild(note);
+  if (command) label.appendChild(command);
   row.appendChild(label);
   const close = el('button', 'btn nudge', '×') as HTMLButtonElement;
   close.type = 'button';
@@ -124,6 +133,7 @@ function paintPart(
     view,
     partHeadText(part, region, view.ctx.model.doc.transport.meter, partNames(view.ctx.model.doc)),
     foldButton(view, 'sequencerOpen', 'Sequencer'),
+    bounceButton(view, part),
   );
   pane.appendChild(header.row);
   if (view.state.sequencerOpen) {

@@ -1,8 +1,8 @@
 # Bounce to Roll, and slide by overlap in the Roll
 
 - **Date:** 2026-10-11
-- **Status:** proposed (decisions agreed with tacowars on 2026-10-11; the
-  mockup awaits approval)
+- **Status:** accepted (decisions agreed with tacowars on 2026-10-11; the
+  mockup approved by tacowars on 2026-10-11)
 - **Links:** this record's issue, windsor#732 · the mockup,
   `docs/research/2026-10-11-bounce-to-roll-mockup/mockup.html` · the Roll
   record `2026-10-04-roll-sequencer` · region patterns in
@@ -60,12 +60,18 @@ build tickets, written then.
      ends at the region's end, where the gate's leave releases it.
    - **A Euclid hit's hold** is in seconds, and the clock's ticks are
      swung (`swingTicks` in `sequencing/swing.ts`: tick `n` sounds at
-     `swingTicks(n)` straight ticks). The note's release tick is the
-     straight tick whose swung time is nearest the hit's onset time plus
-     its hold: `unswingTicks(swingTicks(onset) + hold ÷ secondsPerTick)`,
-     the inverse of the clock's warp, then whichever of the two whole ticks
-     around it sounds nearer that time, the later on a tie. Straight, that is the hold at the
-     tempo. A release that is not already a whole tick is rounded, and
+     `swingTicks(n)` straight ticks). The clock swings by the absolute
+     transport tick (`TickTransport.intervalSeconds` in
+     `sequencing/scheduler.ts`), and a region may start off the swing grid
+     (the Shift-snap in `regionModel.ts`), so the warp is read at the
+     region's absolute phase. For a hit on local tick `onset` of a region
+     starting on transport tick `r`, the note's release is the tick whose
+     swung time is nearest the hit's onset time plus its hold:
+     `unswingTicks(swingTicks(r + onset) + hold ÷ secondsPerTick) − r`,
+     the inverse of the clock's warp with the region's start subtracted
+     afterwards, then whichever of the two whole ticks around it sounds
+     nearer that time, the later on a tie. Straight, that is the hold at
+     the tempo. A release that is not already a whole tick is rounded, and
      counted with the ratchet roundings ("ticks rounded", decision 8).
      Worked below.
    - **A Euclid tail past the region's end.** A Euclid hit is triggered
@@ -102,11 +108,13 @@ build tickets, written then.
    - **Ratchet.** The engine spaces a ratchet's `N` hits evenly across the
      step's swung span (`rollHits` in `song/rollSpan.ts`), in straight
      time, so the bounce places them through the inverse warp, as it does
-     a Euclid release. For a step of `T` ticks starting on tick `s`, the
-     span is `S = swingTicks(s + T) − swingTicks(s)` straight ticks, and
-     hit `i` sounds at `swingTicks(s) + i × S ÷ N`. Its written onset is
+     a Euclid release. For a step of `T` ticks starting on transport tick
+     `s` (the region's start plus the step's local tick, so the warp is
+     read at the absolute phase, as above), the span is
+     `S = swingTicks(s + T) − swingTicks(s)` straight ticks, and hit `i`
+     sounds at `swingTicks(s) + i × S ÷ N`. Its written onset is
      `unswingTicks` of that time, and its release is `unswingTicks` of
-     that time plus the hit's held time. A closed hit (every hit but an
+     that time plus the hit's held time, each less the region's start. A closed hit (every hit but an
      open last one) is held `g × S ÷ N`, with `g` the roll's gate
      (`NoteRoll.gate`): 1 for a Grid step and the part's Gate for an Arp,
      Basslead or Figure step (`rollOutcome`). A Euclid hit is held the
@@ -340,9 +348,10 @@ Four positions fell between ticks (hit 1's release, hit 2's onset, hit
 ### A ratchet across the swing's off-beat (decision 4)
 
 At 75% sixteenth swing a pair is 12 ticks, a tick in its first half lasts
-1.5 straight ticks and one in its second half 0.5. A Grid step at 1/8
-(12 ticks) on the downbeat, tick 0, with a ratchet of 4, spans the whole
-pair: `S` = `swingTicks(12)` − `swingTicks(0)` = 12 straight ticks. The
+1.5 straight ticks and one in its second half 0.5. The region starts on a
+beat, so its local ticks and the transport's share the swing's phase. A
+Grid step at 1/8 (12 ticks) on the downbeat, tick 0, with a ratchet of 4,
+spans the whole pair: `S` = `swingTicks(12)` − `swingTicks(0)` = 12 straight ticks. The
 engine plays its hits at straight times 0, 3, 6 and 9, each closed hit
 held 3. Through `unswingTicks` the onsets are ticks 0, 2, 4 and 6 (9 is
 the off-beat, `unswingTicks(9)` = 6), and the closed hits' releases at 3,
@@ -371,7 +380,9 @@ windsor#736 would give them a tick each.
 
 A Euclid part at 75% sixteenth swing: a pair is 12 ticks and its off-beat
 lands at 75% of it, so a tick in the pair's first half lasts 1.5 straight
-ticks and one in its second half 0.5. A hit on the downbeat (tick 0) whose
+ticks and one in its second half 0.5. The region starts on a beat, so its
+local ticks and the transport's share the swing's phase (`r` = 0 above,
+or any beat). A hit on the downbeat (local tick 0) whose
 hold lasts six straight ticks (`hold` = 6 × `secondsPerTick`) is released
 at straight time 6 by `trigger`. `unswingTicks(6)` = 6 ÷ 1.5 = 4, a whole
 tick, so the note is written 0–4 and nothing is rounded. Played back, the
@@ -383,6 +394,17 @@ A hold of four straight ticks from the same downbeat inverts to tick
 2.667. Its neighbours sound at `swingTicks(2)` = 3 and `swingTicks(3)` =
 4.5, and 4.5 is nearer 4, so the note is written 0–3 and counted as one
 tick rounded. Straight, both holds convert at the tempo and round nothing.
+
+A region that starts off the swing grid is read at the transport's phase.
+One starting on transport tick 6, the first pair's off-beat, with a hit on
+its local tick 0 held six straight ticks: the hit sounds at
+`swingTicks(6)` = 9 straight ticks and is released at 15, and
+`unswingTicks(15)` = 14 (tick 12 opens the next pair, and 3 straight
+ticks into it is 2 ticks), so the note ends on transport tick 14, which
+is local tick 8: it is written 0–8, a whole tick, and nothing is rounded.
+Read at the local phase, as if the region started on a beat, it would be
+written 0–4, which ends on transport tick 10 at `swingTicks(10)` = 11,
+four straight ticks short of the hold.
 
 ### A Euclid tail cut at the region's end (decision 4)
 

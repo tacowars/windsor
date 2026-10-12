@@ -31,6 +31,18 @@
  * while that pitch is held releases the held one first. Nothing chases: an
  * entry mid-note (a seek, a loop jump) starts only the onsets it reaches.
  *
+ * **Slide by overlap** (windsor#739, record `2026-10-11-bounce-to-roll`
+ * decision 7). A note-on carries `slide` when a note of another pitch is
+ * still held: one that started on an earlier tick and whose release falls
+ * after this tick. Since releases come first, every note held when a tick's
+ * onsets begin is such a note, so the count held then answers it with no
+ * scan. Notes starting on one tick (a chord) never slide into each other,
+ * and touching notes (one released on the tick the next starts) retrigger.
+ * A mono patch glides the sounding voice into the new note
+ * (`NoteOnMessage.slide`); a poly patch ignores the flag. The note slid from
+ * still sends its note-off when it ends, which finds its handle no longer
+ * bound to a voice and releases nothing.
+ *
  * A live edit keeps every held note on its scheduled release, unless its
  * note (known by its onset and pitch) is gone, which releases it on the
  * next tick. The position is read from the clock at every tick, so a new
@@ -154,6 +166,8 @@ export class RollSequencer {
   private readonly releaseAt = new Int32Array(MIDI_NOTE_MAX + 1).fill(NOT_HELD);
   /** Per pitch, the loop tick its held note started on: with the pitch, which note it is. */
   private readonly heldOnset = new Int32Array(MIDI_NOTE_MAX + 1);
+  /** Per pitch, the local tick its held note started on, to tell an earlier note from a chord's. */
+  private readonly heldSince = new Int32Array(MIDI_NOTE_MAX + 1);
   private heldCount = 0;
 
   constructor(config: RollSequencerConfig) {
@@ -193,20 +207,30 @@ export class RollSequencer {
     return source.subscribe(1, (event) => this.handleTick(event));
   }
 
-  /** One local tick: the releases due, then the onsets at its loop position. */
+  /**
+   * One local tick: the releases due, then the onsets at its loop position,
+   * each sliding while a note from an earlier tick is still held.
+   */
   handleTick(event: PartTickEvent): readonly NoteEvent[] {
     const { tick, time } = event;
     const { loopTicks } = this.current;
     const position = tick % loopTicks;
     const onsets = this.onsets;
     let events = this.heldCount > 0 ? this.releaseDue(tick, tick, time) : null;
+    // Every note held now started on an earlier tick and is released after this one.
+    let heldEarlier = this.heldCount;
     for (let i = firstOnsetAt(onsets, position); i < onsets.length; i++) {
       const note = onsets[i] as RollNote;
       if (note.tick !== position) break;
       if (note.velocity === 0) continue;
       events ??= [];
-      if (this.releaseAt[note.pitch] !== NOT_HELD) events.push(this.off(note.pitch, tick, time));
-      events.push(this.start(note, tick, time, loopTicks));
+      if (this.releaseAt[note.pitch] !== NOT_HELD) {
+        if ((this.heldSince[note.pitch] as number) < tick) heldEarlier--;
+        events.push(this.off(note.pitch, tick, time));
+      }
+      const on = this.start(note, tick, time, loopTicks);
+      if (heldEarlier > 0) on.slide = true;
+      events.push(on);
     }
     return this.emit(events);
   }
@@ -244,6 +268,7 @@ export class RollSequencer {
   private start(note: RollNote, tick: number, time: number, loopTicks: number): NoteOnEvent {
     this.releaseAt[note.pitch] = tick + Math.min(note.ticks, loopTicks - note.tick);
     this.heldOnset[note.pitch] = note.tick;
+    this.heldSince[note.pitch] = tick;
     this.heldCount++;
     const on: NoteOnEvent = { kind: 'noteOn', tick, time, note: note.pitch, degree: 0 };
     if (note.velocity !== undefined && note.velocity !== 1) on.velocity = note.velocity;

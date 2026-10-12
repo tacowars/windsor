@@ -5552,6 +5552,26 @@ select.field.compact {
   font-size: 16px;
   letter-spacing: 0;
 }
+/* Bounce to Roll (windsor#742, the approved mockup): the console's .btn at
+   the sequencer device's own button size (.seq-btn's padding and type), so it
+   is 22 px tall like the fold arrow and the header row does not grow; 16 px
+   clear of the summary note. Its border stays .btn's: the part colour is the
+   device's, not the header's. */
+.btn.bounce {
+  margin-left: 16px;
+  vertical-align: top;
+  padding: 4px 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.btn.bounce:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: var(--inset);
+  color: var(--ink-dim);
+  border-color: var(--line);
+}
 .pane-inserts {
   margin-top: 12px;
   padding-top: 10px;
