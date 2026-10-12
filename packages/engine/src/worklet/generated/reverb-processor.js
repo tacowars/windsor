@@ -85,23 +85,23 @@ var SLEEP_OUTPUT_FLOOR = 1e-7;
 // packages/engine/src/worklet/reverb/reverbTapTables.ts
 var TAP_TIME = [
   0.063893,
-  0.013135,
+  9135e-6,
   0.024148,
   0.049371,
   0.079806,
   0.010071,
-  7901e-6,
+  6401e-6,
   0.097009,
   0.065061,
-  2239e-6,
-  0.040101,
+  3739e-6,
+  0.038101,
   0.050746,
   2177e-6,
-  0.012564,
+  0.010564,
   0.016937,
   0.116655,
   0.019884,
-  0.027815,
+  0.032315,
   0.076755,
   0.070474,
   0.114526,
@@ -123,8 +123,8 @@ var TAP_GAIN = [
   1,
   -1,
   -1,
-  0.75,
-  -1,
+  -0.75,
+  -0.75,
   -1,
   1,
   1,
@@ -137,7 +137,7 @@ var TAP_GAIN = [
   -0.75
 ];
 var TAPS_PER_SIDE = 12;
-var OUTPUT_TRIM = 0.4694;
+var OUTPUT_TRIM = 0.4781;
 
 // packages/engine/src/worklet/reverb/delayLines.ts
 function _makeDelay(seconds, headroom) {

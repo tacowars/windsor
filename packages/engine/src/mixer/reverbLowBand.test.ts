@@ -133,7 +133,7 @@ describe('the two bands', () => {
    * line, less its excursion (fix round 2 of PR windsor#767). Cut for the
    * full length, this band rang 32.7 s of its 40 (−18 %); cut for the
    * shortened one, 34.8 s (−13 %). The denser output taps (windsor#766) read
-   * the 36 ms tank at other points and measure it 33.8 s (−15.4 %), so this
+   * the 36 ms tank at other points and measure it 33.9 s (−15.4 %), so this
    * corner is held to 16 % (record `2026-10-12-plate-output-taps`).
    */
   it('holds its own target with modulation on: 375 Hz at Size 0.05, Decay 10 × 4, 8 Hz, 4 ms', () => {

@@ -55,10 +55,11 @@ const WINDOWS: [number, number][] = [
 
 /**
  * How far L alone's left energy may sit from R alone's right in any window.
- * At Size 4 the two halves' first output taps reach 50 ms at different times
- * (line 9's at 36 ms on the left, line 5's at 47 ms on the right), so the
- * first window splits them unevenly: identical chains read 1.96 dB there, and
- * the shipped right chain 1.16 dB (record `2026-10-12-plate-stereo-input`).
+ * At Size 4 the first window holds only each half's first output taps, so it
+ * splits the halves unevenly: under table 2 the shipped right chain read
+ * 1.16 dB there (record `2026-10-12-plate-stereo-input`), and under
+ * windsor#766's taps it reads 0.33 dB (0.56 dB at 44.1 kHz; record
+ * `2026-10-12-plate-output-taps`).
  */
 const MIRROR_DB = (size: number): number => (size === 4 ? 1.25 : 1);
 
