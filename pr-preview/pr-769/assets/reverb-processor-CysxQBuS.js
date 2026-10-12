@@ -138,6 +138,7 @@ var TAP_GAIN = [
 ];
 var TAPS_PER_SIDE = 12;
 var OUTPUT_TRIM = 0.4781;
+var BUILD_DIRECT_TRIM = 0.6;
 
 // packages/engine/src/worklet/reverb/delayLines.ts
 function _makeDelay(seconds, headroom) {
@@ -231,6 +232,7 @@ var BUILD = [0.1, 0, 1];
 var QUANTUM = 128;
 var READ_REACH = 2;
 var DIRECT_SLOTS = 3;
+var DIRECT_SCALE = BUILD_DIRECT_TRIM / OUTPUT_TRIM;
 function makeBuild(plate) {
   const capacity = Math.ceil(BUILD_SPREAD * sampleRate) + READ_REACH;
   const size = 2 ** Math.ceil(Math.log2(capacity));
@@ -280,7 +282,7 @@ function configureBuild(plate, parameters) {
   }
   const direct = plate._buildDirect;
   direct[0] = direct[1];
-  direct[1] = BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along;
+  direct[1] = (BUILD_DIRECT_ROWS[lower] + (BUILD_DIRECT_ROWS[lower + 1] - BUILD_DIRECT_ROWS[lower]) * along) * DIRECT_SCALE;
   if (immediate) direct[0] = direct[1];
   direct[2] = (direct[1] - direct[0]) / QUANTUM;
   if (direct[2] !== 0) ramping = true;
