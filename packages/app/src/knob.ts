@@ -24,11 +24,14 @@ export interface KnobSpec {
    */
   steps?: readonly number[];
   fmt?: (v: number) => string;
+  /** The unit the compact knob's bubble prints after `fmt`'s value ("Hz"); the readout itself stays bare. */
+  unit?: string;
   color?: string;
   /**
-   * The compact size (windsor#157): a smaller dial with its value to the
-   * right and no label under it, for a 40 px row. The label stays the
-   * knob's `title`, `aria-label` and undo step.
+   * The compact size (windsor#157): a smaller dial with no value beside it
+   * and no label under it, for a 40 px row. The label stays the knob's
+   * `title`, `aria-label` and undo step, and its label and value show in
+   * the bubble above it (windsor#768, `knobBubble.ts`), as does a lock's tag.
    */
   compact?: boolean;
   /**
@@ -70,6 +73,8 @@ export interface KnobElement extends HTMLElement {
 }
 
 import { escapeHtml } from './dom';
+import { attachKnobBubble } from './knobBubble';
+import { knobBubbleContent } from './knobBubbleModel';
 import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 import type { OpenGesture } from './gestureHooks';
 import type { KnobAutomation } from './knobAutomation';
@@ -146,9 +151,10 @@ function knobClass(spec: Pick<KnobSpec, 'compact' | 'dial'>): string {
 }
 
 /**
- * The knob's inner markup: its dial, readout, AUTO tag and label. The label
- * is text, never markup: a macro's name (windsor#561) comes from whatever
- * patch was imported, so every knob escapes it here, at the sink.
+ * The knob's inner markup: its dial, readout, AUTO tag and label; a compact
+ * knob's dial alone, its value and tag shown in its bubble (windsor#768).
+ * The label is text, never markup: a macro's name (windsor#561) comes from
+ * whatever patch was imported, so every knob escapes it here, at the sink.
  */
 export function knobMarkup(
   spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation' | 'envelope'>,
@@ -157,7 +163,11 @@ export function knobMarkup(
   const c = size / 2;
   const label = spec.compact ? '' : `<span class="knob-label">${escapeHtml(spec.label)}</span>`;
   const tag = escapeHtml(AUTO_TAG_TEXT);
-  const auto = spec.automation || spec.envelope ? `<span class="knob-auto">${tag}</span>` : '';
+  const auto =
+    !spec.compact && (spec.automation || spec.envelope)
+      ? `<span class="knob-auto">${tag}</span>`
+      : '';
+  const readout = spec.compact ? '' : `<span class="knob-val"></span>${auto}${label}`;
   const ring = spec.envelope
     ? `<path class="dial-env" d=""></path><circle class="dial-env-dot" cx="${c}" cy="${c}" r="${ENV_DOT_R}"></circle>`
     : '';
@@ -169,7 +179,7 @@ export function knobMarkup(
     `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN_INSET}"></line>` +
     ring +
     `</svg>` +
-    `<span class="knob-val"></span>${auto}${label}`
+    readout
   );
 }
 
@@ -360,7 +370,8 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const node = knobDom(spec) as KnobElement;
   const arc = node.querySelector('.dial-arc') as SVGPathElement;
   const pin = node.querySelector('.dial-pin') as SVGLineElement;
-  const out = node.querySelector('.knob-val') as HTMLElement;
+  const out = node.querySelector<HTMLElement>('.knob-val');
+  const bubble = spec.compact ? attachKnobBubble(node) : null;
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
   const paintRing = envelopeRingPainter(node, c, r);
@@ -377,12 +388,21 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     arc.setAttribute('d', Math.abs(a1 - a0) < ARC_MIN_DEGREES ? '' : arcPath(c, c, r, a0, a1));
     pin.setAttribute('transform', `rotate(${ang} ${c} ${c})`);
     const aria = knobAria(spec, v);
-    out.textContent = aria.valuetext;
+    if (out) out.textContent = aria.valuetext;
     node.setAttribute('aria-valuenow', aria.valuenow);
     node.setAttribute('aria-valuetext', lock ? automatedValueText(aria.valuetext) : aria.valuetext);
     if (spec.automation) paintLock(node, lock);
+    const env = spec.envelope && paintRing ? spec.envelope() : null;
+    bubble?.update(
+      knobBubbleContent({
+        label: currentLabels.get(node) ?? spec.label,
+        value: aria.valuetext,
+        unit: spec.unit,
+        lock,
+        enveloped: env !== null,
+      }),
+    );
     if (!spec.envelope || !paintRing) return;
-    const env = spec.envelope();
     paintEnvelope(node, env, lock);
     if (env) paintRing(angleOf(toNorm, env.base), angleOf(toNorm, env.playing));
   };

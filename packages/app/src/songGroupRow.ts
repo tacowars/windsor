@@ -1,7 +1,7 @@
 /**
  * A group's folder header on the Song tab (windsor#615; record
  * `2026-10-05-group-automation-folder-tracks`). In the frozen column: the
- * member fold (`▾` open, `▸` folded), the lanes fold, and the group's name
+ * member fold (its arrow down open, right folded), the lanes fold, and the group's name
  * and member count. In the timeline: the outline of where the group plays,
  * the union of its members' regions as merged, faded spans
  * (`songFolderModel.ts`). The outline is read only: it takes no selection,
@@ -11,7 +11,7 @@
  * lanes beneath the header and above its members: the part's lane rows
  * (`songAutomationLane.ts`) with the group as their owner, their curves
  * ghosted over the outline. Folded, it shows the lane count, as a part's
- * `▸` does. The two folds are independent: folding the members leaves the
+ * fold does. The two folds are independent: folding the members leaves the
  * lanes as they are, and folding the lanes leaves the members.
  *
  * Which groups are folded is view state for the session, as `openParts` is:
@@ -21,6 +21,7 @@
  * header in a row group and indents the members under it.
  */
 import type { GroupSpec, Region } from '@windsor/engine';
+import { disclosureArrow, turnDisclosure } from './disclosureArrow';
 import { el } from './dom';
 import type { Readout } from './songAutomationLane';
 import { automationRows } from './songAutomationLane';
@@ -30,13 +31,20 @@ import { LANES_CAPTION, memberCountLabel, outlineSpans } from './songFolderModel
 import type { SongView } from './songTab';
 import { blockBox, partBlockRows } from './songViewTables';
 
-/** A fold button: `▾` open, `▸` folded; a press flips `open` and repaints, keeping the focus on it. */
+/**
+ * A fold button: the arrow (windsor#768 decisions 1 and 3), down open and
+ * right folded, then `caption` inside the button, so the whole of it is
+ * the target; a press flips `open` and repaints, keeping the focus on it.
+ */
 function foldButton(
   view: SongView,
   fold: { readonly open: boolean; readonly focus: string; readonly label: string },
   flip: () => void,
+  caption?: HTMLElement,
 ): HTMLButtonElement {
-  const button = el('button', 'tri', fold.open ? '▾' : '▸') as HTMLButtonElement;
+  const button = el('button', 'tri disclosure') as HTMLButtonElement;
+  button.appendChild(disclosureArrow('fold'));
+  if (caption) button.appendChild(caption);
   button.type = 'button';
   button.dataset['focus'] = fold.focus;
   button.setAttribute('aria-expanded', String(fold.open));
@@ -47,7 +55,9 @@ function foldButton(
     const grid = button.closest('.lanes');
     flip();
     view.paintLanes();
-    grid?.querySelector<HTMLElement>(`[data-focus="${CSS.escape(fold.focus)}"]`)?.focus();
+    const next = grid?.querySelector<HTMLElement>(`[data-focus="${CSS.escape(fold.focus)}"]`);
+    next?.focus();
+    turnDisclosure(next ?? null);
   };
   return button;
 }
@@ -67,27 +77,28 @@ function memberFold(view: SongView, group: GroupSpec): HTMLElement {
 }
 
 /**
- * The lanes fold (windsor#616 decision 1): `▸` beside "lanes", or beside
- * the lane count while folded with lanes, as a part's fold shows its badge.
+ * The lanes fold (windsor#616 decision 1): the arrow beside "lanes", or
+ * beside the lane count while folded with lanes, as a part's fold shows its
+ * badge; the caption sits inside the button (windsor#768 decision 3).
  */
 function lanesFold(view: SongView, group: GroupSpec): HTMLElement {
   const { openGroups } = view.state;
   const open = openGroups.has(group.id);
   const label = `${open ? 'Hide' : 'Show'} automation for ${group.name}`;
-  const button = foldButton(view, { open, focus: `lanes:group:${group.id}`, label }, () => {
-    if (open) openGroups.delete(group.id);
-    else openGroups.add(group.id);
-  });
-  const fold = el('div', 'lane-fold folder-lanes');
   const count = group.automation?.length ?? 0;
   const badge = !open && count > 0;
-  fold.append(
-    button,
-    el(
-      'span',
-      badge ? 'auto-badge' : 'fold-caption',
-      badge ? laneCountLabel(count) : LANES_CAPTION,
-    ),
+  const caption = el(
+    'span',
+    badge ? 'auto-badge' : 'fold-caption',
+    badge ? laneCountLabel(count) : LANES_CAPTION,
+  );
+  const flip = (): void => {
+    if (open) openGroups.delete(group.id);
+    else openGroups.add(group.id);
+  };
+  const fold = el('div', 'lane-fold folder-lanes');
+  fold.appendChild(
+    foldButton(view, { open, focus: `lanes:group:${group.id}`, label }, flip, caption),
   );
   return fold;
 }

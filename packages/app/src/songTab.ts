@@ -43,6 +43,7 @@
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf, ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
+import { turnDisclosure } from './disclosureArrow';
 import { el } from './dom';
 import { loopBraceRow } from './loopBrace';
 import type { DetailPane } from './songDetailPane';
@@ -284,7 +285,9 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
       view.paintLanes();
       // The fit reads the grid's width, so it is measured on the new cells.
       refit();
-      lanes.querySelector<HTMLElement>('.mix-toggle')?.focus();
+      const arrow = lanes.querySelector<HTMLElement>('.mix-toggle');
+      arrow?.focus();
+      turnDisclosure(arrow);
     },
   };
 
