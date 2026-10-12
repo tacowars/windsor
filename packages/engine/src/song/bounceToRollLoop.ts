@@ -8,15 +8,16 @@
  * rendered notes with an onset before `L`, each cut to `min(ticks, L −
  * tick)` as the performer cuts it. Repeated at 0, L, 2L, … and each copy
  * cut at the region's end (a partial last repeat is a prefix), they must
- * give exactly the rendered notes: pitch, onset, length, and the velocity
- * the part played (and the event's own, which a part at Vel 0 writes). Its
+ * give exactly the rendered notes: pitch, onset, length, the velocity the
+ * part played (and the event's own, which a part at Vel 0 writes), and the
+ * accent and ratchet it carries (windsor#755). Its
  * envelopes must read the rendered envelope's value at every onset. A
  * region no candidate fits is unrolled: its loop is its own length.
  *
  * Pure. An empty region is the bounce's to size, not this search's.
  */
 import { BOUNCE_ENVELOPE_STEP_TICKS } from './bounceRenderTables';
-import type { BounceNote, BounceRegion } from './bounceRenderTypes';
+import type { AccentAmounts, BounceNote, BounceRegion } from './bounceRenderTypes';
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
 import { envelopeValueAt } from '../sequencing/rollEnvelopeValue';
 
@@ -26,6 +27,8 @@ export interface BounceLoop {
   /** The rendered notes the loop keeps, each cut at its end; sorted as rendered. */
   readonly notes: readonly BounceNote[];
   readonly envelopes: readonly RollEnvelope[];
+  /** The amounts its notes' accents play: the region's (`BounceRegion.accent`). */
+  readonly accent: AccentAmounts | null;
 }
 
 /** The notes with an onset before `loopTicks`, each cut at the loop's end as the performer cuts it. */
@@ -45,7 +48,9 @@ const plays = (rendered: BounceNote, looped: BounceNote, tick: number, ticks: nu
   rendered.ticks === ticks &&
   rendered.pitch === looped.pitch &&
   rendered.velocity === looped.velocity &&
-  rendered.own === looped.own;
+  rendered.own === looped.own &&
+  rendered.accent === looped.accent &&
+  rendered.ratchet === looped.ratchet;
 
 /** Whether `loop`, repeated every `loopTicks` and cut at `duration`, gives `notes` exactly. */
 function repeatsAs(
@@ -98,8 +103,10 @@ export function shortestLoop(region: BounceRegion, duration: number, barTicks: n
   for (let loopTicks = barTicks; loopTicks < duration; loopTicks += barTicks) {
     const notes = loopNotes(region.notes, loopTicks);
     if (repeatsAs(region.notes, notes, loopTicks, duration) && envelopesRepeat(region, loopTicks)) {
-      return { loopTicks, notes, envelopes: loopEnvelopes(region.envelopes, loopTicks) };
+      const envelopes = loopEnvelopes(region.envelopes, loopTicks);
+      return { loopTicks, notes, envelopes, accent: region.accent };
     }
   }
-  return { loopTicks: duration, notes: region.notes, envelopes: region.envelopes };
+  const { notes, envelopes, accent } = region;
+  return { loopTicks: duration, notes, envelopes, accent };
 }

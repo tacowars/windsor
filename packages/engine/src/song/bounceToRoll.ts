@@ -10,7 +10,11 @@
  * notes or `ROLL_LOOP_TICKS_MAX` ticks refuses the whole bounce, naming the
  * region. The part's Vel rises to the highest level it played, and every
  * note is written at what it played divided by that Vel (at a Vel of 0,
- * at its event's own velocity), so every played level is kept. The part's
+ * at its event's own velocity), so every played level is kept. An accent
+ * written as `accent` (windsor#755) counts at its level without the bump,
+ * which its region's roll adds back (`accentVelocity`, `accentMod`, written
+ * only where they differ from the defaults), so only a baked accent raises
+ * the Vel; a ratchet is written as its note's `ratchet`. The part's
  * sequencer lanes (`seq.*`) are read by the render and removed; every other
  * lane stays. Regions keep their windows, a single ∞ region included.
  *
@@ -18,7 +22,7 @@
  * normaliser nothing to trim; a Figure canon this part led loses its
  * source to the normaliser, as at any kind change of its leader. Pure.
  */
-import { ROLL_NOTES_MAX } from '../audioConstants';
+import { ACCENT_MOD_DEFAULT, ACCENT_VELOCITY_DEFAULT, ROLL_NOTES_MAX } from '../audioConstants';
 import type { AutomationLane } from '../automation/automationLane';
 import { targetKind } from '../automation/automationTargets';
 import { ticksPerBar } from '../sequencing/meter';
@@ -28,7 +32,7 @@ import type { PartRegion, RollSpec } from './arrangement';
 import type { ArrangementDocument, DocumentPart, DocumentPartial } from './arrangementDocument';
 import { bounceCounts, renderBounceRegion } from './bounceRender';
 import { BOUNCE_KINDS } from './bounceRenderTables';
-import type { BounceNote } from './bounceRenderTypes';
+import type { AccentAmounts, BounceNote } from './bounceRenderTypes';
 import { shortestLoop, type BounceLoop } from './bounceToRollLoop';
 import type { BounceFollower, BounceRefusal, BounceResult } from './bounceToRollTypes';
 import { partAt } from './documentParts';
@@ -58,7 +62,12 @@ function renderLoops(doc: ArrangementDocument, part: DocumentPart): Rendered {
     lanes = region.seqLanes;
     const loop =
       region.notes.length === 0
-        ? { loopTicks: Math.min(duration, ROLL_LOOP_TICKS_MAX), notes: [], envelopes: [] }
+        ? {
+            loopTicks: Math.min(duration, ROLL_LOOP_TICKS_MAX),
+            notes: [],
+            envelopes: [],
+            accent: null,
+          }
         : shortestLoop(region, duration, barTicks);
     const refusal = capRefusal(loop, index + 1, barTicks);
     if (refusal) return { refusal };
@@ -67,11 +76,33 @@ function renderLoops(doc: ArrangementDocument, part: DocumentPart): Rendered {
   return { loops, lanes };
 }
 
-/** A rendered note as the Roll holds it, at `vel`: the level it played ÷ the part's Vel, no key at 1. */
+/**
+ * A rendered note as the Roll holds it, at `vel`: the level it played ÷
+ * the part's Vel, no key at 1, with its accent and ratchet.
+ */
 function written(note: BounceNote, vel: number): RollNote {
   const velocity = vel === 0 ? note.own : note.velocity / vel;
-  const { tick, ticks, pitch } = note;
-  return velocity === 1 ? { tick, ticks, pitch } : { tick, ticks, pitch, velocity };
+  const { tick, ticks, pitch, accent, ratchet } = note;
+  return {
+    tick,
+    ticks,
+    pitch,
+    ...(velocity === 1 ? {} : { velocity }),
+    ...(accent ? { accent } : {}),
+    ...(ratchet ? { ratchet } : {}),
+  };
+}
+
+/** The roll's accent amounts, each only where it is not the default, as the normaliser writes them. */
+function accentAmounts(
+  accent: AccentAmounts | null,
+): Pick<RollSpec, 'accentVelocity' | 'accentMod'> {
+  if (!accent) return {};
+  const { velocity, mod } = accent;
+  return {
+    ...(velocity === ACCENT_VELOCITY_DEFAULT ? {} : { accentVelocity: velocity }),
+    ...(mod === ACCENT_MOD_DEFAULT ? {} : { accentMod: mod }),
+  };
 }
 
 /** Region `region`, its window kept, playing `loop` at `vel`. */
@@ -81,6 +112,7 @@ function rollRegion(region: PartRegion, loop: BounceLoop, vel: number): PartRegi
     kind: 'roll',
     loopTicks,
     notes: loop.notes.map((note) => written(note, vel)),
+    ...accentAmounts(loop.accent),
     ...(envelopes.length > 0 ? { envelopes } : {}),
   };
   return { start: region.start, duration: region.duration, pattern };

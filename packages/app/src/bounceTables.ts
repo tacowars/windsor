@@ -46,7 +46,10 @@ export type BounceCount =
 /**
  * Decision 8's approximations, in its order and wording, each shown only
  * when not zero. Notes silenced at velocity 0 are the record's boundary case
- * ("5 notes at velocity 0 silenced"); they come before the lanes.
+ * ("5 notes at velocity 0 silenced"); they come before the lanes. Since
+ * windsor#755 (record `2026-10-12-roll-note-accent-and-ratchet` decision
+ * 11) the engine counts the ratchet and accent lines only for its
+ * fallbacks: a ratchet written as its hits, and an accent baked in.
  */
 export const BOUNCE_COUNT_LINES: readonly (readonly [BounceCount, CountWords])[] = [
   ['ticksRounded', { one: 'tick rounded', many: 'ticks rounded' }],

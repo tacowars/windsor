@@ -44,10 +44,13 @@ describe('a part Vel of 0', () => {
     expect(counts.zeroVelocity).toBe(16);
   });
 
-  it('with accents, an accented note plays the bump and a plain one 0', () => {
+  it('with accents, an accented note is written at 0 to play the roll’s bump, and a plain one 0', () => {
     const grid = gridSpec([gridNote(0, { accent: true }), gridNote(0)], { accentVelocity: 0.3 });
-    const { notes, counts } = render(bounceSong(grid, { velocity: 0, regions: ONE_BAR }));
-    expect(notes.slice(0, 2).map((note) => note.velocity)).toEqual([0.3, 0]);
+    const { notes, counts, accent } = render(bounceSong(grid, { velocity: 0, regions: ONE_BAR }));
+    expect(notes.slice(0, 2).map((note) => note.velocity)).toEqual([0, 0]);
+    expect(notes[0]?.accent).toBe(true);
+    expect(accent?.velocity).toBe(0.3);
+    // Only the plain notes played at 0: the accents played the bump.
     expect(counts.zeroVelocity).toBe(8);
   });
 });
