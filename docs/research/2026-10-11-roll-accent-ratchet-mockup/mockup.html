@@ -375,14 +375,15 @@ body.show-new .acc-knobs > .knob { outline: 1px dashed var(--carrier); outline-o
       demand.</li>
   </ul>
 
-  <h3>Open questions</h3>
+  <h3>Decided (tacowars, 2026-10-12)</h3>
   <ul>
-    <li><b>Chords.</b> Notes that start on one tick share one place in the lane. One cell per onset, acting on
-      every note starting there (or the selected ones), half-lit when they differ? Or a cell per note, stacked?</li>
-    <li><b>Short notes.</b> Is there a shortest hit, below which a ratchet on a very short note is refused?</li>
-    <li><b>Recording.</b> A recorded note is plain. Should a hard hit (a velocity over some threshold) ever
-      record as an accent? Proposed: no.</li>
+    <li><b>Monophonic only.</b> Notes that start together (a chord) take no accent or ratchet: the lane draws
+      no cell for them, and the normaliser clears both from a note that comes to share its onset.</li>
+    <li><b>Shortest ratchet.</b> A note shorter than a 1/32 (3 ticks) takes no ratchet; its Rat cell is
+      disabled.</li>
+    <li><b>Recording.</b> A hard-played note records its velocity, never an accent.</li>
   </ul>
+  The decisions are recorded in <code>docs/log/2026-10-12-roll-note-accent-and-ratchet.md</code>.
 
   <h3>Stand-ins</h3>
   <ul>
