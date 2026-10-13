@@ -14,9 +14,15 @@
  * memory is the processor's sent FIFO exactly (`WAVE_SENT_LIMIT` slots, the
  * warm-up and every install, nothing else, a key installed again moving to
  * newest), so it never believes the processor holds a key it has evicted.
- * The sets the processor builds on its own (a patch posted while a voice
- * sounds at twice the rate) go to a FIFO of their own and evict none it
- * sent. Should a set be missing anyway, the processor builds it, as it did
+ * The sets the processor builds on its own go to a FIFO of their own and
+ * evict none it sent.
+ *
+ * The processor also builds a patch's 2× sets while one of its voices sounds
+ * at twice the rate (`PartWaveSets.rebuild`'s `sounding2x`): a held voice
+ * from a synced patch, retuned live to one with sync off. The main thread
+ * can't see voice lifetimes, so the caller passes `sounding2x` as a superset:
+ * `AudioPart` passes true for the rest of the part's life once it has played
+ * a synced patch. Should a set be missing anyway, the processor builds it, as it did
  * before: nothing fails to sound, and an offline context gets no sender, its
  * processors building their own.
  * `waveSetSender.test.ts` pins the sets and the bits.
@@ -71,16 +77,18 @@ export class WaveSetSender {
   /**
    * The sets `patch` reads that this context's processors may not hold yet,
    * built here (or found in this thread's cache) and copied, each remembered
-   * as sent: empty when none is new. Post them before the patch, on the
-   * part's port, transferring `wavesTransfer(sets)`.
+   * as sent: empty when none is new. Its 2× sets too when `sounding2x`, a
+   * voice at twice the rate may still sound, as the processor's rebuild
+   * takes them. Post them before the patch, on the part's port, transferring
+   * `wavesTransfer(sets)`.
    */
-  setsFor(patch: Patch): WaveSetEntry[] {
+  setsFor(patch: Patch, sounding2x = false): WaveSetEntry[] {
     const out: WaveSetEntry[] = [];
     const rate = this.rate;
     for (const { wave, rate: at, tone, partials, baseRate } of waveSetInputs(
       patch,
       rate,
-      patchOversamples(patch),
+      sounding2x || patchOversamples(patch),
     )) {
       const key = waveSetKey(wave, at, tone, partials, baseRate);
       if (this.sent.includes(key)) continue;

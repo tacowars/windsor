@@ -16,6 +16,7 @@ import type {
 } from './workletMessages';
 import type { WaveSetSender } from './waveSetSender';
 import { waveSetSenderFor, wavesTransfer } from './waveSetSender';
+import { patchOversamples } from '../worklet/fm/partWaveSets';
 import { frameForTime } from './workletMessages';
 
 /** The processor's slot parameter for slot `i` (`voiceSlot0` …, windsor#346). */
@@ -57,6 +58,13 @@ export class AudioPart {
   private held: ScheduledMessage[] | null = null;
   /** Builds the wave sets a patch needs and sends them ahead of it (windsor#795); null offline. */
   private readonly waves: WaveSetSender | null;
+  /**
+   * Whether this part has played a synced patch, whose held voices sound at
+   * twice the rate and make the processor want later patches' 2× sets. It
+   * stays set for the part's life: the main thread can't see when the last
+   * such voice ends, so the sender's rule stays a superset of the processor's.
+   */
+  private oversampled: boolean;
 
   /**
    * `voiceSlots` is the slot map the processor was built with
@@ -83,6 +91,7 @@ export class AudioPart {
     this.slotPaths = Array.from({ length: FM_LANES_MAX }, (_, i) => voiceSlots?.[i] ?? null);
     this.slotRelative = Array.from({ length: FM_LANES_MAX }, (_, i) => !!voiceSlotsRelative?.[i]);
     this.waves = waveSetSenderFor(node.context);
+    this.oversampled = patchOversamples(patch);
   }
 
   get patch(): Patch {
@@ -271,7 +280,8 @@ export class AudioPart {
    */
   setPatch(patch: Patch): void {
     this.patchValue = patch;
-    const sets = this.waves?.setsFor(patch);
+    this.oversampled ||= patchOversamples(patch);
+    const sets = this.waves?.setsFor(patch, this.oversampled);
     if (sets?.length) this.node.port.postMessage({ type: 'waves', sets }, wavesTransfer(sets));
     this.post({ type: 'patch', patch: structuredClone(patch) });
   }

@@ -13,6 +13,7 @@ import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarne
 import { makePatch, WAVE } from '../patch/patch';
 import type { Patch } from '../patch/patch';
 import { WAVE_SENT_LIMIT, waveSetBuildCount, waveSetFor } from '../worklet/fm/waveTables';
+import { AudioPart } from './audioPart';
 import { WaveSetSender, waveSetSenderFor, wavesTransfer } from './waveSetSender';
 import type { WaveSetEntry } from './workletMessages';
 
@@ -161,4 +162,25 @@ describe('a processor sent its wave sets (windsor#795)', () => {
       expect(loaded.waveSetBuilds() - before).toBe(0);
     },
   );
+
+  // Codex on PR #799: a held voice from a synced patch keeps twice the rate, so the processor
+  // builds a later patch's 2× sets though that patch has sync off. The part sends them too.
+  it('builds nothing when a held synced note is retuned to sync off, then to a new Tone', () => {
+    const loaded = loadProcessor();
+    const p = loaded.create(SYNCED);
+    const node = {
+      context: { currentTime: 0, sampleRate: loaded.sampleRate },
+      port: { postMessage: (m: unknown) => p.inbox(m as ScheduledEvent) },
+      parameters: { get: () => ({ value: 0 }) },
+    } as unknown as AudioWorkletNode;
+    const part = new AudioPart('held', node, SYNCED);
+    part.setLiveRetune(true);
+    render(loaded, p, 4, [{ type: 'noteOn', id: 1, note: 45, velocity: 0.9, frame: 0 }]);
+    const unsynced: Patch = { ...SYNCED, ops: SYNCED.ops.map((op) => ({ ...op, sync: 'off' })) };
+    const before = loaded.waveSetBuilds();
+    part.setPatch(unsynced);
+    part.setPatch({ ...unsynced, tone: 0.21 });
+    expect(p.voices.some((v) => v.active)).toBe(true);
+    expect(loaded.waveSetBuilds() - before).toBe(0);
+  });
 });
