@@ -58,6 +58,11 @@ export interface OffsetHandle extends AutomationHandle {
    * lane's `schedule` and `hold`, and a release, set it back to `false`.
    */
   setRelative(relative: boolean): void;
+  /**
+   * Whether the target holds one of the part's voice slots now: a write
+   * that found every slot taken wrote nothing (windsor#781).
+   */
+  slotted(): boolean;
 }
 
 /** Whether `handle` writes offsets a clip envelope can add to. */

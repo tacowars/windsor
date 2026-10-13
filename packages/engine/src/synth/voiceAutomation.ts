@@ -44,6 +44,12 @@
  * An envelope is admitted only where the patch `defined` its target: a
  * macro past the patch's count has no value an offset could move.
  *
+ * A MIDI CC's performance value (windsor#781, `automation/partPerformance.ts`)
+ * writes the same slot through the same handle too: the offset `offsetOf`
+ * reckons for its value against the patch at the move, absolute as a lane's,
+ * and a clip envelope's added on top where one plays. `slotted` tells it
+ * whether its write found a slot.
+ *
  * A part hands out one handle per target, so a resync finds the same one.
  * The nine decay rows have handles too (windsor#347): the worklet reshapes a
  * decay already running from its level. `fmProcessorAutomation.test.ts` and
@@ -162,6 +168,7 @@ function offsetHandle(target: OffsetTarget, reading: OffsetReading): OffsetHandl
     setRelative(on): void {
       relative = on;
     },
+    slotted: () => target.held() !== undefined,
     schedule(value, time, how): void {
       relative = false;
       scheduleOffset(offsetOf(value), time, how);

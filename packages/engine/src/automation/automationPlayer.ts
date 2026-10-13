@@ -38,6 +38,14 @@
  *   whose regions play no envelope has no tracks, and its lanes play
  *   exactly as before.
  *
+ * - **Performance values** (windsor#781, record `2026-10-13-midi-cc-mapping`):
+ *   a MIDI CC's value on one of a part's targets, held from now until it is
+ *   cleared (`perform`, `unperform`), never a lane and never saved. A lane
+ *   that plays the target wins; the value takes a voice target's slot after
+ *   the lanes and ahead of the envelopes; an envelope rides on top of it.
+ *   Each part's values are `PartPerformance`'s, and `performancePlayer.test.ts`
+ *   pins them here. A part with none plays exactly as before.
+ *
  * Offline render pumps the same clock, so it gets the same events
  * (`render/renderPass.ts`). The worklets never learn song time.
  */
@@ -59,6 +67,8 @@ import { FM_LANES_MAX } from './automationTargetTables';
 import { targetKind } from './automationTargets';
 import type { ClipEnvelopeSource } from './clipEnvelopeSource';
 import { ClipEnvelopeTracks, type RewindAt } from './clipEnvelopeTracks';
+import type { PerformanceResult } from './partPerformance';
+import { PartPerformance } from './partPerformance';
 
 /** A lane's target, found on the live graph: its writer and its row. */
 export interface ResolvedTarget {
@@ -95,6 +105,11 @@ export interface AutomationPlayerOptions {
    * given back (windsor#702): `setTimeout` when absent.
    */
   readonly defer?: (run: () => void, seconds: number) => void;
+  /**
+   * Told of each performance value the player drops on its own (windsor#781):
+   * one whose target a lane now plays, or that the part no longer has.
+   */
+  readonly dropped?: (owner: AutomationOwner, target: AutomationTargetId) => void;
 }
 
 const laterByTimeout = (run: () => void, seconds: number): void => {
@@ -139,6 +154,8 @@ export class AutomationPlayer {
   private readonly playing = new Map<string, Playing[]>();
   /** Each part's clip envelope tracks, by `ownerKey`; none for a part whose regions play none. */
   private readonly envelopes = new Map<string, ClipEnvelopeTracks>();
+  /** Each part's performance values, by `ownerKey` (windsor#781); made with its tracks or its first value. */
+  private readonly performances = new Map<string, PartPerformance>();
   /** The ticks issued since the transport started, from the one sounding now on. */
   private issued: Issued[] = [];
   private lastPos: number | null = null;
@@ -186,10 +203,11 @@ export class AutomationPlayer {
     const key = ownerKey(owner);
     let tracks = this.envelopes.get(key);
     if (!source && !tracks) return;
-    if (!this.lanes.has(key)) this.lanes.set(key, { owner, lanes: NO_SONG_LANES });
+    const performance = this.performanceOf(owner);
     if (!tracks) {
       const { resolve } = this.options;
-      const options = { owner, resolve, stepSeconds: this.stepSeconds, slots: FM_LANES_MAX };
+      const { stepSeconds } = this;
+      const options = { owner, resolve, stepSeconds, slots: FM_LANES_MAX, performance };
       this.envelopes.set(key, (tracks = new ClipEnvelopeTracks(options)));
     }
     tracks.source = source;
@@ -233,6 +251,7 @@ export class AutomationPlayer {
     this.lanes.delete(key);
     this.playing.delete(key);
     this.envelopes.delete(key);
+    this.performances.delete(key);
   }
 
   /** The song's length changed (`transport.bars`): positions fold by the new one. */
@@ -245,14 +264,16 @@ export class AutomationPlayer {
    * a song-length change, or a part or group whose inserts or patch changed,
    * or whose insert chain was rebuilt (windsor#345). One owner, or every one
    * the player knows: a part's envelope tracks find their targets again
-   * with its lanes, whether or not it has any.
+   * with its lanes, whether or not it has any. `preset`, a preset switch
+   * (windsor#781, record decision 2): every voice and macro value held is
+   * dropped and reported first (`PartPerformance.rebind`).
    */
-  resync(owner?: AutomationOwner): void {
+  resync(owner?: AutomationOwner, preset = false): void {
     const now = this.options.now();
     const keys = new Set(this.lanes.keys());
     for (const key of this.envelopes.keys()) keys.add(key);
     for (const key of owner === undefined ? keys : [ownerKey(owner)]) {
-      if (keys.has(key)) this.replay(key, now);
+      if (keys.has(key)) this.replay(key, now, preset);
     }
   }
 
@@ -282,7 +303,67 @@ export class AutomationPlayer {
     this.lanes.clear();
     this.playing.clear();
     this.envelopes.clear();
+    this.performances.clear();
     this.forget();
+  }
+
+  /**
+   * Hold `value`, in the target's own units, on `owner`'s `target` from now
+   * (windsor#781): `automated`, changing nothing, while a lane plays the
+   * target; `inert` where the part has no such target now, or for a value
+   * that is not a number; `no-slot` for a voice target that finds every
+   * slot taken; else `applied`. Where an envelope's track writes the slot,
+   * the track is written again from now over the new offset.
+   */
+  perform(owner: AutomationOwner, target: AutomationTargetId, value: number): PerformanceResult {
+    const key = ownerKey(owner);
+    if (this.playing.get(key)?.some((lane) => lane.target === target)) return 'automated';
+    const now = this.options.now();
+    const tracked = this.envelopes.get(key)?.tracking(target) ?? false;
+    const result = this.performanceOf(owner).set(target, value, { now, tracked });
+    if (result === 'applied' && tracked) this.restart(key, now, undefined, target);
+    return result;
+  }
+
+  /**
+   * Give `owner`'s `target` back from now (windsor#781): the strip's or the
+   * insert's own value, or the patch's, its slot freed or left to the
+   * envelope's track alone. Nothing where no value is held.
+   */
+  unperform(owner: AutomationOwner, target: AutomationTargetId): void {
+    const key = ownerKey(owner);
+    const now = this.options.now();
+    const tracked = this.envelopes.get(key)?.tracking(target) ?? false;
+    if (this.performances.get(key)?.clear(target, now, tracked) && tracked) {
+      this.restart(key, now, undefined, target);
+    }
+  }
+
+  /** Every value `owner` holds given back from now. */
+  unperformAll(owner: AutomationOwner): void {
+    const held = this.performances.get(ownerKey(owner))?.targets() ?? [];
+    for (const target of held) this.unperform(owner, target);
+  }
+
+  /**
+   * `owner`'s performance values, made on first use; the owner is
+   * registered with no lanes, as `setEnvelopes` registers it, so a resync,
+   * a removal and a dispose reach it.
+   */
+  private performanceOf(owner: AutomationOwner): PartPerformance {
+    const key = ownerKey(owner);
+    if (!this.lanes.has(key)) this.lanes.set(key, { owner, lanes: NO_SONG_LANES });
+    let found = this.performances.get(key);
+    if (!found) {
+      const { resolve, dropped } = this.options;
+      found = new PartPerformance({
+        resolve: (target) => resolve(owner, target),
+        dropped: (target) => dropped?.(owner, target),
+        tracked: (target) => this.envelopes.get(key)?.tracking(target) ?? false,
+      });
+      this.performances.set(key, found);
+    }
+    return found;
   }
 
   /** Every tick: record it, then schedule its window on every lane. */
@@ -374,11 +455,14 @@ export class AutomationPlayer {
    * Resolve one owner's lanes again and restart them from `now`. A handle no
    * lane plays through any more gives its target back first: the lane is
    * off or gone, or its target moved (an insert on a rebuilt or reordered
-   * stage) or went unread (windsor#345).
+   * stage) or went unread (windsor#345). `preset`: `resync`'s.
    */
-  private replay(key: string, now: number): void {
+  private replay(key: string, now: number, preset = false): void {
     const before = this.playing.get(key) ?? [];
     const next = this.resolveOwner(key);
+    // Before the tracks count the slots: a value whose target a lane now plays is the lane's.
+    const performance = this.performances.get(key);
+    if (performance && !performance.idle) performance.rebind(next, now, preset);
     const tracks = this.envelopes.get(key);
     for (const lane of before) {
       const kept = next.some((p) => p.handle === lane.handle) || tracks?.plays(lane.handle);
@@ -392,20 +476,28 @@ export class AutomationPlayer {
    * Hold the owner's lanes at the playhead now and rewind its envelope
    * tracks there, then schedule again every tick issued past now. `at` is a
    * stop's: the transport position it stopped at, and the envelopes end.
+   * `only` is a performance value's target (windsor#781): the track on it
+   * alone is written again, over the value now under it, and no lane.
    */
-  private restart(key: string, now: number, at?: Omit<RewindAt, 'pos'>): void {
+  private restart(
+    key: string,
+    now: number,
+    at?: Omit<RewindAt, 'pos'>,
+    only?: AutomationTargetId,
+  ): void {
     const lanes = this.playing.get(key) ?? NO_LANES;
     const tracks = this.envelopes.get(key);
     const pos = this.running ? this.positionAt(now) : this.restPos;
-    for (const lane of lanes) {
+    for (const lane of only === undefined ? lanes : NO_LANES) {
       lane.handle.hold(valueAt(lane.row, lane.points, pos), now);
       lane.last = now;
     }
-    tracks?.rewind(now, { pos, ...(at ?? { tick: this.transportAt(now), ending: false }) }, lanes);
+    const rewindAt = { pos, ...(at ?? { tick: this.transportAt(now), ending: false }) };
+    tracks?.rewind(now, rewindAt, lanes, only);
     for (const issued of this.issued) {
       if (issued.time <= now) continue;
-      tracks?.tick(issued, lanes);
-      this.windows(lanes, issued, tracks);
+      tracks?.tick(issued, lanes, only);
+      if (only === undefined) this.windows(lanes, issued, tracks);
     }
   }
 
