@@ -65,6 +65,11 @@ differ, the difference is stated under the decision.
 1. **A mapping binds a source to one part's target.**
    - The source is a device (a name, or Any), a channel (1–16, or Any) and a
      CC number.
+   - The device is matched by name, as the input selector matches it
+     (`listensTo` in `midiInputs.ts`), because Web MIDI ids are not promised
+     stable across sessions. So two connected inputs with the same name are
+     one source to a mapping: a row cannot tell them apart, and only a
+     different channel separates them.
    - The target is one row of the automation catalog, named by the lane
      target id it already has: the part's strip (`strip.level`), an
      insert's continuous field by stable insert id
@@ -357,10 +362,14 @@ it shows.
   its mappings re-arm pickup, since the knob may have moved meanwhile. Under
   Jump, the next value applies.
 - **Two inputs sending the same CC.** With the selector on All inputs, a
-  mapping whose device is Any hears both. Pickup is tracked per input, so a
-  second controller's knob at another position must pick up on its own
-  before it moves the target. Under Jump, the last value wins. Narrowing the
-  row's device to one name stops the other.
+  mapping whose device is Any hears both. Pickup is tracked per device name,
+  so a second controller with another name, its knob at another position,
+  must pick up on its own before it moves the target. Under Jump, the last
+  value wins. Narrowing the row's device to one name stops an input with
+  another name. Two inputs that share a name are one source (decision 1):
+  narrowing cannot stop either, they share one pickup state, and only
+  setting them to different channels and narrowing the row's channel
+  separates them.
 - **Pickup on a target outside the mapping's range.** The current value is
   clamped into the range first. A 1 kHz cutoff under a 2–6 kHz mapping picks
   up when the CC reaches CC 0 (2 kHz), and the cutoff steps up an octave
