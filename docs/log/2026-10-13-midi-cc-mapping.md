@@ -79,8 +79,9 @@ differ, the difference is stated under the decision.
      sequencer's `seq.` rows are not offered.
    - The part, not the channel, keeps the parts apart. Most controllers send
      everything on channel 1, and the console takes every channel today. A
-     mapping names its part, so selecting another part (which then receives
-     the keys) never moves the first part's sound.
+     mapping names its part and keeps driving that part whichever part is
+     selected. With a mapping on part A, selecting part B (which then
+     receives the keys) leaves the CC moving A, and it never moves B.
    - A new mapping's device and channel default to Any. The panel shows what
      learn heard, and a row can narrow either.
 2. **Performance, not an edit.**
