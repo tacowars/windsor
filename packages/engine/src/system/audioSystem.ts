@@ -21,6 +21,11 @@
  * - `BloomChordFollower`: the song's chord on the transport for every bloom on
  *   Song chord (windsor#729), re-planned after every partial that landed.
  *
+ * A MIDI CC's performance values (windsor#781, record
+ * `2026-10-13-midi-cc-mapping`) go through `SongAutomation` too: set,
+ * cleared, a part's cleared and every one cleared (Reset performance), and
+ * `performanceDropped` hears each the engine drops on its own.
+ *
  * What stays here is construction, the lifecycle (`init`, `update`,
  * `dispose`) and the two document transactions, which span them all.
  *
@@ -63,16 +68,19 @@ import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDo
 import type { ApplyResult, MusicEventHandler, RegionStep } from '../song/arrangementPlayer';
 import { ArrangementPlayer } from '../song/arrangementPlayer';
 import { PatchResolver } from '../song/arrangementValidate';
+import type { CcTargetId } from '../song/ccMapping';
 import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
 import { withoutAutomation, withoutGroupAutomation } from './automationPartial';
+import { withoutCcMappings } from './ccMappingsPartial';
 import { withoutPatchSource } from './patchSourcePartial';
 import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
 import { MusicRoster } from './musicRoster';
 import { PartStrips } from './partStrips';
+import type { PerformanceDropped, PerformanceResult } from './songAutomation';
 import { SongAutomation } from './songAutomation';
 import { StandingGraph } from './standingGraph';
 import { SystemLoadMeter } from './systemLoadMeter';
@@ -165,6 +173,18 @@ export class AudioSystem {
   private chords: BloomChordFollower | null = null;
   private started = false;
 
+  /**
+   * Told of each performance value the engine drops on its own (windsor#781):
+   * one whose target a lane now plays (it is ignored while the lane is on,
+   * and does not come back when the lane goes off), or whose target the part
+   * no longer has after a resync (an insert removed or its field unread, a
+   * voice target a macro now maps, a macro the patch lacks). The console
+   * re-arms that mapping's pickup. A value on an insert re-wired in place is
+   * held on the rebuilt stage and not reported; a part removed takes its
+   * values with it, unreported.
+   */
+  performanceDropped: PerformanceDropped | null = null;
+
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
@@ -214,6 +234,7 @@ export class AudioSystem {
       this.engine.context,
       (slot) => roster.strip(slot),
       (id) => groups.get(id),
+      (slot, target) => this.performanceDropped?.(slot, target),
     );
   }
 
@@ -418,7 +439,9 @@ export class AudioSystem {
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
     // A part's lanes are the automation's, after everything else has landed (windsor#344);
     // its `patchSource` is the app's library link, which nothing here plays (windsor#669).
-    const { arrangementParts, strips } = splitStrips(withoutPatchSource(withoutAutomation(parts)));
+    // Its `ccMappings` are the console's setup, which plays nothing until the router sets a value (windsor#782).
+    const played = withoutCcMappings(withoutPatchSource(withoutAutomation(parts)));
+    const { arrangementParts, strips } = splitStrips(played);
     this.sidechains.begin();
     const result = player.apply(
       arrangementParts === undefined
@@ -521,6 +544,41 @@ export class AudioSystem {
    */
   envelopeTargets(slot: number, out: string[]): string[] {
     return this.automation.envelopeTargets(slot, out);
+  }
+
+  /**
+   * Play `value`, in `target`'s own units, on the part on `slot` from now,
+   * as a performance (windsor#781, record `2026-10-13-midi-cc-mapping`
+   * decisions 2, 3 and 8): live on held notes, never written into the patch
+   * or the song. A voice target or macro holds it as an offset from the
+   * patch's value, reckoned now, on one voice slot taken now and held until
+   * it is cleared; a strip or insert target on the params a lane writes.
+   * - `applied`: it plays.
+   * - `automated`: a lane plays the target, and wins; nothing changed.
+   * - `no-slot`: a voice target found all eight voice slots taken; nothing changed.
+   * - `inert`: the part has no such target now (before `initMusic` too).
+   */
+  setPerformance(slot: number, target: CcTargetId, value: number): PerformanceResult {
+    return this.automation.perform(slot, target, value);
+  }
+
+  /**
+   * Give `target` on the part on `slot` back from now: the patch's (or the
+   * strip's, or the insert's) own value, and its voice slot freed. A clip
+   * envelope there plays on alone. Nothing where no value is held.
+   */
+  clearPerformance(slot: number, target: CcTargetId): void {
+    this.automation.unperform(slot, target);
+  }
+
+  /** Give back every performance value the part on `slot` holds. */
+  clearPartPerformance(slot: number): void {
+    this.automation.unperformAll(slot);
+  }
+
+  /** Reset performance: give back every part's performance values. */
+  resetPerformance(): void {
+    this.automation.unperformAll();
   }
 
   /** A return by name, once `init()` has built them. */

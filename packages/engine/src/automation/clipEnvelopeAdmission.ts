@@ -8,11 +8,14 @@
  * In the roll's order, an envelope that plays (`envelopeHeard`) is admitted
  * - when it already holds a slot (a track on its target);
  * - else, sharing its slot, when a song lane playing on the same voice
- *   target holds one, and its target sounds;
+ *   target holds one, or a performance value does (windsor#781), and its
+ *   target sounds;
  * - else when a slot is free and its target sounds, taking that slot.
  *
- * The slots in use are one per song lane on a voice target, and one per
- * target already held that no lane holds. Whether a target sounds is asked
+ * The slots in use are counted in the order they are kept (record
+ * `2026-10-13-midi-cc-mapping` decision 8): one per song lane on a voice
+ * target, then one per voice target holding a performance value that no
+ * lane plays, then one per target already held that neither holds. Whether a target sounds is asked
  * only once a slot is there for it: no macro of the patch maps it, and the
  * patch has a value there (`targetSounds` of the part's handle).
  *
@@ -30,6 +33,8 @@ export interface EnvelopeAdmissionQuery {
   lanes: readonly { readonly target: string }[];
   /** The voice paths already holding a slot for an envelope; none for a fresh start. */
   held: readonly { readonly path: string }[];
+  /** The voice targets holding a performance value (`PartPerformance.voices`), by lane target id; none when absent. */
+  performed?: readonly { readonly target: string }[];
   /** The roll's envelopes, in its order. */
   envelopes: readonly RollEnvelope[];
   /** The roll's loop. */
@@ -46,9 +51,15 @@ export const isVoiceTargetOf = (target: string, path: string): boolean =>
   target.startsWith(VOICE_PREFIX) &&
   target.endsWith(path);
 
-/** Whether a lane of `lanes` plays on the voice target at `path`. */
-function laneOnPath(lanes: EnvelopeAdmissionQuery['lanes'], path: string): boolean {
-  for (let i = 0; i < lanes.length; i++) if (isVoiceTargetOf(lanes[i]!.target, path)) return true;
+/** Whether an entry of `list`, a lane or a performed target, is on the voice target at `path`. */
+function onPath(list: readonly { readonly target: string }[], path: string): boolean {
+  for (let i = 0; i < list.length; i++) if (isVoiceTargetOf(list[i]!.target, path)) return true;
+  return false;
+}
+
+/** Whether an entry of `list` is on `target`. */
+function onTarget(list: readonly { readonly target: string }[], target: string): boolean {
+  for (let i = 0; i < list.length; i++) if (list[i]!.target === target) return true;
   return false;
 }
 
@@ -58,12 +69,23 @@ function hasPath(list: readonly { readonly path: string }[], path: string): bool
   return false;
 }
 
-/** The slots in use before any new admission: the voice lanes', and each held target no lane holds. */
+/** No voice target holding a performance value. */
+const NO_PERFORMANCE: readonly { readonly target: string }[] = [];
+
+/** Whether a lane or a performance value holds the slot of the voice target at `path`. */
+const sharedPath = (query: EnvelopeAdmissionQuery, path: string): boolean =>
+  onPath(query.lanes, path) || onPath(query.performed ?? NO_PERFORMANCE, path);
+
+/**
+ * The slots in use before any new admission: the voice lanes', then each
+ * performed target no lane plays, then each held target neither holds.
+ */
 function slotsInUse(query: EnvelopeAdmissionQuery): number {
-  const { lanes, held } = query;
+  const { lanes, held, performed = NO_PERFORMANCE } = query;
   let used = 0;
   for (let i = 0; i < lanes.length; i++) if (lanes[i]!.target.startsWith(VOICE_PREFIX)) used++;
-  for (let i = 0; i < held.length; i++) if (!laneOnPath(lanes, held[i]!.path)) used++;
+  for (let i = 0; i < performed.length; i++) if (!onTarget(lanes, performed[i]!.target)) used++;
+  for (let i = 0; i < held.length; i++) if (!sharedPath(query, held[i]!.path)) used++;
   return used;
 }
 
@@ -73,7 +95,7 @@ function slotsInUse(query: EnvelopeAdmissionQuery): number {
  */
 export function admittedEnvelopes(query: EnvelopeAdmissionQuery, out: string[] = []): string[] {
   out.length = 0;
-  const { envelopes, held, lanes, loopTicks, slots, sounds } = query;
+  const { envelopes, held, loopTicks, slots, sounds } = query;
   let used = slotsInUse(query);
   for (let i = 0; i < envelopes.length; i++) {
     const envelope = envelopes[i]!;
@@ -83,7 +105,7 @@ export function admittedEnvelopes(query: EnvelopeAdmissionQuery, out: string[] =
       out.push(path);
       continue;
     }
-    const shared = laneOnPath(lanes, path);
+    const shared = sharedPath(query, path);
     if (!shared && used >= slots) continue;
     if (!sounds(path)) continue;
     if (!shared) used++;

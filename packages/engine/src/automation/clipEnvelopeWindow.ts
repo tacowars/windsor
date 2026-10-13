@@ -9,7 +9,9 @@
  * or stepped to where the lane steps or the envelope does not carry on from
  * the tick before (a wrap, a new region pass, a start, an end). Then each of
  * the lane's breakpoints and the envelope's points inside the window, in
- * order, is ramped to as the sum there, a lane's step stepped. The window
+ * order, is ramped to as the sum there, a lane's step stepped. With no lane
+ * on the target, a performance value held there (windsor#781) stands in for
+ * the lane's offset, constant through the tick (`Track.base`). The window
  * keeps its working state in fields, so writing one allocates nothing.
  */
 import type { RollEnvelope } from '../sequencing/rollEnvelope';
@@ -64,6 +66,13 @@ export interface Track {
   last: number;
   /** When its offset is back at 0 after an end, until the slot is given back; NaN otherwise. */
   drainAt: number;
+  /**
+   * The performance value's offset on the target (windsor#781), which the
+   * envelope's adds to where no lane plays it; 0 when none is held.
+   */
+  base: number;
+  /** Whether a performance value is held on the target: its slot is absolute, as a lane's. */
+  performed: boolean;
 }
 
 /** A track's envelope offset at loop position `at`, read inside `loopTicks`. */
@@ -107,8 +116,8 @@ export class EnvelopeWindow {
       ? rampsBetween(lane.row, lane.points, { fromTick: pos, toTick: pos + 1 })
       : null;
     this.last = lane ? lane.last : track.last;
-    // An envelope's 0 is the patch's own value; a lane's slot is the lane's (windsor#718).
-    track.handle.setRelative(lane === undefined);
+    // An envelope's 0 is the patch's own value; a lane's or a performance's slot is theirs (windsor#718).
+    track.handle.setRelative(lane === undefined && !track.performed);
     this.start();
     this.inside();
     if (envelope) this.settle(envelope, frame, this.last);
@@ -150,8 +159,8 @@ export class EnvelopeWindow {
       frame.loopTick !== 0;
     const now = envelope ? envelopeOffset(track, envelope, frame.loopTick, frame.loopTicks) : 0;
     const before = carries ? now : track.live ? track.endOffset : 0;
-    let laneBefore = 0;
-    let laneAfter = 0;
+    let laneBefore = track.base;
+    let laneAfter = track.base;
     if (lane && ramps) {
       laneAfter = handle.offsetOf(valueAt(lane.row, lane.points, pos));
       const stepsHere = ramps.length > 1 && ramps[0]!.tick === pos && ramps[1]!.tick === pos;
@@ -181,8 +190,8 @@ export class EnvelopeWindow {
         point && point.tick < frame.loopTick + 1 ? point.tick - frame.loopTick : Infinity;
       const q = laneQ < envelopeQ ? laneQ : envelopeQ;
       if (q === Infinity) return;
-      let before = 0;
-      let after = 0;
+      let before = track.base;
+      let after = track.base;
       if (laneQ === q && ramps) {
         before = handle.offsetOf(ramps[i]!.value);
         while (i + 1 < ramps.length && ramps[i + 1]!.tick === ramps[i]!.tick) i++;

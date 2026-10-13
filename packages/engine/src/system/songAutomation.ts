@@ -52,6 +52,15 @@
  *   hands the player null, and nothing of its playback changes. Whatever
  *   restarts a part's lanes (a patch edit, a preset switch, its lanes or
  *   inserts) finds its envelopes' targets again with them.
+ * - **Performance values** (windsor#781, record `2026-10-13-midi-cc-mapping`).
+ *   A MIDI CC's value on a part's target goes to the player as the part's
+ *   (`perform`), held until it is cleared or the part leaves the song. A
+ *   resync, after a patch edit, a preset switch, a lane edit or an insert
+ *   edit or re-wire, finds each target again: a value on a rebuilt insert
+ *   stage is held there again, and one whose target a lane now plays or the
+ *   part no longer has is dropped and reported through `dropped`, so the
+ *   console can re-arm its pickup. A part removed takes its values with it,
+ *   unreported.
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
@@ -67,12 +76,19 @@ import { fitLanes, normaliseAutomation } from '../song/automationNormalise';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { GroupBus } from '../mixer/groupBus';
 import { clipEnvelopeSource } from '../automation/clipEnvelopeSource';
+import type { PerformanceResult } from '../automation/partPerformance';
+import type { CcTargetId } from '../song/ccMapping';
 import { automationResolver } from './automationResolver';
 
 /** Where a part's lanes go for its region gate to read: the `ArrangementPlayer`. */
 export interface SeqLaneSink {
   setLanes(slot: number, lanes: readonly AutomationLane[]): void;
 }
+
+/** Told of a performance value the engine dropped on its own: the part's slot and the target. */
+export type PerformanceDropped = (slot: number, target: CcTargetId) => void;
+
+export type { PerformanceResult };
 
 /** What `apply` reads of the merged arrangement. */
 export type MergedSong = Pick<Arrangement, 'transport' | 'parts'>;
@@ -90,6 +106,7 @@ export class SongAutomation {
     private readonly clock: { readonly currentTime: number },
     private readonly stripOf: (slot: number) => PartStrip | undefined,
     private readonly groupOf: (id: number) => GroupBus | undefined = () => undefined,
+    private readonly dropped: PerformanceDropped = () => {},
   ) {}
 
   /**
@@ -105,6 +122,10 @@ export class SongAutomation {
       resolve: automationResolver(this.stripOf, this.groupOf),
       songTicks: this.songTicks,
       restTick: transport.currentTick,
+      dropped: (owner, target) => {
+        // Only a part holds performance values (record decision 1).
+        if (!isGroupOwner(owner)) this.dropped(owner.part, target as CcTargetId);
+      },
     });
     return this.playerValue;
   }
@@ -220,6 +241,24 @@ export class SongAutomation {
     if (this.playerValue) return this.playerValue.envelopeTargets(slot, out);
     out.length = 0;
     return out;
+  }
+
+  /** Hold `value` on the part on `slot`'s `target` from now: `AutomationPlayer.perform`; `inert` before `begin`. */
+  perform(slot: number, target: CcTargetId, value: number): PerformanceResult {
+    return this.playerValue?.perform(partOwner(slot), target, value) ?? 'inert';
+  }
+
+  /** Give the part on `slot`'s `target` back from now: `AutomationPlayer.unperform`. */
+  unperform(slot: number, target: CcTargetId): void {
+    this.playerValue?.unperform(partOwner(slot), target);
+  }
+
+  /** Every value the part on `slot` holds given back, or every part's with no slot. */
+  unperformAll(slot?: number): void {
+    const player = this.playerValue;
+    if (!player) return;
+    const owners = slot === undefined ? player.owners() : [partOwner(slot)];
+    for (const owner of owners) player.unperformAll(owner);
   }
 
   dispose(): void {

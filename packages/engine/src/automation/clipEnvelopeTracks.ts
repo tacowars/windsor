@@ -45,6 +45,14 @@
  *   floors nothing there: a decay time or LFO rate of exactly 0 stays 0
  *   under an envelope at 0. With a lane the slot is the lane's, absolute,
  *   floored as a lane's is (windsor#347).
+ * - **Performance values** (windsor#781, record `2026-10-13-midi-cc-mapping`
+ *   decisions 3 and 8). A MIDI CC's value held on a voice target
+ *   (`partPerformance.ts`) rides under the envelope where no lane plays the
+ *   target: the slot carries its offset plus the envelope's, absolute, as
+ *   with a lane, and an envelope's end ramps back to it. The value keeps
+ *   the slot when the track gives it back. It counts after the lanes and
+ *   before the envelopes, in admission and in `refresh`. The player writes
+ *   a track again from now when the value under it moves (`only`).
  *
  * `tick` and `sweep` allocate nothing of their own, except the first tick
  * of a target and the slot given back; with a lane on the target the window
@@ -60,7 +68,7 @@ import type { AutomationOwner } from './automationOwner';
 import type { AutomationResolver } from './automationPlayer';
 import { voiceTargetId } from './automationTargets';
 import type { EnvelopeAdmissionQuery } from './clipEnvelopeAdmission';
-import { admittedEnvelopes } from './clipEnvelopeAdmission';
+import { admittedEnvelopes, isVoiceTargetOf } from './clipEnvelopeAdmission';
 import type { ClipEnvelopeSource } from './clipEnvelopeSource';
 import {
   emptyClipEnvelopeFrame,
@@ -70,6 +78,7 @@ import {
 } from './clipEnvelopeSource';
 import type { PlayingLane, Track, TrackTick } from './clipEnvelopeWindow';
 import { EnvelopeWindow, envelopeOffset } from './clipEnvelopeWindow';
+import type { PartPerformance } from './partPerformance';
 
 export interface ClipEnvelopeTrackOptions {
   readonly owner: AutomationOwner;
@@ -78,6 +87,8 @@ export interface ClipEnvelopeTrackOptions {
   readonly stepSeconds: number;
   /** The part's voice slots: `FM_LANES_MAX`. */
   readonly slots: number;
+  /** The part's performance values (windsor#781), read for the offset under each track. */
+  readonly performance: PartPerformance;
 }
 
 /** Where a rewind finds the playhead. */
@@ -95,6 +106,10 @@ function laneOn(lanes: readonly PlayingLane[], target: string): PlayingLane | un
   for (let i = 0; i < lanes.length; i++) if (lanes[i]!.target === target) return lanes[i];
   return undefined;
 }
+
+/** Whether a tick or rewind for the track on `only`, a lane target id, passes the one on `target` by. */
+const skips = (only: string | undefined, target: string): boolean =>
+  only !== undefined && only !== target;
 
 /** Whether a lane writes through `handle`. */
 function laneHolds(lanes: readonly PlayingLane[], handle: AutomationHandle): boolean {
@@ -118,6 +133,7 @@ export class ClipEnvelopeTracks {
     this.admission = {
       lanes: [],
       held: this.tracks,
+      performed: options.performance.voices,
       envelopes: [],
       loopTicks: 1,
       slots: options.slots,
@@ -128,6 +144,13 @@ export class ClipEnvelopeTracks {
   /** Nothing to play and no slot held: the player may forget the part's tracks. */
   get idle(): boolean {
     return this.source === null && this.tracks.length === 0;
+  }
+
+  /** Whether a track holds `target`'s slot, playing or ramping out: it writes that slot. */
+  tracking(target: string): boolean {
+    const { tracks } = this;
+    for (let i = 0; i < tracks.length; i++) if (tracks[i]!.target === target) return true;
+    return false;
   }
 
   /** Whether a track wrote `target`'s slot for the tick just written, its lane's window with it. */
@@ -161,26 +184,32 @@ export class ClipEnvelopeTracks {
     return this.tracks.some((track) => track.live && track.handle === handle);
   }
 
-  /** One tick: each envelope the region plays there, and an end for each it no longer does. */
-  tick(issued: TrackTick, lanes: readonly PlayingLane[]): void {
+  /**
+   * One tick: each envelope the region plays there, and an end for each it
+   * no longer does; with `only`, the track on that lane target id alone.
+   */
+  tick(issued: TrackTick, lanes: readonly PlayingLane[], only?: string): void {
     const { frame, tracks } = this;
-    for (let i = 0; i < tracks.length; i++) tracks[i]!.covered = false;
+    for (let i = 0; i < tracks.length; i++) {
+      if (!skips(only, tracks[i]!.target)) tracks[i]!.covered = false;
+    }
     if (this.source?.frameAt(issued.tick, frame)) {
       const { envelopes } = frame;
       for (let i = 0; i < envelopes.length; i++) {
         const envelope = envelopes[i]!;
         if (!envelopePlays(envelope, frame.loopTicks)) continue;
+        if (only !== undefined && !isVoiceTargetOf(only, envelope.target)) continue;
         const track = this.find(envelope.target) ?? this.admit(envelope, lanes);
         if (!track) continue;
-        this.window.write(track, envelope, frame, issued, laneOn(lanes, track.target));
+        this.window.write(this.based(track), envelope, frame, issued, laneOn(lanes, track.target));
         track.covered = true;
       }
     }
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i]!;
-      if (!track.live || track.covered) continue;
+      if (!track.live || track.covered || skips(only, track.target)) continue;
       const lane = laneOn(lanes, track.target);
-      this.window.write(track, null, frame, issued, lane);
+      this.window.write(this.based(track), null, frame, issued, lane);
       track.covered = true;
       if (!lane) track.drainAt = track.last;
     }
@@ -195,17 +224,21 @@ export class ClipEnvelopeTracks {
    * region's whole pass and its end past `now`, so `live` reads the last
    * queued tick, not what sounds, and the hold is what cancels those events.
    */
-  rewind(now: number, at: RewindAt, lanes: readonly PlayingLane[]): void {
+  rewind(now: number, at: RewindAt, lanes: readonly PlayingLane[], only?: string): void {
     for (const track of this.tracks) {
+      if (skips(only, track.target)) continue;
       const lane = laneOn(lanes, track.target);
-      const laneOffset = lane ? track.handle.offsetOf(valueAt(lane.row, lane.points, at.pos)) : 0;
+      const { base } = this.based(track);
+      const laneOffset = lane
+        ? track.handle.offsetOf(valueAt(lane.row, lane.points, at.pos))
+        : base;
       const envelope = at.tick === null ? null : this.envelopeAt(track, Math.floor(at.tick));
       const { loopTick, loopTicks } = this.frame;
       const offset =
         envelope && at.tick !== null
           ? envelopeOffset(track, envelope, loopTick + (at.tick % 1), loopTicks)
           : 0;
-      track.handle.setRelative(lane === undefined);
+      track.handle.setRelative(lane === undefined && !track.performed);
       if (envelope && !at.ending) {
         track.handle.holdOffset(laneOffset + offset, now);
         this.window.on(track).settle(envelope, this.frame, now);
@@ -222,15 +255,39 @@ export class ClipEnvelopeTracks {
     }
   }
 
-  /** Give back each slot whose offset has drained to 0 by `now`, unless a lane holds it. */
+  /** Give back each slot whose offset has drained by `now`, unless a lane or a performance value holds it. */
   sweep(now: number, lanes: readonly PlayingLane[]): void {
     const { tracks } = this;
     for (let i = tracks.length - 1; i >= 0; i--) {
       const track = tracks[i]!;
       if (track.live || !(track.drainAt <= now)) continue;
-      if (!laneHolds(lanes, track.handle)) track.handle.release(now);
+      this.giveBack(track, now, lanes);
       tracks.splice(i, 1);
     }
+  }
+
+  /**
+   * A track leaves its slot: to the lane on its target, which goes on
+   * writing it; else to the performance value there, held at its offset;
+   * else back to the part.
+   */
+  private giveBack(track: Track, now: number, lanes: readonly PlayingLane[]): void {
+    if (laneHolds(lanes, track.handle)) return;
+    const offset = this.options.performance.offsetOn(track.target);
+    if (offset === undefined) {
+      track.handle.release(now);
+      return;
+    }
+    track.handle.setRelative(false);
+    track.handle.holdOffset(offset, now);
+  }
+
+  /** `track` with the performance value under it read now (windsor#781). Allocates nothing. */
+  private based(track: Track): Track {
+    const offset = this.options.performance.offsetOn(track.target);
+    track.performed = offset !== undefined;
+    track.base = offset ?? 0;
+    return track;
   }
 
   /**
@@ -245,13 +302,16 @@ export class ClipEnvelopeTracks {
    */
   refresh(now: number, lanes: readonly PlayingLane[]): void {
     this.refused.clear();
-    const { owner, resolve, slots } = this.options;
+    const { owner, resolve, slots, performance } = this.options;
     const { envelopes, loopTicks } = this.frame;
-    let free = slots - lanes.filter((lane) => isOffsetHandle(lane.handle)).length;
+    // The lanes keep their slots first, then the performance values (windsor#781).
+    const performed = performance.voices.filter((held) => !laneOn(lanes, held.target));
+    let free =
+      slots - lanes.filter((lane) => isOffsetHandle(lane.handle)).length - performed.length;
     const kept = new Set<Track>();
-    /** Whether `target` has a slot: its lane's, or one still free, which it takes. */
+    /** Whether `target` has a slot: its lane's, a performance value's, or one still free, which it takes. */
     const room = (target: string): boolean => {
-      if (laneOn(lanes, target)) return true;
+      if (laneOn(lanes, target) || performance.offsetOn(target) !== undefined) return true;
       if (free <= 0) return false;
       free--;
       return true;
@@ -276,7 +336,7 @@ export class ClipEnvelopeTracks {
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i]!;
       if (kept.has(track)) continue;
-      if (!laneHolds(lanes, track.handle)) track.handle.release(now);
+      this.giveBack(track, now, lanes);
       tracks.splice(i--, 1);
     }
   }
@@ -326,6 +386,8 @@ export class ClipEnvelopeTracks {
       endOffset: 0,
       last: 0,
       drainAt: NaN,
+      base: 0,
+      performed: false,
     };
     this.tracks.push(track);
     return track;
