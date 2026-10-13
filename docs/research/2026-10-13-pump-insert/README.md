@@ -13,6 +13,11 @@ against the 48 kHz quantum.
 grows linearly with the instance count. Editing the shape every 16 quanta
 cost nothing measurable, and an open card's scope added 2 to 2.5 %.
 
+The card, from `npm run dev` (Mixer → Add insert → Dynamics → Pump), at
+its defaults:
+
+![The Pump card on the master inserts at its defaults](pump-card.png)
+
 ## Setup
 
 - **Machine:** Apple M1 (4 performance and 4 efficiency cores, 16 GB),
