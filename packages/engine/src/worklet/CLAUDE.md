@@ -77,6 +77,19 @@ slots (`delaySlots.ts`), a sample and a line's read or write pass through
 fields, and every double field is first written as NaN.
 `inserts/delayAllocation.test.ts` pins it on V8 through
 `__fixtures__/delayChangeScenario.ts`.
+It sleeps on silence (windsor#793, `DELAY_SLEEP`): `write` notes a line
+write above the output floor, and `drowse`, called from `configure` every
+block, counts the frames since the last one. Feedback runs past unity, so no
+span the controls set bounds the repeats; once no write has crossed the floor
+for the line's whole length (`maxSeconds`, 12 s: anything older is
+overwritten, and a time move can reach anything newer), or the lines were
+cleared (built, or switched off), a silent block puts it to sleep: the
+processor writes zeros with no `tick`, the lines, filters and write position
+wait as they are and the controls land on their targets, and the first loud
+block wakes it and renders in full. Its tail is the repeats' fall to the
+floor plus 12 s (21 s at the defaults); a delay held up by its feedback never
+sleeps. `sleep: false` in `processorOptions` is the tests' render without it;
+`inserts/delaySleep.test.ts` holds the tail, the wake and the bits.
 
 `eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
 with its own `tsconfig.json`. `eqProcessor.ts` owns the flat k-rate

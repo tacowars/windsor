@@ -29,12 +29,18 @@ export interface DelayProcessorLike {
     params: Record<string, Float32Array>,
   ): boolean;
 }
-export function loadDelay(rate = 48000, params = delayParams()): DelayProcessorLike {
+/** `sleep: false` renders without the sleep (windsor#793), for a test to compare against. */
+export function loadDelay(
+  rate = 48000,
+  params = delayParams(),
+  options: { sleep?: boolean } = {},
+): DelayProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => DelayProcessorLike>({
     file: 'delay-processor.js',
     sampleRate: rate,
   });
   return new Processor({
     parameterData: firstValues(params),
+    processorOptions: options,
   });
 }

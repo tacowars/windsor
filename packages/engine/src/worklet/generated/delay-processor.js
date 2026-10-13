@@ -59,6 +59,10 @@ var DELAY_DSP = {
   feedbackCeiling: 2,
   cutoffRateRatio: 0.45
 };
+var DELAY_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7
+};
 
 // packages/engine/src/worklet/loadSampler.ts
 var LOAD_MS_PER_SECOND = 1e3;
@@ -168,9 +172,10 @@ var DELAY_SLOT = {
 
 // packages/engine/src/worklet/delay/delayDsp.ts
 var DelayDsp = class {
-  constructor(rate, _params) {
+  constructor(rate, _params, sleep = true) {
     this.rate = this.smooth = this.timeSmooth = this.switchStep = NaN;
     this.inputLeft = this.inputRight = this.value = this.left = this.right = NaN;
+    this.quietFrames = NaN;
     this.rate = rate;
     const length = Math.ceil(rate * DELAY_DSP.maxSeconds) + 2;
     this.buffer = [new Float32Array(length), new Float32Array(length)];
@@ -188,8 +193,12 @@ var DelayDsp = class {
     this.left = this.right = 0;
     this.first = true;
     this.cleared = true;
+    this.sleepEnabled = sleep;
+    this.asleep = this.loudWrite = false;
+    this.quietFrames = length;
   }
-  configure(params, _frames) {
+  /** The block's controls; `quiet` is every input sample of it within the sleep floor. */
+  configure(params, frames, quiet) {
     const t = this.targets;
     for (let k = 0; k < DELAY_KEYS.length; k++) {
       if (k !== DELAY_SLOT.ping && k !== DELAY_SLOT.mid) t[k] = params[DELAY_KEYS[k]][0];
@@ -206,6 +215,17 @@ var DelayDsp = class {
     }
     if (this.controls[DELAY_SLOT.enabled] !== 0) this.cleared = false;
     else if (!this.cleared) this.clear();
+    this.drowse(frames, quiet);
+    if (this.asleep) for (let k = 0; k < DELAY_KEYS.length; k++) this.controls[k] = t[k];
+  }
+  /** The sleep's count, every block: a loud block wakes it; a silent one sleeps once the lines are. */
+  drowse(frames, quiet) {
+    if (!quiet) this.asleep = false;
+    if (this.asleep) return;
+    if (this.loudWrite) this.quietFrames = 0;
+    else this.quietFrames += frames;
+    this.loudWrite = false;
+    if (quiet && this.quietFrames >= this.buffer[0].length) this.asleep = true;
   }
   /** Fully off: the tail goes, so the lines and their filters start from silence. */
   clear() {
@@ -213,6 +233,8 @@ var DelayDsp = class {
     this.buffer[1].fill(0);
     this.filter.fill(0);
     this.cleared = true;
+    this.loudWrite = false;
+    this.quietFrames = this.buffer[0].length;
   }
   /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
   pole(slot2) {
@@ -287,7 +309,9 @@ var DelayDsp = class {
   /** `value`, saturated, into line `channel` at the write position. */
   write(channel) {
     const limit = DELAY_DSP.feedbackCeiling / this.controls[DELAY_SLOT.drive];
-    this.buffer[channel][this.position] = limit * Math.tanh(this.value / limit);
+    const value = limit * Math.tanh(this.value / limit);
+    this.buffer[channel][this.position] = value;
+    if (value > DELAY_SLEEP.outputFloor || value < -DELAY_SLEEP.outputFloor) this.loudWrite = true;
   }
 };
 
@@ -319,7 +343,7 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
         Number(options.parameterData?.[name] ?? descriptor.defaultValue)
       ]);
     }
-    this.dsp = new DelayDsp(sampleRate, params);
+    this.dsp = new DelayDsp(sampleRate, params, options.processorOptions?.sleep !== false);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
@@ -335,9 +359,20 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
+    const dsp = this.dsp;
+    dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
+    if (dsp.asleep) this.rest(out);
+    else this.render(left, right, out, frames);
+    this.load.end(frames);
+    return true;
+  }
+  /**
+   * One awake block, in a method of its own as the plate's `_renderBlock` is (windsor#793): V8
+   * optimises it on sound alone, never inside a `process` that has so far only slept.
+   */
+  render(left, right, out, frames) {
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const dsp = this.dsp;
-    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
       dsp.inputLeft = i < leftFrames ? left[i] : 0;
       dsp.inputRight = i < rightFrames ? right[i] : 0;
@@ -345,8 +380,22 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
-    this.load.end(frames);
+  }
+  /** Every sample of the block within the sleep floor; an absent channel is silent. */
+  silent(left, right) {
+    const floor = DELAY_SLEEP.inputFloor;
+    if (left) {
+      for (let i = 0; i < left.length; i++) if (Math.abs(left[i]) > floor) return false;
+    }
+    if (right && right !== left) {
+      for (let i = 0; i < right.length; i++) if (Math.abs(right[i]) > floor) return false;
+    }
     return true;
+  }
+  /** One asleep block: zeros, the input's silence to within its floor. */
+  rest(out) {
+    out[0].fill(0);
+    if (out[1]) out[1].fill(0);
   }
 };
 registerProcessor(DELAY_NAME, DelayProcessor);
