@@ -3,11 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { WAVE as MAIN_WAVE } from '../../patch/patch';
 import { MIP_BASE_HZ, MIP_COUNT, MIP_TABLE_RATIO, TABLE_SIZE, TABLE_SIZE_MAX } from './fmConstants';
 import { WAVE } from './waveIds';
-
-// The module warms the wave cache at load and reads the scope's sample rate.
-Object.assign(globalThis, { sampleRate: 48000 });
-const { getMips, KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE, mipIndex, SIN_TAB, waveKind } =
-  await import('./waveTables');
+// The module reads no worklet scope at load: the main thread imports it too (windsor#795).
+import {
+  cachedWaveSet,
+  getMips,
+  installWaveSet,
+  KIND_NOISE,
+  KIND_PULSE,
+  KIND_SAW_D,
+  KIND_TABLE,
+  mipIndex,
+  SIN_TAB,
+  WAVE_BUILT_LIMIT,
+  WAVE_SENT_LIMIT,
+  waveKind,
+  waveSetFor,
+  waveSetKey,
+} from './waveTables';
 
 describe('the wave tables', () => {
   it('are the ids the main thread re-exports (#656)', () => {
@@ -124,6 +136,50 @@ describe('the wave tables', () => {
         }
       },
     );
+  });
+
+  describe('the cache both threads key alike (windsor#795)', () => {
+    /** A set no build would make, to install. */
+    const stub = () => ({ mips: [new Float32Array(2)], gains: new Float64Array(MIP_COUNT) });
+
+    it('keys a set by its wave, its Tone’s twentieth, its rates and a User wave’s partials', () => {
+      expect(waveSetKey(WAVE.SAW, 48000, 0.73, null)).toBe('1|0.75|48000|');
+      expect(waveSetKey(WAVE.PULSE, 48000, 0.73, null)).toBe(
+        waveSetKey(WAVE.SAW, 48000, 0.75, null),
+      );
+      expect(waveSetKey(WAVE.SAW, 96000, 0, null, 48000)).toBe('1|0.02|96000/48000|');
+      expect(waveSetKey(WAVE.USER, 48000, 1, [1, 0.5])).toBe(`${WAVE.USER}|1|48000|[1,0.5]`);
+      expect(waveSetKey(WAVE.USER, 48000, 1, null)).not.toBe(waveSetKey(WAVE.USER, 48000, 1, []));
+      const set = waveSetFor(WAVE.SAW, 48000, 0.73, null);
+      expect(cachedWaveSet(waveSetKey(WAVE.SAW, 48000, 0.75, null))).toBe(set);
+    });
+
+    it('installs a set under its key as handed over', () => {
+      const sent = stub();
+      installWaveSet(waveSetKey(WAVE.TRIANGLE, 48000, 0.35, null), sent);
+      expect(waveSetFor(WAVE.TRIANGLE, 48000, 0.35, null)).toBe(sent);
+    });
+
+    it('holds WAVE_SENT_LIMIT installs, drops the oldest first, and moves one installed again to newest', () => {
+      const keys = Array.from({ length: WAVE_SENT_LIMIT + 1 }, (_, i) => `fifo|${i}`);
+      const first = stub();
+      for (const key of keys.slice(0, WAVE_SENT_LIMIT))
+        installWaveSet(key, key === keys[0] ? first : stub());
+      // Installed again, the oldest keeps its set and becomes the newest, so the next drops the second.
+      installWaveSet(keys[0]!, stub());
+      installWaveSet(keys[WAVE_SENT_LIMIT]!, stub());
+      expect(cachedWaveSet(keys[0]!)).toBe(first);
+      expect(cachedWaveSet(keys[1]!)).toBeNull();
+      for (const key of keys.slice(2)) expect(cachedWaveSet(key)).not.toBeNull();
+    });
+
+    it('keeps the sets it builds apart, so no build evicts an install', () => {
+      const sent = stub();
+      installWaveSet('apart|sent', sent);
+      for (let i = 0; i <= WAVE_BUILT_LIMIT; i++) waveSetFor(WAVE.USER, 48000, 1, [1, i / 64]);
+      expect(cachedWaveSet('apart|sent')).toBe(sent);
+      expect(cachedWaveSet(waveSetKey(WAVE.USER, 48000, 1, [1, 0]))).toBeNull();
+    });
   });
 
   it('give PULSE the saw’s own tables, one copy in the cache (#55)', () => {

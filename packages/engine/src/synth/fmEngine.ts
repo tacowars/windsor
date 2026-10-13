@@ -38,6 +38,7 @@ import type {
   VoiceSlotsMessage,
 } from './workletMessages';
 import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
+import { waveSetSenderFor } from './waveSetSender';
 
 export interface PartOptions {
   /**
@@ -167,6 +168,10 @@ export class FmEngine {
     if (notes.length) processorOptions.events = notes;
     if (slotMap) processorOptions.voiceSlots = slotMap.slots;
     if (slotMap?.relative) processorOptions.voiceSlotsRelative = slotMap.relative;
+    // The wave sets the patch reads, built here, not by the processor's
+    // constructor between renders (windsor#795); none offline.
+    const waves = waveSetSenderFor(this.context)?.setsFor(patch);
+    if (waves?.length) processorOptions.waves = waves;
 
     const node = new AudioWorkletNode(this.context, PROCESSOR_NAME, {
       numberOfInputs: 0,

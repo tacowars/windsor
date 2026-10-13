@@ -434,7 +434,7 @@ build output. The map of `fm/` (#644):
 | `fmConstants.ts` | the tunables every other module imports, and `ENVELOPE_CURVE_STEEPNESS`, which the main thread re-exports (#656) |
 | `waveIds.ts` | `WAVE`, the waveform ids, import-free: the main thread's `patch.ts` re-exports it (#656) |
 | `modeIds.ts` | the `LOOP_*`, `FILT_*`, `LFO_*` and `DRIVE_*` ids and the `LOOP_MODE`, `FILTER_MODE`, `LFO_SHAPE` and `DRIVE_SHAPE` objects built from them, import-free: `patch.ts` re-exports the objects (#669, windsor#300) |
-| `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up; each octave's table is sized to its highest harmonic (`MIP_TABLE_RATIO`, 2048 to `TABLE_SIZE_MAX`), so a table of few harmonics stays at 2048 and keeps its bits, and the loops scale the phase by each table's own length (record `2026-10-09-wavetables-sized-to-their-harmonics`) |
+| `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, and `warmWaveCache`, the warm-up the processor runs once at load; each octave's table is sized to its highest harmonic (`MIP_TABLE_RATIO`, 2048 to `TABLE_SIZE_MAX`), so a table of few harmonics stays at 2048 and keeps its bits, and the loops scale the phase by each table's own length (record `2026-10-09-wavetables-sized-to-their-harmonics`). The main thread reads it too (windsor#795): it builds a patch's sets with `waveSetFor` under the key `waveSetKey` gives, the processor's own, and sends them ahead of the patch (`synth/waveSetSender.ts`); the processor installs them (`installWaveSet`) and builds only what it was not sent. The cache is two FIFOs of 32 fixed slots, so an install allocates nothing but the arrays it is handed: one takes the warm-up and every install, a key installed again moving to newest, and the sender's memory is that FIFO exactly; the other takes the scope's own builds, so they never evict a set it sent. `waveSetBuildCount` counts the sets a scope built |
 | `waveTableFft.ts` | `sineSeriesByFft`: the inverse FFT that builds a table longer than 2048 from its harmonics, over a preallocated scratch and Float32 twiddles read at a stride, about 3 ms for a saw's set where summing took 34 |
 | `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
 | `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `writeSegmentLevel` over a segment's fields, which `advance` runs and the console's `segmentLevel` wraps, and its two steps `curveConstant` and `curveShape` (#656, windsor#233) |
@@ -572,7 +572,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change,
    and the test's guard says so in one failure before it renders (windsor#6).
-5. **Eleven modules are read by the main thread too** (#656): `algorithms.ts`,
+5. **Fourteen modules are read by the main thread too** (#656): `algorithms.ts`,
    `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
    `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`),
    `patchDefaults.ts` (#670: `makePatch()` fills from it, and
@@ -586,11 +586,15 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    normaliser keeps a patch's mappings by it, and the main thread's
    inert-lane check and the pickers ask it which targets are mapped), and
    `macroShape.ts` (windsor#566: the Macros card shows what a mapping
-   plays with it; `macroShape.test.ts` pins it to `voiceMacros.ts`).
+   plays with it; `macroShape.test.ts` pins it to `voiceMacros.ts`), and
+   `waveTables.ts`, `waveTableFft.ts` and `partWaveSets.ts` (windsor#795:
+   the main thread builds the wave sets a patch reads with the processor's
+   own code, under the processor's key, and sends them ahead of the patch;
+   `synth/waveSetSender.test.ts` holds the two builds equal byte for byte).
    `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The eleven are listed in the
+   is one table and one curve, and no pin test. The fourteen are listed in the
    engine project's `files` (`packages/engine/tsconfig.json`) and compile
    under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch

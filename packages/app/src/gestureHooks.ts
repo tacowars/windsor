@@ -84,12 +84,19 @@ const RELEASES = ['pointerup', 'pointercancel', 'blur'] as const;
 /**
  * Open a drag's step. The control closes it on its own release; the window's
  * release or blur closes it when the control never hears one. The window
- * listeners live exactly as long as the step.
+ * listeners live exactly as long as the step. `onClose` runs as it closes,
+ * however it closes, inside the step: a knob commits a move it held for the
+ * next frame there (windsor#795).
  */
-export function dragGesture(label: string, win: EventTarget = window): OpenGesture {
+export function dragGesture(
+  label: string,
+  win: EventTarget = window,
+  onClose?: () => void,
+): OpenGesture {
   const end = (): void => gesture.close();
   const gesture = bracket(label, () => {
     for (const type of RELEASES) win.removeEventListener(type, end);
+    onClose?.();
   });
   for (const type of RELEASES) win.addEventListener(type, end);
   return gesture;

@@ -24,6 +24,7 @@ import type { KnobSpec, Scale } from './knob';
 import type { KnobAutomation } from './knobAutomation';
 import type { KnobEnvelope } from './knobEnvelope';
 import { ENVELOPE_KNOBS } from './patchKnobTables';
+import type { FrameSource } from './stepStrip';
 import { notify } from './toast';
 
 vi.mock('./toast', () => ({ notify: vi.fn() }));
@@ -34,8 +35,16 @@ const LINEAR: Scale = { toNorm: (v) => v, fromNorm: (n) => Math.min(1, Math.max(
 type Ctx = ReturnType<typeof openGestureConsole>;
 const levelOf = (ctx: Ctx): number => ctx.model.doc.parts[0]?.strip.level ?? NaN;
 
+/** The animation frames a drag asked for (windsor#795), run by `runFrame`. */
+const frames: (() => void)[] = [];
+const frame: FrameSource = (run) => void frames.push(run);
+const runFrame = (): void => {
+  for (const run of frames.splice(0)) run();
+};
+
 let win: EventTarget;
 beforeEach(() => {
+  frames.length = 0;
   win = new EventTarget();
   vi.stubGlobal('window', win);
   vi.useFakeTimers();
@@ -67,7 +76,7 @@ function levelKnob(
     ...(lock ? { automation: lock } : {}),
     ...(envelope ? { envelope } : {}),
   };
-  attachKnobInput(node as unknown as HTMLElement, spec, LINEAR, (v) => spec.set(v));
+  attachKnobInput(node as unknown as HTMLElement, spec, LINEAR, (v) => spec.set(v), frame);
   return node;
 }
 
@@ -143,7 +152,7 @@ function attackKnob(start: number): { node: FakeElement; value: () => number } {
   };
   const commit = (v: number): void => spec.set(Math.min(o.max, Math.max(o.min, v)));
   const node = new FakeElement();
-  attachKnobInput(node as unknown as HTMLElement, spec, scaleFor(o), commit);
+  attachKnobInput(node as unknown as HTMLElement, spec, scaleFor(o), commit, frame);
   return { node, value: () => value };
 }
 
@@ -161,6 +170,7 @@ describe('a zero-distance drag on a zero-end knob (windsor#324)', () => {
     const knob = attackKnob(0.0005);
     fire(knob.node, 'pointerdown', { clientY: 100 });
     fire(knob.node, 'pointermove', { clientY: 140 });
+    runFrame();
     expect(knob.value()).toBe(0);
     fire(knob.node, 'pointermove', { clientY: 100 });
     fire(knob.node, 'pointerup', { clientY: 100 });

@@ -13,6 +13,7 @@
  *      order, on every path (#548). `fmProcessorGolden.test.ts` is the gate.
  *
  * What this file owns: the parameter descriptors, the message port (patch,
+ * the wave sets the main thread sends ahead of it (windsor#795),
  * notes, live retune, load sampling, the song lanes' slot map), the
  * fader's ramp across a quantum (windsor#346), the frame-stamped event queue, the
  * note map, and `renderBlock`, which admits the notes posted since the last
@@ -45,8 +46,8 @@ import {
   mapVoiceSlots,
 } from './voiceOffsets';
 import { VOICE_TARGET_COUNT } from './voiceTargetTables';
-import { PartWaveSets } from './partWaveSets';
-import { anyVoiceOversampled, patchOversamples } from './voiceOversample';
+import { PartWaveSets, installWaveSets, warmWaveCache } from './partWaveSets';
+import { anyVoiceOversampled } from './voiceOversample';
 
 /** `processorOptions` as the part reads them: the contract's, plus the harness-only switches (#547, #548, windsor#326). */
 interface FmProcessorOptions extends Partial<ProcessorOptions> {
@@ -159,10 +160,12 @@ class FmPartProcessor extends AudioWorkletProcessor {
     for (const v of this.voices) v.oversample.allowed = this.syncOversample;
 
     // The first patch arrives here, with no message, so its macro mappings
-    // are compiled here too (windsor#560).
+    // are compiled here too (windsor#560), and the sets the main thread
+    // built for it are installed before its own build (windsor#795).
     this.patch = compileMacros(normalisePatch(opts.patch));
-    this.waves = new PartWaveSets();
-    this.rebuildWaves();
+    installWaveSets(opts.waves);
+    this.waves = new PartWaveSets(this.syncOversample);
+    this.waves.rebuild(this.patch, sampleRate, false);
 
     this.events = new EventQueue(); // frame-stamped, kept sorted
     // The note map is each voice's `keyed` flag and `voiceId` (windsor#233):
@@ -202,22 +205,17 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e: MessageEvent<WorkletMessage>) => this.onMessage(e.data);
   }
 
-  /**
-   * The patch's wave sets, at a patch message, never in a render. The sets
-   * at twice the rate (windsor#656) are built while a note of this patch
-   * would take it, or a sounding voice at it may rebind to this patch.
-   */
-  rebuildWaves(): void {
-    const p = this.patch;
-    const twice = this.syncOversample && (patchOversamples(p) || anyVoiceOversampled(this.voices));
-    this.waves.rebuild(p, sampleRate, twice);
-  }
-
   onMessage(msg: WorkletMessage): void {
     switch (msg.type) {
+      case 'waves':
+        // Sets the main thread built for the patch to come (windsor#795).
+        installWaveSets(msg.sets);
+        break;
       case 'patch': {
         this.patch = compileMacros(normalisePatch(msg.patch));
-        this.rebuildWaves();
+        // The patch's wave sets, at a patch message, never in a render; at
+        // twice the rate also while a voice sounds at it (windsor#656).
+        this.waves.rebuild(this.patch, sampleRate, anyVoiceOversampled(this.voices));
         // By default live voices keep their old patch reference until they
         // finish, which avoids clicks when a preset swaps under a ringing note.
         // The console opts into hearing the knob as it turns instead.
@@ -580,4 +578,6 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 }
 
+// The common waves, built inside addModule() before anything renders (windsor#795).
+warmWaveCache(sampleRate);
 registerProcessor('fm-part', FmPartProcessor);

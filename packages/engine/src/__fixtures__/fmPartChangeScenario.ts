@@ -124,6 +124,15 @@ export interface FmPartChangeConfig {
    * allocation would swamp what the run measures, the render's.
    */
   vowels?: number[];
+  /**
+   * Each parameter change also posts a `waves` message (windsor#795), the
+   * next of a pool of this many built once, each one set under a key of its
+   * own, as the main thread sends a patch's sets ahead of it. The pool is
+   * larger than the part's wave cache, so every post installs a set and,
+   * once the cache is full, overwrites the oldest. The set's arrays are the
+   * message's, made once here as the port makes them in Chrome.
+   */
+  waves?: number;
 }
 
 /** What the run reads of each voice: flags only, since reading a double field can box it here. */
@@ -269,6 +278,16 @@ function messages(events: FmPartEvent[], startFrame: number): { data: Message }[
   });
 }
 
+/** A pool of `count` `waves` messages, each in its event wrapper, one small set under a key of its own. */
+function wavesMessages(count: number): { data: { type: 'waves'; sets: unknown[] } }[] {
+  return Array.from({ length: count }, (_, i) => ({
+    data: {
+      type: 'waves',
+      sets: [{ key: `probe|${i}`, mips: [new Float32Array(3)], gains: new Float64Array(1) }],
+    },
+  }));
+}
+
 /** The cycle, one quantum at a time, and the paths it has passed through. */
 interface Cycle {
   /** Before quantum `q` renders: its events and its parameter change. */
@@ -310,9 +329,11 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
   const filter = (probe.processor as unknown as { patch: { filter: { vowel: number } } }).patch
     .filter;
   const vowels = config.vowels ?? [];
+  const waves = wavesMessages(config.waves ?? 0);
 
   const toggle = (): void => {
     if (vowels.length > 0) filter.vowel = vowels[change % vowels.length]!;
+    if (waves.length > 0) port.onmessage!(waves[change % waves.length]!);
     const k = change++ % arrays.length;
     const values = arrays[k]!;
     values[0] = values[0] === others[k] ? defaults[k]! : others[k]!;

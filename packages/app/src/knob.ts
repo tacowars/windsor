@@ -91,10 +91,12 @@ import { automatedValueText, lockNotice } from './knobAutomation';
 import type { KnobCc, KnobCcBinding } from './knobCc';
 import { emptyKnobCc, readKnobCc } from './knobCc';
 import { attachKnobCcMenu } from './knobCcMenu';
+import { dragFrames } from './knobDragFrames';
 import type { KnobEnvelope } from './knobEnvelope';
 import { AUTO_TAG_TEXT, followKnob, paintLock } from './knobLock';
 import { angleOf, arcPath, knobRingPainter } from './knobRing';
 import { nearestStep, stepKeyTarget, steppedScale } from './knobSteps';
+import type { FrameSource } from './stepStrip';
 import { notify } from './toast';
 import {
   ARC_END,
@@ -440,16 +442,20 @@ export function continuesKeySteps(e: Event, node: EventTarget): boolean {
 /**
  * The knob's pointer and keys, each gesture one undo step named after the
  * knob (windsor#130 decisions 2 and 4): a drag from press to release, arrow
- * presses less than `UNDO_MERGE_MS` apart, a double-click's reset. Exported
- * for its test, which drives it over a stand-in element.
+ * presses less than `UNDO_MERGE_MS` apart, a double-click's reset. A drag
+ * commits at most once a frame of `frame` (windsor#795, `knobDragFrames.ts`),
+ * and its release at once. Exported for its test, which drives it over a
+ * stand-in element.
  */
 export function attachKnobInput(
   node: HTMLElement,
   spec: KnobSpec,
   scale: Scale,
   commit: (v: number) => void,
+  frame?: FrameSource,
 ): void {
   let drag: OpenGesture | null = null;
+  const moves = dragFrames(commit, frame);
   let startY = 0;
   let startN = 0;
   let startV = 0;
@@ -457,12 +463,12 @@ export function attachKnobInput(
   node.addEventListener('pointerdown', (e) => {
     // A right press opens the knob's menu (windsor#785), never a drag or a lock's notice.
     if (e.button !== 0) return;
+    // A closed drag reads `open` false, so it moves nothing more.
     drag?.close();
-    drag = null;
     const lock = spec.automation?.() ?? null;
     // The label now, not at build: a macro's knob is relabelled in place on a rename.
     if (lock) return notify(lockNotice(currentLabels.get(node) ?? spec.label, lock));
-    drag = dragGesture(spec.label);
+    drag = dragGesture(spec.label, window, moves.flush);
     startY = e.clientY;
     startV = spec.get();
     startN = scale.toNorm(startV);
@@ -488,7 +494,7 @@ export function attachKnobInput(
     // the drag started from, not its round trip through the sweep.
     const dy = e.clientY - startY;
     const range = e.shiftKey ? DRAG_RANGE_FINE_PX : DRAG_RANGE_PX;
-    commit(dy === 0 ? startV : scale.fromNorm(startN - dy / range));
+    moves.push(dy === 0 ? startV : scale.fromNorm(startN - dy / range));
   });
   node.addEventListener('pointerup', stop);
   node.addEventListener('pointercancel', stop);

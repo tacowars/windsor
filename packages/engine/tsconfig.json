@@ -9,11 +9,13 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []
   },
-  // Eleven worklet modules are read by the main thread too (#656): the algorithm
+  // Fourteen worklet modules are read by the main thread too (#656): the algorithm
   // table, the wave ids, the envelope curve, the mode ids, the patch defaults,
   // the constants they use, the voice target table and curve
-  // (windsor#419), the Formant vowels (windsor#331), and the macro mappings
-  // the voice applies (windsor#560) and what one plays (windsor#566). They sit under `worklet/fm/`, which is
+  // (windsor#419), the Formant vowels (windsor#331), the macro mappings
+  // the voice applies (windsor#560) and what one plays (windsor#566), and the
+  // wave tables, their FFT and a part's wave sets, which the main thread
+  // builds and sends ahead of a patch (windsor#795). They sit under `worklet/fm/`, which is
   // excluded below and checked by its own project, so they are listed here by
   // name and compiled by both — under this project's stricter flags as well.
   "files": [
@@ -27,7 +29,10 @@
     "src/worklet/fm/voiceTargetValue.ts",
     "src/worklet/fm/formantTables.ts",
     "src/worklet/fm/macroMappings.ts",
-    "src/worklet/fm/macroShape.ts"
+    "src/worklet/fm/macroShape.ts",
+    "src/worklet/fm/waveTables.ts",
+    "src/worklet/fm/waveTableFft.ts",
+    "src/worklet/fm/partWaveSets.ts"
   ],
   "include": ["src", "src/**/*.json"],
   "exclude": [
