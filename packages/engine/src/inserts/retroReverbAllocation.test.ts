@@ -14,8 +14,9 @@
  * depth and rate, pre-delay, character, mix, duration, early, density, the
  * converter, low decay and low cross, gated and reverse, the enable), then
  * silence at a short decay until the tail is exact zeros, the finite field has
- * faded, the pre-delay is off and the mix has settled (about 520 quanta), then
- * 64 quanta of mono noise and 64 of no input, then 512 quanta of stereo
+ * faded, the pre-delay is off and the mix has settled (about 520 quanta, by
+ * which the reverb has slept, windsor#793), then
+ * 64 quanta of mono noise (which wakes it) and 64 of no input, then 512 quanta of stereo
  * noise with Drift depth switching between exactly 0 and on every quantum
  * (each switch on refills the tank's two detune delays): about 1 670 quanta.
  * The child

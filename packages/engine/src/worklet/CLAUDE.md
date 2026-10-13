@@ -193,6 +193,20 @@ fields (`inputLeft`/`inputRight`, `internalInput`, each converter's
 `input`/`output`), never as arguments or returns, and every double field is
 first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
 through `__fixtures__/retroReverbChangeScenario.ts`.
+It sleeps on silence (windsor#793, `RETRO_REVERB_SLEEP`): `internal` keeps
+each block's wet peak (the wet tone, before the converters, so a tail they
+truncate still counts), and `drowse`, called from `configure` every block,
+counts the frames the input and that peak have both held under their
+floors. Past `spanSeconds` (0.85 s, the longest a sample can go unseen: the
+longest pre-delay, then the longer of the finite field's history and the
+diffusers with the longest tank line at Size 10) it empties the networks as
+the switch's off does and sleeps: the processor writes zeros with no `tick`,
+`configure` smooths only the block-rate controls, lands Mix and the switch
+and keeps the internal clock's phase, and the first loud block wakes it and
+renders in full. Its tail is its own decay to the output floor plus the
+span, so no fixed bound covers it (Decay 20 s with Low decay ×4).
+`sleep: false` in `processorOptions` is the tests' render without it;
+`inserts/retroReverbSleep.test.ts` holds the tail, the wake and the bits.
 
 `meter/` holds the two sample meters, bundled together from
 `meter/meterProcessors.ts` to `generated/peak-meter-processor.js` (so the

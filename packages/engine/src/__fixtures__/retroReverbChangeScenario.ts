@@ -11,7 +11,8 @@
  * then silence at a short decay with every parameter back at its default
  * until the tail has decayed to exact zeros, the finite field has faded out,
  * the pre-delay is off and the mix has settled; then mono noise and no input
- * for `inputs` quanta each; then stereo noise for `flicker` quanta with Drift
+ * for `inputs` quanta each (the silence has put the reverb to sleep by then,
+ * windsor#793, and the mono noise wakes it); then stereo noise for `flicker` quanta with Drift
  * depth switching between 0 and `flickerDepth` every quantum, so the tank's
  * detune delays are refilled on every other block. The probe imports it by path in its child Node,
  * which runs it directly (its types are stripped), so it imports nothing at
@@ -52,6 +53,7 @@ interface RetroState {
   level: number;
   targetLevel: number;
   dormant: boolean;
+  asleep: boolean;
   wetToneLeft: number;
   wetToneRight: number;
   tank: { density: number; sizeTicks: number; low: { on: boolean } };
@@ -89,9 +91,9 @@ const TOGGLES: [string, number][] = [
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
  * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
  * and off, the line taps, the line taps placed on every tick of a Size move, the gain-ranging
- * converters, the low band's split, and the split with the line taps.
+ * converters, the low band's split, the split with the line taps, asleep, and woken.
  */
-const PATHS = 18;
+const PATHS = 20;
 
 /** No input. */
 const none: Float32Array[][] = [];
@@ -143,6 +145,9 @@ function notePaths(
   if (dsp.tank.density !== 0 && dsp.tank.sizeTicks === 0 && !dsp.dormant) seen[14] = 1;
   if (dsp.ranging !== 0 && !dsp.dormant) seen[15] = 1;
   if (dsp.tank.low.on) seen[dsp.tank.density !== 0 ? 17 : 16] = 1;
+  if (dsp.asleep) seen[18] = 1;
+  // Awake on the mono noise after a sleep: the noise woke it.
+  else if (seen[18] && phase === 'mono') seen[19] = 1;
 }
 
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {

@@ -27,12 +27,18 @@ export interface RetroProcessorLike {
     params: Record<string, Float32Array>,
   ): boolean;
 }
-export function loadRetro(rate = 48000, params = retroParams()): RetroProcessorLike {
+/** `sleep: false` renders without the sleep (windsor#793), for a test to compare against. */
+export function loadRetro(
+  rate = 48000,
+  params = retroParams(),
+  options: { sleep?: boolean } = {},
+): RetroProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => RetroProcessorLike>({
     file: 'retro-reverb-processor.js',
     sampleRate: rate,
   });
   return new Processor({
     parameterData: firstValues(params),
+    processorOptions: options,
   });
 }
