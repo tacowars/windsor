@@ -16,6 +16,9 @@
  * so a restart from rest takes the input in over the fade rather than as a step into cold filters
  * (fully on, the input times 1 is the input to the bit). The dry ring, the motion and the hiss keep
  * running.
+ * On silence the tape sleeps (windsor#793, `tapeSleep.ts`): the processor freezes the EQ, the core,
+ * the DC block and the transport delay, and runs `advance` and the dry ring alone until the input
+ * returns.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import {
@@ -121,6 +124,15 @@ class TapeDsp {
   noiseGain = NaN;
   noise = NaN;
   mix = NaN;
+  /**
+   * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, whether an
+   * asleep block runs `advance` (the hiss or the motion), the quiet frames counted toward
+   * `sleepSpan`, and that span.
+   */
+  asleep = false;
+  advancing = false;
+  quietFrames = 0;
+  sleepSpan = 0;
   constructor(
     readonly rate: number,
     params: TapeParams,
@@ -160,6 +172,8 @@ class TapeDsp {
           }
         : null,
     );
+    // The transport delay's ring and the core's fixed latency (`TAPE_SLEEP`).
+    this.sleepSpan = this.buffers[0].length + this.magnetic.latency;
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
     this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.dcPole = Math.exp(-(2 * Math.PI * C.dcHz) / rate);
@@ -228,6 +242,20 @@ class TapeDsp {
   }
   /** One frame, from `input` to `left` and `right`. */
   step(): void {
+    this.advance();
+    this.channel(0);
+    this.left = this.sample;
+    this.channel(1);
+    this.right = this.sample;
+    this.position = (this.position + 1) % this.buffers[0].length;
+    this.magnetic.dryAt =
+      this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
+  }
+  /**
+   * One frame of the controls, the motion, the noise and the core's glide: `step` before its
+   * channels, and an asleep frame's hiss and motion (`tapeSleep.ts`).
+   */
+  advance(): void {
     const s = this.controls,
       t = this.targets,
       k = this.smooth;
@@ -258,13 +286,6 @@ class TapeDsp {
     motion.advance();
     this.tickNoise();
     if (this.magnetic.gliding) this.magnetic.glide();
-    this.channel(0);
-    this.left = this.sample;
-    this.channel(1);
-    this.right = this.sample;
-    this.position = (this.position + 1) % this.buffers[0].length;
-    this.magnetic.dryAt =
-      this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
   }
   /** Test-only: route the input straight to Drive, skipping the Bias and model EQ (design decision 3's calibration). */
   bypassEq(bypassed: boolean): void {

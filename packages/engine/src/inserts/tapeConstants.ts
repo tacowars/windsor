@@ -119,6 +119,24 @@ export const TAPE_DSP = {
   millisecondsPerSecond: 1000,
 };
 /**
+ * The sleep on silence (windsor#793), the plate's pattern (`worklet/tape/tapeSleep.ts`). An input
+ * sample within `inputFloor` of 0 is silence and a sample the DC block writes to the transport
+ * delay within `outputFloor` (about -140 dBFS) an inaudible tail, the plate's floors. The tail is
+ * the DC block's settle, measured rather than fixed: the count starts at the first quiet block
+ * whose every write is under `outputFloor`, after the EQ's and the core's ringing, since the core
+ * holds its remanence under a silent field and the 10 Hz block takes about 0.26 s to bring a
+ * full-scale step under the floor. From there it runs the transport delay's ring
+ * (`TAPE_DSP.maxDelaySeconds` and its two guard samples), so every slot holds a quiet write, plus
+ * the core's fixed latency (`TAPE_MAGNETIC.span`, 48 samples): about 26 ms at 48 kHz. Asleep, a
+ * hiss whose target is off and whose gain has fallen under `hissSnap` lands at 0: its output is
+ * then under a thousandth of the output floor at +24 dB trim.
+ */
+export const TAPE_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  hissSnap: 1e-12,
+};
+/**
  * Filter rows are [kind, Hz, linear gain, Q]. First three come from CC0 coll tape_models.
  * `magnetic` is the core's fixed [drive, width, saturation], each in [0, 1] (design decision 6; a
  * song's `core` overrides it per insert, windsor#291):

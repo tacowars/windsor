@@ -14,10 +14,13 @@ import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
 import { TapeDsp } from './tapeDsp';
 import type { TapeParams } from './tapeDsp';
+import { inputQuiet, renderAsleep, settle } from './tapeSleep';
 
 class TapeProcessor extends AudioWorkletProcessor {
   dsp: TapeDsp;
   running: boolean;
+  /** False only for a test that renders the tape without its sleep (`processorOptions.sleep`). */
+  sleeps: boolean;
   load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
@@ -75,6 +78,7 @@ class TapeProcessor extends AudioWorkletProcessor {
     }
     this.dsp = new TapeDsp(sampleRate, params);
     this.running = true;
+    this.sleeps = (options.processorOptions as { sleep?: boolean } | undefined)?.sleep !== false;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
       if (data.type === 'stop') this.running = false;
@@ -93,6 +97,17 @@ class TapeProcessor extends AudioWorkletProcessor {
     const dsp = this.dsp,
       frame = dsp.input;
     dsp.configure(params, frames);
+    // The sleep (windsor#793, `tapeSleep.ts`): a quiet block keeps it, any other wakes it and renders.
+    const quiet = this.sleeps && inputQuiet(left, right, frames);
+    if (dsp.asleep) {
+      if (quiet) {
+        renderAsleep(dsp, left, right, out, frames);
+        this.load.end(frames);
+        return true;
+      }
+      dsp.asleep = false;
+    }
+    const from = dsp.position;
     // Each sample reaches the DSP in its `input` slots, never as an argument (worklet rule 2). An
     // absent channel is tested apart from the read: `left?.[i]`, a sample or undefined, is a value V8
     // can only hold boxed, a new heap number per sample even when it is stored straight to a slot.
@@ -103,6 +118,8 @@ class TapeProcessor extends AudioWorkletProcessor {
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
+    if (quiet) settle(dsp, from, frames);
+    else dsp.quietFrames = 0;
     this.load.end(frames);
     return true;
   }
