@@ -340,6 +340,15 @@ export const AUDIO_LOAD_REPORT_SECONDS = 1;
  */
 export const AUDIO_LOAD_STALE_MS = 3 * AUDIO_LOAD_REPORT_SECONDS * 1000;
 
+/**
+ * The audio clock's rate (`context.currentTime` against `performance.now()`,
+ * over one `AUDIO_LOAD_REPORT_SECONDS`) below which the render is behind real
+ * time, whatever the duty-cycle sampler's `loadPct` says (windsor#794). A
+ * render that keeps up reads 1.0 within timer jitter; one percent of slack
+ * keeps that jitter from crying wolf.
+ */
+export const CLOCK_RATE_LOSING = 0.99;
+
 /* --------------------------- FM algorithms ------------------------------ */
 
 /**

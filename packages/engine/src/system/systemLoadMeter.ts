@@ -7,6 +7,7 @@
  * which processors report into the sum.
  */
 import { AUDIO_LOAD_REPORT_SECONDS } from '../audioConstants';
+import { AudioClockRate, DeviceUnderruns } from '../cost/audioClock';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
 import type { InsertRegistry } from '../inserts/insertRegistry';
@@ -14,15 +15,22 @@ import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
 
 export class SystemLoadMeter {
   private readonly meter = new AudioLoadMeter();
+  private readonly clock: AudioClockRate;
+  private readonly device = new DeviceUnderruns();
 
   /**
-   * `context` supplies the sample rate each processor reports at; `enabled`
-   * false turns every `attach` and the insert registry's metering off.
+   * `context` supplies the sample rate each processor reports at, the audio
+   * clock and the device's underruns; `enabled` false turns every `attach`,
+   * the insert registry's metering and the two clock readings off. `now` is
+   * the wall clock, injected for the tests.
    */
   constructor(
     private readonly context: BaseAudioContext,
     private readonly enabled: boolean,
-  ) {}
+    now: () => number = () => performance.now(),
+  ) {
+    this.clock = new AudioClockRate(now);
+  }
 
   /** Processors this system has turned load reporting on in. */
   get processorCount(): number {
@@ -49,8 +57,15 @@ export class SystemLoadMeter {
     this.meter.detach(id);
   }
 
+  /** The processors' sum, plus the audio clock's rate and the device's underruns (windsor#794). */
   readout(): AudioLoadReadout {
-    return this.meter.readout();
+    const load = this.meter.readout();
+    if (!this.enabled) return load;
+    return {
+      ...load,
+      clockRate: this.clock.read(this.context),
+      deviceUnderruns: this.device.read(this.context),
+    };
   }
 
   dispose(): void {

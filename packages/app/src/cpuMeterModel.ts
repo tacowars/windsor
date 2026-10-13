@@ -3,7 +3,13 @@
  * reading is drawn and labelled, when the meter samples, and whether a new
  * underrun count flashes the meter and toasts. The numbers are the engine's
  * (`AudioSystem.readout().load`); the console only displays them.
+ *
+ * The sampler's `loadPct` cannot see the browser's own work on the audio
+ * thread, so it stops rising near the limit (windsor#794). The audio clock's
+ * rate and the device's underruns, where the engine has them, say when the
+ * render is losing whatever `loadPct` reads.
  */
+import { CLOCK_RATE_LOSING } from '@windsor/engine';
 import {
   CPU_METER_FLASH_MS,
   CPU_METER_FULL_PCT,
@@ -17,6 +23,10 @@ export interface CpuLoad {
   loadPct: number;
   peakPct: number;
   underruns: number;
+  /** The audio clock's rate over the last interval; null while unknown. */
+  clockRate: number | null;
+  /** The output device's cumulative underruns; null where the browser has none to give. */
+  deviceUnderruns: number | null;
 }
 
 /** What the meter paints for one reading. */
@@ -27,8 +37,10 @@ export interface CpuMeterView {
   peak: number;
   /** The current load, `NN%`. */
   label: string;
-  /** The load is past the whole budget. */
+  /** The load is past the whole budget, or the audio clock is behind real time. */
   over: boolean;
+  /** The button's title and accessible text. */
+  summary: string;
 }
 
 /** A reading the engine could not have meant (NaN, negative) is 0. */
@@ -46,14 +58,49 @@ export function formatLoad(pct: number, maxPct = CPU_METER_MAX_LABEL_PCT): strin
   return rounded > maxPct ? `>${maxPct}%` : `${rounded}%`;
 }
 
-/** The bar, the peak tick and the label for one reading; both marks clamp at a full bar. */
+/** The audio clock is behind real time: a known rate below the floor. */
+export function clockLosing(clockRate: number | null, floor = CLOCK_RATE_LOSING): boolean {
+  return clockRate !== null && Number.isFinite(clockRate) && clockRate < floor;
+}
+
+/**
+ * `CPU 12%, peak 3%, underruns 0`, then `, clock 0.93` while the clock is
+ * below the floor and `, device underruns N` where the device count is known.
+ */
+export function cpuMeterSummary(load: CpuLoad, floor = CLOCK_RATE_LOSING): string {
+  const parts = [
+    `CPU ${formatLoad(load.loadPct)}`,
+    `peak ${Math.round(sanePct(load.peakPct))}%`,
+    `underruns ${load.underruns}`,
+  ];
+  if (clockLosing(load.clockRate, floor)) parts.push(`clock ${load.clockRate?.toFixed(2)}`);
+  if (load.deviceUnderruns !== null) parts.push(`device underruns ${load.deviceUnderruns}`);
+  return parts.join(', ');
+}
+
+/**
+ * The bar, the peak tick, the label and the summary for one reading; both
+ * marks clamp at a full bar. A clock behind real time draws the full-scale
+ * over-budget bar whatever the sampler reads.
+ */
 export function cpuMeterView(load: CpuLoad, fullPct = CPU_METER_FULL_PCT): CpuMeterView {
+  const losing = clockLosing(load.clockRate);
   return {
-    fill: fraction(load.loadPct, fullPct),
+    fill: losing ? 1 : fraction(load.loadPct, fullPct),
     peak: fraction(load.peakPct, fullPct),
     label: formatLoad(load.loadPct),
-    over: sanePct(load.loadPct) > fullPct,
+    over: losing || sanePct(load.loadPct) > fullPct,
+    summary: cpuMeterSummary(load),
   };
+}
+
+/**
+ * Every deadline miss the meter knows of: the sampler's and the device's.
+ * Both are cumulative and monotone, so their sum is too, and one rise in
+ * either fires `stepOverrun` once.
+ */
+export function overrunCount(load: CpuLoad): number {
+  return load.underruns + (load.deviceUnderruns ?? 0);
 }
 
 /**
