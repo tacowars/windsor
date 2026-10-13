@@ -38,11 +38,16 @@ const group = (list, by) => {
 };
 
 console.log(`Environment: ${machine(environment)}, Node ${environment.node}`);
+for (const r of rows)
+  if (r.kind !== 'live' && r.sampleRate !== undefined && r.sampleRate !== 48000) {
+    console.error(`${r.file}: ${r.kind} ${r.name ?? ''} rendered at ${r.sampleRate} Hz, not the 48 kHz the tables assume`);
+    process.exit(1);
+  }
 console.log(`Commits under test: ${[...commits].map((c) => c.slice(0, 7)).join(', ')} (${files.length} results files)\n`);
 
 const offline = rows.filter((r) => r.kind === 'offline');
 if (offline.length) {
-  console.log('### Offline: the whole graph, ms of render time per second of audio (median over rounds, min–max)\n');
+  console.log(`### Offline: the whole graph at ${offline[0].sampleRate ?? 48000} Hz, ms of render time per second of audio (median over rounds, min–max)\n`);
   console.log('| Case | Parts | Runs | ms per audio second | % of one core | Peak |');
   console.log('|---|---:|---:|---:|---:|---:|');
   for (const [name, list] of group(offline, (r) => r.name)) {
@@ -98,6 +103,15 @@ if (kinds.length) {
 
 const live = rows.filter((r) => r.kind === 'live');
 if (live.length) {
+  // The realtime context's rate is the device's, and the budget and the over-budget counts
+  // follow it: runs of one case at two rates are not pooled.
+  for (const [name, list] of group(live, (r) => r.name)) {
+    const rates = new Set(list.map((r) => r.sampleRate));
+    if (rates.size > 1) {
+      console.error(`live case ${name} was traced at ${[...rates].join(' and ')} Hz across ${[...new Set(list.map((r) => r.file))].join(', ')}; move the runs at one rate to a folder of their own`);
+      process.exit(1);
+    }
+  }
   console.log('### Live: one render of the whole graph per quantum on the realtime audio thread, µs (median over rounds)\n');
   console.log('| Case | Runs | Rate | Budget µs | Mean | p50 | p95 | p99 | Max | Over budget / quanta | GC / s | Clock rate | Meter load % | Meter underruns |');
   console.log('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');

@@ -49,6 +49,7 @@ async function offline(name, document = caseByName(name)) {
     msPerAudioSecond: ms / (frames / RATE),
     peak,
     parts: doc.parts.length,
+    sampleRate: RATE,
   };
 }
 
@@ -134,7 +135,7 @@ const paramModule = (name, count) =>
 
 /** Node-only costs, each as ms of render-thread time per second of audio. */
 async function micro(n = 16) {
-  const out = { n };
+  const out = { n, sampleRate: RATE };
   // An empty context: the floor.
   out.empty = await timeOffline(async () => {});
   // The shipped FM part, idle (no notes), n of them.

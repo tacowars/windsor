@@ -26,14 +26,19 @@ the cost, are the result; the absolute microseconds are this machine's.
   measured is the whole graph: here, 16 parts holding chords with no
   inserts render at 65–71 % of the quantum budget; one insert a part puts
   the audio thread at 155 % and the output falls behind real time; three a
-  part at 320 %. Scaled by this machine's measured 2.3× against an M1 (the
-  FM kernel in Node, 87 ns against 37 ns a voice-sample), an M1 holds the
-  no-insert song at about 30 % and a one-insert-a-part song at about 70 %,
-  and three a part does not fit there either. So: at 16 tracks with a
-  modest rack each there is room on a fast laptop and none on a slow one;
-  with the dear kinds there is none anywhere.
-- **Every worklet insert but the EQ, the plate and bloom renders its full
-  DSP on silence.** 48 inserts on 16 parts that play nothing cost 1 600 ms
+  part at 320 %. The M1 records measured only the no-insert case: the same
+  16-part pad song at 28–49 % of the budget live, and at the patch's own
+  `spread` not in real time (`2026-10-03-always-on-part-meters`,
+  `2026-10-01-automation-param-cost`). This container renders the FM
+  kernel 2.3× slower than that M1 in Node, but no insert case was measured
+  there and Chrome's per-node and per-parameter work need not scale the
+  same way, so this report gives no M1 figure for the insert cases: the
+  insert rows are this machine's, and the way to know an M1's is to run
+  `bench.mjs` on one. What the shape says, on any machine: the inserts,
+  not the voices, decide whether 16 tracks fit.
+- **Six worklet kinds render their full DSP on silence**: the tape, the
+  Advanced Drive, the retro reverb, the phaser, the delay and the
+  compressor; the EQ, the plate, bloom and the filter already rest. 48 inserts on 16 parts that play nothing cost 1 600 ms
   of render time per second of audio here, 60 % of what they cost under
   signal, and the tape keeps 70 % of its cost silent, the Advanced Drive,
   the phaser and the retro reverb all of it. Muted and soloed-out parts render
@@ -41,14 +46,15 @@ the cost, are the result; the absolute microseconds are this machine's.
   on the plate's pattern, is the largest single saving available, and it
   touches no sound while a part plays.
 - **Four kinds cost 4–15× the rest**: the tape at 2× (0.5 ms of a 2.67 ms
-  quantum per instance here, about 0.2 ms on an M1), the Advanced Drive,
+  quantum per instance here; the tape record measured about 0.2 ms on the
+  M1), the Advanced Drive,
   bloom and the plate reverb as a strip insert. These were chosen with
   research and sound right; at 16 parts their number, and whether they
   sleep, decides whether a song plays. Cheaper modes exist for two of them
   (the tape's and the drive's 1× settings) and sharing on a group or a send
   costs one instance.
 - **The fixed tax is second-order**: 16 idle parts, their strips and the
-  standing graph cost 17 % of a core here (about 7 % on an M1), of which
+  standing graph cost 17 % of a core here, of which
   the FM part's eleven k-rate parameters are the largest piece and the
   strip's eleven native nodes are cheap. Worth trimming only after the
   inserts.
@@ -145,10 +151,14 @@ byte for byte, and drives a headless Chromium of its own over the DevTools
 protocol (`cdp.mjs`). `songs.mjs` builds the load cases in the page as
 version-15 documents from the shipped `pad-drift` patch: every part a
 Chord Player striking one three-note chord a bar (gate 1) at 120 BPM.
-The patch's operators release over 2.4 s and a bar is 2 s, so a part
-carries its three new voices plus the previous chord's three in release
-for most of each bar: about six voices a part at `spread` 0 (twelve at
-the patch's own `spread` 12), each tail dropping out as it goes dormant.
+The Chord Player releases the held chord at the next onset, and the
+patch's operators then release over 2.4 s with a bar of 2 s, so from the
+third bar on a part carries its three new voices, the previous chord's
+three in release, and for the first 0.4 s of the bar the chord before
+that as well: six voices a part for most of each bar and nine for 0.4 s
+of it at `spread` 0 (twice that at the patch's own `spread` 12, against
+the part's 12-voice limit, which steals the oldest tails), each tail
+dropping out as it goes dormant.
 The load is a steady one per part, not a fixed voice count, and no figure
 below is a per-voice figure except the Node kernel render. `report.mjs`
 prints the tables from `results/` and refuses a results file from another
@@ -285,8 +295,9 @@ Notes on the tables:
 
 - **Offline.** `16-silent` is the standing graph plus 16 idle parts and
   strips: 168 ms a second, 17 % of a core here, before a voice sounds.
-  Each `pad-drift` part (a chord struck a bar over the last one's release,
-  about six voices) adds about 32 ms a second over it, and `spread` 12
+  Each `pad-drift` part (a chord struck a bar over the last one's release:
+  six voices most of the bar, nine for 0.4 s) adds about 32 ms a second
+  over it, and `spread` 12
   (twice the voices) takes the song past real time on this machine.
   The 48 inserts of `16-3ins` add about 2 580 ms a second under signal and
   1 600 on silent parts; the cheap `16-1ins` rotation (an EQ, a compressor,
@@ -301,9 +312,9 @@ Notes on the tables:
   20–28, and the delay, classic drive, echo, filter and chorus at 11–17.
   On a silent input the tape keeps 71 % of its cost, the Advanced Drive,
   the phaser and the retro reverb all of it, the delay 76 %, the EQ 72 %,
-  the compressor 65 %; bloom and the filter drop to a tenth, bloom because
-  it rests once its input and output are quiet (`bloomDsp.ts`), the filter
-  because its DSP on zeros is cheap. The silent cost of the cheap kinds is
+  the compressor 65 %; bloom and the filter drop to a tenth, because each
+  rests once its input and state are quiet (`bloomDsp.ts`, and
+  `filterDsp.ts`'s `settled()`, which writes zeros and skips the sections). The silent cost of the cheap kinds is
   mostly their fixed tax: two or three wrapper nodes, the worklet call and
   the declared parameters (the EQ's 51 parameters are about 33 µs of its
   45 µs a quantum silent). The ranges are wide for the cheap kinds: a
@@ -357,11 +368,12 @@ findings carry the assessment:
 
 1. **An insert costs its full price on silence.** Of the ten worklet
    kinds, only the EQ (a bit-exact copy when flat, zeros when input and
-   state are silent), the plate reverb (sleep after its tail) and bloom
-   (`rest()` once its input and output have been quiet, `bloomDsp.ts`)
+   state are silent), the plate reverb (sleep after its tail), bloom
+   (`rest()` once its input and output have been quiet, `bloomDsp.ts`) and
+   the filter (`settled()` in `filterDsp.ts`, zeros and no section runs)
    look at their input before rendering; the tape, the Advanced Drive, the
-   retro reverb, the phaser, the delay, the compressor and the filter run
-   their whole DSP on zeros (`process()` in each `worklet/*/…Processor.ts`
+   retro reverb, the phaser, the delay and the compressor run their whole
+   DSP on zeros (`process()` in each `worklet/*/…Processor.ts`
    reads `inputs[0]` straight into the render). In the bench, 48 inserts
    on 16 parts that never play cost 1 600 ms of render time per second of
    audio, about 60 % of what the same inserts cost under signal. In a
@@ -382,8 +394,8 @@ findings carry the assessment:
 
 3. **The fixed tax of the graph is real but second-order.** Before any
    voice sounds, 16 idle FM parts with their strips and the standing graph
-   cost 168 ms a second here (about 17 % of a core; about 7 % on an M1 by
-   this machine's 2.3× factor). The micro cases put it in pieces: Chrome's
+   cost 168 ms a second here (about 17 % of a core). The micro cases put
+   it in pieces: Chrome's
    per-worklet call about 1.7 µs a quantum, each declared k-rate parameter
    about 0.6 µs (the FM part's 11 parameters are most of its idle 9.3 µs),
    each native node about 0.4 µs, so the strip's 11 native nodes about
@@ -396,14 +408,16 @@ findings carry the assessment:
 **The voices scale as expected.** 1, 4, 8 and 16 playing parts with no
 inserts read 87, 190, 334 and 652 ms a second: about 32 ms a second (3 %
 of a core here) per part over the idle graph, a chord struck a bar over
-the last chord's 2.4 s release (about six voices sounding, three of them
-in their tails), and `spread` 12 adds 376 ms for twice the voices. These
+the last chord's 2.4 s release (six voices sounding for most of the bar,
+nine for the 0.4 s where two tails overlap), and `spread` 12 adds 376 ms
+for twice the voices. These
 are per-part figures of that load, not per-voice ones. In Node on this
 same machine the kernel renders held `pad-drift` voices at 87 ns a
 voice-sample (4.2 ms a second per voice), against 37 ns on the M1 record,
-so this container is about 2.3× slower than the M1 on the kernel; that
-Node pair is the one per-voice figure here, and the M1 scaling rests on
-it.
+so this container is about 2.3× slower than the M1 on the kernel. That
+Node pair is the one per-voice figure here, and it scales nothing else:
+it says how this machine compares on the kernel, not what the graph or an
+insert costs on the M1.
 
 **Two main-thread paths can stall the pump.** The console's one change
 path renormalises the whole document and re-serialises it after every knob
@@ -446,9 +460,10 @@ is; the rest are smaller or conditional.
 
 ### 1. Let every worklet insert sleep on silence, with its tail (largest)
 
-The one change that moves the 16-part case most. Every worklet kind
-except the EQ, the plate and bloom renders its full DSP on zeros, and the
-bench puts 65–100 % of those kinds' cost on a silent input (the tape 133
+The one change that moves the 16-part case most. Six worklet kinds (the
+tape, the Advanced Drive, the retro reverb, the phaser, the delay and the
+compressor) render their full DSP on zeros, and the bench puts 65–100 % of
+their cost on a silent input (the tape 133
 of 187 ms a second per instance, the Advanced Drive 129 of 128, the
 phaser 23 of 23, the compressor 13 of 20). A real 16-part song has most strips silent most
 of the time: drum parts between hits, pads between regions, every muted
@@ -463,8 +478,9 @@ silence and skips the DSP, and a dispatch that keeps the sleeping quantum
 out of the hot render so V8 keeps its optimised loop. Bloom has its own
 (`bloomDsp.ts`: quiet input for `sleepWait` frames and a quiet output,
 then `rest()` until input returns), which is why it reads 12 ms a second
-silent against 116 awake. Each remaining kind needs its own tail rule,
-from its state:
+silent against 116 awake, and so has the filter (`filterDsp.ts`:
+`settled()` once its state has decayed, then zeros). Each remaining kind
+needs its own tail rule, from its state:
 
 - **Tape**: the transport delay plus the core's 48 samples and the DC
   blockers' settle: tens of milliseconds. The hiss and dropouts are
@@ -473,10 +489,10 @@ from its state:
   silent and let a cheap noise path run, or treat noise above 0 as awake.
 - **Advanced Drive**: stateless but for its filters and oversampler: a few
   milliseconds.
-- **Delay, retro reverb, phaser, compressor, filter**: the delay's feedback
-  tail at its longest setting, the reverb's RT60, the phaser's lattice
-  settle, the compressor's release and the filter's ring; each a span the
-  kind already knows from its parameters.
+- **Delay, retro reverb, phaser, compressor**: the delay's feedback tail
+  at its longest setting, the reverb's RT60, the phaser's lattice settle
+  and the compressor's release; each a span the kind already knows from
+  its parameters. The filter already has its own (`settled()`).
 
 A generic form fits the worklet rules: a block-level peak over the input
 (`SLEEP_INPUT_FLOOR` as the plate's), a countdown in frames, the asleep
@@ -485,21 +501,24 @@ it, no allocation, and a golden that pins the awake render unchanged and
 a test that the sleep engages after the tail and never before. The
 `inserts/*Allocation.test.ts` scenarios cover the switch. Payoff on the
 bench's 16-part three-insert song: of its 2 600 ms a second of insert cost,
-the silent share is about 1 600 (bloom's three instances already resting),
+the silent share is about 1 600 (bloom's and the filter's instances
+already resting),
 so a song whose parts rest half the time saves on the order of 800 ms a
-second here (about 350 on an M1), which is the difference between that
-song playing and not on an M1.
+second here, the size of the gap between the one-insert song playing and
+not on this machine.
 
 ### 2. Budget the dear kinds, and offer their cheaper modes (large)
 
-The tape (187 ms a second an instance here, about 80 on an M1: 0.5 ms of
-a 2.67 ms quantum at 48 kHz per instance), the Advanced Drive (128), bloom
+The tape (187 ms a second an instance here, 0.5 ms of a 2.67 ms quantum
+at 48 kHz per instance; the tape record measured four instances in 31 %
+of a quantum on the M1), the Advanced Drive (128), bloom
 (116) and the plate reverb insert (80) cost 4–15× a cheap kind. Three of
 them on one part already cost more than the part's voices. Options, in
 increasing ambition:
 
 - **Say so in the product.** A cost figure per kind in the insert picker
-  (the kinds table, divided by the M1 factor, is a reasonable first table)
+  (the kinds table, re-taken on the machine the figure is for, is the
+  first table)
   and a running estimate on the CPU button that counts the inserts, since
   the duty-cycle meter cannot see the cost (below). Zero engine risk.
 - **Ship the cheaper setting where one exists.** The tape's
@@ -570,7 +589,7 @@ down, cheapest first:
 ### 5. Fewer declared parameters on the FM part (small, format-neutral)
 
 The eight `voiceSlot` parameters cost 16 parts about 80 µs a quantum on
-this machine (about 35 on an M1, 1.3 % of the budget), idle or not, and the
+this machine (3 % of the budget), idle or not, and the
 EQ's 51 parameters are most of its silent cost (17 ms a second an instance
 here: about 45 µs a quantum, of which the parameters are about 33). The
 lanes are tick-resolution ramps already, so the slots could be carried as
@@ -584,7 +603,7 @@ so it sits behind 1–3.
 ### 6. Leave alone
 
 - **The strip's native nodes.** Eleven nodes a strip cost about 4.9 µs a
-  quantum here (about 2 on an M1); folding the gate, head, rotation and sends
+  quantum here; folding the gate, head, rotation and sends
   into the FM worklet would change the insert order (pan before inserts),
   cost the sends their post-insert point, and save under 2 % of the
   budget at 16 parts. Native nodes propagate silence and cost 0.5 µs each.
@@ -613,20 +632,24 @@ so it sits behind 1–3.
   page's Chromium runs engine code, so the Node version does not touch the
   numbers.
 - The load cases strike chords of one pad patch a bar over its 2.4 s
-  release, so a part's voice count moves between three and six (and
-  twelve at `spread` 12, where the part's 12-voice limit means the
-  release tails are stolen) inside each bar; no active-voice count was
-  read, so the no-insert rows are a cost per part at that load, not per
-  voice. Drums, synced voices, Acid or Formant voices and dense roll parts
+  release, so from the third bar a part's voice count is six for most of
+  each bar and nine for its first 0.4 s, when the chord struck two bars
+  ago is still in its tail (twelve at `spread` 12, where the part's
+  12-voice limit steals the oldest tails); no active-voice count was read,
+  so the no-insert rows are a cost per part at that load, not per voice. Drums, synced voices, Acid or Formant voices and dense roll parts
   cost differently per voice; the kernel's own research covers those.
 - The main-thread figures are a cost per call on an idle page, not a
   profile of the console under a drag.
-- The M1 scaling is one number, the FM kernel's Node render on both
-  machines (87 against 37 ns a voice-sample, `../2026-09-23-645-voice-split-bench`);
-  Chrome's per-node and per-parameter work may scale differently. The
-  tape's per-instance figure cross-checks it: 187 ms a second here against
-  the tape record's four instances in 31 % of a quantum on the M1, about
-  207 µs each, a factor of 2.3.
+- No M1 figure here is an estimate: the M1 numbers quoted are the
+  records' own measurements (the 16-part pad song live, the tape's four
+  instances, the kernel's 37 ns a voice-sample). The 2.3× between this
+  machine and the M1 is the FM kernel's Node render on both
+  (`../2026-09-23-645-voice-split-bench`), stated for orientation only;
+  it is not applied to any graph or insert figure, since Chrome's per-node
+  and per-parameter work may scale differently. The tape's per-instance
+  figure happens to sit at the same ratio (187 ms a second here, about
+  207 µs a quantum each in the M1 record), which is a cross-check, not a
+  scaling.
 - The realtime traces carry the trace's own cost and the container's
   scheduling jitter in their maxima; the means and medians are the
   readings.

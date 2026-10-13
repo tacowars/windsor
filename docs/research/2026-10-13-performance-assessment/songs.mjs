@@ -1,12 +1,13 @@
 /* global structuredClone */
 /** The load cases: version-15 song documents built in the page from the shipped patches.
  * Every part is a Chord Player hitting one three-note chord a bar and holding it (gate 1),
- * at 120 BPM: a new chord every 2 s. `pad-drift`'s operators release over 2.4 s, so the
- * previous chord's voices are still releasing when the next one strikes: a part carries
- * its three new voices plus the last chord's three in release for most of each bar (six
- * voices a part, twelve with the patch's own `spread`, each pair dropping out as the tail
- * goes dormant), not a fixed three. The load is a steady one per part, not a fixed voice
- * count. The harmony moves every four bars. `silent` parts have no sequencer, so their
+ * at 120 BPM: a new chord every 2 s, the held one released at that onset. `pad-drift`'s
+ * operators then release over 2.4 s, so the previous chord's voices are still releasing
+ * when the next one strikes, and the one before that for the bar's first 0.4 s: from the
+ * third bar a part carries six voices for most of each bar and nine for 0.4 s of it
+ * (twice that with the patch's own `spread`, against the part's 12-voice limit, which
+ * steals the oldest tails), not a fixed three. The load is a steady one per part, not a
+ * fixed voice count. The harmony moves every four bars. `silent` parts have no sequencer, so their
  * processors run with every voice inactive: the graph alone.
  */
 import padDrift from '../../../packages/engine/src/patches/pad-drift.json' with { type: 'json' };
