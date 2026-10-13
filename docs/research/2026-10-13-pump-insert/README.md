@@ -111,11 +111,11 @@ from the median.
 - **The scope is cheap.** While the card is on screen, the trace and the
   phase reports add 2 to 2.5 % to the instances' cost. Only the instance
   whose card is open pays it.
-- **Pump does not sleep.** Its render is a per-sample gain on the input, and
-  the detector must hear the key every sample for a trigger to land within
-  1 ms, so it could rest only when the input and the key are both silent.
-  At 0.030 ms an instance there is little to save. The inserts that sleep
-  on silence (windsor#793) are the ones whose tails cost more.
+- **Pump does not sleep yet.** The compressor's sleep (windsor#801) would
+  fit it: Pump's output is its input times a gain, so once the cycle is at
+  rest, the gain has slewed to its last level and the program and the key
+  are silent, a block could write zeros without running the followers. At
+  0.030 ms an instance the saving is small, so it is left to a follow-up.
 
 The raw repeats, the plan and the machine are in
 [`measurement.json`](measurement.json).
