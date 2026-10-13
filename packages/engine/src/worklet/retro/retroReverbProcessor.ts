@@ -63,7 +63,7 @@ class RetroReverbProcessor extends AudioWorkletProcessor {
     const frames = out[0].length;
     const dsp = this.dsp;
     dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
-    if (dsp.asleep) this.rest(out);
+    if (dsp.asleep) this.rest(out, frames);
     else this.render(left, right, out, frames);
     this.load.end(frames);
     return true;
@@ -103,10 +103,15 @@ class RetroReverbProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out: Float32Array[]): void {
+  /**
+   * One asleep block: zeros, the input's silence to within its floor, and the DSP's `rest`, which
+   * keeps the clock, Drift, the Size move, the converters' detectors, Mix and the switch moving
+   * (windsor#802).
+   */
+  rest(out: Float32Array[], frames: number): void {
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
+    this.dsp.rest(frames);
   }
 }
 

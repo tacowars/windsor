@@ -241,13 +241,18 @@ counts the frames the input and that peak have both held under their
 floors. Past `spanSeconds` (0.85 s, the longest a sample can go unseen: the
 longest pre-delay, then the longer of the finite field's history and the
 diffusers with the longest tank line at Size 10) it empties the networks as
-the switch's off does and sleeps: the processor writes zeros with no `tick`,
-`configure` smooths only the block-rate controls, lands Mix and the switch
-and keeps the internal clock's phase, and the first loud block wakes it and
-renders in full. Its tail is its own decay to the output floor plus the
-span, so no fixed bound covers it (Decay 20 s with Low decay ×4).
-`sleep: false` in `processorOptions` is the tests' render without it;
-`inserts/retroReverbSleep.test.ts` holds the tail, the wake and the bits.
+the switch's off does, keeping the converters' detectors, and sleeps: the
+processor writes zeros with no `tick`, `configure` smooths the block-rate
+controls and aims the tank's Size move and Drift (`RetroTank.aim`), and
+`RetroReverbDsp.rest` steps what `tick` moves that is not audio a sample at a
+time (windsor#802): the internal clock, Drift's LFO and the Size move on each
+internal tick (`RetroTank.idle`), the detectors on the silence while
+ranging, Mix's glide and the switch's fade, on an awake reverb's bits. The
+first loud block wakes it and renders in full. Its tail is its own decay to
+the output floor plus the span, so no fixed bound covers it (Decay 20 s with
+Low decay ×4). `sleep: false` in `processorOptions` is the tests' render
+without it; `inserts/retroReverbSleep.test.ts` holds the tail, the wake, the
+changes made asleep and the bits.
 
 `meter/` holds the two sample meters, bundled together from
 `meter/meterProcessors.ts` to `generated/peak-meter-processor.js` (so the

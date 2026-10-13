@@ -13,12 +13,14 @@
  * noise with a parameter change every 8 (size, decay, tone, diffusion, drift
  * depth and rate, pre-delay, character, mix, duration, early, density, the
  * converter, low decay and low cross, gated and reverse, the enable), then
- * silence at a short decay until the tail is exact zeros, the finite field has
- * faded, the pre-delay is off and the mix has settled (about 520 quanta, by
- * which the reverb has slept, windsor#793), then
- * 64 quanta of mono noise (which wakes it) and 64 of no input, then 512 quanta of stereo
+ * silence at a short decay until the reverb has slept (windsor#793), Size,
+ * Mix, Drift and the converter have changed while it sleeps and, once Mix has
+ * glided onto its target, the switch has gone off (windsor#802), and the tail
+ * is exact zeros, the finite field has faded, the pre-delay is off and the mix
+ * has settled, then
+ * 64 quanta of mono noise (which wakes it, at the defaults again) and 64 of no input, then 512 quanta of stereo
  * noise with Drift depth switching between exactly 0 and on every quantum
- * (each switch on refills the tank's two detune delays): about 1 670 quanta.
+ * (each switch on refills the tank's two detune delays).
  * The child
  * warms for 48 000 quanta (the load meter reporting for the first half),
  * forces two collections, then reads `used_heap_size` in ten windows across

@@ -30,11 +30,16 @@
  * Sleep (windsor#793, `RETRO_REVERB_SLEEP`): `internal` keeps the block's
  * wet peak (the wet tone, before the converters), and `configure` counts the
  * frames over which the input and that peak have both stayed under their
- * floors. Past `spanSeconds` it empties the networks as `clear` does and
- * sleeps: the processor writes zeros and runs no `tick`, and `configure` only
- * smooths the block-rate controls and lands the per-sample glides (Mix and the
- * switch), until the first block whose input crosses the floor wakes it and
- * renders in full. The count is `drowse`, which `configure` calls every block
+ * floors. Past `spanSeconds` it empties the networks as `clear` does, but
+ * keeps the converters' detectors, and sleeps: the processor writes zeros and
+ * runs no `tick`, `configure` smooths the block-rate controls and aims the
+ * tank's Size move and Drift (`RetroTank.aim`), and `rest` steps the rest of
+ * `tick` that is not audio a sample at a time (windsor#802): the internal
+ * clock, Drift's LFO and the Size move on each internal tick, the detectors
+ * on the silence while ranging, Mix's glide and the switch's fade. So a
+ * control moved in a gap wakes mid-glide on the bits of a reverb that never
+ * slept. The first block whose input crosses the floor wakes it and renders
+ * in full. The count is `drowse`, which `configure` calls every block
  * so V8 optimises it, where a method only a silence called would stay in a
  * tier that boxes its doubles.
  * `retroReverbSleep.test.ts` holds the tail, the wake and the bits.
@@ -217,20 +222,17 @@ class RetroReverbDsp {
     this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
-    if (this.asleep) {
-      // Nothing renders: the per-sample glides land, the internal clock keeps its time, and
-      // the networks wait for the wake.
-      this.mix = this.targetMix;
-      this.level = this.targetLevel;
-      this.phase += (C.rate / this.rate) * frames;
-      this.phase -= Math.floor(this.phase);
-      return;
-    }
     if (this.level !== 0) this.dormant = false;
     else if (!this.dormant) this.clear();
     // Back on: the networks run again from the silence `clear` left.
     if (this.targetLevel !== 0) this.dormant = false;
     this.countTicks(frames);
+    if (this.asleep) {
+      // Nothing renders: the networks wait for the wake, and `rest` steps what moves without them.
+      this.tank.aim(this);
+      this.configureConverters();
+      return;
+    }
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / C.rate);
     this.tank.configure(this);
     if (this.finite > C.silenceFloor) this.reflections.configure(this);
@@ -292,10 +294,14 @@ class RetroReverbDsp {
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear(): void {
     this.empty();
+    this.resetConverters();
     this.dormant = true;
   }
 
-  /** Every line, network and filter state to zero, for the switch's off and for sleep. */
+  /**
+   * Every line, network and filter state to zero, for the switch's off and for sleep. The
+   * converters' detectors are not audio: asleep they keep running in `rest` (windsor#802).
+   */
   empty(): void {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
@@ -315,7 +321,39 @@ class RetroReverbDsp {
     this.rightFilter.z.fill(0);
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
-    this.resetConverters();
+  }
+
+  /**
+   * One asleep block of `frames` (windsor#802, the rule of Advanced Drive's `rest`): `tick` a
+   * sample at a time with no audio. The internal clock keeps its steps, and on each of its ticks
+   * the tank's Drift and Size move (`RetroTank.idle`) and, while ranging, each converter's
+   * detector takes the silence; Mix glides and the switch fades. Each is `tick`'s arithmetic, so
+   * a wake finds them on the bits of a reverb that never slept. Dormant, `tick` runs nothing.
+   */
+  rest(frames: number): void {
+    if (this.dormant) return;
+    const step = C.rate / this.rate,
+      ranging = this.ranging !== 0;
+    for (let i = 0; i < frames; i++) {
+      this.phase += step;
+      while (this.phase >= 1) {
+        this.phase -= 1;
+        this.tank.idle();
+        if (!ranging) continue;
+        this.inputConverter.input = this.leftConverter.input = this.rightConverter.input = 0;
+        this.inputConverter.tick();
+        this.leftConverter.tick();
+        this.rightConverter.tick();
+      }
+      this.mix += this.smooth * (this.targetMix - this.mix);
+      if (Math.abs(this.targetMix - this.mix) < C.silenceFloor) this.mix = this.targetMix;
+      const level = this.level;
+      if (level !== this.targetLevel)
+        this.level =
+          this.targetLevel > level
+            ? Math.min(this.targetLevel, level + this.levelStep)
+            : Math.max(this.targetLevel, level - this.levelStep);
+    }
   }
 
   /** One sample of the internal clock, of `internalInput`. */
