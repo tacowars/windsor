@@ -234,9 +234,15 @@ differ, the difference is stated under the decision.
      The voice has no handle on that target (`voiceAutomationHandle` returns
      none), so a CC there could not move it.
 7. **Takeover.**
-   - **Pickup** is the default. After a song opens, a preset changes, a
-     range changes, the target is turned on screen (decision 2) or Reset
-     performance, a CC does nothing until it picks up. It picks up when
+   - **Pickup** is the default. The rule: anything that changes what a
+     hardware position means, or lets the knob move while Windsor does not
+     hear it, re-arms pickup. That is, after a song opens, a preset
+     changes, a range changes, `Inv` is toggled, the target is turned on
+     screen (decision 2), Reset performance, the input is unplugged and
+     comes back (see the boundary cases), or the MIDI selector stops
+     listening to the input and later listens again (`midiAccess.ts`
+     detaches the input's handler on deselection as it does on a
+     disconnect). Until then a CC does nothing. It picks up when
      its value reaches or crosses the target's current value. The current
      value is the CC's base where one is held, else the patch's (or the
      strip's or insert's) own value. A clip envelope's offset is not part of
@@ -407,6 +413,14 @@ shows.
   it as "(disconnected)", as the selector does. When the device returns,
   its mappings re-arm pickup, since the knob may have moved meanwhile. Under
   Jump, the next value applies.
+- **An input deselected and selected again.** The MIDI selector moves from
+  controller A to B and back to A, and A's knob moved in between. The
+  mappings that heard A re-arm pickup when the selector listens to A
+  again, as after an unplug, so A's next message cannot jump the target.
+  Under Jump, the next value applies.
+- **`Inv` toggled after pickup.** The same hardware position now means the
+  other end of the range, so the mapping re-arms pickup, as a range edit
+  does. The target holds its value until the knob crosses it.
 - **Two inputs sending the same CC.** With the selector on All inputs, a
   mapping widened to Any device hears both. Pickup is keyed by device name
   and channel (decision 7), so a second controller with another name, its
