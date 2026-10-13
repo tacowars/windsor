@@ -78,6 +78,13 @@ describe('MidiPerformer', () => {
     expect(log).toEqual(['bend -1.5', 'wheel 0.25']);
   });
 
+  it('leaves a controller to the CC router', () => {
+    const { sink, log } = recorder();
+    const p = new MidiPerformer(sink);
+    [on(60), { type: 'cc', channel: 1, cc: 74, value: 90 } as const].forEach((e) => p.handle(e));
+    expect(log).toEqual(['on 60 0.5']);
+  });
+
   it('releases held and sustained notes and rests expression when the device is lost', () => {
     const { sink, log } = recorder();
     const p = new MidiPerformer(sink);
