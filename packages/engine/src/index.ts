@@ -183,6 +183,11 @@ export type { AutomationOwner, GroupOwner, PartOwner } from './automation/automa
 export { groupOwner, isGroupOwner, partOwner } from './automation/automationOwner';
 // The automation player's writer interface (windsor#344); the system plays the lanes itself.
 export type { AutomationHandle, AutomationHow } from './automation/automationHandles';
+// MIDI CC mapping (windsor#780, record `2026-10-13-midi-cc-mapping`): the
+// mapping, its targets, the shared CC tables and the CC ↔ value shaping.
+export type { CcMapping, CcRange, CcSource, CcTargetId } from './song/ccMapping';
+export { ccDefaultRange, ccPosition, ccValue, isCcMappableTarget } from './song/ccMapping';
+export { CC_DATA_MAX, CC_MAPPING_IGNORED } from './song/ccMappingTables';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,
