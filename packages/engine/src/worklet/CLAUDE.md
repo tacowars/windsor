@@ -255,6 +255,18 @@ runs the generated bundle through `__fixtures__/outputStageHarness.ts`, and
 
 `compressor/compressorProcessor.ts` wraps the typed, tested compressor DSP in
 `inserts/compressorDsp.ts`; it also bundles through the table below (#660).
+It sleeps on silence (windsor#793, `COMPRESSOR_SLEEP`): its output is its
+input times its gain, so on silence it holds only the envelope.
+`CompressorDsp.drowse`, called every block, puts it to sleep on a block whose
+program (and key, when external) is silent once the envelope has released to
+`reductionFloorDb` (a gain within 1e-7 of its rest) and the detector's
+highpass has settled; asleep, the processor writes zeros and posts the meter
+with no `advance`, the smoothed controls land on their targets, and the first
+loud block wakes it and renders in full. Its tail is its release, 18 s at the
+defaults and at most `tailSeconds` (21.7 s, the slowest release from Range
+60 dB); one at rest sleeps on its first silent block. `sleep: false` in
+`processorOptions` is the tests' render without it;
+`inserts/compressorSleep.test.ts` holds the tail, the wake and the bits.
 
 The compressor adapter has its own `compressor/tsconfig.json`, included in
 `npm run typecheck`. Like the FM project it erases declared class fields and

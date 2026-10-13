@@ -14,8 +14,14 @@
  * engine's project, whose class fields would be defined as `undefined` first)
  * and first written as a double (worklet rules 2 and 7, windsor#229). Pinned by
  * compressorAllocation.test.ts; compressorDsp.test.ts pins the behaviour.
+ *
+ * Sleep (windsor#793, `COMPRESSOR_SLEEP`): `drowse`, which the worklet calls
+ * every block (so V8 optimises it), puts the compressor to sleep on a silent
+ * block once the envelope has released to the floor; asleep, the worklet
+ * writes zeros and runs no `advance`, the smoothed controls land on their
+ * targets, and a loud block wakes it. `compressorSleep.test.ts` holds it.
  */
-import { COMPRESSOR_DSP as C } from './compressorConstants';
+import { COMPRESSOR_DSP as C, COMPRESSOR_SLEEP as Z } from './compressorConstants';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
 
 export type CompressorParams = Record<string, Float32Array>;
@@ -67,8 +73,12 @@ export class CompressorDsp {
   declare private readonly slowCharge: number;
   declare private readonly slowRelease: number;
   declare private params: CompressorParams;
+  /** Whether it may sleep: `sleep: false` is a test's, to render it without the sleep. */
+  declare readonly sleepEnabled: boolean;
+  /** Released to the floor with the input silent: the block is zeros, and no `advance` runs. */
+  declare asleep: boolean;
 
-  constructor(rate: number, params: CompressorParams) {
+  constructor(rate: number, params: CompressorParams, sleep = true) {
     // Every double is first written as one (NaN), so V8 never has to generalise
     // a small-integer field to a double later (worklet rule 7).
     this.reductionDb = this.gain = this.keyLeft = this.keyRight = NaN;
@@ -93,6 +103,8 @@ export class CompressorDsp {
     this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.slowCharge = coeff(C.autoChargeSeconds, rate);
     this.slowRelease = coeff(C.autoSlowSeconds, rate);
+    this.sleepEnabled = sleep;
+    this.asleep = false;
     this.configure(params, true);
   }
 
@@ -120,6 +132,34 @@ export class CompressorDsp {
       this.highpass = highpass;
       this.hpSpeed = -Math.expm1((-(2 * Math.PI) * highpass) / this.rate);
     }
+  }
+
+  /**
+   * The sleep, once a block after `configure`: a loud block (`quiet` false) wakes it; a silent
+   * one puts it to sleep once the envelope is under the floor and the detector's highpass has
+   * settled; asleep, the smoothed controls land on their targets.
+   */
+  drowse(quiet: boolean): void {
+    if (!quiet) {
+      this.asleep = false;
+      return;
+    }
+    if (!this.asleep) {
+      const floor = Z.reductionFloorDb;
+      if (!this.sleepEnabled || this.fast >= floor) return;
+      if (this.release === 0 && this.slow >= floor) return;
+      const low = Math.max(Math.abs(this.lowL), Math.abs(this.lowR));
+      if (this.highpass > 0 && low >= Z.inputFloor) return;
+      this.fast = this.slow = this.reductionDb = this.lowL = this.lowR = 0;
+      this.asleep = true;
+    }
+    const p = this.params;
+    this.threshold = p.threshold![0]!;
+    this.makeup = p.makeup![0]!;
+    this.mix = p.mix![0]!;
+    this.range = p.range![0]!;
+    this.ratio = p.ratio![0]!;
+    this.enabled = p.enabled![0]!;
   }
 
   /** One sample from `left` and `right`, returning the gain: the tests' form of `advance`. */

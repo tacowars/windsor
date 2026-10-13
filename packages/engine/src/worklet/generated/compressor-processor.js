@@ -40,6 +40,12 @@ var COMPRESSOR_DSP = {
   meterHz: 30,
   meterCeilingDb: 24
 };
+var SLEEP_GAIN_FLOOR = 1e-7;
+var COMPRESSOR_SLEEP = {
+  inputFloor: 1e-9,
+  reductionFloorDb: SLEEP_GAIN_FLOOR / COMPRESSOR_DSP.dbToLog,
+  tailSeconds: Math.max(COMPRESSOR_DSP.autoSlowSeconds, COMPRESSOR_BOUNDS.release[1]) * Math.log(COMPRESSOR_BOUNDS.range[1] * COMPRESSOR_DSP.dbToLog / SLEEP_GAIN_FLOOR)
+};
 
 // packages/engine/src/inserts/insertConstants.ts
 var MAX_INSERTS = 8;
@@ -84,7 +90,7 @@ function feedbackStep(over, previous, slope, speed) {
   return Math.max(0, over + half - y);
 }
 var CompressorDsp = class {
-  constructor(rate, params) {
+  constructor(rate, params, sleep = true) {
     this.reductionDb = this.gain = this.keyLeft = this.keyRight = NaN;
     this.slow = this.fast = this.lowL = this.lowR = NaN;
     this.threshold = this.makeup = this.mix = this.range = this.enabled = this.ratio = NaN;
@@ -107,6 +113,8 @@ var CompressorDsp = class {
     this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.slowCharge = coeff(COMPRESSOR_DSP.autoChargeSeconds, rate);
     this.slowRelease = coeff(COMPRESSOR_DSP.autoSlowSeconds, rate);
+    this.sleepEnabled = sleep;
+    this.asleep = false;
     this.configure(params, true);
   }
   configure(params, initial = false) {
@@ -128,6 +136,33 @@ var CompressorDsp = class {
       this.highpass = highpass;
       this.hpSpeed = -Math.expm1(-(2 * Math.PI) * highpass / this.rate);
     }
+  }
+  /**
+   * The sleep, once a block after `configure`: a loud block (`quiet` false) wakes it; a silent
+   * one puts it to sleep once the envelope is under the floor and the detector's highpass has
+   * settled; asleep, the smoothed controls land on their targets.
+   */
+  drowse(quiet) {
+    if (!quiet) {
+      this.asleep = false;
+      return;
+    }
+    if (!this.asleep) {
+      const floor = COMPRESSOR_SLEEP.reductionFloorDb;
+      if (!this.sleepEnabled || this.fast >= floor) return;
+      if (this.release === 0 && this.slow >= floor) return;
+      const low = Math.max(Math.abs(this.lowL), Math.abs(this.lowR));
+      if (this.highpass > 0 && low >= COMPRESSOR_SLEEP.inputFloor) return;
+      this.fast = this.slow = this.reductionDb = this.lowL = this.lowR = 0;
+      this.asleep = true;
+    }
+    const p = this.params;
+    this.threshold = p.threshold[0];
+    this.makeup = p.makeup[0];
+    this.mix = p.mix[0];
+    this.range = p.range[0];
+    this.ratio = p.ratio[0];
+    this.enabled = p.enabled[0];
   }
   /** One sample from `left` and `right`, returning the gain: the tests' form of `advance`. */
   tick(left, right) {
@@ -250,7 +285,7 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
     for (const [name, value] of Object.entries(COMPRESSOR_DEFAULTS)) {
       params[name] = new Float32Array([Number(options.parameterData?.[name] ?? value)]);
     }
-    this.dsp = new CompressorDsp(sampleRate, params);
+    this.dsp = new CompressorDsp(sampleRate, params, options.processorOptions?.sleep !== false);
     this.running = true;
     this.meter = false;
     this.frames = 0;
@@ -275,6 +310,23 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
     if (!out?.[0]) return true;
     const source = inputs[0];
     const detector = params.external[0] >= 0.5 ? inputs[1] : source;
+    const dsp = this.dsp;
+    dsp.configure(params);
+    if (dsp.sleepEnabled) {
+      const quiet = this.silent(source?.[0], source?.[1]);
+      dsp.drowse(quiet && (detector === source || this.silent(detector?.[0], detector?.[1])));
+    }
+    if (dsp.asleep) this.rest(out);
+    else this.render(source, detector, out);
+    this.report(params, out[0].length);
+    this.load.end(out[0].length);
+    return true;
+  }
+  /**
+   * One awake block, in a method of its own as the plate's `_renderBlock` is (windsor#793): V8
+   * optimises it on sound alone, never inside a `process` that has so far only slept.
+   */
+  render(source, detector, out) {
     const left = source?.[0];
     const right = source?.[1] ?? left;
     const keyL = detector?.[0];
@@ -282,7 +334,6 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const keyLFrames = keyL ? keyL.length : 0, keyRFrames = keyR ? keyR.length : 0;
     const dsp = this.dsp;
-    dsp.configure(params);
     for (let i = 0; i < out[0].length; i++) {
       dsp.keyLeft = i < keyLFrames ? keyL[i] : 0;
       dsp.keyRight = i < keyRFrames ? keyR[i] : 0;
@@ -292,9 +343,22 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
       if (out[1]) out[1][i] = (i < rightFrames ? right[i] : 0) * gain;
       if (this.meter) this.peak = Math.max(this.peak, dsp.reductionDb);
     }
-    this.report(params, out[0].length);
-    this.load.end(out[0].length);
+  }
+  /** Every sample of the block within the sleep floor; an absent channel is silent. */
+  silent(left, right) {
+    const floor = COMPRESSOR_SLEEP.inputFloor;
+    if (left) {
+      for (let i = 0; i < left.length; i++) if (Math.abs(left[i]) > floor) return false;
+    }
+    if (right && right !== left) {
+      for (let i = 0; i < right.length; i++) if (Math.abs(right[i]) > floor) return false;
+    }
     return true;
+  }
+  /** One asleep block: zeros, the input's silence to within its floor. */
+  rest(out) {
+    out[0].fill(0);
+    if (out[1]) out[1].fill(0);
   }
   /** The gain-reduction meter's throttled post. */
   report(params, frames) {

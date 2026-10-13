@@ -6,7 +6,9 @@
  * and settle, with a short silence at its end. Each step also names its
  * input, as the node's two inputs arrive in Chrome: stereo, mono, none (an
  * inactive source has no channels) or stereo with a stereo key on the second
- * input, and whether the gain-reduction meter is on. The warm-up plays the
+ * input, and whether the gain-reduction meter is on. The silence after the
+ * step at Range 0 puts the compressor to sleep and the next step wakes it
+ * (windsor#793); the measured run throws unless it took both. The warm-up plays the
  * cycle whole several times, the load meter on for its first cycle, and the
  * measured run plays it once more, so it measures code already hot. The probe
  * imports this by path in its child Node, which runs it directly (its types
@@ -81,15 +83,25 @@ export default function compressorChangeScenario(probe: ProbeRig): ProbeScenario
     for (let i = 0; i < at.length; i++) at[i]![0] = to[i]!;
     probe.processor.port.onmessage!(meters[step]!);
   };
+  const dsp = (probe.processor as unknown as { dsp: { asleep: boolean } }).dsp;
+  const { warmup, measure } = probe.config;
+  // Whether a quantum ended asleep, and whether one woke, since the warm-up.
+  let slept = false,
+    woke = false;
   // Quanta [from, to). The warm-up and the measured run call this same function.
   const drive = (from: number, to: number): void => {
     for (let q = from; q < to; q++) {
       apply(q);
       const quiet = q % period >= period - config.quiet;
+      const was = dsp.asleep;
       probe.render(q, quiet ? feeds.quiet : feed[Math.floor(q / period) % steps.length]!);
+      if (dsp.asleep) slept = true;
+      else if (was) woke = true;
+    }
+    if (to === warmup + measure && !(slept && woke)) {
+      throw new Error(`the measured run did not sleep and wake: ${slept} ${woke}`);
     }
   };
-  const { warmup } = probe.config;
   return {
     warm: () => {
       if (warmup % cycle !== 0)
@@ -103,6 +115,7 @@ export default function compressorChangeScenario(probe: ProbeRig): ProbeScenario
         drive(q, q + period);
       }
       for (let r = 0; r < WARM_READS; r++) v8.getHeapStatistics();
+      slept = woke = false;
     },
     drive,
   };
