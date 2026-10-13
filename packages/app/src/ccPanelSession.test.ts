@@ -163,4 +163,15 @@ describe('CcSession', () => {
     expect(r.session.heardFrom(0, STRIP)).toBeUndefined();
     expect(r.session.status(0, STRIP)).toEqual({ kind: 'waiting', marker: null });
   });
+
+  it("forgets the last song's held values when another song opens, so pickup starts from the new song's own", () => {
+    const r = rig();
+    learn(r, 0, STRIP);
+    r.session.hear(cc(127));
+    expect(r.session.engine.heldValue(0, STRIP)).toBeDefined();
+    const own = r.session.engine.target(0, STRIP)?.own;
+    r.model.open(r.model.doc);
+    expect(r.session.engine.heldValue(0, STRIP)).toBeUndefined();
+    expect(r.session.current(0, STRIP)).toBe(own);
+  });
 });

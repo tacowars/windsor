@@ -72,6 +72,14 @@ export class DocumentCcEngine implements CcEngine {
     this.host.clearPerformance(part, target);
   }
 
+  /**
+   * Forget every held base without telling the host: another song opened, or a
+   * new live system stands, and neither holds a CC value.
+   */
+  forget(): void {
+    this.held.clear();
+  }
+
   /** The CC base `target` of `part` holds, or undefined when it plays its own value. */
   heldValue(part: number, target: CcTargetId): number | undefined {
     return this.held.get(key(part, target));

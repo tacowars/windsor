@@ -190,6 +190,7 @@ export class CcSession {
       this.learnOn = null;
       this.heardNow = null;
       this.heardBy.clear();
+      this.engine.forget();
       this.router.songOpened(songCcMappings(doc));
     } else {
       this.router.mappingsChanged(songCcMappings(doc));
@@ -204,6 +205,7 @@ export class CcSession {
 
   /** A new live system stands, holding no CC value: every mapping re-arms. */
   systemBuilt(): void {
+    this.engine.forget();
     this.router.resetPerformance();
     this.changed('live');
   }
