@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Mockup only (windsor#778, record 2026-10-13-midi-cc-mapping): the MIDI CC
+     button, its mapping panel, the add and learn flow, the knob's CC tag and
+     ring, and the knob's right-click menu. Everything else is today's Parts
+     tab, captured from the dev build on 2026-10-13 in the project's headless
+     Chrome at a 1440 px window, with a song of one part, "Acid" (Acid Saw on a
+     Grid, macros Accent, Squelch and Grit, a Dub delay insert, lanes on the
+     delay's Feedback and on LFO 1 Amt): the part bar's and operator A's
+     markup and styles are that build's own. The strip at the very top is the
+     mockup's own switcher, not part of the console. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>MIDI CC Mapping Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ---------- today's console rules, copied from the dev build ---------- */
+:root { --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10; --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70; --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c; --sub-ground: #1a1f23; --sub-rail: #20272b; --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif; --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif; --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; --r: 3px; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 13px; margin: 0px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+.console { display: flex; flex-direction: column; min-height: 100vh; }
+.tab-root { flex: 1 1 0%; }
+.section-title { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
+.section-title::after { content: ""; flex: 1 1 0%; height: 1px; background: var(--line); margin-left: 2px; }
+.section-title > span { flex: 0 0 auto; }
+.parts-grid .bays { background: var(--ground); padding: 12px; min-width: 0px; }
+.knob.mapped .knob-auto { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.knob { width: 54px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0px 4px; border-radius: var(--r); cursor: ns-resize; touch-action: none; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--knob-color, var(--ink-dim)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; pointer-events: none; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); pointer-events: none; }
+.knob-readout { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; padding: 3px 3px 6px; min-width: 42px; }
+.knob-readout .readout-val { font-family: var(--f-num); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.knob-readout .readout-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.knob.locked { cursor: not-allowed; }
+.knob.locked .dial-arc { stroke: var(--lock-color); }
+.knob.locked .dial-pin { stroke: var(--lock-color); stroke-width: 2; }
+.knob.locked .dial-face { stroke: var(--lock-color); }
+.knob .knob-auto, .insert-switch .knob-auto { display: none; padding: 0px 4px; border-radius: 6px; background: var(--lock-color); color: var(--ground); font-family: var(--f-panel); font-size: 7.5px; font-weight: 600; letter-spacing: 0.14em; line-height: 11px; pointer-events: none; }
+.knob.locked .knob-auto, .insert-switch.locked .knob-auto { display: block; }
+.knob .dial-env, .knob .dial-env-dot { display: none; }
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1 1 0%; min-width: 44px; background: var(--inset); border: 0px; padding: 5px 4px; cursor: pointer; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--seg-color, var(--carrier)); color: rgb(17, 20, 22); }
+select.field, input.field { width: 100%; max-width: 260px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 7px; font-size: 12px; }
+input.field { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.btn { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; color: var(--ink-dim); font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.field-label { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+.op-rows { --op-cell: 44px; --op-readout: 56px; --op-gap: 4px; --op-core-gap: 14px; --op-env: 560px; --op-env-min: 140px; --op-cols: 10; container-type: inline-size; display: flex; flex-direction: column; gap: 6px; }
+.op-row { display: grid; grid-template-columns: 170px minmax(0px, 1fr); gap: 6px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--op-color); border-radius: var(--r); padding: 7px 10px; }
+.op-id { display: flex; flex-direction: column; gap: 5px; min-width: 0px; }
+.op-id-head { display: flex; align-items: center; gap: 8px; }
+.op-letter { font-family: var(--f-panel); font-size: 17px; font-weight: 700; letter-spacing: 0.05em; color: var(--op-color); line-height: 1; }
+.op-role { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; background: color-mix(in srgb, var(--op-color) 18%, transparent); color: var(--op-color); }
+.op-id-line { display: flex; gap: 4px; }
+.op-id .btn { padding: 3px 6px; font-size: 10px; }
+.op-adv-btn { margin-left: auto; }
+.op-id select.field { flex: 1 1 0%; min-width: 0px; padding: 3px 4px; font-size: 11.5px; }
+.sync-face { position: relative; flex: 0 0 auto; display: grid; place-items: center; min-width: 42px; padding: 3px 12px 3px 6px; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.sync-face:hover { border-color: var(--ink-faint); }
+.sync-face::after { content: ""; position: absolute; right: 3px; bottom: 3px; border-width: 3px 3px 0px; border-style: solid solid none; border-right-color: transparent; border-left-color: transparent; border-image: none; border-top-color: var(--ink-faint); border-bottom-color: currentcolor; }
+.op-body { --op-main: calc(var(--op-cols) * (var(--op-cell) + var(--op-gap)) + var(--op-readout)); --op-adsr: calc(4 * var(--op-cell) + 3 * var(--op-gap)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0px; }
+.op-core { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--op-core-gap); flex: 1 1 calc(var(--op-main) + var(--op-adsr) + 2 * var(--op-core-gap) + var(--op-env)); min-width: 0px; }
+.op-knobs { display: flex; flex: 0 0 auto; align-items: center; gap: var(--op-core-gap); }
+.op-group { display: flex; gap: var(--op-gap); flex: 0 0 auto; align-items: flex-end; }
+.op-row .knob { width: var(--op-cell); }
+.op-row .knob-readout { width: var(--op-readout); }
+.op-row .knob.op-fixed { width: calc(2 * var(--op-cell) + var(--op-readout) + 2 * var(--op-gap)); }
+.op-main { min-width: var(--op-main); }
+.op-row .env-canvas { width: auto; flex: 1 1 var(--op-env-min); min-width: var(--op-env-min); height: 54px; }
+.op-harmonics { grid-column: 1 / -1; }
+.env-canvas { width: 100%; height: 46px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); cursor: grab; touch-action: none; }
+.patch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.patch-bar .bar-label { margin: 0px; }
+.patch-bar input.field, .patch-bar select.field { font-family: var(--f-ui); font-size: 13px; padding: 5px 8px; }
+.patch-bar .bar-name { width: 120px; }
+.patch-bar .bar-seq { width: auto; min-width: 110px; }
+.patch-bar .bar-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0px 4px; }
+.patch-bar .bar-grow { flex: 1 1 0%; }
+.patch-bar .btn { white-space: nowrap; }
+.patch-bar .btn.icon { padding: 6px 8px; }
+.patch-bar .btn:disabled { opacity: 0.4; cursor: default; background: var(--inset); color: var(--ink-dim); border-color: var(--line); }
+.patch-box-wrap { position: relative; flex: 1 1 300px; min-width: 300px; max-width: 420px; }
+.patch-box { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 5px 10px; cursor: pointer; text-align: left; }
+.patch-box:hover, .patch-box-wrap.open .patch-box { border-color: var(--ink-faint); }
+.patch-box-name { font-family: var(--f-ui); font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0px; }
+.patch-box-mod { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--carrier); }
+.patch-box-src { font-family: var(--f-ui); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+.patch-box-search { margin-left: auto; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+.patch-menu-wrap { position: relative; }
+.parts-grid { display: grid; grid-template-columns: 230px minmax(0px, 1fr); gap: 1px; background: var(--line); }
+.parts-grid .rail { background: var(--panel); }
+/* The env ring (windsor#725), as console.css draws it. */
+.knob .dial-env, .knob .dial-env-dot { display: none; }
+.knob.env { --env-color: var(--carrier); }
+.knob.env svg { overflow: visible; }
+.knob.env .dial-env { display: inline; stroke: var(--env-color); stroke-width: 1.6; fill: none; stroke-linecap: round; }
+.knob.env .dial-env-dot { display: inline; fill: var(--env-color); }
+.knob.env:not(.locked) .knob-auto { display: block; background: var(--env-color); }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line-bright); }
+.tb .grp { display: flex; align-items: center; flex-wrap: wrap; row-gap: 4px; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb .grp button:first-of-type { border-radius: var(--r) 0 0 var(--r); margin-left: 0; }
+.tb .grp button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb .grp button:only-of-type { border-radius: var(--r); }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.notes { max-width: 1040px; margin: 14px 16px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.55; color: var(--ink-dim); }
+.notes h2 { font: 700 14px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--carrier); margin: 12px 0 2px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ul { margin: 4px 0 0; padding-left: 18px; }
+.notes code { font: 12px var(--f-num); color: var(--ink); }
+.notes table { border-collapse: collapse; margin: 6px 0 2px; font-size: 12px; }
+.notes th, .notes td { text-align: left; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.notes th { font: 600 9.5px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+.notes td.n { font-family: var(--f-num); color: var(--ink); white-space: nowrap; }
+.view-label { margin: 0 16px 6px; font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.stage { position: relative; padding-bottom: 40px; }
+.crop-note { padding: 12px 14px; color: var(--ink-faint); font: 10px var(--f-num); line-height: 1.5; }
+body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px; }
+
+/* ---------- the proposal: the MIDI CC button ---------- */
+/* A part-bar .btn, after the sequencer picker; its count is the selected part's mappings. */
+.cc-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cc-btn .cc-count { min-width: 16px; padding: 0 4px; border-radius: 6px; background: var(--line-bright); color: var(--ink); font: 500 10px var(--f-num); line-height: 14px; text-align: center; }
+.cc-btn[aria-expanded="true"] { border-color: var(--carrier); color: var(--ink); }
+.cc-btn[aria-expanded="true"] .cc-count { background: var(--carrier); color: var(--ground); }
+.bar-anchor { position: relative; }
+
+/* ---------- the proposal: the panel (a popover under the button) ---------- */
+.cc-pop { position: absolute; z-index: 30; top: calc(100% + 6px); left: 16px; width: min(1080px, calc(100% - 32px)); container: ccpop / inline-size; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.cc-pop[hidden] { display: none; }
+.cc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.cc-title { font: 600 11px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); margin-right: 4px; }
+.cc-head .seg { flex: 0 0 auto; }
+.cc-head .seg button { min-width: 0; padding: 4px 10px; white-space: nowrap; }
+.cc-head .grow { flex: 1 1 0; }
+.cc-head .field-label { margin: 0; }
+.cc-head .btn { padding: 4px 10px; font-size: 10px; }
+.cc-head .btn.icon { padding: 4px 8px; }
+.cc-off { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--hot) 9%, var(--panel)); color: var(--ink); font-size: 12px; }
+.cc-off[hidden] { display: none; }
+.cc-grid { display: grid; grid-template-columns: minmax(70px, .7fr) minmax(130px, 1.3fr) minmax(250px, 2.2fr) minmax(150px, 1.3fr) 38px minmax(170px, 1.6fr) 64px 38px; }
+.cc-grid > .cc-row { display: contents; }
+.cc-grid > .cc-row > div { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.cc-grid > .cc-row.head > div { padding-top: 5px; padding-bottom: 5px; color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; }
+.cc-row.dim > div { opacity: .55; }
+.cc-row.flash > div { background: color-mix(in srgb, var(--carrier) 9%, transparent); }
+.cc-part { gap: 6px; color: var(--ink); font-size: 12px; white-space: nowrap; overflow: hidden; }
+.cc-part i { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--pc); }
+.cc-param { flex-direction: column; align-items: flex-start !important; gap: 1px !important; }
+.cc-param .nm { color: var(--ink); font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cc-param .kind { display: flex; align-items: center; gap: 5px; color: var(--ink-faint); font: 9px var(--f-num); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.cc-param .kind i { width: 3px; height: 10px; border-radius: 1px; background: var(--kc); }
+.cc-src { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
+.cc-src .line { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+.cc-src select.field { width: auto; min-width: 0; max-width: 150px; padding: 2px 4px; font-size: 11px; }
+.cc-src select.ch { max-width: 70px; }
+.cc-chip { flex: none; padding: 1px 6px; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); color: var(--ink); font: 500 11px var(--f-num); white-space: nowrap; }
+.cc-heard { color: var(--ink-faint); font: 9.5px var(--f-num); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cc-listen { color: var(--carrier); font-size: 12px; animation: cc-pulse 1.4s ease-in-out infinite; }
+.cc-heard-now { color: var(--ink); font: 500 11.5px var(--f-num); }
+.cc-heard-now b { color: var(--carrier); font-weight: 500; }
+.cc-range { gap: 4px !important; font: 11px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+.cc-val { padding: 2px 5px; min-width: 52px; border: 1px solid var(--line); border-radius: var(--r); background: var(--inset); color: var(--ink); font: 11px var(--f-num); text-align: center; cursor: ns-resize; }
+.cc-val.narrowed { border-color: var(--line-bright); }
+.cc-inv { padding: 2px 5px !important; font-size: 9px !important; }
+.cc-inv[aria-pressed="true"] { background: var(--carrier); border-color: var(--carrier); color: var(--ground); }
+.cc-live { font: 12px var(--f-num); color: var(--carrier); flex-wrap: wrap; row-gap: 2px !important; }
+.cc-live .sub { width: 100%; color: var(--ink-faint); font-size: 9.5px; }
+.cc-live.none { color: var(--ink-faint); }
+.pill { flex: none; padding: 0 6px; border-radius: 6px; font: 600 8.5px var(--f-panel); letter-spacing: .12em; line-height: 14px; text-transform: uppercase; white-space: nowrap; }
+.pill.pickup { border: 1px solid var(--carrier); color: var(--carrier); }
+.pill.auto { background: var(--lane-c, var(--carrier)); color: var(--ground); }
+.pill.inert { background: var(--line-bright); color: var(--ink-dim); }
+.cc-learn .btn, .cc-del .btn { padding: 3px 7px; font-size: 9.5px; }
+.cc-learn .btn:disabled { opacity: .4; cursor: default; }
+.cc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 10px; position: relative; }
+.cc-foot .btn { padding: 4px 10px; font-size: 10px; }
+.cc-foot .btn:disabled { opacity: .4; cursor: default; }
+.cc-foot .hint { color: var(--ink-faint); font-size: 11px; }
+.auto-count { font-family: var(--f-num); font-size: 9px; white-space: nowrap; color: var(--ink-faint); }
+@keyframes cc-pulse { 50% { opacity: .45; } }
+/* Narrow: each mapping is a two-line card, by the panel's own width (zoom-safe). */
+@container ccpop (max-width: 820px) {
+  .cc-grid { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .cc-grid > .cc-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; border-bottom: 1px solid var(--line); padding: 4px 0; }
+  .cc-grid > .cc-row > div { border-bottom: 0; padding: 3px 8px; }
+  .cc-grid > .cc-row.head { display: none; }
+  .cc-part { grid-column: 1 / -1; }
+  .cc-param { grid-column: 1; }
+  .cc-src { grid-column: 1 / -1; order: 3; }
+  .cc-range { grid-column: 1; order: 4; }
+  .cc-inv-cell { order: 4; }
+  .cc-live { grid-column: 1 / -1; order: 5; }
+}
+
+/* The target picker, drawn as the Roll's envelope picker list (console.css .renv-list). */
+.cc-list { position: absolute; z-index: 40; left: 10px; top: calc(100% - 6px); width: 300px; max-height: 420px; overflow-y: auto; padding: 6px 0; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); }
+.cc-list[hidden] { display: none; }
+.cc-list-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; padding: 0 10px 6px; border-bottom: 1px solid var(--line); color: var(--ink); font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; }
+.cc-group { padding: 6px 10px 2px; color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; }
+.cc-opt { display: flex; align-items: center; gap: 6px; width: 100%; height: 22px; padding: 0 10px 0 14px; background: none; border: 0; color: var(--ink); font: 11.5px var(--f-ui); text-align: left; cursor: pointer; }
+.cc-opt:hover:not(:disabled) { background: var(--panel-hi); }
+.cc-opt:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.cc-opt .tag { margin-left: auto; color: var(--ink-faint); font: 9px var(--f-num); white-space: nowrap; }
+.cc-opt[aria-current="true"] { background: rgba(224, 164, 78, .08); }
+.cc-opt[aria-current="true"] .tag { color: var(--carrier); }
+
+/* ---------- the proposal: the knob ---------- */
+/* A mapped knob: the tag slot reads "CC 71". Moved: the env ring's arc and
+   dot, from the patch's value to the live one; the pin stays. Waiting for
+   pickup: a hollow marker at the hardware's position on the ring's radius. */
+.knob.cc { --env-color: var(--carrier); }
+.knob.cc svg { overflow: visible; }
+.knob.cc .knob-auto { display: block; background: var(--env-color); }
+.knob .dial-cc-hw { display: none; }
+.knob.cc.waiting .dial-cc-hw { display: inline; fill: var(--ground); stroke: var(--env-color); stroke-width: 1.3; }
+.knob.cc.waiting .knob-auto { background: transparent; color: var(--env-color); box-shadow: inset 0 0 0 1px var(--env-color); }
+.knob.cc-learn { position: relative; background: color-mix(in srgb, var(--carrier) 14%, transparent); box-shadow: inset 0 0 0 1px var(--carrier); animation: cc-pulse 1.4s ease-in-out infinite; }
+.op-row { position: relative; }
+.learn-hint { position: absolute; z-index: 20; padding: 5px 8px; background: var(--panel); border: 1px solid var(--carrier); border-radius: var(--r); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); color: var(--ink); font-size: 11.5px; white-space: nowrap; }
+.learn-hint .k { color: var(--ink-faint); font: 10px var(--f-num); margin-left: 6px; }
+.learn-hint[hidden], .ctx[hidden] { display: none; }
+
+/* ---------- the proposal: the right-click menu ---------- */
+.ctx { position: absolute; z-index: 25; min-width: 200px; padding: 4px 0; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.ctx-head { padding: 3px 12px 5px; border-bottom: 1px solid var(--line); margin-bottom: 3px; color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+.ctx button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 12px; background: none; border: 0; color: var(--ink); font: 12px var(--f-ui); text-align: left; cursor: pointer; white-space: nowrap; }
+.ctx button:hover { background: var(--panel-hi); }
+.ctx button .tag { margin-left: auto; color: var(--ink-faint); font: 9.5px var(--f-num); }
+.ctx button.danger { color: var(--hot); }
+.ctx hr { border: 0; border-top: 1px solid var(--line); margin: 3px 0; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+</style>
+</head>
+<body class="show-new" data-panel="closed" data-add="off" data-take="pickup" data-knob="rest" data-menu="none" data-midi="on">
+<div class="tb">
+  <div class="grp"><span class="lbl">Panel</span><button type="button" data-set="panel=closed" class="on">Closed</button><button type="button" data-set="panel=this">This part</button><button type="button" data-set="panel=all">All parts</button></div>
+  <div class="grp"><span class="lbl">Add</span><button type="button" data-set="add=off" class="on">Off</button><button type="button" data-set="add=pick">1 Pick target</button><button type="button" data-set="add=listen">2 Listening</button><button type="button" data-set="add=heard">3 Heard</button></div>
+  <div class="grp"><span class="lbl">Takeover</span><button type="button" data-set="take=pickup" class="on">Pickup</button><button type="button" data-set="take=jump">Jump</button></div>
+  <div class="grp"><span class="lbl">Level knob</span><button type="button" data-set="knob=unmapped">Unmapped</button><button type="button" data-set="knob=rest" class="on">Mapped, at rest</button><button type="button" data-set="knob=moved">Moved</button><button type="button" data-set="knob=waiting">Waiting for pickup</button><button type="button" data-set="knob=learn">Learning</button></div>
+  <div class="grp"><span class="lbl">Right-click</span><button type="button" data-set="menu=none" class="on">None</button><button type="button" data-set="menu=unmapped">Unmapped knob</button><button type="button" data-set="menu=mapped">Mapped knob</button></div>
+  <div class="grp"><span class="lbl">MIDI</span><button type="button" data-set="midi=on" class="on">Enabled</button><button type="button" data-set="midi=off">Not enabled</button></div>
+  <div class="grp"><span class="lbl">Additions</span><button type="button" id="newToggle" class="on">Outline new controls</button></div>
+</div>
+
+<div class="stage">
+  <div class="view-label">Parts tab (1440 px capture; the panel and the menus are the proposal)</div>
+  <div class="bar-anchor">
+<div class="patch-bar" id="patchBar"><span class="field-label bar-label">Part</span><input class="field bar-name" name="part-name-0" value="Acid" aria-label="Name of the part on slot 0"><select class="field bar-seq" name="part-sequencer-0" title="Sequencer" aria-label="Sequencer"><option value="none">Seq: None</option><option value="euclidean">Seq: Euclid</option><option value="grid" selected>Seq: Grid</option><option value="chord">Seq: Chord</option><option value="arp">Seq: Arp</option><option value="bass">Seq: Basslead</option><option value="figure">Seq: Figure</option><option value="roll">Seq: Roll</option></select><button class="btn cc-btn is-new" type="button" id="ccBtn" aria-haspopup="dialog" aria-expanded="false" title="Map your controller's knobs to this part's parameters">MIDI CC <span class="cc-count">6</span></button><span class="bar-sep"></span><span class="field-label bar-label">Patch</span><button class="btn icon" type="button" id="patchPrev" title="Previous patch in the search's filter" aria-label="Previous patch">◀</button><button class="btn icon" type="button" id="patchNext" title="Next patch in the search's filter" aria-label="Next patch">▶</button><div class="patch-box-wrap"><button class="patch-box" type="button" id="patchBox" title="Document patch &quot;acid-saw&quot; — every knob edit lands in the export." aria-haspopup="listbox"><span class="patch-box-name">Acid Saw</span><i class="patch-box-mod" id="patchModified" title="Edited since saved" aria-label="unsaved edits"></i><span class="patch-box-src">Basses · this song</span><span class="patch-box-search">⌕ search</span></button></div><button class="btn" type="button" title="Save your edit as a new patch; built-ins stay read-only" id="patchSave">Save</button><button class="btn" type="button" title="Save as a new patch in your library" id="patchSaveAs">Save as…</button><button class="btn" type="button" title="A fresh starting patch; not in the library until Save as…" id="patchInit">Init</button><div class="patch-menu-wrap"><button class="btn icon" type="button" id="patchMenu" title="Rename, delete, library folder, patch JSON" aria-label="Patch actions" aria-haspopup="menu" aria-expanded="false">⋯</button></div><span class="bar-grow"></span><button class="btn patch-browse" type="button" id="patchBrowse" title="Browse every patch in a full pane: facets, a table and an info pane" aria-pressed="false">⤢ Browse patches</button></div>
+    <div class="cc-pop is-new" id="ccPop" role="dialog" aria-label="MIDI CC mappings" hidden>
+      <div class="cc-head">
+        <span class="cc-title">MIDI CC</span>
+        <div class="seg cc-filter" style="--seg-color: var(--carrier)"><button type="button" data-filter="this">This part</button><button type="button" data-filter="all">All parts</button></div>
+        <span class="grow"></span>
+        <span class="field-label">Takeover</span>
+        <div class="seg cc-take" style="--seg-color: var(--carrier)"><button type="button" data-take="pickup">Pickup</button><button type="button" data-take="jump">Jump</button></div>
+        <button class="btn" type="button" id="ccReset" title="Drop every CC value: each target goes back to its patch value, and pickup re-arms">Reset performance</button>
+        <button class="btn icon" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="cc-off" id="ccOff" hidden>
+        <span>MIDI is off. Your mappings are kept; enable MIDI to play and learn them.</span>
+        <button class="btn" type="button">Enable MIDI</button>
+      </div>
+      <div class="cc-grid" id="ccGrid"></div>
+      <div class="cc-foot">
+        <button class="btn" type="button" id="ccAdd">+ Add mapping</button>
+        <span class="auto-count" id="ccCount">Voice 5/8</span>
+        <span class="hint" id="ccHint">Pick a parameter, then move a knob on your controller.</span>
+        <div class="cc-list" id="ccList" hidden></div>
+      </div>
+    </div>
+  </div>
+  <div class="parts-grid">
+    <div class="rail"><div class="crop-note">Output · Algorithm · Global<br>(not drawn; the rail keeps its 230 px)</div></div>
+    <main class="bays">
+<div class="section-title"><span>Operators</span></div>
+      <div class="op-rows" id="bayGrid">
+<section class="op-row" style="--op-color: #E0A44E;"><div class="op-id"><div class="op-id-head"><span class="op-letter">A</span><span class="op-role">Carrier</span><button class="btn op-adv-btn" type="button" aria-pressed="false" aria-label="Operator A advanced envelope">Adv</button></div><div class="op-id-line"><select class="field" name="wave-op-0" aria-label="Operator A waveform"><option value="0">Sine</option><option value="1" selected>Saw</option><option value="2">Square</option><option value="3">Triangle</option><option value="4">Noise</option><option value="5">Saw D</option><option value="6">Square D</option><option value="7">Sine 4bit</option><option value="8">Sine 8bit</option><option value="9">User</option><option value="10">Pulse</option></select><button class="sync-face" type="button" aria-haspopup="menu" aria-expanded="false" title="Sync: off" aria-label="Operator A sync: off">Sync</button><button class="btn" type="button" aria-label="Operator A pitch mode" aria-pressed="false">Ratio</button></div></div><div class="op-body"><div class="op-core"><div class="op-knobs"><div class="op-group op-main"><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Coarse" title="Coarse - drag, shift-drag for fine, double-click to reset" aria-valuenow="1" aria-valuetext="1"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 6.53 27.33"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-123.75 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">1</span><span class="knob-auto">AUTO</span><span class="knob-label">Coarse</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Fine" title="Fine - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="0.000"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-135 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">0.000</span><span class="knob-auto">AUTO</span><span class="knob-label">Fine</span></div><div class="knob-readout" title="The stored ratio: Coarse + Fine"><span class="readout-val">1.000</span><span class="readout-label">Ratio</span></div><div class="knob op-fixed" tabindex="0" role="slider" style="--knob-color: #E0A44E; display: none;" aria-label="Fixed" title="Fixed - drag, shift-drag for fine, double-click to reset" aria-valuenow="100" aria-valuetext="100"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 19.88 4.03"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(3.351921631243357 19 19)"></line></svg><span class="knob-val">100</span><span class="knob-label">Fixed</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Detune" title="Detune - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="0c"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(0 19 19)"></line></svg><span class="knob-val">0c</span><span class="knob-label">Detune</span></div><div class="knob" id="kLevel" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Level" title="Level - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.8" aria-valuetext="0.80"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 33.82 16.65"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(81 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">0.80</span><span class="knob-auto">AUTO</span><span class="knob-label">Level</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Fdbk" title="Fdbk - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="+0.00"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(0 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">+0.00</span><span class="knob-auto">AUTO</span><span class="knob-label">Fdbk</span></div><div class="knob" id="kWidth" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Width" title="Width - drag, shift-drag for fine, double-click to reset" aria-valuenow="1" aria-valuetext="100%"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(135 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">100%</span><span class="knob-auto">AUTO</span><span class="knob-label">Width</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Vel" title="Vel - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.35" aria-valuetext="0.35"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 9.26 7.59"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-40.5 19 19)"></line></svg><span class="knob-val">0.35</span><span class="knob-label">Vel</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="LP" title="LP - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="Off"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-135 19 19)"></line></svg><span class="knob-val">Off</span><span class="knob-label">LP</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="HP" title="HP - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="Off"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-135 19 19)"></line></svg><span class="knob-val">Off</span><span class="knob-label">HP</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Key Trk" title="Key Trk - drag, shift-drag for fine, double-click to reset" aria-valuenow="0" aria-valuetext="+0.00"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d=""></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-45 19 19)"></line></svg><span class="knob-val">+0.00</span><span class="knob-label">Key Trk</span></div></div><div class="op-group"><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Attack" title="Attack - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.001" aria-valuetext="1m"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 5.04 24.48"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-111.41536632430437 19 19)"></line></svg><span class="knob-val">1m</span><span class="knob-label">Attack</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Decay" title="Decay - drag, shift-drag for fine, double-click to reset" aria-valuenow="1.6" aria-valuetext="1.60s"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 1 1 32.86 13.26"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(67.51793413797736 19 19)"></line><path class="dial-env" d=""></path><circle class="dial-env-dot" cx="19" cy="19" r="1.8"></circle></svg><span class="knob-val">1.60s</span><span class="knob-auto">AUTO</span><span class="knob-label">Decay</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Sustain" title="Sustain - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.55" aria-valuetext="0.55"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 22.50 4.41"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(13.5 19 19)"></line></svg><span class="knob-val">0.55</span><span class="knob-label">Sustain</span></div><div class="knob" tabindex="0" role="slider" style="--knob-color: #E0A44E;" aria-label="Release" title="Release - drag, shift-drag for fine, double-click to reset" aria-valuenow="0.02" aria-valuetext="20m"><svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"></path><path class="dial-arc" d="M 8.39 29.61 A 15 15 0 0 1 6.97 10.04"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(-53.326982331346045 19 19)"></line></svg><span class="knob-val">20m</span><span class="knob-label">Release</span></div></div></div><svg class="env-canvas" viewBox="0 0 225 52" preserveAspectRatio="none" aria-hidden="true" style="--env-color: #E0A44E;"><line x1="218" y1="2" x2="218" y2="50" stroke="var(--line-bright)" stroke-width="1"></line><path d="M 3 50 L 5 4 C 60 6, 110 22, 150 24 L 218 24 L 221 50" fill="none" stroke="#E0A44E" stroke-width="1.5" vector-effect="non-scaling-stroke"></path></svg></div></div><div class="harm op-harmonics" style="display: none;"><span class="field-label">Harmonics</span><canvas class="harm-bars" aria-label="Operator A harmonic levels: drag to draw"></canvas><div class="harm-foot"><div class="seg harm-counts" style="--seg-color: #E0A44E;"><button type="button" aria-pressed="true">16</button><button type="button" aria-pressed="false">32</button><button type="button" aria-pressed="false">64</button></div><canvas class="harm-preview" aria-label="Operator A User wave cycle"></canvas></div></div><div class="learn-hint is-new" id="learnHint" hidden>Move a knob on your controller…<span class="k">Esc cancels</span></div><div class="ctx is-new" id="ctxMenu" role="menu" hidden></div></section>
+<!--OPROWS-STYLE null cls=op-rows-->
+
+      </div>
+      <div class="crop-note">Operators B, C and D, and Shape &amp; modulation, are not drawn.</div>
+    </main>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>MIDI CC mapping</h2>
+  Today's Parts tab: the part bar around the sequencer picker and operator A's row of knobs, captured from the dev
+  build with a song of one part, <b>Acid</b> (Acid Saw on a Grid, the macros Accent, Squelch and Grit, a Dub delay
+  insert, and lanes on the delay's Feedback and on LFO 1 Amt). New controls have dashed outlines, which the
+  <b>Additions</b> toggle hides. The decisions behind them are in <code>docs/log/2026-10-13-midi-cc-mapping.md</code>.
+  The toolbar steps through every state. <b>Panel</b> opens the mapping panel, <b>Add</b> walks through adding a
+  mapping, <b>Level knob</b> shows operator A's Level mapped to CC 71, and <b>Right-click</b> opens the knob menu.
+  <b>Reset performance</b> in the panel works.
+
+  <h3>The proposal</h3>
+  <ul>
+    <li><b>MIDI CC</b> is a part-bar button after the sequencer picker. Its badge counts the selected part's mappings
+      (6 for Acid). It opens the panel as a popover under the button.</li>
+    <li><b>The panel</b> has one row per mapping. The columns are Part, Parameter (with the lane picker's kind
+      line), Source (the device and channel learn heard, each widenable to Any by hand, the CC, and what learn heard), Range
+      (min and max in the target's units, which you drag like a knob or double-click to type), Inv, Live (the CC's
+      value, or a status: Waiting for pickup, Automated, Inert), Learn (remap the source) and Delete. The header
+      holds <b>This part | All parts</b>, <b>Pickup | Jump</b> and <b>Reset performance</b>. The foot holds
+      <b>+ Add mapping</b> and the part's voice count against 8.</li>
+    <li><b>+ Add mapping</b> opens the lane picker's target list. It is grouped Mixer, Inserts, Voice and Macros,
+      shows Voice n/8, leaves out what a macro maps, the insert's On switch and the sequencer rows, and tags
+      targets already mapped or automated. It then goes straight into learn on a new row: "Move a knob on your
+      controller…" with Cancel, then "Heard CC 74 · ch 1 · USB MIDI Controller" as it commits. The new row's range
+      is the target's full range.</li>
+    <li><b>The knob.</b> A mapped knob shows <code>CC 71</code> in the tag slot under its value, where AUTO, ENV
+      and a macro's name sit today. When the CC moves it, the pin stays on the patch's 0.80, and the env ring's arc
+      and dot run to the live 0.30. Waiting for pickup, a hollow marker sits at the controller's position (0.21),
+      and the tag is outlined. While learning, the knob is lit and a hint sits under it.</li>
+    <li><b>Right-click</b> on a knob whose target is in the catalog gives "Learn MIDI CC…". On a mapped knob it also
+      gives "Edit mapping…" and "Remove CC 71". Coarse, Fine, Detune, Vel, LP, HP, Key Trk, Attack, Sustain and
+      Release are not catalog targets, so they keep the browser's menu.</li>
+    <li><b>MIDI not enabled</b>: the panel still lists the mappings, dimmed, with a banner and the keyboard bar's
+      Enable MIDI button. Learn and + Add mapping wait for it.</li>
+  </ul>
+
+  <h3>Values, through the engine's curves</h3>
+  <table>
+    <tr><th>Row</th><th>Target's curve</th><th>Mapping</th><th>CC</th><th>Shown</th></tr>
+    <tr><td>Op A Level</td><td>linear 0–1 (no dB)</td><td>0.00–1.00, inverted</td><td class="n">89</td><td class="n">1 − 89/127 = 0.30; offset −0.50 from the patch's 0.80</td></tr>
+    <tr><td>Cutoff</td><td>octaves, 30 Hz–18 kHz</td><td>2.00–6.00 kHz</td><td class="n">64</td><td class="n">2000 × 3^(64/127) = 3.48 kHz; +1.80 oct from 1.00 kHz</td></tr>
+    <tr><td>Send A</td><td>linear 0–1</td><td>0.00–1.00, inverted</td><td class="n">40</td><td class="n">1 − 40/127 = 0.69 (song's 0.18)</td></tr>
+    <tr><td>Squelch (macro 2)</td><td>linear 0–1</td><td>0.00–1.00</td><td class="n">80</td><td class="n">80/127 = 0.63 (patch's 0.50)</td></tr>
+    <tr><td>Op B Decay</td><td>log, 1 ms floor, to 20 s</td><td>50 ms–2.00 s</td><td class="n">10</td><td class="n">0.05 × 40^(10/127) = 67 ms; picks up past CC 72 (405 ms) over the patch's 400 ms</td></tr>
+    <tr><td>Pad Level</td><td>dB, −60 dB floor to +6.0 dB</td><td>full</td><td class="n">100</td><td class="n">−60 + 66.02 × 100/127 = −8.0 dB</td></tr>
+  </table>
+  LFO 1 Amt has a song lane that is on, so its row reads <b>Automated</b> and the CC is ignored. Acid's voice slots are
+  LFO 1 Amt (its lane, which the CC shares), Op A Level, Cutoff, Squelch and Op B Decay: <b>Voice 5/8</b>. Send A is a
+  strip target and takes none.
+
+  <h3>Decided</h3>
+  <ul>
+    <li><b>A popover or a docked pane?</b> Decided: a <b>popover</b> under the MIDI CC button, as drawn. Mapping is
+      setup you open, change and close. A docked pane would take height from the operator rows on every visit, and
+      the Song tab's shape panel went the same way (<code>2026-10-01-song-automation-lanes</code> decision 13). "Edit
+      mapping…" from a knob on another tab opens the same popover over that tab.</li>
+    <li><b>Where the CC tag sits.</b> Decided: <b>in the tag slot under the value</b>, as drawn, where AUTO, ENV and a
+      macro's name sit. Every knob size has that slot, including the rack's and the Song tab's compact knobs (whose
+      bubble carries the tag). A lane's AUTO wins it, since a lane locks the knob and the CC is ignored, and a CC wins
+      over ENV. The other choice, a corner badge on the dial, would crowd the 38 px dial and the ring that CC and ENV
+      draw.</li>
+  </ul>
+
+  <h3>Stand-ins</h3>
+  <ul>
+    <li>The rail (Output, Algorithm, Global) and the rows under operator A are not drawn. The rail keeps its width, so
+      the operator row wraps as it does in the build.</li>
+    <li>Operator A's envelope picture is redrawn by hand from the capture. In the build it is a canvas.</li>
+    <li>The parts <b>Pad</b> and <b>Kick</b> in All parts, the device names <b>USB MIDI Controller</b> and <b>Second
+      Controller</b>, and every CC number are made up for the mockup.</li>
+    <li>Op A Level's Live cell follows the <b>Level knob</b> toggle: at rest it has heard no value yet, moved it reads CC 89
+      (0.30), and waiting it reads CC 100 (0.21) against the patch's 0.80.</li>
+    <li>Only the toolbar, the panel's two segments and Reset performance respond. Everything else is a picture.</li>
+  </ul>
+</div>
+
+<script>
+(() => {
+  const body = document.body;
+
+  // ---- The engine's curves, copied so every value below is worked, not typed ----
+  // automationDisplay.ts: toDisplay / fromDisplay (a lane's drawing space).
+  const clampUnit = (y) => (y < 0 ? 0 : y > 1 ? 1 : y);
+  const logBottom = (row) => row.floor ?? row.min;
+  const toDisplay = (row, v) => {
+    if (row.scale === 'linear') return clampUnit((v - row.min) / (row.max - row.min));
+    const lo = logBottom(row);
+    if (v <= lo) return 0;
+    return clampUnit(Math.log(v / lo) / Math.log(row.max / lo));
+  };
+  const fromDisplay = (row, y) => {
+    if (y <= 0) return row.min;
+    if (y >= 1) return row.max;
+    if (row.scale === 'linear') return row.min + y * (row.max - row.min);
+    const lo = logBottom(row);
+    return lo * Math.exp(y * Math.log(row.max / lo));
+  };
+  // Record decision 5: CC 0-127 spreads across min..max in the knob's own scale.
+  const ccValue = (row, map, cc) => {
+    const x = map.inv ? 1 - cc / 127 : cc / 127;
+    const y0 = toDisplay(row, map.min);
+    const y1 = toDisplay(row, map.max);
+    return fromDisplay(row, y0 + x * (y1 - y0));
+  };
+  // Record decision 7: the first CC, moving toward the target, whose value reaches the current value.
+  const pickupCc = (row, map, cc, current) => {
+    const at = ccValue(row, map, cc);
+    const up = (current > at) !== !!map.inv;
+    for (let c = cc; c >= 0 && c <= 127; c += up ? 1 : -1) {
+      const v = ccValue(row, map, c);
+      if (at <= current ? v >= current : v <= current) return c;
+    }
+    return up ? 127 : 0;
+  };
+
+  // The catalog rows the mappings use (automationTargetTables.ts, voiceTargetTables.ts).
+  const ROW = {
+    level01: { scale: 'linear', min: 0, max: 1 },
+    cutoff: { scale: 'octaves', min: 30, max: 18000 },
+    decay: { scale: 'log', min: 0, max: 20, floor: 0.001 },
+    stripLevel: { scale: 'db', min: 0, max: 2, floor: 10 ** (-60 / 20) },
+  };
+  const fmt = {
+    num2: (v) => v.toFixed(2),
+    hz: (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} kHz` : `${Math.round(v)} Hz`),
+    time: (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`),
+    db: (v) => (v <= 0 ? '−∞ dB' : `${(20 * Math.log10(v)).toFixed(1).replace('-', '−')} dB`.replace(/^(\d)/, '+$1')),
+  };
+  const PARTS = {
+    acid: { name: 'Acid', color: '#6EA8E2' },
+    pad: { name: 'Pad', color: '#EDE36E' },
+    kick: { name: 'Kick', color: '#BC3D6D' },
+  };
+  const KIND = { mixer: 'var(--modulator)', insert: 'var(--return)', voice: 'var(--carrier)', macro: 'var(--carrier)' };
+  const HEARD = 'USB MIDI Controller · ch 1';
+  const MAPS = [
+    { id: 'lvl', part: 'acid', label: 'Op A Level', kind: 'voice', line: 'Voice · Op A', row: ROW.level01, map: { min: 0, max: 1, inv: true }, cc: 71, f: 'num2', base: 0.8, hw: 89, state: 'live' },
+    { id: 'cut', part: 'acid', label: 'Cutoff', kind: 'voice', line: 'Voice · Filter', row: ROW.cutoff, map: { min: 2000, max: 6000 }, cc: 74, f: 'hz', base: 1000, hw: 64, state: 'live' },
+    { id: 'snd', part: 'acid', label: 'Send A', kind: 'mixer', line: 'Mixer', row: ROW.level01, map: { min: 0, max: 1, inv: true }, cc: 91, f: 'num2', base: 0.18, hw: 40, state: 'live' },
+    { id: 'sq', part: 'acid', label: 'Squelch', kind: 'macro', line: 'Macros · Macro 2', row: ROW.level01, map: { min: 0, max: 1 }, cc: 16, f: 'num2', base: 0.5, hw: 80, state: 'live' },
+    { id: 'dec', part: 'acid', label: 'Op B Decay', kind: 'voice', line: 'Voice · Op B', row: ROW.decay, map: { min: 0.05, max: 2 }, cc: 18, f: 'time', base: 0.4, hw: 10, state: 'pickup' },
+    { id: 'lfo', part: 'acid', label: 'LFO 1 Amt', kind: 'voice', line: 'Voice · LFO', row: ROW.level01, map: { min: 0, max: 1 }, cc: 75, f: 'num2', base: 0.1, hw: 52, state: 'auto' },
+    { id: 'plv', part: 'pad', label: 'Level', kind: 'mixer', line: 'Mixer', row: ROW.stripLevel, map: { min: 0, max: 2 }, cc: 7, f: 'db', base: 0.5, hw: 100, state: 'live', dev: 'Second Controller (disconnected)', ch: '2', heard: 'Second Controller · ch 2' },
+    { id: 'pm2', part: 'pad', label: 'Macro 2', kind: 'macro', line: 'Macros', row: ROW.level01, map: { min: 0, max: 1 }, cc: 17, f: 'num2', base: 0, hw: 30, state: 'inert', why: 'no Macro 2 in this patch' },
+    { id: 'kdc', part: 'kick', label: 'Op A Decay', kind: 'voice', line: 'Voice · Op A', row: ROW.decay, map: { min: 0.02, max: 0.6 }, cc: 19, f: 'time', base: 0.18, hw: null, state: 'none' },
+  ];
+  // Acid's voice slots (record decision 8): its lanes' voice targets and its CC mappings' voice and macro targets.
+  const ACID_LANE_VOICE = ['lfo'];
+
+  let reset = false;
+  const el = (tag, cls, html) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (html !== undefined) node.innerHTML = html;
+    return node;
+  };
+
+  function sourceCell(m, s) {
+    const cell = el('div', 'cc-src');
+    if (m.listen === 'listen') {
+      cell.append(el('span', 'cc-listen', 'Move a knob on your controller…'));
+      cell.append(el('span', 'cc-heard', 'Esc or Cancel leaves nothing behind'));
+      return cell;
+    }
+    if (m.listen === 'heard') {
+      cell.append(el('span', 'cc-heard-now', `Heard <b>CC ${m.cc}</b> · ch 1 · USB MIDI Controller`));
+      cell.append(el('span', 'cc-heard', 'device and channel as heard; widen either to Any here'));
+      return cell;
+    }
+    const dev = m.dev ?? 'USB MIDI Controller';
+    const ch = `ch ${m.ch ?? '1'}`;
+    const line = el('div', 'line');
+    line.innerHTML = `<select class="field" aria-label="Device"><option>${dev}</option></select><select class="field ch" aria-label="Channel"><option>${ch}</option></select><span class="cc-chip">CC ${m.cc}</span>`;
+    cell.append(line, el('span', 'cc-heard', `heard ${m.heard ?? HEARD}`));
+    return cell;
+  }
+
+  function liveCell(m, s) {
+    const cell = el('div', 'cc-live');
+    const value = m.hw === null || m.hw === undefined ? null : ccValue(m.row, m.map, m.hw);
+    if (s.midi === 'off' || m.listen) {
+      cell.classList.add('none');
+      cell.textContent = '—';
+      return cell;
+    }
+    if (m.state === 'auto') {
+      cell.innerHTML = `<span class="pill auto" style="--lane-c: ${KIND[m.kind]}">Automated</span><span class="sub">a song lane drives it; the CC is ignored</span>`;
+      return cell;
+    }
+    if (m.state === 'inert') {
+      cell.innerHTML = `<span class="pill inert">Inert</span><span class="sub">${m.why}</span>`;
+      return cell;
+    }
+    let state = m.state;
+    // Op A Level's row follows the Level knob toggle: at rest, no value yet; moved, CC 89; waiting, CC 100.
+    if (m.id === 'lvl') {
+      const k = s.menu === 'mapped' ? 'rest' : s.knob;
+      if (k === 'moved') return liveCell({ ...m, id: '', hw: 89, state: 'live' }, s);
+      if (k === 'waiting') return liveCell({ ...m, id: '', hw: 100, state: 'pickup' }, s);
+      return liveCell({ ...m, id: '', hw: null, state: 'none' }, s);
+    }
+    if (reset && state === 'live') state = s.take === 'jump' ? 'none' : 'pickup';
+    if (state === 'pickup' && s.take === 'jump' && !reset) state = 'live';
+    if (state === 'none' || value === null) {
+      cell.classList.add('none');
+      cell.innerHTML = `—<span class="sub">no value heard since the song opened</span>`;
+      return cell;
+    }
+    if (state === 'pickup') {
+      const c = pickupCc(m.row, m.map, m.hw, m.base);
+      const end = ccValue(m.row, m.map, c);
+      const lo = Math.min(m.map.min, m.map.max), hi = Math.max(m.map.min, m.map.max);
+      const how = m.base < lo || m.base > hi
+        ? `turn to CC ${c} (${fmt[m.f](end)}): ${fmt[m.f](m.base)} is outside the range`
+        : `turn past CC ${c} (${fmt[m.f](end)}) to take ${fmt[m.f](m.base)}`;
+      cell.innerHTML = `<span class="pill pickup">Waiting for pickup</span><span class="sub">at ${fmt[m.f](value)} · ${how}</span>`;
+      return cell;
+    }
+    cell.textContent = fmt[m.f](value);
+    return cell;
+  }
+
+  function rowOf(m, s) {
+    const r = el('div', 'cc-row');
+    if (s.midi === 'off') r.classList.add('dim');
+    if (m.listen === 'heard') r.classList.add('flash');
+    const part = PARTS[m.part];
+    const range = m.map.min === m.map.max
+      ? `<span class="cc-val">${fmt[m.f](m.map.min)}</span>`
+      : `<span class="cc-val${m.narrow ? ' narrowed' : ''}">${fmt[m.f](m.map.min)}</span>–<span class="cc-val${m.narrow ? ' narrowed' : ''}">${fmt[m.f](m.map.max)}</span>`;
+    const cells = [
+      el('div', 'cc-part', `<i style="--pc: ${part.color}"></i>${part.name}`),
+      el('div', 'cc-param', `<span class="nm">${m.label}</span><span class="kind"><i style="--kc: ${KIND[m.kind]}"></i>${m.line}</span>`),
+      sourceCell(m, s),
+      el('div', 'cc-range', range),
+      el('div', 'cc-inv-cell', `<button class="btn cc-inv" type="button" aria-pressed="${!!m.map.inv}">Inv</button>`),
+      liveCell(m, s),
+      el('div', 'cc-learn', m.listen === 'listen'
+        ? '<button class="btn" type="button">Cancel</button>'
+        : `<button class="btn" type="button"${s.midi === 'off' ? ' disabled' : ''}>Learn</button>`),
+      el('div', 'cc-del', '<button class="btn" type="button" aria-label="Delete mapping">×</button>'),
+    ];
+    r.append(...cells);
+    return r;
+  }
+
+  function renderPanel(s) {
+    const grid = document.getElementById('ccGrid');
+    grid.replaceChildren();
+    const head = el('div', 'cc-row head');
+    for (const h of ['Part', 'Parameter', 'Source', 'Range', 'Inv', 'Live', 'Learn', '']) head.append(el('div', '', h));
+    grid.append(head);
+    const filter = s.add !== 'off' ? 'this' : s.panel;
+    const adding = s.add === 'listen' || s.add === 'heard';
+    let maps = MAPS.filter((m) => filter === 'all' || m.part === 'acid');
+    if (s.add !== 'off') maps = maps.filter((m) => m.id !== 'cut');
+    for (const m of maps) grid.append(rowOf(m, s));
+    if (adding) {
+      grid.append(rowOf({ part: 'acid', label: 'Cutoff', kind: 'voice', line: 'Voice · Filter', row: ROW.cutoff, map: { min: 30, max: 18000 }, cc: 74, f: 'hz', base: 1000, hw: null, state: 'none', listen: s.add }, s));
+    }
+    // Voice n/8: Acid's distinct voice targets, lanes and mappings together.
+    const voice = new Set(ACID_LANE_VOICE);
+    for (const m of MAPS) if (m.part === 'acid' && (m.kind === 'voice' || m.kind === 'macro')) voice.add(m.id);
+    if (s.add === 'pick' || s.add === 'listen') voice.delete('cut');
+    document.getElementById('ccCount').textContent = `Voice ${voice.size}/8 · Acid`;
+    document.getElementById('ccOff').hidden = s.midi !== 'off';
+    document.getElementById('ccAdd').disabled = s.midi === 'off';
+    document.getElementById('ccHint').textContent = s.midi === 'off'
+      ? 'Enable MIDI to add a mapping.'
+      : 'Pick a parameter, then move a knob on your controller.';
+    for (const b of document.querySelectorAll('.cc-filter button')) b.setAttribute('aria-pressed', String(b.dataset.filter === filter));
+    for (const b of document.querySelectorAll('.cc-take button')) b.setAttribute('aria-pressed', String(b.dataset.take === s.take));
+    renderList(s, voice.size);
+  }
+
+  // The target list: the lane picker's groups, as the Song tab reads them for Acid.
+  function renderList(s, used) {
+    const list = document.getElementById('ccList');
+    list.hidden = s.add !== 'pick';
+    if (list.hidden) return;
+    const groups = [
+      ['Mixer', [['Level'], ['Pan'], ['Send A', 'CC 91 · replace'], ['Send B']]],
+      ['Insert · Dub delay', [['Feedback', 'lane on'], ['Highpass'], ['Lowpass'], ['Drive'], ['Mix'], ['Output']]],
+      ['Voice · Filter', [['Cutoff', '', true], ['Vowel']]],
+      ['Voice · Op A', [['Op A Level', 'CC 71 · replace'], ['Op A Decay'], ['Op A Dcy Crv'], ['Op A Fdbk'], ['Op A Width'], ['Op A Ratio']]],
+      ['Voice · Op B', [['Op B Decay', 'CC 18 · replace'], ['Op B Dcy Crv'], ['Op B Fdbk'], ['Op B Width'], ['Op B Ratio']]],
+      ['Voice · Op C', [['Op C Level'], ['Op C Decay'], ['…']]],
+      ['Voice · Op D', [['Op D Level'], ['Op D Decay'], ['…']]],
+      ['Voice · LFO', [['LFO 1 Amt', 'lane · CC 75'], ['LFO 1 Rate'], ['LFO 2 Amt'], ['LFO 2 Rate']]],
+      ['Voice · Pitch', [['Pitch Env']]],
+      ['Macros', [['Accent'], ['Squelch', 'CC 16 · replace'], ['Grit']]],
+    ];
+    let html = `<div class="cc-list-head"><span>Add a mapping</span><span class="auto-count">Voice ${used}/8</span></div>`;
+    for (const [label, opts] of groups) {
+      html += `<div class="cc-group">${label}</div>`;
+      for (const [name, tag, current] of opts) {
+        html += `<button class="cc-opt" type="button"${current ? ' aria-current="true"' : ''}><span class="nm">${name}</span>${tag ? `<span class="tag">${tag}</span>` : ''}</button>`;
+      }
+    }
+    list.innerHTML = html;
+  }
+
+  // ---- The knob, with knob.ts's geometry: 38 px, r 15, the env ring 2.6 px out ----
+  const C = 19, R = 15, RING = R + 2.6, ARC_START = -135, ARC_END = 135;
+  const polar = (r, deg) => {
+    const a = ((deg - 90) * Math.PI) / 180;
+    return [C + r * Math.cos(a), C + r * Math.sin(a)];
+  };
+  const arcPath = (r, a0, a1) => {
+    const [x0, y0] = polar(r, a0);
+    const [x1, y1] = polar(r, a1);
+    const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+  const angle = (v) => ARC_START + Math.min(1, Math.max(0, v)) * (ARC_END - ARC_START);
+  const levelKnob = document.getElementById('kLevel');
+  const widthKnob = document.getElementById('kWidth');
+  const svg = levelKnob.querySelector('svg');
+  const hwMark = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  hwMark.setAttribute('class', 'dial-cc-hw');
+  hwMark.setAttribute('r', '2.2');
+  svg.append(hwMark);
+  const tag = levelKnob.querySelector('.knob-auto');
+  const ring = levelKnob.querySelector('.dial-env');
+  const dot = levelKnob.querySelector('.dial-env-dot');
+  const lvl = MAPS[0];
+
+  function renderKnob(s) {
+    let state = s.knob;
+    if (s.menu === 'mapped') state = 'rest';
+    if (s.menu === 'unmapped' && state === 'learn') state = 'unmapped';
+    levelKnob.classList.toggle('cc', state !== 'unmapped' && state !== 'learn');
+    levelKnob.classList.toggle('is-new', state !== 'unmapped');
+    levelKnob.classList.toggle('cc-learn', state === 'learn');
+    levelKnob.classList.toggle('waiting', state === 'waiting');
+    levelKnob.classList.remove('env');
+    tag.textContent = state === 'unmapped' || state === 'learn' ? 'AUTO' : `CC ${lvl.cc}`;
+    ring.setAttribute('d', '');
+    dot.style.display = 'none';
+    if (state === 'moved') {
+      levelKnob.classList.add('env');
+      const live = ccValue(lvl.row, lvl.map, lvl.hw);
+      const a0 = angle(Math.min(lvl.base, live));
+      const a1 = angle(Math.max(lvl.base, live));
+      ring.setAttribute('d', arcPath(RING, a0, a1));
+      const [x, y] = polar(RING, angle(live));
+      dot.setAttribute('cx', x.toFixed(2));
+      dot.setAttribute('cy', y.toFixed(2));
+      dot.style.display = '';
+    }
+    if (state === 'waiting') {
+      const hw = ccValue(lvl.row, lvl.map, 100);
+      const [x, y] = polar(RING, angle(hw));
+      hwMark.setAttribute('cx', x.toFixed(2));
+      hwMark.setAttribute('cy', y.toFixed(2));
+    }
+    const hint = document.getElementById('learnHint');
+    hint.hidden = state !== 'learn';
+    if (!hint.hidden) place(hint, levelKnob, 4);
+  }
+
+  function place(node, knob, dy) {
+    const row = knob.closest('.op-row').getBoundingClientRect();
+    const k = knob.getBoundingClientRect();
+    node.style.left = `${Math.max(0, k.left - row.left - 6)}px`;
+    node.style.top = `${k.bottom - row.top + dy}px`;
+  }
+
+  function renderMenu(s) {
+    const menu = document.getElementById('ctxMenu');
+    menu.hidden = s.menu === 'none';
+    if (menu.hidden) return;
+    if (s.menu === 'unmapped') {
+      menu.innerHTML = '<div class="ctx-head">Op A Width</div><button type="button">Learn MIDI CC…<span class="tag">Voice 5/8 → 6/8</span></button>';
+      place(menu, widthKnob, 2);
+    } else {
+      menu.innerHTML = `<div class="ctx-head">Op A Level · CC ${lvl.cc}</div><button type="button">Learn MIDI CC…<span class="tag">replaces CC ${lvl.cc}</span></button><button type="button">Edit mapping…</button><hr><button type="button" class="danger">Remove CC ${lvl.cc}</button>`;
+      place(menu, levelKnob, 2);
+    }
+  }
+
+  function render() {
+    const s = { ...body.dataset };
+    const open = s.panel !== 'closed' || s.add !== 'off';
+    document.getElementById('ccPop').hidden = !open;
+    const btn = document.getElementById('ccBtn');
+    btn.setAttribute('aria-expanded', String(open));
+    btn.querySelector('.cc-count').textContent = s.add === 'pick' || s.add === 'listen' ? '5' : '6';
+    if (open) renderPanel(s);
+    // The popover floats over the page; the stage grows so it never covers the notes.
+    const stage = document.querySelector('.stage');
+    stage.style.paddingBottom = '';
+    if (open) {
+      const pop = document.getElementById('ccPop').getBoundingClientRect();
+      const list = document.getElementById('ccList');
+      const bottom = list.hidden ? pop.bottom : Math.max(pop.bottom, list.getBoundingClientRect().bottom);
+      const over = bottom + 24 - stage.getBoundingClientRect().bottom;
+      if (over > 0) stage.style.paddingBottom = `${40 + over}px`;
+    }
+    renderKnob(s);
+    renderMenu(s);
+    for (const b of document.querySelectorAll('.tb [data-set]')) {
+      const [k, v] = b.dataset.set.split('=');
+      b.classList.toggle('on', body.dataset[k] === v);
+    }
+  }
+
+  document.querySelector('.tb').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.id === 'newToggle') {
+      body.classList.toggle('show-new');
+      b.classList.toggle('on');
+      return;
+    }
+    const [k, v] = b.dataset.set.split('=');
+    body.dataset[k] = v;
+    if (k === 'add' && v !== 'off') body.dataset.panel = 'this';
+    if (k === 'panel' && v === 'closed') body.dataset.add = 'off';
+    if (k === 'take') reset = false;
+    if (k === 'menu' && v === 'mapped') body.dataset.knob = 'rest';
+    if (k === 'knob' && v !== 'rest') body.dataset.menu = body.dataset.menu === 'mapped' ? 'none' : body.dataset.menu;
+    render();
+  });
+  document.getElementById('ccPop').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.filter) body.dataset.panel = b.dataset.filter;
+    if (b.dataset.take) { body.dataset.take = b.dataset.take; reset = false; }
+    if (b.id === 'ccReset') reset = true;
+    render();
+  });
+  window.addEventListener('resize', render);
+  render();
+})();
+</script>
+</body>
+</html>
