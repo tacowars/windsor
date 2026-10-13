@@ -6,7 +6,7 @@
  */
 import { CARRIER_COLOR } from './consoleColors';
 import type { KnobAutomation } from './knobAutomation';
-import { ENV_TAG_TEXT, lockTagText } from './knobLock';
+import { knobTagText } from './knobLock';
 import type { KnobBubbleGeometry, KnobBubbleTiming } from './knobBubbleTables';
 import { KNOB_BUBBLE_PX, KNOB_BUBBLE_TIMING } from './knobBubbleTables';
 
@@ -35,18 +35,24 @@ export interface KnobBubbleReading {
   readonly lock: KnobAutomation | null;
   /** Whether a clip envelope moves it. */
   readonly enveloped: boolean;
+  /** The CC its mapping listens to (windsor#785), or null with none; a lock's tag wins. */
+  readonly cc?: number | null;
 }
 
 /**
  * The bubble's content: the label, the value with its unit, and the tag a
  * lock shows (its macro's name, else AUTO, in the lane's colour) or, with
- * no lock, ENV in the envelope's colour while a clip envelope moves it.
+ * no lock, `CC <n>` while a mapping drives it, else ENV while a clip
+ * envelope moves it, both in the envelope's colour (`knobTagText`).
  */
 export function knobBubbleContent(reading: KnobBubbleReading): KnobBubbleContent {
   const { lock } = reading;
-  let tag: KnobBubbleTag | null = null;
-  if (lock) tag = { text: lockTagText(lock), color: lock.color };
-  else if (reading.enveloped) tag = { text: ENV_TAG_TEXT, color: CARRIER_COLOR };
+  const cc = reading.cc ?? null;
+  const tagged = lock !== null || cc !== null || reading.enveloped;
+  const text = knobTagText(lock, cc, reading.enveloped);
+  const tag: KnobBubbleTag | null = tagged
+    ? { text, color: lock ? lock.color : CARRIER_COLOR }
+    : null;
   const value = reading.unit ? `${reading.value} ${reading.unit}` : reading.value;
   return { label: reading.label, value, tag };
 }

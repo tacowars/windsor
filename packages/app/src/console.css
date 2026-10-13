@@ -6973,6 +6973,144 @@ select.field.auto-snap {
   background: var(--env-color);
 }
 
+/* ---------- the CC knob (windsor#785) ---------- */
+/* Record `2026-10-13-midi-cc-mapping` decisions 2, 3, 7 and 12, built to the
+   approved mockup (docs/research/2026-10-13-midi-cc-mapping-mockup): a knob a
+   MIDI CC mapping drives (knobLock.ts sets .cc while no lock holds it) reads
+   "CC <n>" in the tag slot under its value, in the env ring's colour. When
+   the CC moves it, the env ring above runs from the pin, which stays on the
+   knob's own value, to the CC's value. Waiting for pickup (.cc-waiting), a
+   hollow marker sits on the ring's radius at the hardware's position and the
+   tag is outlined. While learn listens for it (.cc-learn) the knob is lit,
+   pulsing, with a hint under it. The compact knob shows its tag in its
+   bubble, as AUTO and ENV. */
+.knob.cc {
+  --env-color: var(--carrier);
+}
+.knob.cc svg {
+  overflow: visible;
+}
+.knob.cc .knob-auto {
+  display: block;
+  background: var(--env-color);
+}
+.knob .dial-cc-hw {
+  display: none;
+}
+.knob.cc.cc-waiting .dial-cc-hw {
+  display: inline;
+  fill: var(--ground);
+  stroke: var(--env-color);
+  stroke-width: 1.3;
+}
+.knob.cc.cc-waiting .knob-auto {
+  background: transparent;
+  color: var(--env-color);
+  box-shadow: inset 0 0 0 1px var(--env-color);
+}
+.knob.cc-learn {
+  position: relative;
+  isolation: isolate;
+}
+.knob.cc-learn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--carrier) 14%, transparent);
+  box-shadow: inset 0 0 0 1px var(--carrier);
+  pointer-events: none;
+}
+.knob.cc-learn::before,
+.knob.cc-learn > :not(.knob-cc-hint) {
+  animation: cc-pulse 1.4s ease-in-out infinite;
+}
+.knob-cc-hint {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: -6px;
+  padding: 5px 8px;
+  background: var(--panel);
+  border: 1px solid var(--carrier);
+  border-radius: var(--r);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.knob-cc-hint .k {
+  margin-left: 6px;
+  color: var(--ink-faint);
+  font: 10px var(--f-num);
+}
+@media (prefers-reduced-motion: reduce) {
+  .knob.cc-learn::before,
+  .knob.cc-learn > :not(.knob-cc-hint) {
+    animation: none;
+  }
+}
+/* A knob's right-click menu (knobCcMenu.ts, the mockup's .ctx): fixed over
+   the page, placed under the knob by songRowMenuPlacement.ts. */
+.knob-cc-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.knob-cc-menu-head {
+  margin-bottom: 3px;
+  padding: 3px 12px 5px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font: 600 9px var(--f-panel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.knob-cc-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font: 12px var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.knob-cc-menu button:hover:not(:disabled),
+.knob-cc-menu button:focus-visible {
+  background: var(--panel-hi);
+}
+.knob-cc-menu button:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.knob-cc-menu button .tag {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font: 9.5px var(--f-num);
+}
+.knob-cc-menu button.danger {
+  color: var(--hot);
+}
+.knob-cc-menu hr {
+  margin: 3px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
 /* ---------- controls ---------- */
 
 .seg {

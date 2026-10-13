@@ -61,6 +61,15 @@ export interface KnobSpec {
    * A lane's lock wins the tag; the ring still shows what plays.
    */
   envelope?: () => KnobEnvelope | null;
+  /**
+   * The part and catalog target a MIDI CC mapping can drive through the knob
+   * (windsor#785, `knobCc.ts`). A mapped knob reads `CC <n>` in its tag
+   * while no lock holds it, its env ring runs from the pin to the CC's value
+   * playing (with any envelope over it), a hollow marker waits at the
+   * hardware's position until pickup, and it is lit while learn listens
+   * for it. A right-click opens its menu (`knobCcMenu.ts`).
+   */
+  cc?: KnobCcBinding;
 }
 
 /**
@@ -79,8 +88,12 @@ import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestur
 import type { OpenGesture } from './gestureHooks';
 import type { KnobAutomation } from './knobAutomation';
 import { automatedValueText, lockNotice } from './knobAutomation';
+import type { KnobCc, KnobCcBinding } from './knobCc';
+import { emptyKnobCc, readKnobCc } from './knobCc';
+import { attachKnobCcMenu } from './knobCcMenu';
 import type { KnobEnvelope } from './knobEnvelope';
-import { AUTO_TAG_TEXT, followKnob, paintEnvelope, paintLock } from './knobLock';
+import { AUTO_TAG_TEXT, followKnob, paintLock } from './knobLock';
+import { angleOf, arcPath, knobRingPainter } from './knobRing';
 import { nearestStep, stepKeyTarget, steppedScale } from './knobSteps';
 import { notify } from './toast';
 import {
@@ -88,12 +101,11 @@ import {
   ARC_MIN_DEGREES,
   ARC_START,
   ARIA_VALUE_PRECISION,
+  CC_MARKER_R,
   DRAG_RANGE_FINE_PX,
   DRAG_RANGE_PX,
   ENV_DOT_R,
-  ENV_RING_GAP,
   FACE_INSET,
-  HALF_TURN_DEGREES,
   KEY_STEP,
   KEY_STEP_FINE,
   KNOB_COMPACT_PAD_PX,
@@ -105,21 +117,8 @@ import {
   KNOB_RACK_R,
   LOG_FLOOR,
   PIN_INSET,
-  TWELVE_OCLOCK_DEGREES,
   ZERO_END_SLICE,
 } from './knobConstants';
-
-function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
-  const a = ((deg - TWELVE_OCLOCK_DEGREES) * Math.PI) / HALF_TURN_DEGREES;
-  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-}
-
-function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
-  const [x0, y0] = polar(cx, cy, r, a0);
-  const [x1, y1] = polar(cx, cy, r, a1);
-  const large = Math.abs(a1 - a0) > HALF_TURN_DEGREES ? 1 : 0;
-  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-}
 
 /** A dial's radius and its SVG's side, in px. */
 export interface KnobGeometry {
@@ -157,20 +156,24 @@ function knobClass(spec: Pick<KnobSpec, 'compact' | 'dial'>): string {
  * whatever patch was imported, so every knob escapes it here, at the sink.
  */
 export function knobMarkup(
-  spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation' | 'envelope'>,
+  spec: Pick<KnobSpec, 'label' | 'compact' | 'dial' | 'automation' | 'envelope' | 'cc'>,
 ): string {
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
   const label = spec.compact ? '' : `<span class="knob-label">${escapeHtml(spec.label)}</span>`;
   const tag = escapeHtml(AUTO_TAG_TEXT);
   const auto =
-    !spec.compact && (spec.automation || spec.envelope)
+    !spec.compact && (spec.automation || spec.envelope || spec.cc)
       ? `<span class="knob-auto">${tag}</span>`
       : '';
   const readout = spec.compact ? '' : `<span class="knob-val"></span>${auto}${label}`;
-  const ring = spec.envelope
-    ? `<path class="dial-env" d=""></path><circle class="dial-env-dot" cx="${c}" cy="${c}" r="${ENV_DOT_R}"></circle>`
+  const marker = spec.cc
+    ? `<circle class="dial-cc-hw" cx="${c}" cy="${c}" r="${CC_MARKER_R}"></circle>`
     : '';
+  const ring =
+    spec.envelope || spec.cc
+      ? `<path class="dial-env" d=""></path><circle class="dial-env-dot" cx="${c}" cy="${c}" r="${ENV_DOT_R}"></circle>${marker}`
+      : '';
   return (
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
     `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE_INSET}"></circle>` +
@@ -336,35 +339,6 @@ export function knobAria(spec: Pick<KnobSpec, 'fmt'>, v: number): KnobAria {
   };
 }
 
-/** The dial angle, in degrees, of `v` on `toNorm`'s sweep. */
-const angleOf = (toNorm: (v: number) => number, v: number): number =>
-  ARC_START + Math.min(1, Math.max(0, toNorm(v))) * (ARC_END - ARC_START);
-
-/**
- * The env ring's painter (windsor#725), or null on a knob with no ring: given
- * the centre's and the playing value's dial angles, its arc runs between
- * them outside the track, and its dot sits on the playing value, resting on
- * the centre while nothing plays. The stylesheet hides the ring off `.env`.
- */
-function envelopeRingPainter(
-  node: HTMLElement,
-  c: number,
-  dialR: number,
-): ((base: number, playing: number) => void) | null {
-  const ring = node.querySelector('.dial-env');
-  const dot = node.querySelector('.dial-env-dot');
-  if (!ring || !dot) return null;
-  const r = dialR + ENV_RING_GAP;
-  return (base, playing) => {
-    const a0 = Math.min(base, playing);
-    const a1 = Math.max(base, playing);
-    ring.setAttribute('d', a1 - a0 < ARC_MIN_DEGREES ? '' : arcPath(c, c, r, a0, a1));
-    const [x, y] = polar(c, c, r, playing);
-    dot.setAttribute('cx', x.toFixed(2));
-    dot.setAttribute('cy', y.toFixed(2));
-  };
-}
-
 /** Build one knob. The element re-renders itself after every commit. */
 export function makeKnob(spec: KnobSpec): KnobElement {
   const node = knobDom(spec) as KnobElement;
@@ -374,8 +348,11 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const bubble = spec.compact ? attachKnobBubble(node) : null;
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
-  const paintRing = envelopeRingPainter(node, c, r);
   const { toNorm, fromNorm } = scaleFor(spec);
+  const paintRing = knobRingPainter(node, c, r, toNorm);
+  const { cc: binding } = spec;
+  const ccOut = emptyKnobCc();
+  const readCc = binding && ((): KnobCc | null => readKnobCc(binding, ccOut));
 
   const render = (): void => {
     const lock = spec.automation?.() ?? null;
@@ -393,6 +370,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     node.setAttribute('aria-valuetext', lock ? automatedValueText(aria.valuetext) : aria.valuetext);
     if (spec.automation) paintLock(node, lock);
     const env = spec.envelope && paintRing ? spec.envelope() : null;
+    const cc = readCc?.() ?? null;
     bubble?.update(
       knobBubbleContent({
         label: currentLabels.get(node) ?? spec.label,
@@ -400,11 +378,10 @@ export function makeKnob(spec: KnobSpec): KnobElement {
         unit: spec.unit,
         lock,
         enveloped: env !== null,
+        cc: cc?.cc ?? null,
       }),
     );
-    if (!spec.envelope || !paintRing) return;
-    paintEnvelope(node, env, lock);
-    if (env) paintRing(angleOf(toNorm, env.base), angleOf(toNorm, env.playing));
+    paintRing?.({ env, lock, cc, pin: v });
   };
 
   const commit = (raw: number): void => {
@@ -420,8 +397,28 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   attachKnobInput(node, spec, { toNorm, fromNorm }, commit);
   node.refresh = render;
   render();
-  if (spec.automation || spec.envelope) followKnob(node, spec, render);
+  followReads(node, spec, render, readCc);
   return node;
+}
+
+/**
+ * Redraw the knob whenever its lock, its envelope or its CC mapping answers
+ * differently, and give a knob a CC can drive its right-click menu.
+ */
+function followReads(
+  node: HTMLElement,
+  spec: KnobSpec,
+  render: () => void,
+  cc: (() => KnobCc | null) | undefined,
+): void {
+  const reads = { automation: spec.automation, envelope: spec.envelope, cc };
+  if (spec.automation || spec.envelope || cc) followKnob(node, reads, render);
+  if (!spec.cc) return;
+  attachKnobCcMenu(node, {
+    binding: spec.cc,
+    lock: () => spec.automation?.() ?? null,
+    label: () => currentLabels.get(node) ?? spec.label,
+  });
 }
 
 /** The arrow keys a knob steps on, and which way; any other key ends its merged step. */
@@ -458,6 +455,8 @@ export function attachKnobInput(
   let startV = 0;
   const locked = (): boolean => (spec.automation?.() ?? null) !== null;
   node.addEventListener('pointerdown', (e) => {
+    // A right press opens the knob's menu (windsor#785), never a drag or a lock's notice.
+    if (e.button !== 0) return;
     drag?.close();
     drag = null;
     const lock = spec.automation?.() ?? null;

@@ -41,7 +41,7 @@ describe('what the bubble reads', () => {
     expect(read(STRIP_PAN_KNOB, -0.5).value).toBe('-0.50');
   });
 
-  it("carries a lock's tag in its colour, a macro's name, or ENV under an envelope", () => {
+  it("carries a lock's tag in its colour, a macro's name, a CC's, or ENV under an envelope", () => {
     const base = { label: 'Level', value: '0.80', enveloped: true };
     expect(knobBubbleContent({ ...base, lock: { color: '#123456', value: 0.8 } }).tag).toEqual({
       text: 'AUTO',
@@ -50,6 +50,7 @@ describe('what the bubble reads', () => {
     const macro = { color: '#654321', value: 0.8, macro: 'Wobble' };
     expect(knobBubbleContent({ ...base, lock: macro }).tag?.text).toBe('Wobble');
     expect(knobBubbleContent({ ...base, lock: null }).tag?.text).toBe('ENV');
+    expect(knobBubbleContent({ ...base, lock: null, cc: 71 }).tag?.text).toBe('CC 71');
     expect(knobBubbleContent({ ...base, lock: null, enveloped: false }).tag).toBeNull();
   });
 });

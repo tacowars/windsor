@@ -15,6 +15,7 @@ import { makePatch, partAt, songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $ } from './dom';
 import { knobSongTick, patchKnobAutomation } from './knobAutomation';
+import { heldOnPath, knobCcScope } from './knobCc';
 import { knobEnvelopeAt, type KnobEnvelopeQuery } from './knobEnvelope';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
@@ -137,6 +138,7 @@ function patchEditor(ctx: AppCtx): PatchEditor {
         knobSongTick(ctx.model.doc, ctx.transport.position()),
       ),
     envelope,
+    cc: { scope: knobCcScope(ctx), part: () => ctx.parts.selected },
   };
   return editor;
 }
@@ -144,8 +146,9 @@ function patchEditor(ctx: AppCtx): PatchEditor {
 /**
  * The editor's env ring read (windsor#725): the selected part's clip
  * envelope on a knob's path at the audible tick, moving only on the targets
- * the engine holds a slot for. One query and one admitted list, refilled
- * per read, so a knob's frame allocates nothing of its own.
+ * the engine holds a slot for, over the CC's value where one is held. One
+ * query and one admitted list, refilled per read, so a knob's frame
+ * allocates nothing of its own.
  */
 function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
   const admitted: string[] = [];
@@ -165,6 +168,8 @@ function knobEnvelopeReader(ctx: AppCtx): NonNullable<PatchEditor['envelope']> {
     query.patch = ctx.parts.patch;
     query.path = path;
     query.base = Number(getPath(ctx.parts.patch, path) ?? 0);
+    // A MIDI CC's value held on the target is what the envelope rides on (windsor#785).
+    query.held = heldOnPath(ctx.parts.selected, path);
     query.tick = ctx.transport.position();
     query.running = ctx.transport.running;
     // The engine's own admitted set while it plays; stopped, nothing moves.

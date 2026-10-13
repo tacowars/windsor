@@ -29,6 +29,8 @@ interface NumericControl {
   big?: boolean | undefined;
   /** The lane that holds the knob, if any (windsor#397, `insertFieldLock`). */
   automation?: KnobSpec['automation'];
+  /** The knob's MIDI CC binding (windsor#785, `insertFieldLock`). */
+  cc?: KnobSpec['cc'];
 }
 export function driveKnob(o: NumericControl): HTMLElement {
   return makeKnob({
@@ -43,5 +45,6 @@ export function driveKnob(o: NumericControl): HTMLElement {
     fmt: o.hz ? fmtHz : fmt2,
     ...(o.hz ? { curve: 'log' as const } : {}),
     ...(o.automation ? { automation: o.automation } : {}),
+    ...(o.cc ? { cc: o.cc } : {}),
   });
 }

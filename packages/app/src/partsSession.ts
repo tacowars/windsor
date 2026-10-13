@@ -21,6 +21,7 @@
 import type { ArrangementDocument, DocumentPart, Patch, PartsPartial } from '@windsor/engine';
 import { clonePatch, makePatch, partAt } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
+import type { KnobCcScope } from './knobCc';
 import type { KnobEnvelope } from './knobEnvelope';
 import { library, libraryPatch } from './libraryModel';
 import { resolveSlot } from './partSelectionSync';
@@ -175,4 +176,16 @@ export interface PatchEditor {
    * Absent, no knob shows an env ring.
    */
   envelope?(path: string, out: KnobEnvelope): KnobEnvelope | null;
+  /**
+   * The document and the selected part a knob's MIDI CC mapping is read
+   * from and edited in (windsor#785, `knobCc.ts`). Absent, no knob shows a
+   * CC tag or offers the right-click menu.
+   */
+  readonly cc?: PatchEditorCc;
+}
+
+/** What the Parts tab's knobs map a CC through: the document's scope and the selected part. */
+export interface PatchEditorCc {
+  readonly scope: KnobCcScope;
+  part(): number;
 }

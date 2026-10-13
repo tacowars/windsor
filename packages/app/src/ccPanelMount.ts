@@ -12,12 +12,15 @@
  *   document before it.
  * - **The host.** A value the live system dropped on its own, and each new
  *   system, which holds none.
+ * - **The knobs.** Their CC tag, ring, marker and learn highlight read the
+ *   session's status, held value and learn (`knobCc.ts`, windsor#785).
  */
 import { CcPanel } from './ccPanel';
 import { setCcPanelEntry } from './ccPanelEntry';
 import { CcSession, watchDocument } from './ccPanelSession';
 import { readTakeover } from './ccTakeover';
 import type { AppCtx } from './context';
+import { setKnobCcState } from './knobCc';
 import type { MidiAccessor } from './midiAccess';
 
 /** Build the console's CC session and panel, and wire them in. */
@@ -34,5 +37,12 @@ export function mountCcPanel(ctx: AppCtx, midi: MidiAccessor): CcPanel {
   watchDocument(ctx.model, session);
   const panel = new CcPanel(ctx, session, midi);
   setCcPanelEntry(panel);
+  setKnobCcState({
+    status: (part, target) => session.status(part, target),
+    held: (part, target) => session.engine.heldValue(part, target),
+    get learning() {
+      return session.learning;
+    },
+  });
   return panel;
 }
