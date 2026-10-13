@@ -133,7 +133,9 @@ if (micro.length) {
   console.log('### Micro: 16 of each on an offline context, ms per audio second (median over rounds)\n');
   console.log('| Case | ms per audio second | Per node, ms/s | Per node, µs a quantum |');
   console.log('|---|---:|---:|---:|');
-  const keys = Object.keys(micro[0]).filter((k) => typeof micro[0][k] === 'number' && !['n', 'round', 'load1'].includes(k));
+  // The cases are the numeric fields that are not the row's metadata.
+  const META = ['n', 'round', 'load1', 'sampleRate'];
+  const keys = Object.keys(micro[0]).filter((k) => typeof micro[0][k] === 'number' && !META.includes(k));
   const empty = median(micro.map((r) => r.empty));
   for (const k of keys) {
     const v = micro.map((r) => r[k]);

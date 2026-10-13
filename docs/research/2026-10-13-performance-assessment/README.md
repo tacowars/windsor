@@ -499,13 +499,17 @@ A generic form fits the worklet rules: a block-level peak over the input
 quantum dispatched from a separate method so the awake render never sees
 it, no allocation, and a golden that pins the awake render unchanged and
 a test that the sleep engages after the tail and never before. The
-`inserts/*Allocation.test.ts` scenarios cover the switch. Payoff on the
-bench's 16-part three-insert song: of its 2 600 ms a second of insert cost,
-the silent share is about 1 600 (bloom's and the filter's instances
-already resting),
-so a song whose parts rest half the time saves on the order of 800 ms a
-second here, the size of the gap between the one-insert song playing and
-not on this machine.
+`inserts/*Allocation.test.ts` scenarios cover the switch. What is on the
+table is measured, the saving is not: the kinds table puts the six kinds'
+cost on a silent input at 133, 129, 23, 20, 13 and 13 ms a second an
+instance here (the tape, the Advanced Drive, the phaser, the retro
+reverb, the delay and the compressor), against their fixed tax of a few
+ms each that a sleeping instance would still pay. How much of that a
+real song gets back depends on how much of the time each part rests and
+on each kind's tail, neither of which this bench read, so the payoff is
+not given as a number; the ticket's acceptance line is the sleeping
+implementation re-run through this bench's `16-silent-3ins` and
+`16-3ins` cases.
 
 ### 2. Budget the dear kinds, and offer their cheaper modes (large)
 
@@ -541,10 +545,11 @@ increasing ambition:
 
 The duty-cycle sampler reads only inside `process()`, so it cannot see
 Chrome's per-node, per-parameter or scheduling work, and it saturates:
-in the live table the 16-part three-insert song reads 68 % on the meter
-while the thread is at 286 % of real time (the audio clock at 0.34 of
-wall time) and the 16-part song with no inserts reads 37 % at a true
-68 %. The app shows a number that stops rising at the point where the
+in the live table the 16-part three-insert song reads 65 % on the meter
+(the median over its runs) while the thread is at 317 % of real time (the
+audio clock at 0.31 of wall time) and the 16-part song with no inserts
+reads 50 % at a true 71 %. The app shows a number that stops rising at
+the point where the
 user needs it most. Two cheap readouts fix that without touching the
 worklets:
 
