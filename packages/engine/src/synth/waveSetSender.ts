@@ -9,24 +9,27 @@
  * tables are the same bits.
  *
  * One sender per live context, since the worklet's wave cache is one per
- * context's global scope: it remembers the keys it sent, oldest first, and
- * sends a key again once it has forgotten it. It remembers fewer than the
- * processor's cache holds (`WAVE_CACHE_LIMIT`), so the sets the processor
- * builds on its own (a patch posted while a voice sounds at twice the rate)
- * cannot have evicted a key it still remembers. Should one have, the
- * processor builds it, as it did before: nothing fails to sound, and an
- * offline context gets no sender, its processors building their own.
+ * context's global scope: it remembers the keys it sent, oldest first, the
+ * warm-up's before them, and sends a key again once it has forgotten it. Its
+ * memory is the processor's sent FIFO exactly (`WAVE_SENT_LIMIT` slots, the
+ * warm-up and every install, nothing else, a key installed again moving to
+ * newest), so it never believes the processor holds a key it has evicted.
+ * The sets the processor builds on its own (a patch posted while a voice
+ * sounds at twice the rate) go to a FIFO of their own and evict none it
+ * sent. Should a set be missing anyway, the processor builds it, as it did
+ * before: nothing fails to sound, and an offline context gets no sender, its
+ * processors building their own.
  * `waveSetSender.test.ts` pins the sets and the bits.
  */
 import type { Patch } from '../patch/patch';
 import { SYNC_OVERSAMPLE } from '../worklet/fm/fmConstants';
 import { OPERATOR_COUNT } from '../worklet/fm/patchDefaults';
 import { patchOversamples, readsWaveSet } from '../worklet/fm/partWaveSets';
-import { WARM_WAVES, WAVE_CACHE_LIMIT, waveSetFor, waveSetKey } from '../worklet/fm/waveTables';
+import { WARM_WAVES, WAVE_SENT_LIMIT, waveSetFor, waveSetKey } from '../worklet/fm/waveTables';
 import type { WaveSetEntry } from './workletMessages';
 
-/** Keys a sender remembers: half the processor's cache, the other half headroom for its own builds. */
-const SENT_MEMORY = WAVE_CACHE_LIMIT / 2;
+/** Keys a sender remembers: the processor's sent FIFO, slot for slot. */
+const SENT_MEMORY = WAVE_SENT_LIMIT;
 
 /** One wave set's inputs, as `waveSetFor` takes them. */
 interface WaveSetInputs {
@@ -87,8 +90,11 @@ export class WaveSetSender {
     return out;
   }
 
+  /** `key` as the newest sent, as `installWaveSet` takes it: moved there if held, else over the oldest. */
   private remember(key: string): void {
-    if (this.sent.length >= SENT_MEMORY) this.sent.shift();
+    const at = this.sent.indexOf(key);
+    if (at >= 0) this.sent.splice(at, 1);
+    else if (this.sent.length >= SENT_MEMORY) this.sent.shift();
     this.sent.push(key);
   }
 }

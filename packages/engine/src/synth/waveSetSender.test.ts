@@ -12,7 +12,7 @@ import { loadProcessor, render } from '../__fixtures__/workletHarness';
 import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
 import { makePatch, WAVE } from '../patch/patch';
 import type { Patch } from '../patch/patch';
-import { waveSetBuildCount, waveSetFor } from '../worklet/fm/waveTables';
+import { WAVE_SENT_LIMIT, waveSetBuildCount, waveSetFor } from '../worklet/fm/waveTables';
 import { WaveSetSender, waveSetSenderFor, wavesTransfer } from './waveSetSender';
 import type { WaveSetEntry } from './workletMessages';
 
@@ -132,4 +132,33 @@ describe('a processor sent its wave sets (windsor#795)', () => {
     expect(own.built).toBe(6);
     expect(Buffer.from(sent.samples.buffer).equals(Buffer.from(own.samples.buffer))).toBe(true);
   });
+
+  // Codex on PR #799: the sender's memory must never drift from the processor's cache. Seventy
+  // sets after the warm-up's four: the oldest the sent FIFO holds, and the oldest a single cache
+  // of 64 slots held, which a sender remembering 32 had forgotten and sent again.
+  it.each([
+    ['the oldest it holds', 70 - WAVE_SENT_LIMIT],
+    ['one the sender had forgotten', 10],
+  ])(
+    'builds nothing when a full cache revisits %s, takes a new set, and revisits it again',
+    (_, revisit) => {
+      const loaded = loadProcessor();
+      const p = loaded.create(makePatch());
+      const sender = new WaveSetSender(loaded.sampleRate);
+      /** Four operators on one User wave of its own: one set, one key. */
+      const user = (i: number): Patch =>
+        makePatch({ ops: SAWS.map(() => ({ wave: WAVE.USER, userPartials: [1, i / 128] })) });
+      const play = (i: number): void => {
+        const sets = sender.setsFor(user(i));
+        if (sets.length > 0) p.inbox({ type: 'waves', sets } as unknown as ScheduledEvent);
+        p.inbox({ type: 'patch', patch: user(i) } as unknown as ScheduledEvent);
+      };
+      const before = loaded.waveSetBuilds();
+      for (let i = 0; i < 70; i++) play(i);
+      play(revisit);
+      play(70);
+      play(revisit);
+      expect(loaded.waveSetBuilds() - before).toBe(0);
+    },
+  );
 });

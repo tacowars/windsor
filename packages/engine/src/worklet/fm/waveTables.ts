@@ -4,7 +4,7 @@
  * harmonics it holds, the cache that shares
  * them across every part in this worklet global scope, and the render kind an
  * operator's wave selects. PULSE (#55) is two reads of the saw set, so its
- * waves are the saw's and the cache holds one copy. Invariants: `SIN_TAB` and `WAVE_CACHE` are
+ * waves are the saw's and the cache holds one copy. Invariants: `SIN_TAB` and the cache are
  * single-instance module state, never duplicated; `WAVE` mirrors `patch.ts`
  * (`patch.test.ts` pins the copy until #656 shares it). The module touches no
  * worklet scope at load: the main thread imports it too (windsor#795), builds
@@ -175,53 +175,92 @@ interface WaveSet {
  * so the scoring bank's User presets render exactly as before. Only a `patch`
  * or `waves` message reaches here, never the audio loop, so the string is fine.
  *
- * `WAVE_CACHE_LIMIT` slots, filled in order and then overwritten oldest
- * first, as the `Map` it replaced evicted (windsor#795): a slot is written in
- * place, so installing a set the main thread sent allocates nothing but the
- * arrays it was handed, where the map's insert and eviction did
- * (`fmProcessorAllocation.test.ts`: 51 KB over the run against none). A
- * lookup scans the slots: at most 64 string compares, at a message.
+ * Two FIFOs of fixed slots, evicting oldest first as the `Map` they replaced
+ * did (windsor#795). A slot is written in place, so installing a set the
+ * main thread sent allocates nothing but the arrays it was handed, where the
+ * map's insert and eviction did (`fmProcessorAllocation.test.ts`: 51 KB over
+ * the run against none).
+ *
+ * - `SENT_SETS` (`WAVE_SENT_LIMIT` slots) takes the warm-up and every
+ *   install, and nothing else. `synth/waveSetSender.ts` keeps the same FIFO
+ *   of the keys it sent, the warm-up's first, so the two agree by
+ *   construction: the sender never believes this scope holds a key it has
+ *   evicted. A key installed again moves to newest, as the sender's memory
+ *   moves a key it sends again.
+ * - `BUILT_SETS` (`WAVE_BUILT_LIMIT` slots) takes the sets this scope builds
+ *   on a miss (a 2× set for a voice sounding at it, an offline context's
+ *   every set, the main thread's own builds). The sender never sees them, so
+ *   they never evict a set it sent.
+ *
+ * A lookup scans both: at most 64 string compares, at a message.
  */
-const WAVE_CACHE_LIMIT = 64;
-const WAVE_CACHE = {
-  keys: new Array<string>(WAVE_CACHE_LIMIT).fill(''),
-  sets: new Array<WaveSet | null>(WAVE_CACHE_LIMIT).fill(null),
-  /** Slots in use, from 0. */
-  size: 0,
-  /** Once every slot is in use, the oldest, which the next set overwrites. */
-  oldest: 0,
-};
+const WAVE_SENT_LIMIT = 32;
+const WAVE_BUILT_LIMIT = 32;
+
+/** One FIFO: `size` slots in use, the oldest at 0 and the newest at `size - 1`. */
+interface WaveSetFifo {
+  keys: string[];
+  sets: (WaveSet | null)[];
+  size: number;
+}
+
+function waveSetFifo(limit: number): WaveSetFifo {
+  const keys = new Array<string>(limit).fill('');
+  return { keys, sets: new Array<WaveSet | null>(limit).fill(null), size: 0 };
+}
+
+const SENT_SETS = waveSetFifo(WAVE_SENT_LIMIT);
+const BUILT_SETS = waveSetFifo(WAVE_BUILT_LIMIT);
 
 /** Sets built in this scope since load, rather than found or installed: how a test sees a message build nothing. */
 let waveSetBuilds = 0;
 
-/** The cached set under `key`, or null. */
-function cachedWaveSet(key: string): WaveSet | null {
-  const cache = WAVE_CACHE;
-  for (let i = 0; i < cache.size; i++) if (cache.keys[i] === key) return cache.sets[i]!;
-  return null;
+/** The slot holding `key` in `fifo`, or -1. */
+function fifoSlot(fifo: WaveSetFifo, key: string): number {
+  for (let i = 0; i < fifo.size; i++) if (fifo.keys[i] === key) return i;
+  return -1;
 }
 
-/** Cache `set` under `key`, a key not held, over the oldest once every slot is in use. */
-function cacheWaveSet(key: string, set: WaveSet): void {
-  const cache = WAVE_CACHE;
-  let slot = cache.size;
-  if (slot < WAVE_CACHE_LIMIT) cache.size++;
-  else {
-    slot = cache.oldest;
-    cache.oldest = (slot + 1) % WAVE_CACHE_LIMIT;
+/** Empty slot `at` of `fifo`, each newer slot moving down one. */
+function fifoDrop(fifo: WaveSetFifo, at: number): void {
+  for (let i = at + 1; i < fifo.size; i++) {
+    fifo.keys[i - 1] = fifo.keys[i]!;
+    fifo.sets[i - 1] = fifo.sets[i]!;
   }
-  cache.keys[slot] = key;
-  cache.sets[slot] = set;
+  fifo.size--;
+  fifo.keys[fifo.size] = '';
+  fifo.sets[fifo.size] = null;
+}
+
+/** `set` under `key`, a key `fifo` does not hold, as its newest, over its oldest once every slot is in use. */
+function fifoPush(fifo: WaveSetFifo, key: string, set: WaveSet): void {
+  if (fifo.size === fifo.keys.length) fifoDrop(fifo, 0);
+  fifo.keys[fifo.size] = key;
+  fifo.sets[fifo.size] = set;
+  fifo.size++;
+}
+
+/** The cached set under `key`, or null. */
+function cachedWaveSet(key: string): WaveSet | null {
+  const sent = fifoSlot(SENT_SETS, key);
+  if (sent >= 0) return SENT_SETS.sets[sent]!;
+  const built = fifoSlot(BUILT_SETS, key);
+  return built >= 0 ? BUILT_SETS.sets[built]! : null;
 }
 
 /**
  * Cache a set built elsewhere, on the main thread (windsor#795), under the
- * key it was built for, as handed over, never copied; a key already held
- * keeps its set.
+ * key it was built for, as handed over, never copied, as the sent FIFO's
+ * newest. A key that FIFO holds keeps its set and moves to newest.
  */
 function installWaveSet(key: string, set: WaveSet): void {
-  if (cachedWaveSet(key) === null) cacheWaveSet(key, set);
+  const at = fifoSlot(SENT_SETS, key);
+  let held = set;
+  if (at >= 0) {
+    held = SENT_SETS.sets[at]!;
+    fifoDrop(SENT_SETS, at);
+  }
+  fifoPush(SENT_SETS, key, held);
 }
 
 /**
@@ -293,7 +332,7 @@ function waveSetFor(
 
   waveSetBuilds++;
   set = { mips, gains };
-  cacheWaveSet(key, set);
+  fifoPush(BUILT_SETS, key, set);
   return set;
 }
 
@@ -359,14 +398,18 @@ const WARM_WAVES: readonly number[] = [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TR
  * imports this module too, never does (windsor#795).
  */
 function warmWaveCache(rate: number): void {
-  for (const w of WARM_WAVES) getMips(w, rate, 1, null);
+  // Into the sent FIFO too, first, as the sender remembers them (windsor#795).
+  for (const w of WARM_WAVES) {
+    installWaveSet(waveSetKey(w, rate, 1, null), waveSetFor(w, rate, 1, null));
+  }
 }
 
 export type { WaveSet };
 export {
   SIN_TAB,
   WARM_WAVES,
-  WAVE_CACHE_LIMIT,
+  WAVE_BUILT_LIMIT,
+  WAVE_SENT_LIMIT,
   cachedWaveSet,
   getMips,
   installWaveSet,

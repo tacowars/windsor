@@ -1432,34 +1432,48 @@ function quantiseMips(mips, levels) {
   }
   return mips;
 }
-var WAVE_CACHE_LIMIT = 64;
-var WAVE_CACHE = {
-  keys: new Array(WAVE_CACHE_LIMIT).fill(""),
-  sets: new Array(WAVE_CACHE_LIMIT).fill(null),
-  /** Slots in use, from 0. */
-  size: 0,
-  /** Once every slot is in use, the oldest, which the next set overwrites. */
-  oldest: 0
-};
-var waveSetBuilds = 0;
-function cachedWaveSet(key) {
-  const cache = WAVE_CACHE;
-  for (let i = 0; i < cache.size; i++) if (cache.keys[i] === key) return cache.sets[i];
-  return null;
+var WAVE_SENT_LIMIT = 32;
+var WAVE_BUILT_LIMIT = 32;
+function waveSetFifo(limit) {
+  const keys = new Array(limit).fill("");
+  return { keys, sets: new Array(limit).fill(null), size: 0 };
 }
-function cacheWaveSet(key, set) {
-  const cache = WAVE_CACHE;
-  let slot = cache.size;
-  if (slot < WAVE_CACHE_LIMIT) cache.size++;
-  else {
-    slot = cache.oldest;
-    cache.oldest = (slot + 1) % WAVE_CACHE_LIMIT;
+var SENT_SETS = waveSetFifo(WAVE_SENT_LIMIT);
+var BUILT_SETS = waveSetFifo(WAVE_BUILT_LIMIT);
+var waveSetBuilds = 0;
+function fifoSlot(fifo, key) {
+  for (let i = 0; i < fifo.size; i++) if (fifo.keys[i] === key) return i;
+  return -1;
+}
+function fifoDrop(fifo, at) {
+  for (let i = at + 1; i < fifo.size; i++) {
+    fifo.keys[i - 1] = fifo.keys[i];
+    fifo.sets[i - 1] = fifo.sets[i];
   }
-  cache.keys[slot] = key;
-  cache.sets[slot] = set;
+  fifo.size--;
+  fifo.keys[fifo.size] = "";
+  fifo.sets[fifo.size] = null;
+}
+function fifoPush(fifo, key, set) {
+  if (fifo.size === fifo.keys.length) fifoDrop(fifo, 0);
+  fifo.keys[fifo.size] = key;
+  fifo.sets[fifo.size] = set;
+  fifo.size++;
+}
+function cachedWaveSet(key) {
+  const sent = fifoSlot(SENT_SETS, key);
+  if (sent >= 0) return SENT_SETS.sets[sent];
+  const built = fifoSlot(BUILT_SETS, key);
+  return built >= 0 ? BUILT_SETS.sets[built] : null;
 }
 function installWaveSet(key, set) {
-  if (cachedWaveSet(key) === null) cacheWaveSet(key, set);
+  const at = fifoSlot(SENT_SETS, key);
+  let held = set;
+  if (at >= 0) {
+    held = SENT_SETS.sets[at];
+    fifoDrop(SENT_SETS, at);
+  }
+  fifoPush(SENT_SETS, key, held);
 }
 function getMips(wave, sampleRate2, tone, userPartials, baseRate = sampleRate2) {
   return waveSetFor(wave, sampleRate2, tone, userPartials, baseRate).mips;
@@ -1493,7 +1507,7 @@ function waveSetFor(wave, sampleRate2, tone, userPartials, baseRate = sampleRate
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
   waveSetBuilds++;
   set = { mips, gains };
-  cacheWaveSet(key, set);
+  fifoPush(BUILT_SETS, key, set);
   return set;
 }
 function waveSetBuildCount() {
@@ -1527,7 +1541,9 @@ function waveKind(wave) {
 }
 var WARM_WAVES = [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE];
 function warmWaveCache(rate) {
-  for (const w of WARM_WAVES) getMips(w, rate, 1, null);
+  for (const w of WARM_WAVES) {
+    installWaveSet(waveSetKey(w, rate, 1, null), waveSetFor(w, rate, 1, null));
+  }
 }
 
 // packages/engine/src/worklet/fm/lfo.ts

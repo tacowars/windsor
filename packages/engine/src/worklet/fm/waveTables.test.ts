@@ -14,7 +14,8 @@ import {
   KIND_TABLE,
   mipIndex,
   SIN_TAB,
-  WAVE_CACHE_LIMIT,
+  WAVE_BUILT_LIMIT,
+  WAVE_SENT_LIMIT,
   waveKind,
   waveSetFor,
   waveSetKey,
@@ -153,20 +154,31 @@ describe('the wave tables', () => {
       expect(cachedWaveSet(waveSetKey(WAVE.SAW, 48000, 0.75, null))).toBe(set);
     });
 
-    it('installs a set under its key as handed over, and keeps a key it holds', () => {
-      const held = waveSetFor(WAVE.SQUARE, 48000, 0.4, null);
-      installWaveSet(waveSetKey(WAVE.SQUARE, 48000, 0.4, null), stub());
-      expect(waveSetFor(WAVE.SQUARE, 48000, 0.4, null)).toBe(held);
+    it('installs a set under its key as handed over', () => {
       const sent = stub();
       installWaveSet(waveSetKey(WAVE.TRIANGLE, 48000, 0.35, null), sent);
       expect(waveSetFor(WAVE.TRIANGLE, 48000, 0.35, null)).toBe(sent);
     });
 
-    it('holds WAVE_CACHE_LIMIT sets and drops the oldest first', () => {
-      const keys = Array.from({ length: WAVE_CACHE_LIMIT + 1 }, (_, i) => `fifo|${i}`);
-      for (const key of keys) installWaveSet(key, stub());
-      expect(cachedWaveSet(keys[0]!)).toBeNull();
-      for (const key of keys.slice(1)) expect(cachedWaveSet(key)).not.toBeNull();
+    it('holds WAVE_SENT_LIMIT installs, drops the oldest first, and moves one installed again to newest', () => {
+      const keys = Array.from({ length: WAVE_SENT_LIMIT + 1 }, (_, i) => `fifo|${i}`);
+      const first = stub();
+      for (const key of keys.slice(0, WAVE_SENT_LIMIT))
+        installWaveSet(key, key === keys[0] ? first : stub());
+      // Installed again, the oldest keeps its set and becomes the newest, so the next drops the second.
+      installWaveSet(keys[0]!, stub());
+      installWaveSet(keys[WAVE_SENT_LIMIT]!, stub());
+      expect(cachedWaveSet(keys[0]!)).toBe(first);
+      expect(cachedWaveSet(keys[1]!)).toBeNull();
+      for (const key of keys.slice(2)) expect(cachedWaveSet(key)).not.toBeNull();
+    });
+
+    it('keeps the sets it builds apart, so no build evicts an install', () => {
+      const sent = stub();
+      installWaveSet('apart|sent', sent);
+      for (let i = 0; i <= WAVE_BUILT_LIMIT; i++) waveSetFor(WAVE.USER, 48000, 1, [1, i / 64]);
+      expect(cachedWaveSet('apart|sent')).toBe(sent);
+      expect(cachedWaveSet(waveSetKey(WAVE.USER, 48000, 1, [1, 0]))).toBeNull();
     });
   });
 
