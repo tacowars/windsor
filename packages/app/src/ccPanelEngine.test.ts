@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { PerformanceHost } from './ccPanelEngine';
 import { DocumentCcEngine } from './ccPanelEngine';
 import { mergeDocument } from './documentModel';
+import type { PerformanceResult } from './host';
 import { newSong } from './songParts';
 
 const doc = makeArrangement(
@@ -22,7 +23,7 @@ const doc = makeArrangement(
   }),
 ).document;
 
-function engine(result: 'applied' | 'no-slot' | null) {
+function engine(result: PerformanceResult | null) {
   const host: PerformanceHost = { setPerformance: () => result, clearPerformance: () => {} };
   return new DocumentCcEngine(() => doc, host);
 }
@@ -45,5 +46,18 @@ describe('DocumentCcEngine', () => {
     const full = engine('no-slot');
     expect(full.apply(0, 'voice.ops.0.level', 0.8)).toBe('noSlot');
     expect(full.heldValue(0, 'voice.ops.0.level')).toBeUndefined();
+  });
+
+  it('passes a refusal through and holds nothing: inert, automated, and audio off', () => {
+    const cases = [
+      ['inert', 'inert'],
+      ['automated', 'automated'],
+      [null, 'off'],
+    ] as const;
+    for (const [result, applied] of cases) {
+      const e = engine(result);
+      expect(e.apply(0, 'insert.t.wear', 0.8)).toBe(applied);
+      expect(e.heldValue(0, 'insert.t.wear')).toBeUndefined();
+    }
   });
 });

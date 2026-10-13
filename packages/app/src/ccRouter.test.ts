@@ -9,13 +9,15 @@ import {
 } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 
-import type { CcEngine, CcMessage } from './ccEngine';
+import type { CcApplyResult, CcEngine, CcMessage } from './ccEngine';
 import { CcRouter } from './ccRouter';
 import type { CcTakeover } from './ccTakeover';
 
 const LEVEL: CcTargetId = 'voice.ops.0.level';
 const CUTOFF: CcTargetId = 'voice.filter.cutoff';
 const LEVEL_ROW = requireCatalogRow(LEVEL);
+/** A Tape insert's Wear, which Split leaves the engine unable to play. */
+const WEAR: CcTargetId = 'insert.t.wear';
 const at = (part: number, target: CcTargetId): string => `${part}|${target}`;
 
 /** A fake engine: each target's own value, lanes on, patches, and a log of applies and clears. */
@@ -24,18 +26,20 @@ function rig(takeover: CcTakeover = 'pickup') {
   const lanes = new Set<string>();
   const patches = new Map<number, Patch>();
   const log: string[] = [];
-  const state = { slots: true };
+  /** What the engine answers the next apply: `applied` logs it. */
+  const state: { result: CcApplyResult } = { result: 'applied' };
   const engine: CcEngine = {
     target: (part, target) => {
       const value = own.get(at(part, target));
-      return value === undefined ? undefined : { row: requireCatalogRow(target), own: value };
+      // An insert's row needs its kind, which the fake has none of: it reads as the level's.
+      const row = target === WEAR ? LEVEL_ROW : requireCatalogRow(target);
+      return value === undefined ? undefined : { row, own: value };
     },
     patch: (part) => patches.get(part),
     automated: (part, target) => lanes.has(at(part, target)),
     apply: (part, target, value) => {
-      if (!state.slots) return 'noSlot';
-      log.push(`apply ${part} ${target} ${value}`);
-      return 'applied';
+      if (state.result === 'applied') log.push(`apply ${part} ${target} ${value}`);
+      return state.result;
     },
     clear: (part, target) => void log.push(`clear ${part} ${target}`),
   };
@@ -314,12 +318,56 @@ describe('status (decision 12)', () => {
 
   it('reads No voice slot until a slot frees', () => {
     const r = rig('jump');
-    r.state.slots = false;
+    r.state.result = 'noSlot';
     r.router.songOpened([{ part: 0, mapping: learned() }]);
     r.router.handle(cc(90));
     expect(r.router.status(0, LEVEL)).toEqual({ kind: 'noSlot' });
-    r.state.slots = true;
+    r.state.result = 'applied';
     r.router.handle(cc(91));
     expect(r.router.status(0, LEVEL)).toEqual({ kind: 'live', value: 91 / 127, held: true });
+  });
+
+  it('holds nothing and reads Inert when the engine refuses a value, and does not pick up', () => {
+    const r = rig();
+    r.own.set(at(0, WEAR), 40 / 127);
+    r.state.result = 'inert';
+    r.router.songOpened([{ part: 0, mapping: learned({ target: WEAR }) }]);
+    r.router.handle(cc(40));
+    expect(r.router.status(0, WEAR)).toEqual({
+      kind: 'inert',
+      reason: "not available in this insert's current mode",
+    });
+    // Had the refused value picked up, 41 would apply anywhere; it must reach the target again.
+    r.own.set(at(0, WEAR), 100 / 127);
+    r.state.result = 'applied';
+    r.router.handle(cc(41));
+    expect(r.log).toEqual([]);
+    r.router.handle(cc(100));
+    expect(r.router.status(0, WEAR)).toEqual({ kind: 'live', value: 100 / 127, held: true });
+  });
+
+  it('holds nothing and reads Automated when the engine reports a lane the document does not', () => {
+    const r = rig('jump');
+    r.state.result = 'automated';
+    r.router.songOpened([{ part: 0, mapping: learned() }]);
+    r.router.handle(cc(90));
+    expect(r.router.status(0, LEVEL)).toEqual({ kind: 'automated' });
+    r.state.result = 'applied';
+    r.router.handle(cc(91));
+    expect(r.log).toEqual([level(91 / 127)]);
+  });
+
+  it('holds nothing while audio is off, and tries the next value once it is on', () => {
+    const r = rig();
+    r.state.result = 'off';
+    r.router.songOpened([{ part: 0, mapping: learned() }]);
+    r.router.handle(cc(40));
+    expect(r.router.status(0, LEVEL)).toEqual({
+      kind: 'waiting',
+      marker: { cc: 40, value: 40 / 127 },
+    });
+    r.state.result = 'applied';
+    r.router.handle(cc(41));
+    expect(r.router.status(0, LEVEL)).toEqual({ kind: 'live', value: 41 / 127, held: true });
   });
 });

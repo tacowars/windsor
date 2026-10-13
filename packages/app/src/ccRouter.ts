@@ -31,7 +31,13 @@ import {
 
 import type { CcEngine, CcMessage, PartCcMapping } from './ccEngine';
 import { type CcKeyState, armKey, ccKey, heardOnly, pickupStep } from './ccPickup';
-import { type CcMarker, type CcStatus, CC_NOT_IN_PART, ccInertReason } from './ccStatus';
+import {
+  type CcMarker,
+  type CcStatus,
+  CC_NOT_IN_PART,
+  ccInertReason,
+  ccRefusedStatus,
+} from './ccStatus';
 import type { CcTakeover } from './ccTakeover';
 
 /** One mapping's performance state. */
@@ -44,8 +50,8 @@ interface Entry {
   lastKey: string | null;
   /** The CC base the engine holds for the target, in its units; undefined when none. */
   held: number | undefined;
-  /** The engine found no voice slot at the last value applied. */
-  noSlot: boolean;
+  /** The status the engine's refusal of the last value left (`ccRefusedStatus`), or undefined. */
+  refused: CcStatus | undefined;
 }
 
 const entryKey = (part: number, target: CcTargetId): string => `${part}|${target}`;
@@ -153,7 +159,7 @@ export class CcRouter {
     const reason = ccInertReason(this.engine.patch(part), target);
     if (reason !== undefined) return { kind: 'inert', reason };
     if (this.engine.automated(part, target)) return { kind: 'automated' };
-    if (entry.noSlot) return { kind: 'noSlot' };
+    if (entry.refused) return entry.refused;
     const position = ccPosition(now.row, entry.mapping, entry.held ?? now.own);
     const picked = [...entry.keys.values()].some((k) => k.picked);
     if (this.takeover === 'pickup' && position !== null && !picked) {
@@ -179,13 +185,22 @@ export class CcRouter {
     }
     const position = ccPosition(now.row, mapping, entry.held ?? now.own);
     const step = pickupStep(before, message, position, this.takeover);
+    if (!step.apply) {
+      entry.keys.set(key, step.state);
+      return;
+    }
+    const value = ccValue(now.row, mapping, message.value);
+    const result = this.engine.apply(part, mapping.target, value);
+    entry.refused = ccRefusedStatus(result, mapping.target);
+    if (result !== 'applied' && result !== 'noSlot') {
+      // Nothing moved: the key does not pick up, so the next value is tried again.
+      entry.keys.set(key, heardOnly(before, message));
+      return;
+    }
     entry.keys.set(key, step.state);
-    if (!step.apply) return;
     for (const [other, state] of entry.keys)
       if (other !== key) entry.keys.set(other, armKey(state));
-    const value = ccValue(now.row, mapping, message.value);
-    entry.noSlot = this.engine.apply(part, mapping.target, value) === 'noSlot';
-    if (!entry.noSlot) entry.held = value;
+    if (result === 'applied') entry.held = value;
   }
 
   /** Clear the target's CC base, if it holds one, and re-arm the mapping. */
@@ -198,7 +213,7 @@ export class CcRouter {
   private drop(entry: Entry): void {
     if (entry.held !== undefined) this.engine.clear(entry.part, entry.mapping.target);
     entry.held = undefined;
-    entry.noSlot = false;
+    entry.refused = undefined;
   }
 
   /** The hardware position heard last, where the target's row places it. */
@@ -216,7 +231,7 @@ const fresh = (part: number, mapping: CcMapping): Entry => ({
   keys: new Map(),
   lastKey: null,
   held: undefined,
-  noSlot: false,
+  refused: undefined,
 });
 
 /** Re-arm every key, keeping the hardware position each last sent. */

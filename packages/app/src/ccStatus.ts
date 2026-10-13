@@ -17,8 +17,11 @@ import {
   catalogRow,
   effectiveMacroMappings,
   macroIndexOf,
+  targetKind,
   voicePathOf,
 } from '@windsor/engine';
+
+import type { CcApplyResult } from './ccEngine';
 
 /** The hardware position a mapping waiting for pickup heard last: its hollow marker. */
 export interface CcMarker {
@@ -82,3 +85,28 @@ export function ccInertReason(patch: Patch | undefined, target: CcTargetId): str
 
 /** The reason a mapping whose target its part does not hold is inert. */
 export const CC_NOT_IN_PART = 'not in this part';
+
+/** The reason an insert target the engine refused is inert: its current settings lack it. */
+export const CC_NOT_IN_MODE = "not available in this insert's current mode";
+
+/**
+ * The status a value the engine did not apply leaves on its row, or
+ * undefined when it applied or audio is off (the next value tries again).
+ * The engine gives no reason for `inert`, so an insert target reads its
+ * mode's, and any other the part's.
+ */
+export function ccRefusedStatus(result: CcApplyResult, target: CcTargetId): CcStatus | undefined {
+  switch (result) {
+    case 'applied':
+    case 'off':
+      return undefined;
+    case 'noSlot':
+    case 'automated':
+      return { kind: result };
+    case 'inert':
+      return {
+        kind: 'inert',
+        reason: targetKind(target) === 'insert' ? CC_NOT_IN_MODE : CC_NOT_IN_PART,
+      };
+  }
+}

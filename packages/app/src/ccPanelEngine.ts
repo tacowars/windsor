@@ -56,14 +56,15 @@ export class DocumentCcEngine implements CcEngine {
   }
 
   /**
-   * Play `value`. Only a full voice reports `noSlot`; a value the engine
-   * plays, and one it cannot play now (audio off, a lane or a target it lacks,
-   * which the router checks itself first), is held as the CC's base.
+   * Play `value`, passing the engine's result through. Only a value the
+   * engine applied is held as the CC's base; a full voice, a lane, a target
+   * it cannot play now and audio off (`null`) hold nothing.
    */
   apply(part: number, target: CcTargetId, value: number): CcApplyResult {
-    if (this.host.setPerformance(part, target, value) === 'no-slot') return 'noSlot';
-    this.held.set(key(part, target), value);
-    return 'applied';
+    const result = this.host.setPerformance(part, target, value);
+    if (result === 'applied') this.held.set(key(part, target), value);
+    if (result === null) return 'off';
+    return result === 'no-slot' ? 'noSlot' : result;
   }
 
   clear(part: number, target: CcTargetId): void {
