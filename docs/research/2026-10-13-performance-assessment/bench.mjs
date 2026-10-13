@@ -25,6 +25,9 @@ const arg = (name, fallback) => {
 };
 const rounds = Number(arg('--rounds', 3));
 const only = arg('--only', null);
+// `--cases a,b`: only these offline and kinds cases, written to a `-calibration` file that
+// report.mjs keeps out of the pooled tables.
+const cases = arg('--cases', null)?.split(',') ?? null;
 const LIVE_WARMUP_S = 4;
 const LIVE_TRACE_S = 12;
 const CATEGORIES = ['webaudio', 'disabled-by-default-v8.gc', 'blink.user_timing'];
@@ -71,6 +74,7 @@ async function offlineRound(browser, base, round, results) {
   const page = await openPage(browser, base);
   await ready(page);
   for (const c of rotate(OFFLINE_CASES, round)) {
+    if (cases && !cases.includes(c.name)) continue;
     const r = await page.evaluate(`bench.offline(${JSON.stringify(c.name)})`);
     results.push({ kind: 'offline', round, load1: loadavg()[0], ...r });
     console.log(round, 'offline', c.name, `${r.msPerAudioSecond.toFixed(1)} ms/s`);
@@ -82,6 +86,7 @@ async function kindsRound(browser, base, round, results) {
   const page = await openPage(browser, base);
   await ready(page);
   for (const k of rotate(['none', ...KINDS], round)) {
+    if (cases && !cases.includes(`kind-${k}`)) continue;
     for (const silent of [false, true]) {
       const r = await page.evaluate(`bench.kind(${JSON.stringify(k)}, ${silent})`);
       results.push({ kind: 'kind', insert: k, silent, round, load1: loadavg()[0], ...r });
@@ -188,6 +193,7 @@ const environment = {
   finished: new Date().toISOString(),
 };
 mkdirSync(new URL('results/', folder), { recursive: true });
-const out = new URL(`results/${started.toISOString().replace(/[:.]/g, '-')}${only ? `-${only}` : ''}.json`, folder);
+const suffix = `${only ? `-${only}` : ''}${cases ? '-calibration' : ''}`;
+const out = new URL(`results/${started.toISOString().replace(/[:.]/g, '-')}${suffix}.json`, folder);
 writeFileSync(out, `${JSON.stringify({ environment, results }, null, 2)}\n`);
 console.log('wrote', out.pathname);

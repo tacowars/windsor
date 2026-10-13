@@ -32,12 +32,27 @@ const caseByName = (name) => {
   return found.document;
 };
 
-/** Render one case offline at 48 kHz and time it. */
+/**
+ * The time `OfflineAudioContext.startRendering()` took on the last call: the render phase
+ * alone, without the two system builds `renderSong` makes first (`captureOpening`, then the
+ * real one). The scheduler's stops and `setTimeout(0)` yields inside the render stay in it.
+ */
+let renderPhaseMs = 0;
+const startRendering = OfflineAudioContext.prototype.startRendering;
+OfflineAudioContext.prototype.startRendering = async function () {
+  const t0 = performance.now();
+  const buffer = await startRendering.call(this);
+  renderPhaseMs = performance.now() - t0;
+  return buffer;
+};
+
+/** Render one case offline at 48 kHz and time it: the whole `renderSong`, and its render phase. */
 async function offline(name, document = caseByName(name)) {
   const doc = made(document);
   const t0 = performance.now();
   const rendered = await renderSong(doc, { sampleRate: RATE, tailSeconds: 1 });
   const ms = performance.now() - t0;
+  const renderMs = renderPhaseMs;
   const frames = rendered.channels[0].length;
   let peak = 0;
   const left = rendered.channels[0];
@@ -47,6 +62,9 @@ async function offline(name, document = caseByName(name)) {
     renderMs: ms,
     audioSeconds: frames / RATE,
     msPerAudioSecond: ms / (frames / RATE),
+    renderPhaseMs: renderMs,
+    renderPhaseMsPerAudioSecond: renderMs / (frames / RATE),
+    setupMs: ms - renderMs,
     peak,
     parts: doc.parts.length,
     sampleRate: RATE,

@@ -3,7 +3,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 
 const folder = new URL('results/', import.meta.url);
-const files = readdirSync(folder).filter((f) => f.endsWith('.json'));
+const all = readdirSync(folder).filter((f) => f.endsWith('.json'));
+// A `-calibration` file is a `--cases` run with the render phase timed apart; it is reported
+// on its own below and never pooled into the tables.
+const files = all.filter((f) => !f.includes('-calibration'));
+const calibrationFiles = all.filter((f) => f.includes('-calibration'));
 const rows = [];
 let environment = null;
 const commits = new Set();
@@ -141,6 +145,18 @@ if (micro.length) {
     const v = micro.map((r) => r[k]);
     const per = k === 'empty' ? 0 : (median(v) - empty) / 16;
     console.log(`| ${k} | ${span(v, 1)} | ${per.toFixed(2)} | ${((per / 1000) * 1e6 / 375).toFixed(2)} |`);
+  }
+  console.log();
+}
+
+if (calibrationFiles.length) {
+  console.log('### Calibration: the whole `renderSong` against its render phase alone (`startRendering`), ms per audio second\n');
+  console.log('| Case | Audio s | Whole, ms/s | Render phase, ms/s | Setup, ms | Setup share of the whole |');
+  console.log('|---|---:|---:|---:|---:|---:|');
+  for (const f of calibrationFiles) {
+    const data = JSON.parse(readFileSync(new URL(f, folder), 'utf8'));
+    for (const r of data.results.filter((r) => r.renderPhaseMs !== undefined))
+      console.log(`| ${r.name} | ${r.audioSeconds.toFixed(1)} | ${r.msPerAudioSecond.toFixed(1)} | ${r.renderPhaseMsPerAudioSecond.toFixed(1)} | ${r.setupMs.toFixed(0)} | ${((r.setupMs / r.renderMs) * 100).toFixed(1)} % |`);
   }
   console.log();
 }
