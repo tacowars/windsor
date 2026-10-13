@@ -1266,7 +1266,10 @@ var TapeDsp = class {
     this.position = (this.position + 1) % this.buffers[0].length;
     this.magnetic.dryAt = this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
   }
-  /** One frame of the controls, the motion, the noise and the core's glide: `step` before its channels, and the sleep's hiss. */
+  /**
+   * One frame of the controls, the motion, the noise and the core's glide: `step` before its
+   * channels, and an asleep frame's hiss and motion (`tapeSleep.ts`).
+   */
   advance() {
     const s = this.controls, t = this.targets, k = this.smooth;
     s.drive += k * (t.drive - s.drive);

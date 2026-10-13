@@ -16,6 +16,9 @@
  * so a restart from rest takes the input in over the fade rather than as a step into cold filters
  * (fully on, the input times 1 is the input to the bit). The dry ring, the motion and the hiss keep
  * running.
+ * On silence the tape sleeps (windsor#793, `tapeSleep.ts`): the processor freezes the EQ, the core,
+ * the DC block and the transport delay, and runs `advance` and the dry ring alone until the input
+ * returns.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import {
@@ -248,7 +251,10 @@ class TapeDsp {
     this.magnetic.dryAt =
       this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
   }
-  /** One frame of the controls, the motion, the noise and the core's glide: `step` before its channels, and the sleep's hiss. */
+  /**
+   * One frame of the controls, the motion, the noise and the core's glide: `step` before its
+   * channels, and an asleep frame's hiss and motion (`tapeSleep.ts`).
+   */
   advance(): void {
     const s = this.controls,
       t = this.targets,
