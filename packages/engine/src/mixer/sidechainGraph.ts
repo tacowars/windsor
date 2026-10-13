@@ -1,10 +1,11 @@
 /** Pure routing rules shared by imports, live edits and the source selector. */
 import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ArrangementDocument } from '../song/arrangementDocument';
+import { isKeyedSpec, withSidechain } from '../inserts/sidechainSource';
 export type InsertTarget = number | 'master';
 export type SidechainGraph = ReadonlyMap<InsertTarget, readonly InsertSpec[]>;
 export const sidechainSlot = (spec: InsertSpec | undefined): number | null =>
-  spec?.kind === 'compressor' && typeof spec.sidechain === 'object' ? spec.sidechain.track : null;
+  isKeyedSpec(spec) && typeof spec.sidechain === 'object' ? spec.sidechain.track : null;
 export function documentSidechains(
   doc: Pick<ArrangementDocument, 'parts' | 'master'>,
 ): SidechainGraph {
@@ -68,11 +69,7 @@ export function disconnectInvalid(
       target,
       next
         .get(target)!
-        .map((spec, at) =>
-          at === index && spec.kind === 'compressor'
-            ? { ...spec, sidechain: { track: null } }
-            : spec,
-        ),
+        .map((spec, at) => (at === index ? withSidechain(spec, { track: null }) : spec)),
     );
   }
   return next;
@@ -87,7 +84,7 @@ export function canSidechain(
   graph.set(
     target,
     (graph.get(target) ?? []).map((spec, at) =>
-      at === index && spec.kind === 'compressor' ? { ...spec, sidechain: { track: source } } : spec,
+      at === index ? withSidechain(spec, { track: source }) : spec,
     ),
   );
   return invalidSidechains(graph).length === 0;

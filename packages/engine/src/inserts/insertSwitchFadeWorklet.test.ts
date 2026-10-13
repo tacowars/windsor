@@ -1,7 +1,7 @@
 /**
  * Every worklet insert's on/off switch is click-free (windsor#630): the
  * shipped bundles of Filter, the compressor, Phaser, Delay, Tape, Advanced
- * Drive, Retro Reverb, EQ and bloom, each switched off and back on under a steady
+ * Drive, Retro Reverb, EQ, bloom and Pump, each switched off and back on under a steady
  * sine, crossfade dry and wet linearly over `INSERT_SWITCH_FADE_S`.
  *
  * - **No click:** no sample-to-sample step across either switch is larger
@@ -33,6 +33,7 @@ import { compressorParams, loadCompressor } from '../__fixtures__/compressorHarn
 import { delayParams, loadDelay } from '../__fixtures__/delayHarness';
 import { eqParams, loadEq } from '../__fixtures__/eqHarness';
 import { filterParams, loadFilter } from '../__fixtures__/filterHarness';
+import { loadPump, pumpParams } from '../__fixtures__/pumpHarness';
 import { loadPhaser, phaserParams } from '../__fixtures__/phaserHarness';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
@@ -154,6 +155,21 @@ const KINDS: Kind[] = [
     },
     latency: 0,
     rings: true,
+  },
+  {
+    // A steady tone never triggers it, so it rests at its last level: 0.5, a gain to fade.
+    name: 'pump',
+    load: () => {
+      const level = 0.5;
+      const points = [
+        { at: 0, level, bend: 0 },
+        { at: 1, level, bend: 0 },
+      ];
+      const params = pumpParams({ points, smoothMs: 0 });
+      return { processor: loadPump(RATE, params), params };
+    },
+    latency: 0,
+    rings: false,
   },
   {
     name: 'bloom',

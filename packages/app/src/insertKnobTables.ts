@@ -61,6 +61,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   eq: 'Parametric EQ',
   filter: 'Filter',
   bloom: 'Bloom',
+  pump: 'Pump',
 };
 
 /**
@@ -75,7 +76,7 @@ export const INSERT_GROUPS: readonly {
   { label: 'EQ', kinds: ['eq'] },
   { label: 'Filter', kinds: ['filter'] },
   { label: 'Drive', kinds: ['drive', 'advanced-drive', 'tape'] },
-  { label: 'Dynamics', kinds: ['compressor'] },
+  { label: 'Dynamics', kinds: ['compressor', 'pump'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
   { label: 'Time', kinds: ['echo', 'delay'] },
   { label: 'Space', kinds: ['reverb', 'retro-reverb'] },

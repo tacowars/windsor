@@ -148,6 +148,19 @@ windsor#729). The worklet takes one 12-bit pitch-class mask, `pitchMask`
 (`inserts/bloomPitches.ts`, windsor#728). The console card is
 `app/src/bloomCard.ts`. Cost: `docs/research/2026-10-11-bloom-insert/README.md`.
 
+Pump (windsor#803, record `2026-10-13-pump-insert`) is the kind `pump` in
+the Dynamics group: a drawn gain shape that the onsets of its key restart,
+for sidechain pumping without the compressor. It is `inserts/pump*`
+(`pumpSpec.ts`, `pumpConstants.ts`, `pumpCurves.ts` (the bend both the
+worklet and the card evaluate), `pumpParameters.ts` (`PumpParamSource`, so
+the worklet never imports the spec) and `pumpInsert.ts`), with DSP under
+`worklet/pump/` (`pumpDetector.ts`, `pumpShape.ts`, `pumpScope.ts`,
+`pumpDsp.ts`) and the card `app/src/pump*` (`pumpCard.ts`, the editor
+`pumpCurve.ts` / `pumpCurveInput.ts` over `pumpCurveModel.ts`, and
+`pumpTables.ts`). It keys as the compressor does, through `isKeyedSpec` and
+`withSidechain` (`inserts/sidechainSource.ts`). Cost:
+`docs/research/2026-10-13-pump-insert/`.
+
 The wet-path slot (epic windsor#686, record `2026-10-11-wet-path-slot`): a
 **host** insert carries one child insert of another kind on its wet path,
 before its Mix. Echo and bloom are hosts. To make a kind a host:

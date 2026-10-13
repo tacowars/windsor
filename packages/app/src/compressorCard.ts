@@ -10,14 +10,14 @@
  * in place of the sidechain selector.
  */
 import { DEFAULT_COMPRESSOR } from '@windsor/engine';
-import { sidechainSelector } from './sidechainSelector';
+import { sidechainCell } from './sidechainSelector';
 import { compressorMeter } from './compressorMeter';
 import { COMPRESSOR_KNOBS, COMPRESSOR_SELECTS } from './compressorTables';
-import { isChildTarget, targetChange } from './insertTarget';
+import { targetChange } from './insertTarget';
 import type { InsertCard } from './insertCards';
 import { setInsertField } from './insertEdits';
 import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
-import { insertColumn, insertNote, insertPage, insertSelect, wideColumn } from './insertLayout';
+import { insertColumn, insertPage, insertSelect, wideColumn } from './insertLayout';
 import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
 
@@ -43,12 +43,7 @@ function steppedPicker(
   });
 }
 
-/** What a slot child's card says in place of its sidechain selector. */
-export const CHILD_SIDECHAIN_NOTE = 'In the slot its sidechain is forced to Internal.';
-
-/** The sidechain selector, or in a slot the note that the source is Internal. */
-const sidechainCell = (ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement =>
-  isChildTarget(slot) ? insertNote(CHILD_SIDECHAIN_NOTE) : sidechainSelector(ctx, slot, index);
+export { CHILD_SIDECHAIN_NOTE } from './sidechainSelector';
 
 export const compressorCard: InsertCard = (ctx, slot, index) => [
   {

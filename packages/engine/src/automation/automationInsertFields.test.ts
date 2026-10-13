@@ -14,8 +14,8 @@ const fields = (spec: InsertSpec): string[] => automatableInsertFields(spec).map
 const defaults = <S extends InsertSpec>(kind: S['kind']): S => INSERT_KINDS[kind].defaults as S;
 
 describe('insertKindFields', () => {
-  it('appends the switch, On on a switch scale, to all fourteen kinds', () => {
-    expect(INSERT_KIND_NAMES).toHaveLength(14);
+  it('appends the switch, On on a switch scale, to all fifteen kinds', () => {
+    expect(INSERT_KIND_NAMES).toHaveLength(15);
     expect(INSERT_SWITCH_ROW).toMatchObject({ target: 'enabled', label: 'On', min: 0, max: 1 });
     expect(INSERT_SWITCH_ROW.scale).toBe('switch');
     for (const kind of INSERT_KIND_NAMES) {

@@ -1,6 +1,7 @@
 /** Mixer-owned detector fanout. Desired lists and actual lists differ during insert fades. */
 import type { PartStrip } from './channelStrip';
 import type { MasterStrip } from './masterStrip';
+import { isKeyedSpec } from '../inserts/sidechainSource';
 import {
   invalidSidechains,
   sidechainSlot,
@@ -43,9 +44,7 @@ export class SidechainRouter {
         if (!stage.detector) return;
         const spec = strip.insertSpecs[index];
         const external =
-          spec?.kind === 'compressor' &&
-          spec.sidechain !== undefined &&
-          spec.sidechain !== 'internal';
+          isKeyedSpec(spec) && spec.sidechain !== undefined && spec.sidechain !== 'internal';
         stage.detector.setExternal(external);
         if (!external || invalid.some((item) => item.target === target && item.index === index))
           return;

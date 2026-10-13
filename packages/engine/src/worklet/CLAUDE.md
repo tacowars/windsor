@@ -208,6 +208,23 @@ test project, as `fm/` is); `inserts/filter*.test.ts` run the bundle through
 `__fixtures__/filterHarness.ts`, and `inserts/filterAllocation.test.ts` pins
 rules 2 and 7 through `__fixtures__/filterChangeScenario.ts`.
 
+`pump/` is the Pump insert (record `2026-10-13-pump-insert`), built as
+`generated/pump-processor.js` with its own `tsconfig.json` (`compressor/`'s
+flags). It plays a drawn gain shape that a key's onsets retrigger, keyed like
+the compressor from its own input or the mixer's detector on input 1.
+`pumpProcessor.ts` owns the params, lifetime and the scope's posts (only while
+a card asks), `pumpDsp.ts` the cycle, gain slew and switch, `pumpDetector.ts`
+the onset detector, `pumpShape.ts` the breakpoints and their rational bend
+(the same expression as `inserts/pumpCurves.ts`, which the card draws with),
+and `pumpScope.ts` the key's level binned across a cycle. It reads only
+`inserts/pumpConstants.ts`, `pumpCurves.ts` and `pumpParameters.ts`, never the
+spec. `inserts/pumpDsp.test.ts` runs the bundle through
+`__fixtures__/pumpHarness.ts`, and `inserts/pumpAllocation.test.ts` pins rules
+2 and 7 through `__fixtures__/pumpChangeScenario.ts`.
+It does not sleep on silence yet. The compressor's pattern would fit (its
+output is the input times a gain), but one instance costs 1.1 % of a 48 kHz
+quantum (`docs/research/2026-10-13-pump-insert/`), so the saving is small.
+
 `bloom/` is bloom, the harmonic pad generator (windsor#712, record
 `2026-10-11-bloom-insert`), built as `generated/bloom-processor.js` with its
 own `tsconfig.json`. `bloomProcessor.ts` owns the descriptors, the block
@@ -479,7 +496,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`, `bloom/`,
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`, `bloom/`, `pump/`,
    `outputStage/`, `tape/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so

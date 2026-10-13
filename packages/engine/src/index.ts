@@ -697,6 +697,20 @@ export { DEFAULT_FILTER } from './inserts/filterSpec';
 export type { FilterSpec } from './inserts/filterSpec';
 export { FILTER_BOUNDS, FILTER_MODES, FILTER_MODE_VOICE_IDS } from './inserts/filterConstants';
 export type { FilterMode } from './inserts/filterConstants';
+// The Pump insert, a drawn gain shape keyed by a sidechain (record `2026-10-13-pump-insert`).
+export { DEFAULT_PUMP } from './inserts/pumpSpec';
+export type { PumpPoint, PumpSpec } from './inserts/pumpSpec';
+export {
+  PUMP_BOUNDS,
+  PUMP_DIVISIONS,
+  PUMP_DSP,
+  PUMP_MAX_POINTS,
+  PUMP_POINT_BOUNDS,
+} from './inserts/pumpConstants';
+export type { PumpDivision } from './inserts/pumpConstants';
+export { bendShape, pumpGain, pumpLengthMs, pumpLevelAt } from './inserts/pumpCurves';
+export type { PumpScope, PumpScopeReading } from './inserts/pumpInsert';
+export { isKeyedSpec, withSidechain } from './inserts/sidechainSource';
 // bloom, the harmonic pad generator (windsor#712).
 export { DEFAULT_BLOOM } from './inserts/bloomSpec';
 export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';

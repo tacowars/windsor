@@ -273,4 +273,5 @@ export const INACTIVE_WHY: InactiveWhy = {
     return driveStageWhy(spec, field);
   },
   eq: eqBandWhy,
+  pump: () => 'the Pump is synced',
 };
