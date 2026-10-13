@@ -101,6 +101,11 @@ var TAPE_DSP = {
   biasDb: 10,
   millisecondsPerSecond: 1e3
 };
+var TAPE_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  hissSnap: 1e-12
+};
 var TAPE_MODELS = [
   {
     magnetic: [0.15938492002896965, 0.2784419672098011, 0.32353375502862036],
@@ -1146,6 +1151,15 @@ var TapeDsp = class {
     this.noiseGain = NaN;
     this.noise = NaN;
     this.mix = NaN;
+    /**
+     * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, whether an
+     * asleep block runs `advance` (the hiss or the motion), the quiet frames counted toward
+     * `sleepSpan`, and that span.
+     */
+    this.asleep = false;
+    this.advancing = false;
+    this.quietFrames = 0;
+    this.sleepSpan = 0;
     this.hissGain = this.noiseLow = this.noiseHigh = this.left = this.right = this.sample = 0;
     this.noiseGain = this.noise = 0;
     this.gain = this.trim = this.mix = 1;
@@ -1179,6 +1193,7 @@ var TapeDsp = class {
         saturation: params.coreSaturation[0]
       } : null
     );
+    this.sleepSpan = this.buffers[0].length + this.magnetic.latency;
     this.smooth = 1 - Math.exp(-1 / (rate * TAPE_DSP.smoothSeconds));
     this.switchStep = 1 / (INSERT_SWITCH_FADE_S * rate);
     this.dcPole = Math.exp(-(2 * Math.PI * TAPE_DSP.dcHz) / rate);
@@ -1243,6 +1258,16 @@ var TapeDsp = class {
   }
   /** One frame, from `input` to `left` and `right`. */
   step() {
+    this.advance();
+    this.channel(0);
+    this.left = this.sample;
+    this.channel(1);
+    this.right = this.sample;
+    this.position = (this.position + 1) % this.buffers[0].length;
+    this.magnetic.dryAt = this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
+  }
+  /** One frame of the controls, the motion, the noise and the core's glide: `step` before its channels, and the sleep's hiss. */
+  advance() {
     const s = this.controls, t = this.targets, k = this.smooth;
     s.drive += k * (t.drive - s.drive);
     s.wear += k * (t.wear - s.wear);
@@ -1268,12 +1293,6 @@ var TapeDsp = class {
     motion.advance();
     this.tickNoise();
     if (this.magnetic.gliding) this.magnetic.glide();
-    this.channel(0);
-    this.left = this.sample;
-    this.channel(1);
-    this.right = this.sample;
-    this.position = (this.position + 1) % this.buffers[0].length;
-    this.magnetic.dryAt = this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
   }
   /** Test-only: route the input straight to Drive, skipping the Bias and model EQ (design decision 3's calibration). */
   bypassEq(bypassed) {
@@ -1347,6 +1366,74 @@ var TapeDsp = class {
   }
 };
 
+// packages/engine/src/worklet/tape/tapeSleep.ts
+function inputQuiet(left, right, frames) {
+  const floor = TAPE_SLEEP.inputFloor;
+  if (left !== void 0) {
+    for (let i = 0; i < frames; i++) if (left[i] > floor || left[i] < -floor) return false;
+  }
+  if (right !== void 0 && right !== left) {
+    for (let i = 0; i < frames; i++) if (right[i] > floor || right[i] < -floor) return false;
+  }
+  return true;
+}
+function settle(dsp, from, frames) {
+  const floor = TAPE_SLEEP.outputFloor, left = dsp.buffers[0], right = dsp.buffers[1], length = left.length;
+  let at = from;
+  for (let i = 0; i < frames; i++) {
+    if (left[at] > floor || left[at] < -floor || right[at] > floor || right[at] < -floor) {
+      dsp.quietFrames = 0;
+      return;
+    }
+    at = at + 1 === length ? 0 : at + 1;
+  }
+  dsp.quietFrames += frames;
+  if (dsp.quietFrames < dsp.sleepSpan) return;
+  dsp.quietFrames = 0;
+  dsp.asleep = true;
+}
+function rest(dsp) {
+  const s = dsp.controls, t = dsp.targets;
+  const off = t.hiss <= TAPE_BOUNDS.hiss[0];
+  if (off && dsp.noiseGain < TAPE_SLEEP.hissSnap) dsp.noiseGain = 0;
+  const still = t.split ? t.wow === 0 && t.flutter === 0 && t.dropouts === 0 : t.wear === 0;
+  dsp.advancing = !(off && dsp.noiseGain === 0 && still);
+  if (dsp.advancing) return;
+  s.drive = t.drive;
+  s.wear = t.wear;
+  s.wow = t.wow;
+  s.flutter = t.flutter;
+  s.dropouts = t.dropouts;
+  s.wowRate = t.wowRate;
+  s.flutterRate = t.flutterRate;
+  s.hiss = t.hiss;
+  s.trim = t.trim;
+  s.mix = t.mix;
+  s.enabled = t.enabled;
+  dsp.updateGains();
+  dsp.mix = s.mix * s.enabled;
+  for (let model = 0; model < TAPE_MODELS.length; model++)
+    dsp.weights[model] = model === dsp.model ? 1 : 0;
+}
+function renderAsleep(dsp, left, right, out, frames) {
+  rest(dsp);
+  const advancing = dsp.advancing, frame = dsp.input, magnetic = dsp.magnetic, ring = magnetic.dry, latency = magnetic.latency, outLeft = out[0], outRight = out[1];
+  for (let i = 0; i < frames; i++) {
+    frame[0] = left === void 0 ? 0 : left[i] ?? 0;
+    frame[1] = right === void 0 ? 0 : right[i] ?? 0;
+    if (advancing) dsp.advance();
+    else if (magnetic.gliding) magnetic.glide();
+    const wet = advancing ? dsp.noise * (1 - dsp.motion.dropout) * dsp.trim : 0, mix = dsp.mix, at = magnetic.dryAt;
+    let dry = ring[at];
+    ring[at] = frame[0];
+    outLeft[i] = mix < Number.EPSILON ? dry : dry + mix * (wet - dry);
+    dry = ring[latency + at];
+    ring[latency + at] = frame[1];
+    if (outRight !== void 0) outRight[i] = mix < Number.EPSILON ? dry : dry + mix * (wet - dry);
+    magnetic.dryAt = at + 1 === latency ? 0 : at + 1;
+  }
+}
+
 // packages/engine/src/worklet/tape/tapeProcessor.ts
 var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -1403,6 +1490,7 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
     }
     this.dsp = new TapeDsp(sampleRate, params);
     this.running = true;
+    this.sleeps = options.processorOptions?.sleep !== false;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
@@ -1419,6 +1507,16 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
     const frames = out[0].length;
     const dsp = this.dsp, frame = dsp.input;
     dsp.configure(params, frames);
+    const quiet = this.sleeps && inputQuiet(left, right, frames);
+    if (dsp.asleep) {
+      if (quiet) {
+        renderAsleep(dsp, left, right, out, frames);
+        this.load.end(frames);
+        return true;
+      }
+      dsp.asleep = false;
+    }
+    const from = dsp.position;
     for (let i = 0; i < frames; i++) {
       frame[0] = left === void 0 ? 0 : left[i] ?? 0;
       frame[1] = right === void 0 ? 0 : right[i] ?? 0;
@@ -1426,6 +1524,8 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
+    if (quiet) settle(dsp, from, frames);
+    else dsp.quietFrames = 0;
     this.load.end(frames);
     return true;
   }

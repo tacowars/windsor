@@ -5,7 +5,9 @@
  * switch the magnetic core between 2x and 4x, change the model, Bias, Drive,
  * the Wear macro and the split dials, the rates, hiss, trim and the seed, and
  * take Mix down to dry and the insert off and on, and set, sweep and clear the
- * song's core controls (windsor#291). Each step also names its
+ * song's core controls (windsor#291). A step may hold a longer silence of its own, long
+ * enough for the tape to fall asleep (windsor#793), and the next step's input wakes it. Each
+ * step also names its
  * input, as the node's input arrives in Chrome: stereo, mono (the right
  * channel follows the left) or none (an inactive source has no channels).
  * The warm-up plays the cycle whole several times, the load meter on for its
@@ -37,6 +39,8 @@ export interface TapeChangeStep {
    * value in `values` to `to`, index for index, linearly over the step's quanta before its silence.
    */
   sweep?: { names: string[]; to: number[] };
+  /** Quanta of silence at this step's end, in place of the config's `quiet` (windsor#793's sleep). */
+  quiet?: number;
 }
 
 export interface TapeChangeConfig {
@@ -81,6 +85,8 @@ export default function tapeChangeScenario(probe: ProbeRig): ProbeScenario {
     Float64Array.from(step.sweep?.names ?? [], (name) => step.values[step.names.indexOf(name)]!),
   );
   const sweepTo = steps.map((step) => Float64Array.from(step.sweep?.to ?? []));
+  // Where each step's silence starts, and where its sweep ends.
+  const quietFrom = Int32Array.from(steps, (step) => period - (step.quiet ?? config.quiet));
   const moving = period - config.quiet;
   // Integer arithmetic only, and no double but a sweep's value, which goes straight to its
   // parameter: the probe measures this code's heap along with the processor's.
@@ -103,8 +109,9 @@ export default function tapeChangeScenario(probe: ProbeRig): ProbeScenario {
   const drive = (from: number, to: number): void => {
     for (let q = from; q < to; q++) {
       apply(q);
-      const quiet = q % period >= period - config.quiet;
-      probe.render(q, quiet ? feeds.quiet : feed[Math.floor(q / period) % steps.length]!);
+      const step = Math.floor(q / period) % steps.length;
+      const quiet = q % period >= quietFrom[step]!;
+      probe.render(q, quiet ? feeds.quiet : feed[step]!);
     }
   };
   const { warmup } = probe.config;

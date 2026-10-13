@@ -24,7 +24,10 @@
  *   a new seed, Mix down to dry and the insert switched off and on, and the
  *   song's core controls (windsor#291) set at the knob box's corners, swept
  *   a quantum at a time across each control's range and all three at once,
- *   and cleared back to the model's row. The
+ *   and cleared back to the model's row, and four steps for the sleep
+ *   (windsor#793): silence long enough to fall asleep, changes while
+ *   asleep, a wake, asleep with the hiss and Wear's motion running, and
+ *   the hiss turned off asleep. The
  *   input arrives stereo, mono or with no channels (an inactive source). It
  *   warms up with the cycle twelve times, the load meter on for the first:
  *   after six, V8 compiled the block's `configure` to its top tier inside
@@ -114,7 +117,7 @@ const sweepTo = (to: number[]): Sweep => ({ names: SWEEP_NAMES, to });
  * song's core (windsor#291): its flag, then drive, width and saturation in the knob box, set at
  * its corners, swept across each control's range alone and all three at once, and cleared.
  */
-const STEPS: [number[], TapeInput, Sweep?][] = [
+const STEPS: [number[], TapeInput, Sweep?, number?][] = [
   [[2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 0.16, 0.28, 0.32], 'stereo'],
   [[4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 1, 1, 0.05, 0], 'stereo'],
   [
@@ -147,6 +150,24 @@ const STEPS: [number[], TapeInput, Sweep?][] = [
     sweepTo([1, 0.85, 1]),
   ],
   [[2, 1, 3.3, 10, 20, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 1, 0.85, 1], 'stereo'],
+  // The sleep (windsor#793): silent long enough to fall asleep with the hiss and motion off, then
+  // asleep through a factor, model, Drive, Mix and trim change; woken by mono input and asleep
+  // again with the hiss and Wear on; the hiss and Wear turned off asleep, landing on the dry ring;
+  // and woken by the cycle's first step.
+  [
+    [2, 0, 12, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 0.16, 0.28, 0.32],
+    'stereo',
+    undefined,
+    140,
+  ],
+  [[4, 4, -10, 30, 0, 0, 0, 0, 0, 1, 7, -70, 3, 0.5, 9, 1, 0, 0.16, 0.28, 0.32], 'none'],
+  [
+    [2, 1, 6, 0, 40, 0, 0, 0, 0, 1, 7, -40, 0, 0.8, 5, 1, 0, 0.16, 0.28, 0.32],
+    'mono',
+    undefined,
+    140,
+  ],
+  [[2, 1, 6, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 0.8, 5, 1, 0, 0.16, 0.28, 0.32], 'none'],
 ];
 const CYCLE = STEPS.length * PERIOD;
 
@@ -186,11 +207,12 @@ function steady(oversampling: number): ProbeRun {
 }
 
 function changes(): ProbeRun {
-  const steps = STEPS.map(([values, input, sweep]): TapeChangeStep => ({
+  const steps = STEPS.map(([values, input, sweep, quiet]): TapeChangeStep => ({
     names: NAMES,
     values,
     input,
     ...(sweep ? { sweep } : {}),
+    ...(quiet === undefined ? {} : { quiet }),
   }));
   return run({ steps, period: PERIOD, quiet: QUIET }, 12 * CYCLE, CYCLE);
 }

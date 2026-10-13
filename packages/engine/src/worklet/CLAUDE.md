@@ -28,6 +28,24 @@ every double field is first written as NaN. The dropout roll is written in
 so a factor switch only resets: paths that rare stay in V8's lower tiers,
 which box. `inserts/tapeAllocation.test.ts` pins it on V8 through
 `__fixtures__/tapeChangeScenario.ts`.
+The tape sleeps on silence (windsor#793, `tape/tapeSleep.ts`, the plate's
+pattern). After an awake block whose input is under `TAPE_SLEEP.inputFloor`
+(1e-9) and whose every DC-block write to the transport delay is under
+`outputFloor` (1e-7), it counts toward `TapeDsp.sleepSpan`, the delay's ring
+plus the core's 48 samples; the DC block's settle is the wait before the count
+starts, about 0.2 s after a tone. Asleep, the EQ, the core, the DC block and
+the ring are frozen where they stood, not cleared, so a woken tape keeps its
+remanence and renders within a float32 ulp of one that never slept. The hiss
+stays audible: while it sounds or the motion moves, an asleep frame runs
+`TapeDsp.advance` (the controls, motion, dropouts, noise and glide, as awake)
+and mixes the noise over the dry ring with the ring's read at 0; with both off
+(a hiss gain under `hissSnap` lands at 0) the controls land on their targets
+and the dry ring runs alone, a wet of exactly 0. The processor reads each
+block's input before rendering it, and any sample over the floor wakes the
+tape on that block, rendered in full. `renderAsleep` is the asleep block,
+dispatched outside the awake loop; `processorOptions.sleep: false` renders
+without the sleep, for tests. `inserts/tapeSleep.test.ts` pins the tail, the
+frozen path, the wake and the hiss against that.
 
 `tape/tapeMagnetic.ts` and `tape/tapeOversample.ts` are the magnetic core
 (windsor#219, epic #146 E1), written from the published Jiles–Atherton model:
