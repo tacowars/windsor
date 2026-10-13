@@ -839,30 +839,53 @@ var AdvancedDriveDsp = class {
   }
   /**
    * On the way to sleep (windsor#793, `driveSleep.ts`): the graph and the
-   * oversamplers empty, as a switch-on from off leaves them, and the controls
-   * at their targets. The next tick sets the graph's controls outright.
+   * oversamplers empty, as a switch-on from off leaves them. The controls,
+   * the fade, the follower and the LFO carry on in `rest`; the next tick sets
+   * the graph's controls outright.
    */
   sleep() {
     this.clear();
-    this.rest(0);
     this.counter = 0;
   }
   /**
-   * One asleep block of `frames`: every control lands on its target at once
-   * (the empty graph cannot zipper, and a fade through dry has nothing to
-   * fade), the follower releases towards the silence and the LFO's phase
-   * moves on, so a wake finds both where an awake drive would have them.
+   * One asleep block of `frames`: `update`'s control path a sample at a time,
+   * with no audio. The controls smooth, the switch and the fade through dry
+   * move and land, the follower releases towards the silence and the LFO's
+   * phase integrates the smoothed frequency, each in `update`'s arithmetic, so
+   * a wake finds them on the bits an awake drive fed silence would have
+   * (Codex on PR #797). The graph is empty and stays so; the release's
+   * coefficient is worked out again only when its control moves.
    */
   rest(frames) {
-    const s = this.controls;
-    s.set(this.targets);
-    this.activeCount = 0;
-    this.pending = false;
-    this.transition = 1;
-    this.follower *= Math.exp(-frames / (this.rate * s[DRIVE_SLOT.release] / DRIVE_DSP.ms));
-    const hz = s[DRIVE_SLOT.sync] >= 1 / 2 ? s[DRIVE_SLOT.bpm] / (DRIVE_DSP.secondsPerMinute * s[DRIVE_SLOT.beats]) : s[DRIVE_SLOT.rate];
-    this.phase += hz * frames / this.rate;
-    this.phase -= Math.floor(this.phase);
+    const s = this.controls, t = this.targets, keys = this.activeKeys;
+    let release = NaN, keep = 0;
+    for (let n = 0; n < frames; n++) {
+      for (let i = 0; i < this.activeCount; i++) {
+        const k = keys[i];
+        s[k] += this.smooth * (t[k] - s[k]);
+        if (Math.abs(s[k] - t[k]) < DRIVE_DSP.silence) s[k] = t[k];
+      }
+      const enabled = s[DRIVE_SLOT.enabled];
+      if (enabled !== t[DRIVE_SLOT.enabled])
+        s[DRIVE_SLOT.enabled] = t[DRIVE_SLOT.enabled] > enabled ? Math.min(t[DRIVE_SLOT.enabled], enabled + this.switchStep) : Math.max(t[DRIVE_SLOT.enabled], enabled - this.switchStep);
+      this.transition = Math.max(
+        0,
+        Math.min(1, this.transition + (this.pending ? -this.step : this.step))
+      );
+      if (this.pending && this.transition === 0) {
+        for (let i = 0; i < DISCRETE.length; i++) s[DISCRETE[i]] = t[DISCRETE[i]];
+        this.pending = false;
+        this.counter = 0;
+      }
+      if (s[DRIVE_SLOT.release] !== release) {
+        release = s[DRIVE_SLOT.release];
+        keep = 1 - Math.exp(-1 / (this.rate * (release / DRIVE_DSP.ms)));
+      }
+      this.follower += keep * (0 - this.follower);
+      const hz = s[DRIVE_SLOT.sync] >= 1 / 2 ? s[DRIVE_SLOT.bpm] / (DRIVE_DSP.secondsPerMinute * s[DRIVE_SLOT.beats]) : s[DRIVE_SLOT.rate];
+      this.phase += hz / this.rate;
+      this.phase -= Math.floor(this.phase);
+    }
   }
   /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
   update() {
@@ -1036,7 +1059,7 @@ var DriveSleep = class {
     this.asleep = true;
   }
   /**
-   * One asleep block: the dry path, and the DSP's block-rate rest. False when
+   * One asleep block: the dry path, and the DSP's control-only rest. False when
    * the input has crossed the floor: the drive wakes, and the caller renders
    * the block in full.
    */
