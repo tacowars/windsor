@@ -7,6 +7,7 @@ import type { AutomationHandle } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { StripStage } from '../mixer/channelStrip';
 import type { Harmony } from '../harmony/harmonyTimeline';
+import type { PumpScope } from './pumpInsert';
 
 /**
  * A host's wet path (record `2026-10-11-wet-path-slot`): where its slot's
@@ -44,6 +45,11 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
     read(into: Float32Array<ArrayBuffer>): void;
     setActive(active: boolean): void;
   };
+  /**
+   * The Pump's scope (record `2026-10-13-pump-insert` decision 5): the key's
+   * level across the last cycle and the playhead, posted only while active.
+   */
+  readonly pumpScope?: PumpScope;
   /** Mixer-owned external detector routing, separate from program audio. */
   readonly detector?: { readonly input: AudioNode; setExternal(external: boolean): void };
   /**

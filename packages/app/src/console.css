@@ -10118,3 +10118,27 @@ input.field.cc-val-input {
   font: 9px var(--f-num);
   white-space: nowrap;
 }
+/* The Pump (record 2026-10-13-pump-insert): the shape editor on the left at
+   the EQ's plot size, the key's level drawn behind the shape; the frame
+   draws the border, so a press lands on the canvas's own px. */
+.insert-page.pump-page {
+  padding-left: 6px;
+}
+.pump-plot-wrap {
+  position: relative;
+  flex: none;
+  align-self: center;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.pump-plot {
+  display: block;
+  width: 384px;
+  height: 160px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.insert-row .pump-plot:focus-visible {
+  outline-offset: 0;
+}

@@ -18,7 +18,8 @@ import { graphParams } from './insertParamRig';
  */
 export function openSpec(kind: InsertKindName): InsertSpec {
   const spec = { ...INSERT_KINDS[kind].defaults, enabled: true } as InsertSpec;
-  return spec.kind === 'delay' ? { ...spec, leftSync: false, rightSync: false } : spec;
+  if (spec.kind === 'delay') return { ...spec, leftSync: false, rightSync: false };
+  return spec.kind === 'pump' ? { ...spec, sync: false } : spec;
 }
 
 /** `spec` with the catalog field `field` (`bands.3.freq` included) at `value`. */

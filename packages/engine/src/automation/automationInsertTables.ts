@@ -47,6 +47,8 @@ import { ECHO_BOUNDS } from '../inserts/echoConstants';
 import { ENSEMBLE_BOUNDS } from '../inserts/ensembleConstants';
 import { EQ_BAND_COUNT, EQ_BOUNDS, EQ_FIRST_ORDER_SLOPE } from '../inserts/eqConstants';
 import { FILTER_BOUNDS } from '../inserts/filterConstants';
+import { PUMP_BOUNDS } from '../inserts/pumpConstants';
+import type { PumpSpec } from '../inserts/pumpSpec';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -359,6 +361,20 @@ const FILTER_ROWS = [
   row('mix', 'Mix', FILTER_BOUNDS.mix),
 ];
 
+const PU = PUMP_BOUNDS;
+/**
+ * The Pump's continuous controls (record `2026-10-13-pump-insert`); its
+ * length in ms only while it is not synced. The drawn shape, the division
+ * and the source are not targets.
+ */
+const PUMP_ROWS: InsertFieldRow<PumpSpec>[] = [
+  row('depth', 'Depth', PU.depth),
+  when(row('lengthMs', 'Length', PU.lengthMs, 'log', 'ms'), (spec: PumpSpec) => !spec.sync),
+  row('sensitivity', 'Sensitivity', PU.sensitivity),
+  row('holdMs', 'Hold', PU.holdMs, 'log', 'ms'),
+  row('smoothMs', 'Smooth', PU.smoothMs, 'linear', 'ms'),
+];
+
 const B = BLOOM_BOUNDS;
 /**
  * bloom's continuous levers and Freeze, a switch lane held between points
@@ -414,6 +430,7 @@ const KIND_ROWS: KindRows = {
   eq: EQ_ROWS,
   filter: FILTER_ROWS,
   bloom: BLOOM_ROWS,
+  pump: PUMP_ROWS,
 };
 
 /** The prefix a host's slot rows carry (record `2026-10-11-wet-path-slot`). */

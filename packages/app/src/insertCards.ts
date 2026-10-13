@@ -27,6 +27,7 @@ import { echoCard } from './echoCard';
 import { eqCard } from './eqCard';
 import { filterCard } from './filterCard';
 import { bloomCard } from './bloomCard';
+import { pumpCard } from './pumpCard';
 
 /**
  * One page of an insert: its tab's name, and the body built when it is
@@ -57,4 +58,5 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   eq: eqCard,
   filter: filterCard,
   bloom: bloomCard,
+  pump: pumpCard,
 };

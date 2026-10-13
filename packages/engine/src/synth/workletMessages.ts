@@ -291,3 +291,6 @@ export const BLOOM_WORKLET_URL = new URL(
   '../worklet/generated/bloom-processor.js',
   import.meta.url,
 );
+
+/** The Pump insert, a drawn gain shape keyed by a sidechain (record `2026-10-13-pump-insert`). */
+export const PUMP_WORKLET_URL = new URL('../worklet/generated/pump-processor.js', import.meta.url);

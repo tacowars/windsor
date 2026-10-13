@@ -74,6 +74,7 @@ export const WORKLETS = [
     output: 'generated/filter-processor.js',
   },
   { name: 'bloom', entry: 'bloom/bloomProcessor.ts', output: 'generated/bloom-processor.js' },
+  { name: 'pump', entry: 'pump/pumpProcessor.ts', output: 'generated/pump-processor.js' },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */

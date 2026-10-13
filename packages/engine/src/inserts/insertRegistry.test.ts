@@ -51,6 +51,7 @@ describe('INSERT_KINDS', () => {
       'eq',
       'filter',
       'bloom',
+      'pump',
     ]);
     for (const name of INSERT_KIND_NAMES) {
       const kind = INSERT_KINDS[name];

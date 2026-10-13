@@ -34,6 +34,9 @@ import type { EqSpec } from './eqSpec';
 import { FILTER_INSERT } from './filterInsert';
 import type { FilterSpec } from './filterSpec';
 import { BLOOM_INSERT } from './bloomInsert';
+import { PUMP_INSERT } from './pumpInsert';
+import type { PumpSpec } from './pumpSpec';
+import { isKeyedSpec } from './sidechainSource';
 import type { BloomSpec } from './bloomSpec';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { IdClaim } from './insertIds';
@@ -64,6 +67,7 @@ export type InsertSpec = (
   | EqSpec
   | FilterSpec
   | BloomSpec
+  | PumpSpec
 ) &
   InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
@@ -86,6 +90,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   eq: EQ_INSERT,
   filter: FILTER_INSERT,
   bloom: BLOOM_INSERT,
+  pump: PUMP_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];
@@ -220,9 +225,9 @@ function withoutNestedSlot(
   return { ...raw, [SLOT_FIELD]: null };
 }
 
-/** The v1 slot limits (epic decision 8): a child compressor listens to its own input. */
+/** The v1 slot limits (epic decision 8): a child that keys from a sidechain listens to its own input. */
 function slotLimits(spec: InsertSpec, path: string, n: FieldNormaliser): InsertSpec {
-  if (spec.kind !== 'compressor' || (spec.sidechain ?? 'internal') === 'internal') return spec;
+  if (!isKeyedSpec(spec) || (spec.sidechain ?? 'internal') === 'internal') return spec;
   n.correction(`${path}.sidechain: ${show(spec.sidechain)} in a slot — set to "internal"`);
   return { ...spec, sidechain: 'internal' };
 }

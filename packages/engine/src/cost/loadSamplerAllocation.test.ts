@@ -78,6 +78,7 @@ const BUNDLES = [
   'filter-processor.js',
   'output-stage-processor.js',
   'phaser-processor.js',
+  'pump-processor.js',
   'retro-reverb-processor.js',
   'reverb-processor.js',
   'tape-processor.js',
@@ -96,6 +97,7 @@ const CLEAN = new Set([
   'tape-processor.js', // windsor#265
   'filter-processor.js', // windsor#622, clean from the start
   'bloom-processor.js', // windsor#712, clean from the start
+  'pump-processor.js', // record 2026-10-13-pump-insert, clean from the start
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {

@@ -14,6 +14,7 @@ import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { withInsertIds } from '../inserts/insertIds';
 import { normaliseInserts } from '../inserts/insertRegistry';
+import { isKeyedSpec } from '../inserts/sidechainSource';
 import { DEFAULT_STRIP, RETURNS, isGroupOutput, isReturnName } from '../mixer/mix';
 
 /**
@@ -151,7 +152,7 @@ export function normaliseBusInserts(
     return withInsertIds(base);
   }
   return normaliseInserts(raw, path, n).map((spec, i) => {
-    if (spec.kind !== 'compressor' || spec.sidechain === undefined) return spec;
+    if (!isKeyedSpec(spec) || spec.sidechain === undefined) return spec;
     if (spec.sidechain === 'internal') return spec;
     n.correction(`${path}[${i}].sidechain: ${bus} keys from its own input — internal`);
     return { ...spec, sidechain: 'internal' };

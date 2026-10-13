@@ -1,16 +1,19 @@
 /** Track names are labels only: the song stores stable slots. */
-import { canSidechain } from '@windsor/engine';
+import { canSidechain, isKeyedSpec, withSidechain } from '@windsor/engine';
 import type { SidechainSource } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { insertNote } from './insertLayout';
 import {
   insertsOf,
   isBusTarget,
+  isChildTarget,
   isGroupTarget,
   targetChange,
   type ChainTarget,
+  type InsertTarget,
 } from './insertTarget';
-/** A chain's compressor's source; a slot child's is always Internal and has none (windsor#692). */
+/** A keyed insert's source (the compressor's, the Pump's); a slot child's is always Internal and has none (windsor#692). */
 export function sidechainSelector(ctx: AppCtx, target: ChainTarget, index: number): HTMLElement {
   const wrap = el('label', 'field-wrap', 'Sidechain (post-FX)');
   const select = document.createElement('select');
@@ -18,7 +21,7 @@ export function sidechainSelector(ctx: AppCtx, target: ChainTarget, index: numbe
   select.setAttribute('aria-label', `Sidechain ${target} insert ${index + 1}`);
   select.add(new Option('Internal', 'internal'));
   const spec = insertsOf(ctx, target)[index];
-  const source = spec?.kind === 'compressor' ? spec.sidechain : undefined;
+  const source = isKeyedSpec(spec) ? spec.sidechain : undefined;
   const selected =
     typeof source === 'object'
       ? source.track === null
@@ -43,7 +46,7 @@ export function sidechainSelector(ctx: AppCtx, target: ChainTarget, index: numbe
         ? 'internal'
         : { track: select.value === 'disconnected' ? null : Number(select.value) };
     const inserts = insertsOf(ctx, target).map((entry, at) =>
-      at === index && entry.kind === 'compressor' ? { ...entry, sidechain } : entry,
+      at === index ? withSidechain(entry, sidechain) : entry,
     );
     if (ctx.change(targetChange(ctx, target, inserts)).ok) ctx.render();
     else select.value = selected;
@@ -51,3 +54,15 @@ export function sidechainSelector(ctx: AppCtx, target: ChainTarget, index: numbe
   wrap.appendChild(select);
   return wrap;
 }
+
+/** What a slot child's card says in place of its sidechain selector. */
+export const CHILD_SIDECHAIN_NOTE = 'In the slot its sidechain is forced to Internal.';
+
+/**
+ * The sidechain selector, or in a host's slot the note that the source is
+ * Internal (record `2026-10-11-wet-path-slot` decision 8).
+ */
+export const sidechainCell = (ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement =>
+  isChildTarget(slot)
+    ? insertNote(CHILD_SIDECHAIN_NOTE)
+    : sidechainSelector(ctx, slot as ChainTarget, index);
