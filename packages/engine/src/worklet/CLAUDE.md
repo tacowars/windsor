@@ -68,8 +68,9 @@ It sleeps on silence (windsor#793, the plate's pattern): `driveSleep.ts`
 counts each awake block quiet when the input is within its floor,
 `DRIVE_SLEEP.inputFloor` (1e-9) divided by the worst-case linear gain of the
 current settings (`gauge`, once a block, recomputed only when the targets
-change; a crushing stage leaves only exact zeros quiet), and the output, as heard and at the graph's
-last wet and dry samples before Mix and the switch, is within `outputFloor`
+change; a crushing stage leaves only exact zeros quiet), and the output, as
+heard and at the graph's last wet and dry samples before Mix and the switch,
+is within `outputFloor`
 (1e-7), and after `holdSeconds` (50 ms) of quiet the DSP empties its graph
 and oversamplers and sleeps. The tail is the output's own: a resonant stage
 modulated down rings for seconds, so no fixed span bounds it. Asleep, `rest`
