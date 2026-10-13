@@ -7,7 +7,6 @@ import {
   cpuMeterView,
   formatLoad,
   meterSampleAt,
-  overrunCount,
   stepOverrun,
 } from './cpuMeterModel';
 
@@ -93,7 +92,7 @@ describe('meterSampleAt', () => {
 function run(readings: Array<[number, number]>): Array<ReturnType<typeof stepOverrun>> {
   let state: OverrunState = INITIAL_OVERRUN_STATE;
   return readings.map(([count, ms]) => {
-    const step = stepOverrun(state, count, ms);
+    const step = stepOverrun(state, { underruns: count, deviceUnderruns: null }, ms);
     state = step.state;
     return step;
   });
@@ -146,21 +145,22 @@ describe('stepOverrun', () => {
   });
 });
 
-describe('overrunCount', () => {
-  it('fires the overrun step once on a rise in the device count', () => {
-    const first = stepOverrun(
-      INITIAL_OVERRUN_STATE,
-      overrunCount(reading({ deviceUnderruns: 2 })),
-      0,
-    );
-    const rise = stepOverrun(first.state, overrunCount(reading({ deviceUnderruns: 3 })), 100);
-    const steady = stepOverrun(rise.state, overrunCount(reading({ deviceUnderruns: 3 })), 200);
+describe('stepOverrun with the device count', () => {
+  it('fires once on a rise in the device count', () => {
+    const first = stepOverrun(INITIAL_OVERRUN_STATE, reading({ deviceUnderruns: 2 }), 0);
+    const rise = stepOverrun(first.state, reading({ deviceUnderruns: 3 }), 100);
+    const steady = stepOverrun(rise.state, reading({ deviceUnderruns: 3 }), 200);
     expect([first.toast, rise.toast, steady.toast]).toEqual([false, true, false]);
     expect(rise.added).toBe(1);
   });
 
-  it('counts the sampler alone where the device has no figure', () => {
-    expect(overrunCount(reading({ underruns: 5 }))).toBe(5);
-    expect(overrunCount(reading({ underruns: 5, deviceUnderruns: 2 }))).toBe(7);
+  it('still toasts a device rise when a rebuilt system restarts the sampler', () => {
+    const first = stepOverrun(
+      INITIAL_OVERRUN_STATE,
+      reading({ underruns: 10, deviceUnderruns: 100 }),
+      0,
+    );
+    const rebuild = stepOverrun(first.state, reading({ underruns: 0, deviceUnderruns: 105 }), 250);
+    expect(rebuild).toMatchObject({ toast: true, flashing: true, added: 5 });
   });
 });

@@ -95,15 +95,6 @@ export function cpuMeterView(load: CpuLoad, fullPct = CPU_METER_FULL_PCT): CpuMe
 }
 
 /**
- * Every deadline miss the meter knows of: the sampler's and the device's.
- * Both are cumulative and monotone, so their sum is too, and one rise in
- * either fires `stepOverrun` once.
- */
-export function overrunCount(load: CpuLoad): number {
-  return load.underruns + (load.deviceUnderruns ?? 0);
-}
-
-/**
  * The sample the meter is on at `nowMs`: it changes once per interval, so a
  * `watchPlayhead` over it marks at about 4 Hz and does nothing in between.
  */
@@ -111,10 +102,15 @@ export function meterSampleAt(nowMs: number, intervalMs = CPU_METER_INTERVAL_MS)
   return Math.floor(nowMs / intervalMs);
 }
 
+/** The two cumulative deadline-miss counts a reading carries. */
+export type OverrunCounts = Pick<CpuLoad, 'underruns' | 'deviceUnderruns'>;
+
 /** The overrun alert's memory between readings. */
 export interface OverrunState {
-  /** The count last seen; null before the first reading. */
+  /** The sampler's count last seen; null before the first reading. */
   underruns: number | null;
+  /** The device's count last seen; null before its first known reading. */
+  deviceUnderruns: number | null;
   /** When the last toast went up; null before the first. */
   lastToastMs: number | null;
   /** The meter shows red until this time. */
@@ -123,6 +119,7 @@ export interface OverrunState {
 
 export const INITIAL_OVERRUN_STATE: OverrunState = {
   underruns: null,
+  deviceUnderruns: null,
   lastToastMs: null,
   flashUntilMs: -Infinity,
 };
@@ -143,24 +140,35 @@ export interface OverrunStep {
   flashing: boolean;
   /** Put up a toast now. */
   toast: boolean;
-  /** How many underruns arrived since the last reading. */
+  /** How many underruns arrived since the last reading, both counts together. */
   added: number;
 }
 
 /**
- * One reading of the cumulative underrun count. A rise flashes the meter for
- * `flashMs` and toasts unless one went up within `toastGapMs`; a steady count
- * does neither. The first reading only sets the baseline, and a count that
- * falls (a rebuilt system starts a new meter at 0) re-baselines silently.
+ * How far one cumulative count rose since its baseline. The first known
+ * reading only sets the baseline, and a count that falls adds nothing, so
+ * each count re-baselines on its own.
+ */
+function rise(previous: number | null, count: number | null): number {
+  if (previous === null || count === null) return 0;
+  return Math.max(0, count - previous);
+}
+
+/**
+ * One reading of the sampler's and the device's cumulative underrun counts.
+ * They are tracked apart: a rebuilt system restarts the sampler's count at 0
+ * on the same context, while the device's keeps counting. A rise in either
+ * flashes the meter for `flashMs` and toasts unless one went up within
+ * `toastGapMs`, once per reading; a steady or falling count does neither.
  */
 export function stepOverrun(
   state: OverrunState,
-  underruns: number,
+  counts: OverrunCounts,
   nowMs: number,
   rules: OverrunRules = OVERRUN_RULES,
 ): OverrunStep {
-  const previous = state.underruns;
-  const added = previous === null ? 0 : Math.max(0, underruns - previous);
+  const added =
+    rise(state.underruns, counts.underruns) + rise(state.deviceUnderruns, counts.deviceUnderruns);
   let { lastToastMs, flashUntilMs } = state;
   let toast = false;
   if (added > 0) {
@@ -169,7 +177,12 @@ export function stepOverrun(
     if (toast) lastToastMs = nowMs;
   }
   return {
-    state: { underruns, lastToastMs, flashUntilMs },
+    state: {
+      underruns: counts.underruns,
+      deviceUnderruns: counts.deviceUnderruns ?? state.deviceUnderruns,
+      lastToastMs,
+      flashUntilMs,
+    },
     flashing: nowMs < flashUntilMs,
     toast,
     added,

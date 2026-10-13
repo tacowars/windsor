@@ -11,13 +11,7 @@
  * off the loop idles.
  */
 import type { AppCtx } from './context';
-import {
-  cpuMeterView,
-  INITIAL_OVERRUN_STATE,
-  meterSampleAt,
-  overrunCount,
-  stepOverrun,
-} from './cpuMeterModel';
+import { cpuMeterView, INITIAL_OVERRUN_STATE, meterSampleAt, stepOverrun } from './cpuMeterModel';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';
 
@@ -43,7 +37,7 @@ export function mountCpuMeter(button: HTMLElement, ctx: AppCtx): void {
     const { load } = system.readout();
     const now = performance.now();
     const view = cpuMeterView(load);
-    const step = stepOverrun(overrun, overrunCount(load), now);
+    const step = stepOverrun(overrun, load, now);
     overrun = step.state;
     button.style.setProperty('--cpu-fill', String(view.fill));
     button.style.setProperty('--cpu-peak', String(view.peak));
