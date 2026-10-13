@@ -21,12 +21,18 @@ export interface PhaserProcessorLike {
     params: Record<string, Float32Array>,
   ): boolean;
 }
-export function loadPhaser(rate = 48000, params = phaserParams()): PhaserProcessorLike {
+/** `sleep: false` renders without the sleep (windsor#793), for a test to compare against. */
+export function loadPhaser(
+  rate = 48000,
+  params = phaserParams(),
+  options: { sleep?: boolean } = {},
+): PhaserProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => PhaserProcessorLike>({
     file: 'phaser-processor.js',
     sampleRate: rate,
   });
   return new Processor({
     parameterData: firstValues(params),
+    processorOptions: options,
   });
 }

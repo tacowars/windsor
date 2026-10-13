@@ -39,6 +39,11 @@ var PHASER_DSP = {
   degreesPerTurn: 360,
   millisecondsPerSecond: 1e3
 };
+var PHASER_SLEEP = {
+  inputFloor: 1e-9,
+  stateFloor: 1e-7,
+  tailSeconds: 2
+};
 
 // packages/engine/src/worklet/loadSampler.ts
 var LOAD_MS_PER_SECOND = 1e3;
@@ -134,7 +139,7 @@ var SLOT = {
 var LEFT = 0;
 var RIGHT = 1;
 var PhaserDsp = class {
-  constructor(rate, params) {
+  constructor(rate, params, sleep = true) {
     this.rate = this.smooth = this.attack = this.release = this.bassPole = this.switchStep = NaN;
     this.phase = this.follower = this.feedbackPole = this.mix = NaN;
     this.rate = rate;
@@ -158,13 +163,46 @@ var PhaserDsp = class {
     this.targets.set(this.controls);
     this.phase = this.follower = 0;
     this.feedbackPole = this.mix = 0;
+    this.sleepEnabled = sleep;
+    this.asleep = false;
   }
-  configure(params, _frames) {
+  /**
+   * The block's targets, then the sleep (windsor#793), written out here and
+   * not called: `configure` runs every block, so V8 optimises it, where a
+   * method that only a silence calls stays in a tier that boxes its doubles.
+   * `quiet` is every input sample of the block within the floor. A quiet block
+   * puts the phaser to sleep once every audio state has rung out; an asleep
+   * one lands the controls on their targets and moves the sweep and the
+   * follower on a block; a loud one wakes it to render in full.
+   */
+  configure(params, frames, quiet) {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
     if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
+    if (!quiet) {
+      this.asleep = false;
+      return;
+    }
+    if (!this.asleep) {
+      const floor = PHASER_SLEEP.stateFloor;
+      let rung = true;
+      for (let i = 0; i < this.state.length; i++)
+        if (Math.abs(this.state[i]) >= floor) rung = false;
+      for (let c = 0; c < 2; c++) {
+        if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
+        if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
+      }
+      if (!rung) return;
+      this.clear();
+      this.asleep = true;
+    }
+    const s = this.controls;
+    for (let slot = 0; slot < s.length; slot++) s[slot] = t[slot];
+    this.follower *= Math.pow(1 - this.release, frames);
+    this.phase += s[SLOT.rate] * frames / this.rate;
+    this.phase -= Math.floor(this.phase);
   }
-  /** Back on from fully off: the all-passes and the feedback start from rest. */
+  /** Back on from fully off, or asleep: the all-passes and the feedback start from rest. */
   clear() {
     this.state.fill(0);
     this.bass.fill(0);
@@ -250,7 +288,7 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
         Number(options.parameterData?.[name] ?? descriptor.defaultValue)
       ]);
     }
-    this.dsp = new PhaserDsp(sampleRate, params);
+    this.dsp = new PhaserDsp(sampleRate, params, options.processorOptions?.sleep !== false);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
@@ -266,10 +304,21 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
+    const dsp = this.dsp;
+    dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
+    if (dsp.asleep) this.rest(out);
+    else this.render(left, right, out, frames);
+    this.load.end(frames);
+    return true;
+  }
+  /**
+   * One awake block, in a method of its own as the plate's `_renderBlock` is (windsor#793): V8
+   * optimises it on sound alone, never inside a `process` that has so far only slept.
+   */
+  render(left, right, out, frames) {
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const dsp = this.dsp;
     const input = dsp.input, output = dsp.output;
-    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
       input[0] = i < leftFrames ? left[i] : 0;
       input[1] = i < rightFrames ? right[i] : 0;
@@ -277,8 +326,22 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
       out[0][i] = output[0];
       if (out[1]) out[1][i] = output[1];
     }
-    this.load.end(frames);
+  }
+  /** Every sample of the block within the sleep floor; an absent channel is silent. */
+  silent(left, right) {
+    const floor = PHASER_SLEEP.inputFloor;
+    if (left) {
+      for (let i = 0; i < left.length; i++) if (Math.abs(left[i]) > floor) return false;
+    }
+    if (right && right !== left) {
+      for (let i = 0; i < right.length; i++) if (Math.abs(right[i]) > floor) return false;
+    }
     return true;
+  }
+  /** One asleep block: zeros, the input's silence to within its floor. */
+  rest(out) {
+    out[0].fill(0);
+    if (out[1]) out[1].fill(0);
   }
 };
 registerProcessor(PHASER_NAME, PhaserProcessor);

@@ -17,9 +17,18 @@
  * nothing heard before the switch-on, before the switch-off or while off, comes
  * out after it. The envelope follower and the sweep's phase keep running; they
  * carry no audio.
+ *
+ * Sleep (windsor#793, `PHASER_SLEEP`): on a block whose input is silent,
+ * `configure` reads the all-pass, bass and feedback state, and once all of it
+ * is under the floor it zeroes it and sleeps; the processor then writes the
+ * block's zeros and runs no `tick`. Asleep, the controls land on their targets
+ * and the sweep's phase and the follower's release move on a block at a time,
+ * so the sweep keeps its time across a gap. The first block whose input
+ * crosses the floor wakes it and renders in full. `phaserSleep.test.ts` holds
+ * the tail, the sleep and the wake.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
-import { PHASER_DEFAULTS, PHASER_DSP as C } from '../../inserts/phaserConstants';
+import { PHASER_DEFAULTS, PHASER_DSP as C, PHASER_SLEEP as Z } from '../../inserts/phaserConstants';
 
 type PhaserParams = Record<string, Float32Array>;
 /** Every control's name, in slot order. */
@@ -64,8 +73,12 @@ class PhaserDsp {
   follower: number;
   feedbackPole: number;
   mix: number;
+  /** Whether it may sleep: `sleep: false` is a test's, to render the phaser without it. */
+  readonly sleepEnabled: boolean;
+  /** The state has rung out with the input silent: the block is zeros, and no `tick` runs. */
+  asleep: boolean;
 
-  constructor(rate: number, params: PhaserParams) {
+  constructor(rate: number, params: PhaserParams, sleep = true) {
     // Every double field is first written as a double (rule 7).
     this.rate = this.smooth = this.attack = this.release = this.bassPole = this.switchStep = NaN;
     this.phase = this.follower = this.feedbackPole = this.mix = NaN;
@@ -90,15 +103,48 @@ class PhaserDsp {
     this.targets.set(this.controls);
     this.phase = this.follower = 0;
     this.feedbackPole = this.mix = 0;
+    this.sleepEnabled = sleep;
+    this.asleep = false;
   }
 
-  configure(params: PhaserParams, _frames: number): void {
+  /**
+   * The block's targets, then the sleep (windsor#793), written out here and
+   * not called: `configure` runs every block, so V8 optimises it, where a
+   * method that only a silence calls stays in a tier that boxes its doubles.
+   * `quiet` is every input sample of the block within the floor. A quiet block
+   * puts the phaser to sleep once every audio state has rung out; an asleep
+   * one lands the controls on their targets and moves the sweep and the
+   * follower on a block; a loud one wakes it to render in full.
+   */
+  configure(params: PhaserParams, frames: number, quiet: boolean): void {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
     if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
+    if (!quiet) {
+      this.asleep = false;
+      return;
+    }
+    if (!this.asleep) {
+      const floor = Z.stateFloor;
+      let rung = true;
+      for (let i = 0; i < this.state.length; i++)
+        if (Math.abs(this.state[i]) >= floor) rung = false;
+      for (let c = 0; c < 2; c++) {
+        if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
+        if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
+      }
+      if (!rung) return;
+      this.clear();
+      this.asleep = true;
+    }
+    const s = this.controls;
+    for (let slot = 0; slot < s.length; slot++) s[slot] = t[slot];
+    this.follower *= Math.pow(1 - this.release, frames);
+    this.phase += (s[SLOT.rate] * frames) / this.rate;
+    this.phase -= Math.floor(this.phase);
   }
 
-  /** Back on from fully off: the all-passes and the feedback start from rest. */
+  /** Back on from fully off, or asleep: the all-passes and the feedback start from rest. */
   clear(): void {
     this.state.fill(0);
     this.bass.fill(0);

@@ -5,8 +5,10 @@
  * dry, and the insert switched off and on) applied at its first quantum and
  * then held while the controls glide and settle, with a short silence at its
  * end. Each step also names its input, as the node's input arrives in
- * Chrome: stereo, mono (the right channel follows the left) or none (an
- * inactive source has no channels). The warm-up plays the cycle whole
+ * Chrome: stereo, mono (the right channel follows the left), none (an
+ * inactive source has no channels) or silent throughout, which puts the
+ * phaser to sleep until the next step wakes it (windsor#793); the measured
+ * run throws unless it took both. The warm-up plays the cycle whole
  * several times, the load meter on for its first cycle, and the measured run
  * plays it once more, so it measures code already hot. The probe imports this
  * by path in its child Node, which runs it directly (its types are stripped),
@@ -24,7 +26,7 @@ import type { ProbeRig, ProbeScenario } from './workletAllocationProbe';
 const WARM_READS = 64;
 
 /** What a step feeds the node's one input. */
-export type PhaserInput = 'stereo' | 'mono' | 'none';
+export type PhaserInput = 'stereo' | 'mono' | 'none' | 'silent';
 
 export interface PhaserChangeStep {
   /** The parameters this step sets, and their values, index for index. */
@@ -49,6 +51,7 @@ function inputs(probe: ProbeRig): Record<PhaserInput | 'quiet', Float32Array[][]
     stereo: [program!],
     mono: [[program![0]!]],
     none: [[]],
+    silent: [silent!],
     quiet: [silent!],
   };
 }
@@ -70,15 +73,25 @@ export default function phaserChangeScenario(probe: ProbeRig): ProbeScenario {
       to = values[step]!;
     for (let i = 0; i < at.length; i++) at[i]![0] = to[i]!;
   };
+  const dsp = (probe.processor as unknown as { dsp: { asleep: boolean } }).dsp;
+  const { warmup, measure } = probe.config;
+  // Whether a quantum ended asleep, and whether one woke, since the warm-up.
+  let slept = false,
+    woke = false;
   // Quanta [from, to). The warm-up and the measured run call this same function.
   const drive = (from: number, to: number): void => {
     for (let q = from; q < to; q++) {
       apply(q);
       const quiet = q % period >= period - config.quiet;
+      const was = dsp.asleep;
       probe.render(q, quiet ? feeds.quiet : feed[Math.floor(q / period) % steps.length]!);
+      if (dsp.asleep) slept = true;
+      else if (was) woke = true;
+    }
+    if (to === warmup + measure && !(slept && woke)) {
+      throw new Error(`the measured run did not sleep and wake: ${slept} ${woke}`);
     }
   };
-  const { warmup } = probe.config;
   return {
     warm: () => {
       if (warmup % cycle !== 0)
@@ -92,6 +105,7 @@ export default function phaserChangeScenario(probe: ProbeRig): ProbeScenario {
         drive(q, q + period);
       }
       for (let r = 0; r < WARM_READS; r++) v8.getHeapStatistics();
+      slept = woke = false;
     },
     drive,
   };
