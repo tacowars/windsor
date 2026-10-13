@@ -1,0 +1,139 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memoryGB": 15.7,
+    "kernel": "6.18.44-fc-v114",
+    "arch": "x64",
+    "node": "v22.22.0",
+    "chromeVersion": "Chromium 141.0.7390.37",
+    "commit": "63abbbf03db8eb6c35e016a37a09d19086037cf5",
+    "rounds": 1,
+    "only": "offline",
+    "started": "2026-10-13T17:37:47.999Z",
+    "finished": "2026-10-13T17:41:01.485Z"
+  },
+  "results": [
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 0.54,
+      "name": "16-silent",
+      "renderMs": 2856.3000000000466,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 168.01764705882627,
+      "peak": 1.2514577853821712e-20,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.05,
+      "name": "16-silent-3ins",
+      "renderMs": 30078.800000000047,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 1769.3411764705909,
+      "peak": 2.5083560604377258e-20,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.05,
+      "name": "1-none",
+      "renderMs": 1476.9000000000233,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 86.87647058823666,
+      "peak": 0.7070831656455994,
+      "parts": 1
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.04,
+      "name": "4-none",
+      "renderMs": 3578.5,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 210.5,
+      "peak": 0.8912509083747864,
+      "parts": 4
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.12,
+      "name": "8-none",
+      "renderMs": 5909.099999999977,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 347.59411764705743,
+      "peak": 0.8912509083747864,
+      "parts": 8
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.1,
+      "name": "16-none",
+      "renderMs": 11075.5,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 651.5,
+      "peak": 0.8912509083747864,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.07,
+      "name": "16-spread",
+      "renderMs": 17463.599999999977,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 1027.2705882352927,
+      "peak": 0.8912509083747864,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.06,
+      "name": "16-sends",
+      "renderMs": 11788.400000000023,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 693.4352941176485,
+      "peak": 0.8912509083747864,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.04,
+      "name": "16-1ins",
+      "renderMs": 24964.099999999977,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 1468.476470588234,
+      "peak": 0.8912509083747864,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.01,
+      "name": "16-3ins",
+      "renderMs": 55019.40000000002,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 3236.4352941176485,
+      "peak": 0.8912509083747864,
+      "parts": 16
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 1.01,
+      "name": "8-3ins",
+      "renderMs": 28196.5,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 1658.6176470588234,
+      "peak": 0.8218623995780945,
+      "parts": 8
+    }
+  ]
+}

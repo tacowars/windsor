@@ -1,0 +1,33 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memoryGB": 15.7,
+    "kernel": "6.18.44-fc-v114",
+    "arch": "x64",
+    "node": "v22.22.0",
+    "chromeVersion": "Chromium 141.0.7390.37",
+    "commit": "63abbbf03db8eb6c35e016a37a09d19086037cf5",
+    "rounds": 1,
+    "only": "micro",
+    "started": "2026-10-13T17:36:34.095Z",
+    "finished": "2026-10-13T17:36:42.133Z"
+  },
+  "results": [
+    {
+      "kind": "micro",
+      "round": 0,
+      "load1": 1.24,
+      "n": 16,
+      "empty": 3.275,
+      "fmIdle": 56.50499999999884,
+      "worklet0p": 10.254999999998835,
+      "worklet3p": 21.659999999997673,
+      "worklet11p": 56.279999999998836,
+      "worklet27p": 110.225,
+      "stripChain": 36.79500000000117,
+      "oneGain": 6.1099999999976715,
+      "rotationOnly": 19.81500000000233
+    }
+  ]
+}

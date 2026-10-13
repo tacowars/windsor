@@ -1,0 +1,238 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memoryGB": 15.7,
+    "kernel": "6.18.44-fc-v114",
+    "arch": "x64",
+    "node": "v22.22.0",
+    "chromeVersion": "Chromium 141.0.7390.37",
+    "commit": "63abbbf03db8eb6c35e016a37a09d19086037cf5",
+    "rounds": 1,
+    "only": "live",
+    "started": "2026-10-13T17:46:19.709Z",
+    "finished": "2026-10-13T17:47:44.232Z"
+  },
+  "results": [
+    {
+      "kind": "live",
+      "name": "16-none",
+      "round": 0,
+      "load1": 1.52,
+      "sampleRate": 44100,
+      "baseLatency": 0.01,
+      "clockRate": 1.00044316902752,
+      "meter": {
+        "loadPct": 37.040714995034755,
+        "peakPct": 0,
+        "underruns": 3,
+        "processors": 18
+      },
+      "underrunsMeter": 1,
+      "seconds": 11.504398,
+      "renders": {
+        "count": 3979,
+        "mean": 1963.7979391806987,
+        "p50": 1719,
+        "p95": 3421,
+        "p99": 4133,
+        "max": 10049,
+        "overBudget": 400,
+        "budgetUs": 2902.4943310657595
+      },
+      "cpu": {
+        "count": 3979,
+        "mean": 1922.821563206836,
+        "p50": 1689,
+        "p95": 3340,
+        "p99": 3834,
+        "max": 4706,
+        "overBudget": 359,
+        "budgetUs": 2902.4943310657595
+      },
+      "quantaPerSecond": 345.8677281505734,
+      "gc": {
+        "count": 0,
+        "perSecond": 0,
+        "msPerSecond": 0,
+        "longestUs": 0
+      }
+    },
+    {
+      "kind": "live",
+      "name": "16-sends",
+      "round": 0,
+      "load1": 1.26,
+      "sampleRate": 44100,
+      "baseLatency": 0.01,
+      "clockRate": 0.9996593822066024,
+      "meter": {
+        "loadPct": 53.233830845771145,
+        "peakPct": 0,
+        "underruns": 6,
+        "processors": 18
+      },
+      "underrunsMeter": 3,
+      "seconds": 11.504208,
+      "renders": {
+        "count": 3969,
+        "mean": 2054.374401612497,
+        "p50": 1891,
+        "p95": 3048,
+        "p99": 3908,
+        "max": 22530,
+        "overBudget": 257,
+        "budgetUs": 2902.4943310657595
+      },
+      "cpu": {
+        "count": 3969,
+        "mean": 2021.8770471151424,
+        "p50": 1864,
+        "p95": 2965,
+        "p99": 3711,
+        "max": 5579,
+        "overBudget": 226,
+        "budgetUs": 2902.4943310657595
+      },
+      "quantaPerSecond": 345.00419324824446,
+      "gc": {
+        "count": 7,
+        "perSecond": 0.6084730039651578,
+        "msPerSecond": 0.036682229667613794,
+        "longestUs": 404
+      }
+    },
+    {
+      "kind": "live",
+      "name": "16-1ins",
+      "round": 0,
+      "load1": 1.25,
+      "sampleRate": 44100,
+      "baseLatency": 0.01,
+      "clockRate": 0.7148500477104546,
+      "meter": {
+        "loadPct": 67.47915330339961,
+        "peakPct": 34.453125,
+        "underruns": 10,
+        "processors": 30
+      },
+      "underrunsMeter": 6,
+      "seconds": 11.498306,
+      "renders": {
+        "count": 2804,
+        "mean": 3981.5474322396576,
+        "p50": 3579,
+        "p95": 6340,
+        "p99": 7901,
+        "max": 34543,
+        "overBudget": 2768,
+        "budgetUs": 2902.4943310657595
+      },
+      "cpu": {
+        "count": 2804,
+        "mean": 3866.635520684736,
+        "p50": 3558,
+        "p95": 6168,
+        "p99": 7291,
+        "max": 16280,
+        "overBudget": 2770,
+        "budgetUs": 2902.4943310657595
+      },
+      "quantaPerSecond": 243.86200889070096,
+      "gc": {
+        "count": 35,
+        "perSecond": 3.0439266444987636,
+        "msPerSecond": 0.2206411970598104,
+        "longestUs": 636
+      }
+    },
+    {
+      "kind": "live",
+      "name": "16-3ins",
+      "round": 0,
+      "load1": 1.19,
+      "sampleRate": 44100,
+      "baseLatency": 0.01,
+      "clockRate": 0.34338456764839537,
+      "meter": {
+        "loadPct": 68.47479259731972,
+        "peakPct": 826.8750000000001,
+        "underruns": 11,
+        "processors": 56
+      },
+      "underrunsMeter": 6,
+      "seconds": 11.48543,
+      "renders": {
+        "count": 1362,
+        "mean": 8293.459618208517,
+        "p50": 7621,
+        "p95": 11820,
+        "p99": 15936,
+        "max": 49258,
+        "overBudget": 1362,
+        "budgetUs": 2902.4943310657595
+      },
+      "cpu": {
+        "count": 1362,
+        "mean": 7987.356828193832,
+        "p50": 7585,
+        "p95": 11146,
+        "p99": 13164,
+        "max": 18828,
+        "overBudget": 1362,
+        "budgetUs": 2902.4943310657595
+      },
+      "quantaPerSecond": 118.58502467909344,
+      "gc": {
+        "count": 91,
+        "perSecond": 7.9230816782654205,
+        "msPerSecond": 0.480434776930424,
+        "longestUs": 626
+      }
+    },
+    {
+      "kind": "live",
+      "name": "8-3ins",
+      "round": 0,
+      "load1": 1.22,
+      "sampleRate": 44100,
+      "baseLatency": 0.01,
+      "clockRate": 0.5999157275273171,
+      "meter": {
+        "loadPct": 67.18907987866531,
+        "peakPct": 137.8125,
+        "underruns": 14,
+        "processors": 31
+      },
+      "underrunsMeter": 9,
+      "seconds": 11.498647,
+      "renders": {
+        "count": 2352,
+        "mean": 4717.028486394558,
+        "p50": 4161,
+        "p95": 7030,
+        "p99": 8735,
+        "max": 32933,
+        "overBudget": 2352,
+        "budgetUs": 2902.4943310657595
+      },
+      "cpu": {
+        "count": 2352,
+        "mean": 4609.286564625851,
+        "p50": 4154,
+        "p95": 6979,
+        "p99": 7849,
+        "max": 12088,
+        "overBudget": 2352,
+        "budgetUs": 2902.4943310657595
+      },
+      "quantaPerSecond": 204.54580438898594,
+      "gc": {
+        "count": 63,
+        "perSecond": 5.47890547470498,
+        "msPerSecond": 0.26194386174303813,
+        "longestUs": 608
+      }
+    }
+  ]
+}

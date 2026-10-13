@@ -1,0 +1,63 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memoryGB": 15.7,
+    "kernel": "6.18.44-fc-v114",
+    "arch": "x64",
+    "node": "v22.22.0",
+    "chromeVersion": "Chromium 141.0.7390.37",
+    "commit": "a3d78d8ff15a53a6dc5f8b2c6c71686c58bcd68d",
+    "rounds": 1,
+    "only": "offline",
+    "started": "2026-10-13T19:14:45.569Z",
+    "finished": "2026-10-13T19:15:57.819Z"
+  },
+  "results": [
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 0.42,
+      "name": "16-silent",
+      "renderMs": 3136.4000000003725,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 184.49411764708074,
+      "renderPhaseMs": 2543.399999999907,
+      "renderPhaseMsPerAudioSecond": 149.61176470587688,
+      "setupMs": 593.0000000004657,
+      "peak": 1.2514577853821712e-20,
+      "parts": 16,
+      "sampleRate": 48000
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 0.51,
+      "name": "16-none",
+      "renderMs": 11162.200000000186,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 656.6000000000109,
+      "renderPhaseMs": 10721.80000000028,
+      "renderPhaseMsPerAudioSecond": 630.6941176470752,
+      "setupMs": 440.39999999990687,
+      "peak": 0.8912509083747864,
+      "parts": 16,
+      "sampleRate": 48000
+    },
+    {
+      "kind": "offline",
+      "round": 0,
+      "load1": 0.73,
+      "name": "16-3ins",
+      "renderMs": 56210.60000000009,
+      "audioSeconds": 17,
+      "msPerAudioSecond": 3306.5058823529466,
+      "renderPhaseMs": 55607.30000000028,
+      "renderPhaseMsPerAudioSecond": 3271.01764705884,
+      "setupMs": 603.2999999998137,
+      "peak": 0.8912509083747864,
+      "parts": 16,
+      "sampleRate": 48000
+    }
+  ]
+}
