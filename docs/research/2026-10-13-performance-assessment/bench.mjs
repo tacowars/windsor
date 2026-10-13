@@ -1,4 +1,4 @@
-/* global process, console */
+/* global process, console, URL */
 /** The performance assessment's bench (2026-10-13), one command from the repo root:
  *   node docs/research/2026-10-13-performance-assessment/bench.mjs [--rounds n] [--only offline|live|kinds|micro]
  * It bundles page.mjs with esbuild, serves it beside the engine's generated worklet bundles,

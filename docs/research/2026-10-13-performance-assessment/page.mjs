@@ -3,7 +3,7 @@
  * console plays through), `FmEngine` + `AudioSystem` + the app's 25 ms pump for the live
  * cases, and a few node-only micro cases on an `OfflineAudioContext`.
  */
-/* global window, performance, setInterval, clearInterval, AudioContext, OfflineAudioContext, AudioWorkletNode, ConstantSourceNode, GainNode, Blob, URL */
+/* global window, performance, setInterval, clearInterval, structuredClone, AudioContext, OfflineAudioContext, AudioWorkletNode, ConstantSourceNode, GainNode, Blob, URL */
 import {
   AudioSystem,
   FmEngine,
@@ -19,7 +19,6 @@ import { DocumentModel } from '../../../packages/app/src/documentModel.ts';
 
 const RATE = 48000;
 const MICRO_SECONDS = 20;
-const MS = 1000;
 
 function made(raw) {
   const result = makeArrangement(raw);

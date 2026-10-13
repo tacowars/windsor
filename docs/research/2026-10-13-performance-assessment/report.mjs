@@ -1,4 +1,4 @@
-/* global console */
+/* global console, URL */
 /** Prints the README's tables from every results/*.json: medians over rounds, with min–max. */
 import { readdirSync, readFileSync } from 'node:fs';
 
