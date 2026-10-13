@@ -837,6 +837,33 @@ var AdvancedDriveDsp = class {
       this.down[i].buffer.fill(0);
     }
   }
+  /**
+   * On the way to sleep (windsor#793, `driveSleep.ts`): the graph and the
+   * oversamplers empty, as a switch-on from off leaves them, and the controls
+   * at their targets. The next tick sets the graph's controls outright.
+   */
+  sleep() {
+    this.clear();
+    this.rest(0);
+    this.counter = 0;
+  }
+  /**
+   * One asleep block of `frames`: every control lands on its target at once
+   * (the empty graph cannot zipper, and a fade through dry has nothing to
+   * fade), the follower releases towards the silence and the LFO's phase
+   * moves on, so a wake finds both where an awake drive would have them.
+   */
+  rest(frames) {
+    const s = this.controls;
+    s.set(this.targets);
+    this.activeCount = 0;
+    this.pending = false;
+    this.transition = 1;
+    this.follower *= Math.exp(-frames / (this.rate * s[DRIVE_SLOT.release] / DRIVE_DSP.ms));
+    const hz = s[DRIVE_SLOT.sync] >= 1 / 2 ? s[DRIVE_SLOT.bpm] / (DRIVE_DSP.secondsPerMinute * s[DRIVE_SLOT.beats]) : s[DRIVE_SLOT.rate];
+    this.phase += hz * frames / this.rate;
+    this.phase -= Math.floor(this.phase);
+  }
   /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
   update() {
     const s = this.controls, t = this.targets, keys = this.activeKeys;
@@ -905,6 +932,73 @@ var AdvancedDriveDsp = class {
   }
 };
 
+// packages/engine/src/inserts/advancedDriveSleepConstants.ts
+var DRIVE_SLEEP = { inputFloor: 1e-9, outputFloor: 1e-7, holdSeconds: 0.05 };
+
+// packages/engine/src/worklet/advancedDrive/driveSleep.ts
+function inputQuiet(channel, frames) {
+  if (!channel) return true;
+  const n = channel.length < frames ? channel.length : frames;
+  for (let i = 0; i < n; i++) {
+    const x = channel[i];
+    if (x > DRIVE_SLEEP.inputFloor || x < -DRIVE_SLEEP.inputFloor) return false;
+  }
+  return true;
+}
+function outputQuiet(channel, frames) {
+  if (!channel) return true;
+  for (let i = 0; i < frames; i++) {
+    const x = channel[i];
+    if (x > DRIVE_SLEEP.outputFloor || x < -DRIVE_SLEEP.outputFloor) return false;
+  }
+  return true;
+}
+function writeDry(out, input, frames) {
+  if (!out) return;
+  const n = input ? input.length < frames ? input.length : frames : 0;
+  for (let i = 0; i < n; i++) out[i] = input[i];
+  for (let i = n; i < frames; i++) out[i] = 0;
+}
+var DriveSleep = class {
+  constructor(rate, enabled) {
+    this.enabled = enabled;
+    this.hold = this.quiet = NaN;
+    this.hold = Math.ceil(DRIVE_SLEEP.holdSeconds * rate);
+    this.quiet = 0;
+    this.asleep = false;
+  }
+  /** After an awake block: count it quiet or not, and sleep once the quiet has held. */
+  watch(left, right, out, frames, dsp) {
+    if (!this.enabled) return;
+    const graph = dsp.graph, floor = DRIVE_SLEEP.outputFloor;
+    const quiet = inputQuiet(left, frames) && inputQuiet(right, frames) && outputQuiet(out[0], frames) && outputQuiet(out[1], frames) && Math.abs(graph.left) <= floor && Math.abs(graph.right) <= floor && Math.abs(graph.dryLeft) <= floor && Math.abs(graph.dryRight) <= floor;
+    if (!quiet) {
+      this.quiet = 0;
+      return;
+    }
+    this.quiet += frames;
+    if (this.quiet < this.hold) return;
+    dsp.sleep();
+    this.quiet = 0;
+    this.asleep = true;
+  }
+  /**
+   * One asleep block: the dry path, and the DSP's block-rate rest. False when
+   * the input has crossed the floor: the drive wakes, and the caller renders
+   * the block in full.
+   */
+  rest(left, right, out, frames, dsp) {
+    if (!inputQuiet(left, frames) || !inputQuiet(right, frames)) {
+      this.asleep = false;
+      return false;
+    }
+    writeDry(out[0], left, frames);
+    writeDry(out[1], right, frames);
+    dsp.rest(frames);
+    return true;
+  }
+};
+
 // packages/engine/src/worklet/advancedDrive/advancedDriveProcessor.ts
 var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
@@ -920,6 +1014,8 @@ var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletP
       ]);
     }
     this.dsp = new AdvancedDriveDsp(sampleRate, params);
+    const opts = options.processorOptions ?? {};
+    this.sleep = new DriveSleep(sampleRate, opts.sleep !== false);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
@@ -935,9 +1031,19 @@ var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletP
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
+    const dsp = this.dsp, sleep = this.sleep;
+    dsp.configure(params, frames);
+    if (!sleep.asleep || !sleep.rest(left, right, out, frames, dsp)) {
+      this.render(left, right, out, frames);
+      sleep.watch(left, right, out, frames, dsp);
+    }
+    this.load.end(frames);
+    return true;
+  }
+  /** One awake block, every sample through the DSP. */
+  render(left, right, out, frames) {
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const dsp = this.dsp;
-    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
       dsp.inputLeft = i < leftFrames ? left[i] : 0;
       dsp.inputRight = i < rightFrames ? right[i] : 0;
@@ -945,8 +1051,6 @@ var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletP
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
-    this.load.end(frames);
-    return true;
   }
 };
 registerProcessor(ADVANCED_DRIVE_NAME, AdvancedDriveProcessor);

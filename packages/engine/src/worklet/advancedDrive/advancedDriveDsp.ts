@@ -16,6 +16,8 @@
  * Delay's lines do, so a restart from rest takes the input in over the fade
  * rather than as a step into cold filters (fully on, the input times 1 is the
  * input to the bit). The follower and the LFO keep running; they carry no audio.
+ * Asleep (windsor#793, `driveSleep.ts`), `rest` replaces `tick` for a whole
+ * block: the controls land, the follower releases and the LFO moves on.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { ADVANCED_DRIVE_PARAMETERS } from '../../inserts/advancedDriveParameters';
@@ -108,6 +110,33 @@ export class AdvancedDriveDsp implements DriveLfoState {
       this.up[i].buffer.fill(0);
       this.down[i].buffer.fill(0);
     }
+  }
+  /**
+   * On the way to sleep (windsor#793, `driveSleep.ts`): the graph and the
+   * oversamplers empty, as a switch-on from off leaves them, and the controls
+   * at their targets. The next tick sets the graph's controls outright.
+   */
+  sleep(): void {
+    this.clear();
+    this.rest(0);
+    this.counter = 0;
+  }
+  /**
+   * One asleep block of `frames`: every control lands on its target at once
+   * (the empty graph cannot zipper, and a fade through dry has nothing to
+   * fade), the follower releases towards the silence and the LFO's phase
+   * moves on, so a wake finds both where an awake drive would have them.
+   */
+  rest(frames: number): void {
+    const s = this.controls;
+    s.set(this.targets);
+    this.activeCount = 0;
+    this.pending = false;
+    this.transition = 1;
+    this.follower *= Math.exp(-frames / ((this.rate * s[S.release]) / C.ms));
+    const hz = s[S.sync] >= 1 / 2 ? s[S.bpm] / (C.secondsPerMinute * s[S.beats]) : s[S.rate];
+    this.phase += (hz * frames) / this.rate;
+    this.phase -= Math.floor(this.phase);
   }
   /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
   update(): void {
