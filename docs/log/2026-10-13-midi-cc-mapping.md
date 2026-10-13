@@ -237,12 +237,13 @@ differ, the difference is stated under the decision.
    - **Pickup** is the default. The rule: anything that changes what a
      hardware position means, or lets the knob move while Windsor does not
      hear it, re-arms pickup. That is, after a song opens, a preset
-     changes, a range changes, `Inv` is toggled, the target is turned on
-     screen (decision 2), Reset performance, the input is unplugged and
-     comes back (see the boundary cases), or the MIDI selector stops
-     listening to the input and later listens again (`midiAccess.ts`
-     detaches the input's handler on deselection as it does on a
-     disconnect). Until then a CC does nothing. It picks up when
+     changes, a range changes, `Inv` is toggled, the mapping's source
+     changes (a new CC from Learn, or an edit of its device or channel),
+     the target is turned on screen (decision 2), Reset performance, the
+     input is unplugged and comes back (see the boundary cases), or the
+     MIDI selector stops listening to the input and later listens again
+     (`midiAccess.ts` detaches the input's handler on deselection as it
+     does on a disconnect). Until then a CC does nothing. It picks up when
      its value reaches or crosses the target's current value. The current
      value is the CC's base where one is held, else the patch's (or the
      strip's or insert's) own value. A clip envelope's offset is not part of
@@ -389,8 +390,11 @@ differ, the difference is stated under the decision.
         value, where AUTO, ENV and a macro's name sit, which every knob size
         has (decision 3 says which wins). A corner badge would crowd the
         38 px dial and its ring.
-      - A knob outside the catalog (Coarse, Detune, Vel) keeps the
-        browser's own menu.
+      - Coarse and Fine are the two halves of one catalog target,
+        `ops.<i>.ratio` (`ratioKnobs.ts` wires both to it), so both offer
+        the menu, and both show the ratio's mapping, tag and ring.
+      - A knob outside the catalog (Detune, Vel) keeps the browser's own
+        menu.
       - A knob a macro maps is locked today, with the macro's name as its
         tag. Its menu offers "Learn MIDI CC…" disabled, with the reason.
 13. **Out of scope.** These are listed under Later.
