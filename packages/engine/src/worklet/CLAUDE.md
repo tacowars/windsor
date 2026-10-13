@@ -219,6 +219,9 @@ and `pumpScope.ts` the key's level binned across a cycle. It reads only
 spec. `inserts/pumpDsp.test.ts` runs the bundle through
 `__fixtures__/pumpHarness.ts`, and `inserts/pumpAllocation.test.ts` pins rules
 2 and 7 through `__fixtures__/pumpChangeScenario.ts`.
+It does not sleep on silence: its render is a per-sample gain, and the
+detector must hear the key every sample, so a rest would save little (one
+instance is 1.1 % of a 48 kHz quantum, `docs/research/2026-10-13-pump-insert/`).
 
 `bloom/` is bloom, the harmonic pad generator (windsor#712, record
 `2026-10-11-bloom-insert`), built as `generated/bloom-processor.js` with its
