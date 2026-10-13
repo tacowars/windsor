@@ -159,15 +159,17 @@ every double field is first written as NaN.
 `__fixtures__/phaserChangeScenario.ts`.
 It sleeps on silence (windsor#793, `PHASER_SLEEP`): a block whose input is
 within the floor, once every all-pass, bass and feedback state is under the
-output floor, zeroes that state and writes zeros, with no `tick`; asleep, the
-controls land on their targets and the sweep and the follower move on a
-block at a time, and the first loud block wakes it and renders in full. Its
+output floor, zeroes that state and writes zeros, with no `tick`; asleep,
+`PhaserDsp.rest` steps `tick`'s control path a sample at a time with no
+audio (the controls' glides, the switch's fade, the follower's release and
+the sweep's phase, on an awake phaser's bits; windsor#802), and the first
+loud block wakes it and renders in full. Its
 tail is the lattice's settle, read off the state, 1.26 s at the slowest
-corner (`tailSeconds` bounds it). The bookkeeping is written out in
-`configure`, which runs every block and so is optimised; a method only a
-silence calls stays in a tier that boxes doubles. `sleep: false` in
+corner (`tailSeconds` bounds it). The sleep's count is written out in
+`configure`, which runs every block and so is optimised. `sleep: false` in
 `processorOptions` is the tests' render without it;
-`inserts/phaserSleep.test.ts` holds the tail, the wake and the bits.
+`inserts/phaserSleep.test.ts` holds the tail, the wake, the changes made
+asleep and the bits.
 
 `filter/` is the Filter insert (windsor#622), built as
 `generated/filter-processor.js` with its own `tsconfig.json` (`fm/`'s flags,

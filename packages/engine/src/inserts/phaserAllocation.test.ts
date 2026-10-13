@@ -14,16 +14,17 @@
  * both signs and none, the feedback cut, stereo spread, envelope of both
  * signs, bass keep, dry/wet down to dry, and the insert switched off. The
  * input arrives stereo, mono or with no channels (an inactive source). A
- * thirteenth step is silent throughout, so the phaser falls asleep and the
- * next step's first quantum wakes it (windsor#793); the scenario throws
- * unless the measured cycle took both. It
+ * thirteenth step is silent throughout, so the phaser falls asleep, and a
+ * fourteenth, still silent, changes every control and switches it off while
+ * it sleeps (windsor#802); the next step's first quantum wakes it
+ * (windsor#793), and the scenario throws unless the measured cycle took both. It
  * warms up with the cycle six times, the load meter on for the first, then
  * reads `used_heap_size` in ten windows over one more cycle, with the meter
  * off (each reading calls `Date.now()` twice, and V8 returns each as a new
  * heap number, 32 bytes a quantum), and counts the collections in it, which
  * must be none, or the reading means nothing.
  *
- * Tolerance: 16 KiB over the 2 080 measured quanta, the EQ's. The eleven
+ * Tolerance: 16 KiB over the 2 240 measured quanta, the EQ's. The eleven
  * readings' own result objects take about 600 bytes each. Before this fix the
  * render boxed about 8 KB a quantum in Node
  * (`docs/research/2026-09-30-load-sampler-allocation/`), which would read
@@ -84,6 +85,8 @@ const STEPS: [number[], PhaserInput][] = [
   [[4, 2500, 2, -0.2, 900, 75, 0.5, 0.1, 0.3, 1], 'none'],
   [[0.3, 700, 1.25, 0.3, 400, 20, 1, 0.4, 0.7, 1], 'stereo'],
   [[0.2, 900, 2, 0.25, 350, 0, 0, 0, 0.5, 1], 'silent'],
+  // Asleep through a change of every control and the switch, which glide asleep (windsor#802).
+  [[6, 2500, 3.5, -0.6, 900, 120, 2.5, 0.7, 0.9, 0], 'silent'],
 ];
 const CYCLE = STEPS.length * PERIOD;
 
