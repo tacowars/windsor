@@ -1,15 +1,23 @@
 /**
  * A part's voice slots (epic windsor#699 decision 6): the distinct voice
- * targets across its song voice lanes and the envelopes of every roll
- * pattern it holds, the one count both automation pickers read.
+ * targets across its song voice lanes, the envelopes of every roll
+ * pattern it holds and its voice CC mappings (windsor#782), the one count
+ * both automation pickers read.
  */
 import { describe, expect, it } from 'vitest';
 
-import type { RollEnvelope, RollSpec, VoiceTargetPath } from '@windsor/engine';
+import type { CcMapping, RollEnvelope, RollSpec, VoiceTargetPath } from '@windsor/engine';
 import { DEFAULT_ROLL_CONFIG } from '@windsor/engine';
 import { type VoiceSlotPart, laneVoicePaths, voiceSlotTargets } from './partVoiceSlots';
 
 const env = (target: VoiceTargetPath): RollEnvelope => ({ target, on: true, points: [] });
+const cc = (target: CcMapping['target']): CcMapping => ({
+  source: { device: null, channel: null, cc: 74 },
+  target,
+  min: 0,
+  max: 1,
+  inverted: false,
+});
 const roll = (...envelopes: RollEnvelope[]): RollSpec => ({
   kind: 'roll',
   ...DEFAULT_ROLL_CONFIG,
@@ -40,5 +48,20 @@ describe('a part’s voice slots', () => {
       'ops.0.level',
       'ops.1.level',
     ]);
+  });
+
+  it('counts a target a lane and a mapping share once, and a strip or insert mapping not at all', () => {
+    const part: VoiceSlotPart = {
+      automation: [{ target: 'voice.filter.cutoff', on: true, points: [] }],
+      ccMappings: [
+        cc('voice.filter.cutoff'),
+        cc('voice.macros.1.value'),
+        cc('strip.level'),
+        cc('insert.eq1.bands.0.freq'),
+      ],
+      sequencer: roll(),
+      regions: [],
+    };
+    expect([...voiceSlotTargets(part)].sort()).toEqual(['filter.cutoff', 'macros.1.value']);
   });
 });

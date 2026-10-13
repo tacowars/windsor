@@ -1,7 +1,8 @@
 /**
  * Lanes follow their macro (windsor#561 fix round 2): removing a macro drops
  * the lanes on it and moves the later macros' lanes down a row, on every part
- * playing the patch, song lanes and step lanes alike, and leaves every other
+ * playing the patch, song lanes, step lanes and CC mappings (windsor#782)
+ * alike, and leaves every other
  * part and lane as it was. Every macro edit the card commits, a rename or a
  * removal, puts the Song tab out of date (fix round 3): its lane titles and
  * lane picker are drawn from the patch's macros.
@@ -18,6 +19,7 @@ import {
   makePatch,
   voiceTargetId,
   type ArrangementDocument,
+  type CcMapping,
   type DocumentPart,
   type RegionPattern,
   type StepModLane,
@@ -159,6 +161,24 @@ describe('removing a macro moves its lanes with it', () => {
     expect(moved && 'lanes' in moved && params(moved.lanes)).toEqual([
       ['macros.0.value', 0.2],
       ['macros.1.value', 0.3],
+    ]);
+  });
+
+  it('moves the CC mappings with their macro, and drops the removed macro’s', () => {
+    const mapping = (target: CcMapping['target'], cc: number): CcMapping => ({
+      source: { device: null, channel: null, cc },
+      target,
+      min: 0,
+      max: 1,
+      inverted: false,
+    });
+    const ccMappings = [0, 1, 2].map((j) => mapping(voiceTargetId(macroValuePath(j)), 20 + j));
+    const doc = { ...DOC, parts: [part(FULL_SLOT.arp, SHARED, { ccMappings })] };
+    const model = new DocumentModel(doc);
+    model.merge({ parts: macroRemovalParts(doc, SHARED, 1) });
+    expect(at(model.doc, FULL_SLOT.arp).ccMappings).toEqual([
+      mapping(voiceTargetId('macros.0.value'), 20),
+      mapping(voiceTargetId('macros.1.value'), 22),
     ]);
   });
 });

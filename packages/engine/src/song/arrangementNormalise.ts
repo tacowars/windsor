@@ -42,6 +42,7 @@ import { normaliseHarmonyEvents, normaliseRegions } from './timelineNormalise';
 import { loopGridTicks, normaliseLoop } from './songLoop';
 import { normaliseStrip } from './deskNormalise';
 import { normaliseAutomation } from './automationNormalise';
+import { normaliseCcMappings } from './ccMappingNormalise';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { normalisePatches } from '../patch/patchNormalise';
@@ -63,6 +64,7 @@ const PART_KEYS = [
   'regions',
   'sequencer',
   'automation',
+  'ccMappings',
   'patchSource',
 ];
 
@@ -192,8 +194,8 @@ export class ArrangementNormaliser extends FieldNormaliser {
 
   /**
    * One part of the list (#597): identity, patch, strip, regions, sequencer,
-   * automation lanes (windsor#342) and the patch's library link (windsor#669). Null drops it, reported. The lanes
-   * come after the strip, whose insert ids they name. Its colour is read
+   * automation lanes (windsor#342), CC mappings (windsor#782) and the patch's library link (windsor#669). Null drops it, reported. The lanes
+   * and the mappings come after the strip, whose insert ids they name. Its colour is read
    * raw and assigned once the whole list is known (`partColours.ts`).
    */
   part(
@@ -220,6 +222,11 @@ export class ArrangementNormaliser extends FieldNormaliser {
       path: `${path}.automation`,
       n: this,
     });
+    const ccMappings = normaliseCcMappings(o.ccMappings, {
+      inserts: strip.inserts,
+      path: `${path}.ccMappings`,
+      n: this,
+    });
     const part = {
       slot,
       name: typeof o.name === 'string' ? o.name : fallbackName,
@@ -235,6 +242,8 @@ export class ArrangementNormaliser extends FieldNormaliser {
       sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
       // Absent stays absent: a song without lanes reads and exports as before (decision 15).
       ...(automation && { automation }),
+      // Absent stays absent too: a song without mappings exports as before (windsor#782).
+      ...(ccMappings && { ccMappings }),
       ...this.patchSource(o.patchSource, path),
     };
     return { part, path, colour: o.colour };
