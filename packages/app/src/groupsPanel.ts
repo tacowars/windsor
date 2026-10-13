@@ -8,7 +8,8 @@
  * accent (`consoleColors.ts`'s `groupAccent`). While a lane of the group's
  * is on (windsor#616, the Song tab's folder track), its Level and Pan knobs
  * and its inserts' knobs lock in the lane's colour, as a part's do
- * (`knobAutomation.ts`).
+ * (`knobAutomation.ts`). A group belongs to no part, so its knobs' menu
+ * refuses MIDI CC learn (windsor#785).
  *
  * The rules are `groupModel.ts`'s: every edit is one `ctx.change`, one undo
  * step, applied live to `AudioSystem.groupBus(id)`. The lights are the Song
@@ -39,6 +40,7 @@ import {
 } from './groupModel';
 import { makeKnob, type KnobSpec } from './knob';
 import { catalogKnobAutomation, knobSongTick } from './knobAutomation';
+import { noPartCc } from './knobCc';
 import { GROUP_LEVEL_KNOB, GROUP_PAN_KNOB } from './mixerTables';
 import type { LightMeters, MixerLights } from './songMixerLights';
 import { songMixerLights } from './songMixerLights';
@@ -105,6 +107,7 @@ function groupKnobs(ctx: AppCtx, group: GroupSpec, color: string): HTMLElement {
       color,
       dial: 'rack',
       automation: groupLock(ctx, id, 'strip.level'),
+      cc: noPartCc(ctx, 'strip.level'),
       get: () => now()?.level ?? GROUP_LEVEL_KNOB.def,
       set: (level) => void ctx.change({ groups: { [id]: { level } } }),
     }),
@@ -113,6 +116,7 @@ function groupKnobs(ctx: AppCtx, group: GroupSpec, color: string): HTMLElement {
       color,
       dial: 'rack',
       automation: groupLock(ctx, id, 'strip.pan'),
+      cc: noPartCc(ctx, 'strip.pan'),
       get: () => now()?.pan ?? GROUP_PAN_KNOB.def,
       set: (pan) => void ctx.change({ groups: { [id]: { pan } } }),
     }),

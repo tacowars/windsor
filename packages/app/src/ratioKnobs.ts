@@ -17,7 +17,9 @@
  * or a macro mapping can hold it. While one does, both knobs lock and light
  * as every other path knob does (windsor#649 decision 9): the one lock the
  * editor answers for the path, split into each knob's half of the held
- * ratio, and the readout shows the held ratio too.
+ * ratio, and the readout shows the held ratio too. A MIDI CC mapping on the
+ * ratio (windsor#785) shows on both knobs the same way: its tag, and its
+ * ring and marker split into each knob's half.
  */
 import { el } from './dom';
 import { makeKnob, type KnobElement, type KnobSpec } from './knob';
@@ -25,6 +27,7 @@ import type { KnobAutomation } from './knobAutomation';
 import { emptyKnobEnvelope } from './knobEnvelope';
 import { followAutomation } from './knobLock';
 import type { PatchEditor } from './partsSession';
+import { pathCc } from './patchPath';
 import {
   COARSE_DEF,
   COARSE_MAX,
@@ -122,6 +125,7 @@ export function ratioKnobSpecs(
       onChange,
       ...halfLock(editor, i, (ratio) => split(ratio).coarse),
       ...halfEnvelope(editor, i, (ratio) => split(ratio).coarse),
+      ...pathCc(editor, `ops.${i}.ratio`, (ratio) => split(ratio).coarse),
     },
     fine: {
       label: 'Fine',
@@ -135,6 +139,7 @@ export function ratioKnobSpecs(
       onChange,
       ...halfLock(editor, i, (ratio) => split(ratio).fine),
       ...halfEnvelope(editor, i, (ratio) => split(ratio).fine),
+      ...pathCc(editor, `ops.${i}.ratio`, (ratio) => split(ratio).fine),
     },
   };
 }

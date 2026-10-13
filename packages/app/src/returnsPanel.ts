@@ -16,6 +16,7 @@ import { fmt2 } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { makeKnob } from './knob';
+import { noPartCc } from './knobCc';
 import { BUS_LABELS } from './mixerTables';
 import { busSenders, busSendersLine } from './sendBusModel';
 import { stripInserts } from './stripInserts';
@@ -29,6 +30,7 @@ function levelKnob(ctx: AppCtx, name: ReturnName): HTMLElement {
     color: CARRIER_COLOR,
     dial: 'rack-big',
     fmt: fmt2,
+    cc: noPartCc(ctx, 'strip.level'),
     get: () => ctx.model.doc.returns?.[name]?.level ?? RETURNS[name].level,
     set: (v) => void ctx.change({ returns: { [name]: { level: v } } }),
   });

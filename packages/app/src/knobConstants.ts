@@ -37,6 +37,12 @@ export const PIN_INSET = 5;
  */
 export const ENV_RING_GAP = 2.6;
 export const ENV_DOT_R = 1.8;
+/**
+ * The hollow marker a MIDI CC mapping waiting for pickup draws on the env
+ * ring's radius at the hardware's position (windsor#785, the approved
+ * mockup's `.dial-cc-hw`).
+ */
+export const CC_MARKER_R = 2.2;
 /** An arc shorter than this is not drawn at all (the value sits on zero). */
 export const ARC_MIN_DEGREES = 0.4;
 /** Degrees in a half turn, for the polar conversion and the large-arc flag. */

@@ -75,8 +75,8 @@ interface DriveView {
   commit(spec: AdvancedDriveSpec, render?: boolean): void;
   /** Set by the Main page: refreshes its Starting point after every commit, from any control. */
   afterCommit?: () => void;
-  /** The lock a lane puts on the knob over `field` (`stages.0.amount`, `drive`). */
-  lock(field: string): Pick<KnobSpec, 'automation'>;
+  /** The lock a lane puts on the knob over `field` (`stages.0.amount`, `drive`), and its CC binding. */
+  lock(field: string): Pick<KnobSpec, 'automation' | 'cc'>;
 }
 
 const HZ_FIELDS: ReadonlySet<string> = new Set(['pivot', 'low', 'high', 'rate', 'frequency']);

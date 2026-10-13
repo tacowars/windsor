@@ -29,7 +29,10 @@
  * The centre is the patch's value, or, under a song lane on the same target
  * that is on, the lane's value at the song tick: the lane's lock wins the
  * knob, and the engine adds the envelope's offset over the lane's
- * (`clipEnvelopeWindow.ts`).
+ * (`clipEnvelopeWindow.ts`). With no lane on, a MIDI CC's value held on the
+ * target is what the envelope rides on (windsor#785, record
+ * `2026-10-13-midi-cc-mapping` decision 3), while the ring still starts at
+ * the patch's value, where the knob's pin stays.
  *
  * The knob asks again on every frame of the playhead's loop. What a part's
  * rolls hold on each target is worked out once per part object, and which
@@ -76,8 +79,10 @@ export interface KnobEnvelopeQuery {
   patch: Patch;
   /** The knob's patch path (`filter.cutoff`, `macros.2.value`). */
   path: string;
-  /** The working patch's value at `path`: the centre, under no lane. */
+  /** The working patch's value at `path`: the centre, under no lane and no CC. */
   base: number;
+  /** The MIDI CC's value held on the target (windsor#785), or undefined: the centre, under no lane. */
+  held?: number | undefined;
   /** The transport's tick (`ConsoleTransport.position`), running or not. */
   tick: number;
   /** Whether the transport runs: stopped or paused, the ring rests at the centre. */
@@ -213,10 +218,10 @@ export function knobEnvelopeAt(
   const held = cached.held.targets.get(path);
   if (!held || !cached.sounding!.paths.has(path)) return null;
   const { lane, laneRow } = held;
-  const base =
-    lane && laneRow ? valueAt(laneRow, lane.points, songTickOf(tick, songTicks)) : query.base;
+  const laneValue =
+    lane && laneRow ? valueAt(laneRow, lane.points, songTickOf(tick, songTicks)) : undefined;
   const value = query.running ? envelopeValueNow(query, cached, held) : 0;
-  out.base = base;
-  out.playing = stepModValue(held.row, base, value);
+  out.base = laneValue ?? query.base;
+  out.playing = stepModValue(held.row, laneValue ?? query.held ?? query.base, value);
   return out;
 }

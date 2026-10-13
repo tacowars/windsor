@@ -112,6 +112,13 @@ describe('a knob an envelope moves', () => {
     expect(env?.playing).toBeCloseTo(1000 * 2 ** (value * span), 6);
   });
 
+  it("rides on a MIDI CC's held value, the ring still starting at the patch's (windsor#785)", () => {
+    const span = voiceTargetRow('filter.cutoff')!.span;
+    const env = knobEnvelopeAt(query(part, 'filter.cutoff', { held: 3000 }));
+    expect(env?.base).toBe(1000);
+    expect(env?.playing).toBeCloseTo(3000 * 2 ** (value * span), 6);
+  });
+
   it('plays an add row (Resonance) by its span, in its own units', () => {
     const span = voiceTargetRow('filter.resonance')!.span;
     const env = knobEnvelopeAt(query(part, 'filter.resonance', { base: 3 }));
