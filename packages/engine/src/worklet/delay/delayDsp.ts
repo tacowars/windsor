@@ -15,10 +15,17 @@
  * cut, never resumed, and switching back on starts from silence.
  *
  * Sleep (windsor#793, `DELAY_SLEEP`): `write` notes a write above the floor,
- * and `drowse`, called from `configure` every block (so V8 optimises it),
- * counts the frames since the last one. Once that is the line's whole length,
- * or the lines were cleared, a block whose input is silent puts the delay to
- * sleep: the processor writes zeros and runs no `tick`, the lines, filters
+ * or the first non-zero write into empty lines, and `drowse`, called from
+ * `configure` every block (so V8 optimises it), counts the frames since the
+ * last one. Once that is the line's whole length, or the lines hold exact
+ * zeros (built, or cleared), a block whose input is silent puts the delay to
+ * sleep, unless the loop can hold or grow what is in it: Feedback at or past
+ * unity in magnitude, current or target, keeps lines that are not empty awake
+ * and their count at zero, since a write under the floor can regenerate past
+ * it, and wakes them if they slept. Nothing else in
+ * the loop adds gain: the interpolated read, the ping-pong crossfade and the
+ * one-pole filters are at most unity, and the saturator's slope is at most
+ * one. Asleep: the processor writes zeros and runs no `tick`, the lines, filters
  * and write position wait as they are (everything in them is under the
  * floor), and the controls land on their targets. The first block whose
  * input crosses the floor wakes it and renders in full.
@@ -66,6 +73,10 @@ class DelayDsp {
   loudWrite: boolean;
   /** Frames since the last write above the floor; a line's length or more once it is empty. */
   quietFrames: number;
+  /** The lines hold exact zeros: built or cleared, and nothing non-zero written since. */
+  empty: boolean;
+  /** The loop gain can reach unity (|Feedback| >= 1, current or target): no sleep. */
+  held: boolean;
 
   constructor(rate: number, _params: DelayParams, sleep = true) {
     // Doubles first written as doubles (worklet rule 7).
@@ -92,7 +103,8 @@ class DelayDsp {
     this.first = true;
     this.cleared = true;
     this.sleepEnabled = sleep;
-    this.asleep = this.loudWrite = false;
+    this.asleep = this.loudWrite = this.held = false;
+    this.empty = true;
     this.quietFrames = length;
   }
 
@@ -115,17 +127,22 @@ class DelayDsp {
     }
     if (this.controls[S.enabled] !== 0) this.cleared = false;
     else if (!this.cleared) this.clear();
+    this.held = Math.abs(t[S.feedback]) >= 1 || Math.abs(this.controls[S.feedback]) >= 1;
     this.drowse(frames, quiet);
     // Asleep, nothing renders: the glides land.
     if (this.asleep) for (let k = 0; k < KEYS.length; k++) this.controls[k] = t[k];
   }
 
-  /** The sleep's count, every block: a loud block wakes it; a silent one sleeps once the lines are. */
+  /** The sleep's count, every block: a loud or held block wakes it; a silent one sleeps once the lines are. */
   drowse(frames: number, quiet: boolean): void {
-    if (!quiet) this.asleep = false;
+    // Held, a write under the floor can grow past it; lines of exact zeros stay zeros.
+    const holding = this.held && !this.empty;
+    if (!quiet || holding) this.asleep = false;
     if (this.asleep) return;
-    if (this.loudWrite) this.quietFrames = 0;
-    else this.quietFrames += frames;
+    if (this.loudWrite || holding) {
+      this.quietFrames = 0;
+      this.empty = false;
+    } else this.quietFrames += frames;
     this.loudWrite = false;
     if (quiet && this.quietFrames >= this.buffer[0].length) this.asleep = true;
   }
@@ -137,6 +154,7 @@ class DelayDsp {
     this.filter.fill(0);
     this.cleared = true;
     this.loudWrite = false;
+    this.empty = true;
     this.quietFrames = this.buffer[0].length;
   }
 
@@ -223,7 +241,9 @@ class DelayDsp {
     const limit = C.feedbackCeiling / this.controls[S.drive];
     const value = limit * Math.tanh(this.value / limit);
     this.buffer[channel][this.position] = value;
-    if (value > Z.outputFloor || value < -Z.outputFloor) this.loudWrite = true;
+    if (value > Z.outputFloor || value < -Z.outputFloor || (this.empty && value !== 0)) {
+      this.loudWrite = true;
+    }
   }
 }
 

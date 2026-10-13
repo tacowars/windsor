@@ -194,7 +194,8 @@ var DelayDsp = class {
     this.first = true;
     this.cleared = true;
     this.sleepEnabled = sleep;
-    this.asleep = this.loudWrite = false;
+    this.asleep = this.loudWrite = this.held = false;
+    this.empty = true;
     this.quietFrames = length;
   }
   /** The block's controls; `quiet` is every input sample of it within the sleep floor. */
@@ -215,15 +216,19 @@ var DelayDsp = class {
     }
     if (this.controls[DELAY_SLOT.enabled] !== 0) this.cleared = false;
     else if (!this.cleared) this.clear();
+    this.held = Math.abs(t[DELAY_SLOT.feedback]) >= 1 || Math.abs(this.controls[DELAY_SLOT.feedback]) >= 1;
     this.drowse(frames, quiet);
     if (this.asleep) for (let k = 0; k < DELAY_KEYS.length; k++) this.controls[k] = t[k];
   }
-  /** The sleep's count, every block: a loud block wakes it; a silent one sleeps once the lines are. */
+  /** The sleep's count, every block: a loud or held block wakes it; a silent one sleeps once the lines are. */
   drowse(frames, quiet) {
-    if (!quiet) this.asleep = false;
+    const holding = this.held && !this.empty;
+    if (!quiet || holding) this.asleep = false;
     if (this.asleep) return;
-    if (this.loudWrite) this.quietFrames = 0;
-    else this.quietFrames += frames;
+    if (this.loudWrite || holding) {
+      this.quietFrames = 0;
+      this.empty = false;
+    } else this.quietFrames += frames;
     this.loudWrite = false;
     if (quiet && this.quietFrames >= this.buffer[0].length) this.asleep = true;
   }
@@ -234,6 +239,7 @@ var DelayDsp = class {
     this.filter.fill(0);
     this.cleared = true;
     this.loudWrite = false;
+    this.empty = true;
     this.quietFrames = this.buffer[0].length;
   }
   /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
@@ -311,7 +317,9 @@ var DelayDsp = class {
     const limit = DELAY_DSP.feedbackCeiling / this.controls[DELAY_SLOT.drive];
     const value = limit * Math.tanh(this.value / limit);
     this.buffer[channel][this.position] = value;
-    if (value > DELAY_SLEEP.outputFloor || value < -DELAY_SLEEP.outputFloor) this.loudWrite = true;
+    if (value > DELAY_SLEEP.outputFloor || value < -DELAY_SLEEP.outputFloor || this.empty && value !== 0) {
+      this.loudWrite = true;
+    }
   }
 };
 
