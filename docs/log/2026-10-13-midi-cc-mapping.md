@@ -27,7 +27,7 @@ What the engine and the console had, read from the code on 2026-10-13:
 
 - **A catalog of targets** (`automation/automationTargets.ts` and its
   tables): the part's strip (Level, Pan, Send A, Send B), each insert's
-  fields by stable insert id, 38 voice rows (`worklet/fm/voiceTargetTables.ts`,
+  fields by stable insert id, 42 voice rows (`worklet/fm/voiceTargetTables.ts`,
   the last 8 the macros) and the sequencer rows. Song lanes, step lanes,
   clip envelopes and the Parts tab's knobs all read it.
 - **Eight voice slots per part** (`FM_LANES_MAX`). A slot is a k-rate
