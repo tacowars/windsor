@@ -54,27 +54,45 @@ if (offline.length) {
 
 const kinds = rows.filter((r) => r.kind === 'kind');
 if (kinds.length) {
-  // The baseline is the kinds round's own `none` case (the same 4-bar song with no insert);
-  // the first round, before `none` existed, falls back to the 8-bar offline cases.
-  const none = kinds.filter((r) => r.insert === 'none');
-  const base = none.length ? none.filter((r) => !r.silent).map((r) => r.msPerAudioSecond) : offline.filter((r) => r.name === '16-none').map((r) => r.msPerAudioSecond);
-  const silentBase = none.length ? none.filter((r) => r.silent).map((r) => r.msPerAudioSecond) : offline.filter((r) => r.name === '16-silent').map((r) => r.msPerAudioSecond);
-  console.log('### Kinds: 16 parts with one insert of the kind each, ms per audio second; the per-insert column subtracts the 16-part song without inserts and divides by 16\n');
+  // Each run is paired with its own baseline: the `none` row of the same file, round and
+  // silence (the same 4-bar song with no insert). A kinds run from before `none` existed is
+  // paired with the earliest offline file's `16-none` / `16-silent` row (the 8-bar song), as
+  // the README's method says. The per-insert figure is the median of those paired
+  // differences over 16 parts, never a difference of pooled medians.
+  const offlineFiles = [...new Set(offline.map((r) => r.file))].sort();
+  const legacy = (silent) =>
+    offline.find((r) => r.file === offlineFiles[0] && r.name === (silent ? '16-silent' : '16-none'));
+  const baselineOf = (run) =>
+    kinds.find((b) => b.insert === 'none' && b.file === run.file && b.round === run.round && b.silent === run.silent) ??
+    legacy(run.silent);
+  console.log('### Kinds: 16 parts with one insert of the kind each, ms per audio second; per insert is the median (min–max) over runs of (run − its own no-insert baseline) / 16\n');
   console.log('| Kind | Playing, ms/s | Per insert, ms/s | Per insert, µs a quantum | Silent input, ms/s | Per silent insert, ms/s |');
   console.log('|---|---:|---:|---:|---:|---:|');
   const byKind = group(kinds, (r) => r.insert);
   const table = [];
   for (const [name, list] of byKind) {
     if (name === 'none') continue;
-    const play = list.filter((r) => !r.silent).map((r) => r.msPerAudioSecond);
-    const silent = list.filter((r) => r.silent).map((r) => r.msPerAudioSecond);
-    const per = base.length ? (median(play) - median(base)) / 16 : NaN;
-    const perSilent = silentBase.length && silent.length ? (median(silent) - median(silentBase)) / 16 : NaN;
-    table.push({ name, play, silent, per, perSilent });
+    const paired = (silent) =>
+      list
+        .filter((r) => r.silent === silent)
+        .map((r) => {
+          const base = baselineOf(r);
+          if (!base) throw Error(`no baseline for ${r.name} in ${r.file} round ${r.round}`);
+          return (r.msPerAudioSecond - base.msPerAudioSecond) / 16;
+        });
+    table.push({
+      name,
+      play: list.filter((r) => !r.silent).map((r) => r.msPerAudioSecond),
+      silent: list.filter((r) => r.silent).map((r) => r.msPerAudioSecond),
+      per: paired(false),
+      perSilent: paired(true),
+    });
   }
-  table.sort((a, b) => b.per - a.per);
+  table.sort((a, b) => median(b.per) - median(a.per));
   for (const t of table)
-    console.log(`| ${t.name} | ${span(t.play, 0)} | ${t.per.toFixed(1)} | ${((t.per / 1000) * 1e6 / 375).toFixed(0)} | ${t.silent.length ? span(t.silent, 0) : '—'} | ${t.perSilent.toFixed(1)} |`);
+    console.log(
+      `| ${t.name} | ${span(t.play, 0)} | ${span(t.per, 1)} | ${((median(t.per) / 1000) * 1e6 / 375).toFixed(0)} | ${t.silent.length ? span(t.silent, 0) : '—'} | ${t.perSilent.length ? span(t.perSilent, 1) : '—'} |`,
+    );
   console.log();
 }
 

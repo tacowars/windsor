@@ -8,7 +8,7 @@
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg, release, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -154,10 +154,10 @@ const started = new Date();
 const server = await serve(await files());
 const base = `http://127.0.0.1:${server.address().port}/`;
 const chromeVersion = execFileSync(CHROME, ['--version'], { encoding: 'utf8' }).trim();
-// Chromium's throwaway profiles go under one folder of the system temp dir, as CLAUDE.md asks
-// of a tool that insists on /tmp; it is made here and removed after the browser closes.
-const profileRoot = join(tmpdir(), 'windsor-perf-bench');
-mkdirSync(profileRoot, { recursive: true });
+// Chromium's throwaway profile goes under a folder of this invocation's own in the system temp
+// dir, as CLAUDE.md asks of a tool that insists on /tmp: unique, so two invocations never share
+// or remove each other's, and removed after the browser closes.
+const profileRoot = mkdtempSync(join(tmpdir(), 'windsor-perf-bench-'));
 const browser = await launch(CHROME, profileRoot);
 const results = [];
 try {
