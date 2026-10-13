@@ -118,6 +118,17 @@ controls live in Float64Array slots rather than a record keyed by name, and
 every double field is first written as NaN.
 `inserts/phaserAllocation.test.ts` pins it on V8 through
 `__fixtures__/phaserChangeScenario.ts`.
+It sleeps on silence (windsor#793, `PHASER_SLEEP`): a block whose input is
+within the floor, once every all-pass, bass and feedback state is under the
+output floor, zeroes that state and writes zeros, with no `tick`; asleep, the
+controls land on their targets and the sweep and the follower move on a
+block at a time, and the first loud block wakes it and renders in full. Its
+tail is the lattice's settle, read off the state, 1.26 s at the slowest
+corner (`tailSeconds` bounds it). The bookkeeping is written out in
+`configure`, which runs every block and so is optimised; a method only a
+silence calls stays in a tier that boxes doubles. `sleep: false` in
+`processorOptions` is the tests' render without it;
+`inserts/phaserSleep.test.ts` holds the tail, the wake and the bits.
 
 `filter/` is the Filter insert (windsor#622), built as
 `generated/filter-processor.js` with its own `tsconfig.json` (`fm/`'s flags,
@@ -182,6 +193,20 @@ fields (`inputLeft`/`inputRight`, `internalInput`, each converter's
 `input`/`output`), never as arguments or returns, and every double field is
 first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
 through `__fixtures__/retroReverbChangeScenario.ts`.
+It sleeps on silence (windsor#793, `RETRO_REVERB_SLEEP`): `internal` keeps
+each block's wet peak (the wet tone, before the converters, so a tail they
+truncate still counts), and `drowse`, called from `configure` every block,
+counts the frames the input and that peak have both held under their
+floors. Past `spanSeconds` (0.85 s, the longest a sample can go unseen: the
+longest pre-delay, then the longer of the finite field's history and the
+diffusers with the longest tank line at Size 10) it empties the networks as
+the switch's off does and sleeps: the processor writes zeros with no `tick`,
+`configure` smooths only the block-rate controls, lands Mix and the switch
+and keeps the internal clock's phase, and the first loud block wakes it and
+renders in full. Its tail is its own decay to the output floor plus the
+span, so no fixed bound covers it (Decay 20 s with Low decay ×4).
+`sleep: false` in `processorOptions` is the tests' render without it;
+`inserts/retroReverbSleep.test.ts` holds the tail, the wake and the bits.
 
 `meter/` holds the two sample meters, bundled together from
 `meter/meterProcessors.ts` to `generated/peak-meter-processor.js` (so the

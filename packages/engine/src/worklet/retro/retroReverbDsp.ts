@@ -26,11 +26,24 @@
  * the bit. The first quantum that starts fully off clears the networks, lines and filters in place,
  * and while the switch stays off they do not run: the tail is cut, never resumed, and switching back
  * on starts from silence.
+ *
+ * Sleep (windsor#793, `RETRO_REVERB_SLEEP`): `internal` keeps the block's
+ * wet peak (the wet tone, before the converters), and `configure` counts the
+ * frames over which the input and that peak have both stayed under their
+ * floors. Past `spanSeconds` it empties the networks as `clear` does and
+ * sleeps: the processor writes zeros and runs no `tick`, and `configure` only
+ * smooths the block-rate controls and lands the per-sample glides (Mix and the
+ * switch), until the first block whose input crosses the floor wakes it and
+ * renders in full. The count is `drowse`, which `configure` calls every block
+ * so V8 optimises it, where a method only a silence called would stay in a
+ * tier that boxes its doubles.
+ * `retroReverbSleep.test.ts` holds the tail, the wake and the bits.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import {
   RETRO_REVERB_DSP as C,
   RETRO_REVERB_BOUNDS as B,
+  RETRO_REVERB_SLEEP as Z,
 } from '../../inserts/retroReverbConstants';
 import { RetroDelay } from './retroDelay';
 import { RetroFilter } from './retroFilter';
@@ -98,8 +111,17 @@ class RetroReverbDsp {
   inputLeft: number;
   inputRight: number;
   internalInput: number;
+  /** Whether it may sleep: `sleep: false` is a test's, to render the reverb without it. */
+  sleepEnabled: boolean;
+  /** Emptied after a silent span: the block is zeros, and no `tick` runs. */
+  asleep: boolean;
+  /** The largest wet-tone sample since the block began, and the frames input and wet held quiet. */
+  wetPeak: number;
+  quietFrames: number;
+  /** The frames the quiet must hold before the reverb sleeps. */
+  sleepSpan: number;
 
-  constructor(rate: number, params: RetroParams) {
+  constructor(rate: number, params: RetroParams, sleep = true) {
     // Rule 7: each double field is born a double (NaN), before its start value.
     this.rate = this.phase = this.previousInput = this.heldLeft = this.heldRight = NaN;
     this.left = this.right = this.size = this.decay = this.tone = this.diffusion = NaN;
@@ -110,6 +132,11 @@ class RetroReverbDsp {
     this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.lowDecay = this.lowCross = NaN;
+    this.wetPeak = this.quietFrames = this.sleepSpan = NaN;
+    this.wetPeak = this.quietFrames = 0;
+    this.sleepSpan = Z.spanSeconds * rate;
+    this.sleepEnabled = sleep;
+    this.asleep = false;
     this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = 0;
     this.rate = rate;
@@ -155,7 +182,9 @@ class RetroReverbDsp {
     this.configureConverters();
   }
 
-  configure(params: RetroParams, frames: number): void {
+  /** The block's controls; `quiet` is every input sample of it within the sleep floor. */
+  configure(params: RetroParams, frames: number, quiet: boolean): void {
+    this.drowse(frames, quiet);
     const k = 1 - Math.exp(-frames / (C.smoothSeconds * this.rate));
     const slew = (C.sizeSlew * frames) / this.rate;
     this.size += Math.max(-slew, Math.min(slew, k * (params.size[0] - this.size)));
@@ -188,6 +217,15 @@ class RetroReverbDsp {
     this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
+    if (this.asleep) {
+      // Nothing renders: the per-sample glides land, the internal clock keeps its time, and
+      // the networks wait for the wake.
+      this.mix = this.targetMix;
+      this.level = this.targetLevel;
+      this.phase += (C.rate / this.rate) * frames;
+      this.phase -= Math.floor(this.phase);
+      return;
+    }
     if (this.level !== 0) this.dormant = false;
     else if (!this.dormant) this.clear();
     // Back on: the networks run again from the silence `clear` left.
@@ -201,6 +239,22 @@ class RetroReverbDsp {
       this.earlyTaps.configure();
     }
     this.configureConverters();
+  }
+
+  /**
+   * The sleep's count, every block (so V8 optimises it): a loud block wakes the reverb; a quiet
+   * one after a quiet wet block counts, and past the span the networks empty and it sleeps.
+   */
+  drowse(frames: number, quiet: boolean): void {
+    if (!quiet) this.asleep = false;
+    if (this.asleep) return;
+    if (quiet && this.wetPeak < Z.outputFloor) this.quietFrames += frames;
+    else this.quietFrames = 0;
+    this.wetPeak = 0;
+    if (this.quietFrames <= this.sleepSpan) return;
+    this.empty();
+    this.quietFrames = 0;
+    this.asleep = true;
   }
 
   /** The block's Character and converter share, into each conversion point. */
@@ -237,6 +291,12 @@ class RetroReverbDsp {
 
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear(): void {
+    this.empty();
+    this.dormant = true;
+  }
+
+  /** Every line, network and filter state to zero, for the switch's off and for sleep. */
+  empty(): void {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
     for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
@@ -256,7 +316,6 @@ class RetroReverbDsp {
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
     this.resetConverters();
-    this.dormant = true;
   }
 
   /** One sample of the internal clock, of `internalInput`. */
@@ -301,6 +360,10 @@ class RetroReverbDsp {
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < C.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < C.silenceFloor) this.wetToneRight = 0;
+    const wetLeft = Math.abs(this.wetToneLeft),
+      wetRight = Math.abs(this.wetToneRight);
+    if (wetLeft > this.wetPeak) this.wetPeak = wetLeft;
+    if (wetRight > this.wetPeak) this.wetPeak = wetRight;
     this.leftConverter.input = this.wetToneLeft;
     this.leftConverter.tick();
     this.heldLeft = this.leftConverter.output;

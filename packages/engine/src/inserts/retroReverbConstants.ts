@@ -150,3 +150,30 @@ export const RETRO_REVERB_DSP = {
   densityMaxBoost: 10 ** (6 / 20),
   millisecondsPerSecond: 1000,
 } as const;
+/**
+ * Sleep (windsor#793), the plate's pattern (record
+ * `2026-09-15-silent-voices-and-plate-sleep-floors`) and its floors: an input
+ * sample within `inputFloor` of 0 is silence, and a wet sample (the tank and
+ * the finite field after the wet tone, before the output converters, so a
+ * tail the converters truncate still counts) within `outputFloor` is an
+ * inaudible tail. Once both have held for `spanSeconds`, longer than a sample
+ * can go unseen (the longest pre-delay, then the longer of the finite field's
+ * history at the longest Duration and the diffusers with the longest tank
+ * line at the largest Size, Drift's reach and the detune lines), the networks
+ * are empty to that floor: they are cleared and stop rendering until the
+ * input moves. So the tail is the reverb's decay to the output floor plus
+ * 0.85 s; no fixed span bounds the decay itself (Decay 20 s with Low decay ×4).
+ */
+export const RETRO_REVERB_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  spanSeconds:
+    RETRO_REVERB_BOUNDS.preDelay[1] +
+    Math.max(
+      RETRO_REVERB_BOUNDS.duration[1],
+      RETRO_REVERB_DSP.diffuserSeconds.reduce((sum, seconds) => sum + seconds, 0) +
+        Math.max(...RETRO_REVERB_DSP.tankSeconds) * RETRO_REVERB_BOUNDS.size[1] +
+        RETRO_REVERB_DSP.driftExcursion +
+        2 * RETRO_REVERB_DSP.detuneExcursion,
+    ),
+};
