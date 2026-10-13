@@ -1,4 +1,4 @@
-/* global console, URL */
+/* global console, process, URL */
 /** Prints the README's tables from every results/*.json: medians over rounds, with min–max. */
 import { readdirSync, readFileSync } from 'node:fs';
 
@@ -6,9 +6,17 @@ const folder = new URL('results/', import.meta.url);
 const files = readdirSync(folder).filter((f) => f.endsWith('.json'));
 const rows = [];
 let environment = null;
+const commits = new Set();
+// One machine and browser per report: a results file from another is refused, not pooled.
+const machine = (e) => [e.cpu, e.cores, e.arch, e.kernel, e.chromeVersion].join(' | ');
 for (const f of files) {
   const data = JSON.parse(readFileSync(new URL(f, folder), 'utf8'));
   environment ??= data.environment;
+  if (machine(data.environment) !== machine(environment)) {
+    console.error(`${f} was taken on another machine or browser (${machine(data.environment)}); move it to a folder of its own`);
+    process.exit(1);
+  }
+  commits.add(data.environment.commit);
   rows.push(...data.results.map((r) => ({ ...r, file: f })));
 }
 
@@ -29,7 +37,8 @@ const group = (list, by) => {
   return out;
 };
 
-console.log(`Environment: ${JSON.stringify(environment, null, 1)}\n`);
+console.log(`Environment: ${machine(environment)}, Node ${environment.node}`);
+console.log(`Commits under test: ${[...commits].map((c) => c.slice(0, 7)).join(', ')} (${files.length} results files)\n`);
 
 const offline = rows.filter((r) => r.kind === 'offline');
 if (offline.length) {

@@ -144,9 +144,15 @@ the app's `DocumentModel`, serves the engine's generated worklet bundles
 byte for byte, and drives a headless Chromium of its own over the DevTools
 protocol (`cdp.mjs`). `songs.mjs` builds the load cases in the page as
 version-15 documents from the shipped `pad-drift` patch: every part a
-Chord Player holding one three-note chord a bar (gate 1), so the voice
-count is fixed, three a part at `spread` 0. `report.mjs` prints the tables
-from `results/`.
+Chord Player striking one three-note chord a bar (gate 1) at 120 BPM.
+The patch's operators release over 2.4 s and a bar is 2 s, so a part
+carries its three new voices plus the previous chord's three in release
+for most of each bar: about six voices a part at `spread` 0 (twelve at
+the patch's own `spread` 12), each tail dropping out as it goes dormant.
+The load is a steady one per part, not a fixed voice count, and no figure
+below is a per-voice figure except the Node kernel render. `report.mjs`
+prints the tables from `results/` and refuses a results file from another
+machine or browser.
 
 - **Offline** (`bench.offline`): the engine's own `renderSong` at 48 kHz,
   the export path, which builds the same parts, strips, returns and master
@@ -155,7 +161,7 @@ from `results/`.
   cost; 10 ms a second is 1 % of a core. 8 bars at 120 BPM plus a 1 s
   tail. Cases: 16 silent parts (every voice inactive, so the graph alone)
   with and without three inserts each; 1, 4, 8 and 16 playing parts with
-  no inserts; 16 parts at the patch's `spread` 12 (six voices a chord);
+  no inserts; 16 parts at the patch's `spread` 12 (twice the voices);
   16 parts with sends; with one insert each; with three inserts each plus
   an EQ and a compressor on the master; and 8 parts with three each.
 - **Kinds** (`bench.kind`): 16 playing parts with one insert of one kind
@@ -185,9 +191,19 @@ from `results/`.
   the autosave's `changed` check reads after every change), and the
   engine's `AudioSystem.apply` of the same partials.
 
-Three rounds of each, cases rotated by round. The machine was otherwise
-idle (one-minute load average in each result row). Raw results are in
-`results/`.
+Every case has three runs (the main-thread case five), from two
+invocations: one single-round invocation per kind of case
+(`--only offline`, `--only kinds`, `--only live`, `--only micro`, and
+`--rounds 3 --only main`), then one two-round invocation of everything,
+with the cases rotated by the round index inside each invocation. So the
+runs are not three rotations of one protocol; the first run of each case
+and the next two come from different sessions a few minutes apart, and
+the kinds' first run predates the `none` baseline. The medians and ranges
+are over those runs; the environment (the same container and Chromium
+throughout; the engine code is the same under both commits the files
+name, since nothing under `packages/` changed) is checked by `report.mjs`.
+The machine was otherwise idle (one-minute load average in each result
+row). Raw results are in `results/`.
 
 ## Results
 
@@ -267,8 +283,9 @@ Notes on the tables:
 
 - **Offline.** `16-silent` is the standing graph plus 16 idle parts and
   strips: 168 ms a second, 17 % of a core here, before a voice sounds.
-  Each three-voice `pad-drift` part adds about 32 ms a second over it, and
-  `spread` 12 (96 voices) takes the song past real time on this machine.
+  Each `pad-drift` part (a chord struck a bar over the last one's release,
+  about six voices) adds about 32 ms a second over it, and `spread` 12
+  (twice the voices) takes the song past real time on this machine.
   The 48 inserts of `16-3ins` add about 2 580 ms a second under signal and
   1 600 on silent parts; the cheap `16-1ins` rotation (an EQ, a compressor,
   a delay, a filter, a phaser, a tape… one each) adds 860. The peak column
@@ -370,13 +387,15 @@ findings carry the assessment:
 
 **The voices scale as expected.** 1, 4, 8 and 16 playing parts with no
 inserts read 87, 190, 334 and 652 ms a second: about 32 ms a second (3 %
-of a core here) per three-voice part over the idle graph, and `spread` 12
-(six voices a chord) adds 376 ms for 48 more voices. In Node on this same
-machine the kernel renders `pad-drift` at 87 ns a voice-sample (4.2 ms a
-second per voice), against 37 ns on the M1 record, so this container is
-about 2.3× slower than the M1 on the kernel; the Chrome figure per voice
-is higher again because the song's releases overlap its chords and the
-control updates ride on top.
+of a core here) per part over the idle graph, a chord struck a bar over
+the last chord's 2.4 s release (about six voices sounding, three of them
+in their tails), and `spread` 12 adds 376 ms for twice the voices. These
+are per-part figures of that load, not per-voice ones. In Node on this
+same machine the kernel renders held `pad-drift` voices at 87 ns a
+voice-sample (4.2 ms a second per voice), against 37 ns on the M1 record,
+so this container is about 2.3× slower than the M1 on the kernel; that
+Node pair is the one per-voice figure here, and the M1 scaling rests on
+it.
 
 **Two main-thread paths can stall the pump.** The console's one change
 path renormalises the whole document and re-serialises it after every knob
@@ -585,9 +604,13 @@ so it sits behind 1–3.
 - Node 22 drives the bench (Node 24 was not installable offline); only the
   page's Chromium runs engine code, so the Node version does not touch the
   numbers.
-- The load cases hold chords of one pad patch. Drums, synced voices, Acid
-  or Formant voices and dense roll parts cost differently per voice; the
-  kernel's own research covers those.
+- The load cases strike chords of one pad patch a bar over its 2.4 s
+  release, so a part's voice count moves between three and six (and
+  twelve at `spread` 12, where the part's 12-voice limit means the
+  release tails are stolen) inside each bar; no active-voice count was
+  read, so the no-insert rows are a cost per part at that load, not per
+  voice. Drums, synced voices, Acid or Formant voices and dense roll parts
+  cost differently per voice; the kernel's own research covers those.
 - The main-thread figures are a cost per call on an idle page, not a
   profile of the console under a drag.
 - The M1 scaling is one number, the FM kernel's Node render on both
