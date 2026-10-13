@@ -13,7 +13,8 @@ let environment = null;
 const commits = new Set();
 // One machine and browser per report: a results file from another is refused, not pooled.
 const machine = (e) => [e.cpu, e.cores, e.arch, e.kernel, e.chromeVersion].join(' | ');
-for (const f of files) {
+/** The file's data, once its environment matches the first file's; a mismatch ends the report. */
+function read(f) {
   const data = JSON.parse(readFileSync(new URL(f, folder), 'utf8'));
   environment ??= data.environment;
   if (machine(data.environment) !== machine(environment)) {
@@ -21,8 +22,11 @@ for (const f of files) {
     process.exit(1);
   }
   commits.add(data.environment.commit);
-  rows.push(...data.results.map((r) => ({ ...r, file: f })));
+  return data;
 }
+for (const f of files) rows.push(...read(f).results.map((r) => ({ ...r, file: f })));
+// The calibration files pass the same check, and their rows the same rate check below.
+const calibrationRows = calibrationFiles.flatMap((f) => read(f).results.map((r) => ({ ...r, file: f })));
 
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -42,7 +46,7 @@ const group = (list, by) => {
 };
 
 console.log(`Environment: ${machine(environment)}, Node ${environment.node}`);
-for (const r of rows)
+for (const r of [...rows, ...calibrationRows])
   if (r.kind !== 'live' && r.sampleRate !== undefined && r.sampleRate !== 48000) {
     console.error(`${r.file}: ${r.kind} ${r.name ?? ''} rendered at ${r.sampleRate} Hz, not the 48 kHz the tables assume`);
     process.exit(1);
@@ -153,9 +157,8 @@ if (calibrationFiles.length) {
   console.log('### Calibration: the whole `renderSong` against its render phase alone (`startRendering`), ms per audio second\n');
   console.log('| Case | Audio s | Whole, ms/s | Render phase, ms/s | Setup, ms | Setup share of the whole |');
   console.log('|---|---:|---:|---:|---:|---:|');
-  for (const f of calibrationFiles) {
-    const data = JSON.parse(readFileSync(new URL(f, folder), 'utf8'));
-    for (const r of data.results.filter((r) => r.renderPhaseMs !== undefined))
+  {
+    for (const r of calibrationRows.filter((r) => r.renderPhaseMs !== undefined))
       console.log(`| ${r.name} | ${r.audioSeconds.toFixed(1)} | ${r.msPerAudioSecond.toFixed(1)} | ${r.renderPhaseMsPerAudioSecond.toFixed(1)} | ${r.setupMs.toFixed(0)} | ${((r.setupMs / r.renderMs) * 100).toFixed(1)} % |`);
   }
   console.log();
