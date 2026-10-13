@@ -11,6 +11,8 @@
  *   full, and the woken render follows a drive that never slept to within
  *   `WAKE_BOUND`, modulation and all; with no modulation it is the bits of a
  *   fresh drive;
+ * - at the most gain the controls allow, an input under the unity floor still
+ *   wakes it, since the floor is divided by the settings' gain (Codex on PR #797);
  * - with no input connected it sleeps too, and `sleep: false` never sleeps.
  *
  * That a render that never goes silent is unchanged is the other drive tests'
@@ -199,6 +201,40 @@ describe('Advanced Drive sleeps on silence (windsor#793)', () => {
         y = block(fresh, b * QUANTUM, tone);
       expect(Array.from(a)).toEqual(Array.from(y));
     }
+  });
+
+  it('wakes on an input under the unity floor at the most gain, as a drive that never slept', () => {
+    // +36 dB of Drive, +24 dB a stage in series and +12 dB out: 96 dB on this path.
+    const hot: Partial<AdvancedDriveSpec> = {
+      route: 'serial',
+      blend: 1,
+      drive: 36,
+      output: 12,
+      stages: [0, 1, 2].map(() => ({
+        ...DEFAULT_DRIVE_STAGE,
+        shaping: false,
+        filtering: false,
+        level: 24,
+      })),
+    };
+    const asleep = rig(hot),
+      awake = rig(hot, false);
+    const quietBlocks = Math.round((TAIL * RATE) / QUANTUM);
+    const faint = (frame: number): number =>
+      0.9 * DRIVE_SLEEP.inputFloor * Math.sin((2 * Math.PI * HZ * frame) / RATE);
+    for (let b = 0; b < quietBlocks; b++) block(asleep, b * QUANTUM, silence);
+    expect(asleep.processor.sleep.asleep).toBe(true);
+    let loudest = 0;
+    for (let b = 0; b < quietBlocks; b++) block(awake, b * QUANTUM, silence);
+    for (let b = quietBlocks; b < 2 * quietBlocks; b++) {
+      const a = Float32Array.from(block(asleep, b * QUANTUM, faint)),
+        y = block(awake, b * QUANTUM, faint);
+      expect(asleep.processor.sleep.asleep).toBe(false);
+      expect(Array.from(a)).toEqual(Array.from(y));
+      loudest = Math.max(loudest, peak(y));
+    }
+    // Heard: far over the output floor, where a dry copy would have stayed under it.
+    expect(loudest).toBeGreaterThan(100 * DRIVE_SLEEP.outputFloor);
   });
 
   it('sleeps with no input connected, writing silence', () => {

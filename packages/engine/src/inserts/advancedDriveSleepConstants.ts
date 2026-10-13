@@ -21,4 +21,19 @@
  * block's end happens to catch near a zero crossing is read at many phases
  * before the drive sleeps.
  */
-export const DRIVE_SLEEP = { inputFloor: 1e-9, outputFloor: 1e-7, holdSeconds: 0.05 };
+/**
+ * The input floor is for a drive at unity: `driveSleep.ts` divides it by the
+ * worst-case linear gain of the current settings (Codex on PR #797), so a
+ * drive at +36 dB, three stages at +24 dB and the output at +12 dB needs an
+ * input 120 dB quieter to sleep, and wakes on it. `shaperSlope` bounds every
+ * curve's slope at any bias (the soft curve's sine, pi/2); `headroom` covers
+ * what the bound does not model: the oversamplers' ripple, a crossover band's
+ * overshoot and a filter swept while it rings.
+ */
+export const DRIVE_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  holdSeconds: 0.05,
+  shaperSlope: Math.PI / 2,
+  headroom: 4,
+};

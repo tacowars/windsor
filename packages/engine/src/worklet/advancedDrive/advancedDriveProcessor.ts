@@ -56,6 +56,7 @@ class AdvancedDriveProcessor extends AudioWorkletProcessor {
     const dsp = this.dsp,
       sleep = this.sleep;
     dsp.configure(params, frames);
+    sleep.gauge(dsp.targets);
     if (!sleep.asleep || !sleep.rest(left, right, out, frames, dsp)) {
       this.render(left, right, out, frames);
       sleep.watch(left, right, out, frames, dsp);
