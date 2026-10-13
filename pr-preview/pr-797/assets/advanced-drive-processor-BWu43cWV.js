@@ -933,18 +933,16 @@ var AdvancedDriveDsp = class {
 };
 
 // packages/engine/src/inserts/advancedDriveSleepConstants.ts
-var DRIVE_SLEEP = { inputFloor: 1e-9, outputFloor: 1e-7, holdSeconds: 0.05 };
+var DRIVE_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  holdSeconds: 0.05,
+  shaperSlope: Math.PI / 2,
+  headroom: 4
+};
 
 // packages/engine/src/worklet/advancedDrive/driveSleep.ts
-function inputQuiet(channel, frames) {
-  if (!channel) return true;
-  const n = channel.length < frames ? channel.length : frames;
-  for (let i = 0; i < n; i++) {
-    const x = channel[i];
-    if (x > DRIVE_SLEEP.inputFloor || x < -DRIVE_SLEEP.inputFloor) return false;
-  }
-  return true;
-}
+var CRUSH = DRIVE_SHAPERS.indexOf("crush");
 function outputQuiet(channel, frames) {
   if (!channel) return true;
   for (let i = 0; i < frames; i++) {
@@ -962,16 +960,71 @@ function writeDry(out, input, frames) {
 var DriveSleep = class {
   constructor(rate, enabled) {
     this.enabled = enabled;
-    this.hold = this.quiet = NaN;
+    this.hold = this.quiet = this.floor = NaN;
     this.hold = Math.ceil(DRIVE_SLEEP.holdSeconds * rate);
     this.quiet = 0;
+    this.floor = DRIVE_SLEEP.inputFloor;
     this.asleep = false;
+    this.seen = new Float64Array(DRIVE_KEYS.length).fill(NaN);
+    this.stages = Array.from({ length: DRIVE_DSP.stages }, (_, i) => driveStageSlots(i));
+  }
+  /** True when the channel's first `frames` samples are all within `floor`; no channel is silence. */
+  inputQuiet(channel, frames) {
+    if (!channel) return true;
+    const n = channel.length < frames ? channel.length : frames, floor = this.floor;
+    for (let i = 0; i < n; i++) {
+      const x = channel[i];
+      if (x > floor || x < -floor) return false;
+    }
+    return true;
+  }
+  /**
+   * Once a block, before the render: when the targets have changed, bound the
+   * gain from the input to the output and set `floor` under it. A stage is
+   * bounded by its filter's resonant peak and peak gain when filtering, its
+   * shaper's steepest slope at the most Amount its modulation can reach plus
+   * the DC tracker's as much again when shaping, and its Level; the routes by
+   * the larger of the serial pair and the sum of all three, which covers each;
+   * then the Drive, the tilt and its undo at their steepest, and the Output.
+   */
+  gauge(t) {
+    if (!this.enabled) return;
+    const seen = this.seen;
+    let changed = false;
+    for (let k = 0; k < seen.length; k++) {
+      if (t[k] !== seen[k]) changed = true;
+      seen[k] = t[k];
+    }
+    if (!changed) return;
+    let first = 1, second = 1, sum = 0;
+    for (let i = 0; i < this.stages.length; i++) {
+      const p = this.stages[i];
+      let g = 1;
+      if (t[p.enabled] > 0) {
+        const q = t[p.resonance];
+        if (t[p.filtering] > 0 && q > Math.SQRT1_2) g *= q / Math.sqrt(1 - 1 / (DRIVE_MATH.four * q * q));
+        if (t[p.filtering] > 0 && t[p.peak] > 0) g *= DRIVE_MATH.decimal ** (t[p.peak] / DRIVE_DSP.dbDivisor);
+        const a = Math.min(
+          1,
+          Math.max(0, t[p.amount]) + Math.abs(t[p.envAmount]) + Math.abs(t[p.lfoAmount])
+        );
+        if (t[p.shaping] > 0 && a > 0)
+          g *= t[p.shaper] === CRUSH ? Infinity : 2 * DRIVE_SLEEP.shaperSlope * DRIVE_MATH.decimal ** (a * DRIVE_DSP.driveScale / 2 / DRIVE_DSP.dbDivisor) + 1;
+        g *= DRIVE_MATH.decimal ** (t[p.level] / DRIVE_DSP.dbDivisor);
+      }
+      if (i === 0) first = g;
+      if (i === 1) second = g;
+      sum += g;
+    }
+    const tilt = Math.abs(t[DRIVE_SLOT.tone]) / 2 / DRIVE_DSP.dbDivisor;
+    const gain = DRIVE_MATH.decimal ** ((t[DRIVE_SLOT.drive] + t[DRIVE_SLOT.output]) / DRIVE_DSP.dbDivisor) * DRIVE_MATH.decimal ** (tilt * (1 + Math.abs(t[DRIVE_SLOT.compensation]))) * Math.max(first * Math.max(1, second), sum);
+    this.floor = DRIVE_SLEEP.inputFloor / (DRIVE_SLEEP.headroom * Math.max(1, gain));
   }
   /** After an awake block: count it quiet or not, and sleep once the quiet has held. */
   watch(left, right, out, frames, dsp) {
     if (!this.enabled) return;
     const graph = dsp.graph, floor = DRIVE_SLEEP.outputFloor;
-    const quiet = inputQuiet(left, frames) && inputQuiet(right, frames) && outputQuiet(out[0], frames) && outputQuiet(out[1], frames) && Math.abs(graph.left) <= floor && Math.abs(graph.right) <= floor && Math.abs(graph.dryLeft) <= floor && Math.abs(graph.dryRight) <= floor;
+    const quiet = this.inputQuiet(left, frames) && this.inputQuiet(right, frames) && outputQuiet(out[0], frames) && outputQuiet(out[1], frames) && Math.abs(graph.left) <= floor && Math.abs(graph.right) <= floor && Math.abs(graph.dryLeft) <= floor && Math.abs(graph.dryRight) <= floor;
     if (!quiet) {
       this.quiet = 0;
       return;
@@ -988,7 +1041,7 @@ var DriveSleep = class {
    * the block in full.
    */
   rest(left, right, out, frames, dsp) {
-    if (!inputQuiet(left, frames) || !inputQuiet(right, frames)) {
+    if (!this.inputQuiet(left, frames) || !this.inputQuiet(right, frames)) {
       this.asleep = false;
       return false;
     }
@@ -1033,6 +1086,7 @@ var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletP
     const frames = out[0].length;
     const dsp = this.dsp, sleep = this.sleep;
     dsp.configure(params, frames);
+    sleep.gauge(dsp.targets);
     if (!sleep.asleep || !sleep.rest(left, right, out, frames, dsp)) {
       this.render(left, right, out, frames);
       sleep.watch(left, right, out, frames, dsp);
