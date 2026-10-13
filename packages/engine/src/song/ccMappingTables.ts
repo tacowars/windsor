@@ -20,3 +20,6 @@ export const CC_MAPPING_IGNORED: ReadonlySet<number> = new Set([
   // The channel mode messages.
   120, 121, 122, 123, 124, 125, 126, 127,
 ]);
+
+/** A mapping's channel is 1..16, or null for Any (decision 1). */
+export const CC_CHANNEL_MAX = 16;

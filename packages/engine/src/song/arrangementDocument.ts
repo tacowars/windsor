@@ -40,6 +40,7 @@ import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { normaliseSongMeta } from './songMetaNormalise';
 import type { ChannelStrip, GroupSpec, ReturnSpec } from '../mixer/mix';
 import type { AutomationLane } from '../automation/automationLane';
+import type { CcMapping } from './ccMapping';
 import type { Patch } from '../patch/patch';
 import type { ResolveOptions } from './arrangementValidate';
 import type { FormatRefusal } from './formatUpgrade';
@@ -67,6 +68,14 @@ export interface DocumentPart extends MusicPart {
    * partial replaces the whole list. `automation/automationPlayer.ts` plays them (windsor#344).
    */
   readonly automation?: readonly AutomationLane[];
+  /**
+   * The part's MIDI CC mappings (windsor#782, record
+   * `2026-10-13-midi-cc-mapping` decision 9): which controller knob moves
+   * which of its targets, over what range. Setup only, never a CC value.
+   * Absent when it has none; a partial replaces the whole list. The console
+   * plays them (`ccMappingNormalise.ts` says what a song may hold).
+   */
+  readonly ccMappings?: readonly CcMapping[];
   /**
    * The library id this part's own copy of its patch came from (windsor#669,
    * record `2026-10-10-each-part-owns-its-patch`): set only when `preset`

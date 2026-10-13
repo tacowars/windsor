@@ -10,7 +10,8 @@
  * It reaches every part whose `preset` is the patch (the patch is one
  * snapshot every such part plays): its song lanes (`automation`), its
  * sequencer's step lanes (`lanes` on a grid, arp, bass or figure,
- * `modLanes` on a Euclid), and the step lanes of each region's own pattern.
+ * `modLanes` on a Euclid), the step lanes of each region's own pattern, and
+ * its CC mappings (windsor#782), which follow their macro as lanes do.
  * `macroRemovalParts` is pure over the document; `removeMacroAndItsLanes`
  * commits it with the patch's edit. Every macro edit the card commits
  * (`commitMacros`, and the removal) puts the other tabs out of date.
@@ -18,6 +19,7 @@
 import type {
   ArrangementDocument,
   AutomationLane,
+  CcMapping,
   DocumentPart,
   DeepPartial,
   Macro,
@@ -78,6 +80,14 @@ const songLanes = (lanes: readonly AutomationLane[], removed: number) =>
     }),
   );
 
+const ccMappings = (mappings: readonly CcMapping[], removed: number) =>
+  shiftedLanes(
+    mappings,
+    removed,
+    (mapping) => voicePathOf(mapping.target),
+    (mapping, path) => ({ ...mapping, target: voiceTargetId(path) }),
+  );
+
 const stepLanes = (lanes: readonly StepModLane[], removed: number) =>
   shiftedLanes(
     lanes,
@@ -131,11 +141,13 @@ function shiftedRegions(regions: readonly PartRegion[], removed: number): PartRe
 /** What the removal changes on `part`, or undefined for a part with no lane on a moved macro. */
 function partChange(part: DocumentPart, removed: number): DeepPartial<DocumentPart> | undefined {
   const automation = songLanes(part.automation ?? [], removed);
+  const mappings = ccMappings(part.ccMappings ?? [], removed);
   const sequencer = stepLaneChange(part.sequencer, removed);
   const regions = shiftedRegions(part.regions, removed);
-  if (!automation && !sequencer && !regions) return undefined;
+  if (!automation && !mappings && !sequencer && !regions) return undefined;
   return {
     ...(automation && { automation }),
+    ...(mappings && { ccMappings: mappings }),
     ...(sequencer && { sequencer: sequencer as DeepPartial<DocumentPart['sequencer']> }),
     ...(regions && { regions }),
   };
