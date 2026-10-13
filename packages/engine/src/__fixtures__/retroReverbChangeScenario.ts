@@ -12,7 +12,9 @@
  * until the tail has decayed to exact zeros, the finite field has faded out,
  * the pre-delay is off and the mix has settled; then mono noise and no input
  * for `inputs` quanta each (the silence has put the reverb to sleep by then,
- * windsor#793, and the mono noise wakes it); then stereo noise for `flicker` quanta with Drift
+ * windsor#793, and the mono noise wakes it; asleep, Size, Mix, Drift and the converter change, then
+ * once Mix has glided onto its target the switch goes off, both moving asleep, windsor#802, and
+ * the mono noise restores the defaults); then stereo noise for `flicker` quanta with Drift
  * depth switching between 0 and `flickerDepth` every quantum, so the tank's
  * detune delays are refilled on every other block. The probe imports it by path in its child Node,
  * which runs it directly (its types are stripped), so it imports nothing at
@@ -87,13 +89,23 @@ const TOGGLES: [string, number][] = [
   ['enabled', 0],
 ];
 
+/** What changes while the reverb sleeps in the silence (windsor#802), each a value from `TOGGLES`. */
+const ASLEEP_MOVES: [string, number][] = [
+  ['size', 2.4],
+  ['mix', 0.8],
+  ['driftRate', 3],
+  ['driftDepth', 0.8],
+  ['converter', 1],
+];
+
 /**
  * Finite field, reverb alone, pre-delay line, pre-delay off, tail at zero, mix gliding, mix settled,
  * mono, no input, the switch fading, switched off and dormant, the early taps, Drift switching on
  * and off, the line taps, the line taps placed on every tick of a Size move, the gain-ranging
- * converters, the low band's split, the split with the line taps, asleep, and woken.
+ * converters, the low band's split, the split with the line taps, asleep, woken, Mix gliding
+ * asleep and the switch fading asleep.
  */
-const PATHS = 20;
+const PATHS = 22;
 
 /** No input. */
 const none: Float32Array[][] = [];
@@ -145,9 +157,37 @@ function notePaths(
   if (dsp.tank.density !== 0 && dsp.tank.sizeTicks === 0 && !dsp.dormant) seen[14] = 1;
   if (dsp.ranging !== 0 && !dsp.dormant) seen[15] = 1;
   if (dsp.tank.low.on) seen[dsp.tank.density !== 0 ? 17 : 16] = 1;
+  if (dsp.asleep && dsp.mix !== dsp.targetMix) seen[20] = 1;
+  if (dsp.asleep && dsp.level !== dsp.targetLevel) seen[21] = 1;
   if (dsp.asleep) seen[18] = 1;
   // Awake on the mono noise after a sleep: the noise woke it.
   else if (seen[18] && phase === 'mono') seen[19] = 1;
+}
+
+/**
+ * The silence's moves while the reverb sleeps (windsor#802): `moved` is called each quiet quantum
+ * and is true once they are done. Asleep, `ASLEEP_MOVES` change; once Mix has glided onto its
+ * target, the switch goes off; the wake ends the moves, and the next silence moves again.
+ */
+function asleepMover(params: Record<string, Float32Array>, dsp: RetroState): { moved(): boolean } {
+  const moving = ASLEEP_MOVES.map(([name]) => params[name]!);
+  const values = Float32Array.from(ASLEEP_MOVES, ([, value]) => value);
+  const enabled = params.enabled!;
+  // 0 before the reverb sleeps, 1 once the controls moved asleep, 2 once the switch has.
+  let moves = 0;
+  return {
+    moved: (): boolean => {
+      if (moves === 2 && dsp.asleep) return true;
+      // Awake in a silence after the moves: a new silence, which moves again once it sleeps.
+      if (moves === 2) moves = 0;
+      if (!dsp.asleep) return false;
+      if (moves === 0) for (let k = 0; k < moving.length; k++) moving[k]![0] = values[k]!;
+      else if (dsp.mix === dsp.targetMix) enabled[0] = 0;
+      else return false;
+      moves++;
+      return false;
+    },
+  };
 }
 
 function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
@@ -160,6 +200,7 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
   const decay = params.decay!;
   const decayDefault = decay[0]!;
   const depth = params.driftDepth!;
+  const asleep = asleepMover(params, dsp);
   const mono = [[sound[0]![0]!]];
   const seen = new Uint8Array(PATHS);
   let phase: Phase = 'loud';
@@ -170,10 +211,10 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
     const k = change++ % TOGGLES.length;
     arrays[k]![0] = arrays[k]![0] === others[k] ? defaults[k]! : others[k]!;
   };
-  // Every parameter at its default, the decay short: the tail runs down to zero.
-  const hush = (): void => {
+  // Every parameter at its default, the decay at `seconds`: short, the tail runs down to zero.
+  const hush = (seconds: number): void => {
     for (let k = 0; k < arrays.length; k++) arrays[k]![0] = defaults[k]!;
-    decay[0] = config.quietDecay;
+    decay[0] = seconds;
   };
   // Drift's depth from exactly 0 to on and back, a block each: the detune delays' refill.
   const flicker = (): Float32Array[][] => {
@@ -192,14 +233,14 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
       if (q % config.period === 0) toggle();
       if (--left > 0) return sound;
       phase = 'quiet';
-      hush();
+      hush(config.quietDecay);
       return quiet;
     }
     if (phase === 'quiet') {
-      if (!settled(dsp, config)) return quiet;
+      if (!asleep.moved() || !settled(dsp, config)) return quiet;
       phase = 'mono';
       left = config.inputs;
-      decay[0] = decayDefault;
+      hush(decayDefault);
     }
     if (--left > 0) return phase === 'mono' ? mono : none;
     if (phase === 'mono') {
@@ -211,8 +252,7 @@ function retroCycle(probe: ProbeRig, config: RetroReverbChangeConfig): Cycle {
     left = config.flicker;
     return none;
   };
-  const note = (): void => notePaths(seen, dsp, phase, config);
-  return { step, note, seen };
+  return { step, note: () => notePaths(seen, dsp, phase, config), seen };
 }
 
 export default function retroReverbChangeScenario(probe: ProbeRig): ProbeScenario {

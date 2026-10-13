@@ -623,7 +623,31 @@ var RetroTank = class {
     this.driftPhase = this.driftStep = this.excursion = this.detune = 0;
   }
   configure(settings) {
-    const { size, ticks, decay, tone, diffusion, driftRate, driftDepth, density, finite } = settings;
+    const { size, decay, tone, diffusion, density, finite } = settings;
+    this.aim(settings);
+    const share = 1 - finite;
+    this.diffusion = diffusion * RETRO_REVERB_DSP.maxDiffusion;
+    this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / RETRO_REVERB_DSP.rate);
+    for (let i = 0; i < this.lines.length; i++)
+      this.gains[i] = Math.pow(RETRO_REVERB_DSP.decayTarget, RETRO_REVERB_DSP.tankSeconds[i] * size / decay);
+    const low = this.low;
+    low.configure(settings, share > RETRO_REVERB_DSP.silenceFloor && settings.lowDecay !== 1, this.gains);
+    this.density = share > RETRO_REVERB_DSP.silenceFloor ? density * share : 0;
+    if (this.density === 0 || !low.on) low.stateLeft = low.stateRight = 0;
+    if (this.density === 0) return;
+    this.placeTaps();
+    this.level.point[0] = tone;
+    this.level.point[1] = size;
+    this.level.point[2] = decay;
+    this.level.match();
+    this.weighTaps();
+  }
+  /**
+   * The block's Size move and Drift's LFO: `configure`'s first part, and all of it an asleep
+   * block needs (windsor#802), since `idle` steps only these.
+   */
+  aim(settings) {
+    const { size, ticks, driftRate, driftDepth, finite } = settings;
     this.sizeTarget = size;
     this.sizeStep = 0;
     this.sizeTicks = ticks;
@@ -641,21 +665,22 @@ var RetroTank = class {
       for (let i = 0; i < right.length; i++) right[i] = this.right;
     }
     this.detune = detune;
-    this.diffusion = diffusion * RETRO_REVERB_DSP.maxDiffusion;
-    this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / RETRO_REVERB_DSP.rate);
-    for (let i = 0; i < this.lines.length; i++)
-      this.gains[i] = Math.pow(RETRO_REVERB_DSP.decayTarget, RETRO_REVERB_DSP.tankSeconds[i] * size / decay);
-    const low = this.low;
-    low.configure(settings, share > RETRO_REVERB_DSP.silenceFloor && settings.lowDecay !== 1, this.gains);
-    this.density = share > RETRO_REVERB_DSP.silenceFloor ? density * share : 0;
-    if (this.density === 0 || !low.on) low.stateLeft = low.stateRight = 0;
-    if (this.density === 0) return;
-    this.placeTaps();
-    this.level.point[0] = tone;
-    this.level.point[1] = size;
-    this.level.point[2] = decay;
-    this.level.match();
-    this.weighTaps();
+  }
+  /**
+   * One asleep internal tick (windsor#802): `tick`'s LFO step and `stepSize`'s, in their
+   * arithmetic, with no audio, so a woken tank's Drift and Size are where an awake one's are. The
+   * taps are placed again by the waking block's `configure`, before its first tick.
+   */
+  idle() {
+    if (this.detune !== 0) {
+      let phase = this.driftPhase + this.driftStep;
+      if (phase >= 1) phase -= 2;
+      this.driftPhase = phase;
+    }
+    if (this.sizeStep === 0) return;
+    this.sizeTicks--;
+    this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+    if (this.sizeTicks === 0) this.sizeStep = 0;
   }
   /**
    * The taps' delays at the lines' Size now: once a block while Size holds, and on every tick of
@@ -1129,17 +1154,15 @@ var RetroReverbDsp = class {
     this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
-    if (this.asleep) {
-      this.mix = this.targetMix;
-      this.level = this.targetLevel;
-      this.phase += RETRO_REVERB_DSP.rate / this.rate * frames;
-      this.phase -= Math.floor(this.phase);
-      return;
-    }
     if (this.level !== 0) this.dormant = false;
     else if (!this.dormant) this.clear();
     if (this.targetLevel !== 0) this.dormant = false;
     this.countTicks(frames);
+    if (this.asleep) {
+      this.tank.aim(this);
+      this.configureConverters();
+      return;
+    }
     this.wetPole = 1 - Math.exp(-(2 * Math.PI * this.tone) / RETRO_REVERB_DSP.rate);
     this.tank.configure(this);
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) this.reflections.configure(this);
@@ -1195,9 +1218,13 @@ var RetroReverbDsp = class {
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear() {
     this.empty();
+    this.resetConverters();
     this.dormant = true;
   }
-  /** Every line, network and filter state to zero, for the switch's off and for sleep. */
+  /**
+   * Every line, network and filter state to zero, for the switch's off and for sleep. The
+   * converters' detectors are not audio: asleep they keep running in `rest` (windsor#802).
+   */
   empty() {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
@@ -1217,7 +1244,34 @@ var RetroReverbDsp = class {
     this.rightFilter.z.fill(0);
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
-    this.resetConverters();
+  }
+  /**
+   * One asleep block of `frames` (windsor#802, the rule of Advanced Drive's `rest`): `tick` a
+   * sample at a time with no audio. The internal clock keeps its steps, and on each of its ticks
+   * the tank's Drift and Size move (`RetroTank.idle`) and, while ranging, each converter's
+   * detector takes the silence; Mix glides and the switch fades. Each is `tick`'s arithmetic, so
+   * a wake finds them on the bits of a reverb that never slept. Dormant, `tick` runs nothing.
+   */
+  rest(frames) {
+    if (this.dormant) return;
+    const step = RETRO_REVERB_DSP.rate / this.rate, ranging = this.ranging !== 0;
+    for (let i = 0; i < frames; i++) {
+      this.phase += step;
+      while (this.phase >= 1) {
+        this.phase -= 1;
+        this.tank.idle();
+        if (!ranging) continue;
+        this.inputConverter.input = this.leftConverter.input = this.rightConverter.input = 0;
+        this.inputConverter.tick();
+        this.leftConverter.tick();
+        this.rightConverter.tick();
+      }
+      this.mix += this.smooth * (this.targetMix - this.mix);
+      if (Math.abs(this.targetMix - this.mix) < RETRO_REVERB_DSP.silenceFloor) this.mix = this.targetMix;
+      const level = this.level;
+      if (level !== this.targetLevel)
+        this.level = this.targetLevel > level ? Math.min(this.targetLevel, level + this.levelStep) : Math.max(this.targetLevel, level - this.levelStep);
+    }
   }
   /** One sample of the internal clock, of `internalInput`. */
   internal() {
@@ -1346,7 +1400,7 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
     const frames = out[0].length;
     const dsp = this.dsp;
     dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
-    if (dsp.asleep) this.rest(out);
+    if (dsp.asleep) this.rest(out, frames);
     else this.render(left, right, out, frames);
     this.load.end(frames);
     return true;
@@ -1377,10 +1431,15 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
     }
     return true;
   }
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out) {
+  /**
+   * One asleep block: zeros, the input's silence to within its floor, and the DSP's `rest`, which
+   * keeps the clock, Drift, the Size move, the converters' detectors, Mix and the switch moving
+   * (windsor#802).
+   */
+  rest(out, frames) {
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
+    this.dsp.rest(frames);
   }
 };
 registerProcessor(RETRO_REVERB_NAME, RetroReverbProcessor);

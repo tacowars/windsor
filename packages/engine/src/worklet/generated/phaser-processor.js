@@ -171,11 +171,10 @@ var PhaserDsp = class {
    * not called: `configure` runs every block, so V8 optimises it, where a
    * method that only a silence calls stays in a tier that boxes its doubles.
    * `quiet` is every input sample of the block within the floor. A quiet block
-   * puts the phaser to sleep once every audio state has rung out; an asleep
-   * one lands the controls on their targets and moves the sweep and the
-   * follower on a block; a loud one wakes it to render in full.
+   * puts the phaser to sleep once every audio state has rung out, and the
+   * block is then an asleep one (`rest`); a loud one wakes it to render in full.
    */
-  configure(params, frames, quiet) {
+  configure(params, quiet) {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
     if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
@@ -183,24 +182,35 @@ var PhaserDsp = class {
       this.asleep = false;
       return;
     }
-    if (!this.asleep) {
-      const floor = PHASER_SLEEP.stateFloor;
-      let rung = true;
-      for (let i = 0; i < this.state.length; i++)
-        if (Math.abs(this.state[i]) >= floor) rung = false;
-      for (let c = 0; c < 2; c++) {
-        if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
-        if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
-      }
-      if (!rung) return;
-      this.clear();
-      this.asleep = true;
+    if (this.asleep) return;
+    const floor = PHASER_SLEEP.stateFloor;
+    let rung = true;
+    for (let i = 0; i < this.state.length; i++) if (Math.abs(this.state[i]) >= floor) rung = false;
+    for (let c = 0; c < 2; c++) {
+      if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
+      if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
     }
-    const s = this.controls;
-    for (let slot = 0; slot < s.length; slot++) s[slot] = t[slot];
-    this.follower *= Math.pow(1 - this.release, frames);
-    this.phase += s[SLOT.rate] * frames / this.rate;
-    this.phase -= Math.floor(this.phase);
+    if (!rung) return;
+    this.clear();
+    this.asleep = true;
+  }
+  /**
+   * One asleep block of `frames` (windsor#802, the rule of Advanced Drive's `rest`): `tick`'s
+   * control path a sample at a time, with no audio. The controls smooth, the switch fades, the
+   * follower releases towards the silence and the sweep's phase integrates the smoothed rate,
+   * each in `tick`'s arithmetic, so a wake finds them on the bits of a phaser that never slept.
+   */
+  rest(frames) {
+    const s = this.controls, t = this.targets, k = this.smooth, on = SLOT.enabled;
+    for (let n = 0; n < frames; n++) {
+      for (let slot = 0; slot < s.length; slot++)
+        if (slot !== on) s[slot] += k * (t[slot] - s[slot]);
+      const enabled = s[on], to = t[on];
+      s[on] = to > enabled ? Math.min(to, enabled + this.switchStep) : Math.max(to, enabled - this.switchStep);
+      this.follower += this.release * (0 - this.follower);
+      this.phase += s[SLOT.rate] / this.rate;
+      this.phase -= Math.floor(this.phase);
+    }
   }
   /** Back on from fully off, or asleep: the all-passes and the feedback start from rest. */
   clear() {
@@ -305,8 +315,8 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
     const dsp = this.dsp;
-    dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
-    if (dsp.asleep) this.rest(out);
+    dsp.configure(params, dsp.sleepEnabled && this.silent(left, right));
+    if (dsp.asleep) this.rest(out, frames);
     else this.render(left, right, out, frames);
     this.load.end(frames);
     return true;
@@ -338,10 +348,14 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
     }
     return true;
   }
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out) {
+  /**
+   * One asleep block: zeros, the input's silence to within its floor, and the DSP's control-only
+   * `rest`, which keeps the glides, the fade, the follower and the sweep moving (windsor#802).
+   */
+  rest(out, frames) {
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
+    this.dsp.rest(frames);
   }
 };
 registerProcessor(PHASER_NAME, PhaserProcessor);

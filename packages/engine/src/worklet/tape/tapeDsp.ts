@@ -125,12 +125,10 @@ class TapeDsp {
   noise = NaN;
   mix = NaN;
   /**
-   * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, whether an
-   * asleep block runs `advance` (the hiss or the motion), the quiet frames counted toward
-   * `sleepSpan`, and that span.
+   * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, the quiet
+   * frames counted toward `sleepSpan`, and that span.
    */
   asleep = false;
-  advancing = false;
   quietFrames = 0;
   sleepSpan = 0;
   constructor(

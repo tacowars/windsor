@@ -22,7 +22,7 @@ export function tapeParams(spec: Partial<TapeSpec> = {}): Record<string, Float32
 export interface TapeProcessorLike {
   port: { posted: unknown[]; onmessage(event: { data: unknown }): void };
   /** The parts of the bundle's `TapeDsp` the sleep's tests read (windsor#793). */
-  dsp: { asleep: boolean; advancing: boolean; position: number; sleepSpan: number };
+  dsp: { asleep: boolean; position: number; sleepSpan: number };
   process(
     inputs: Float32Array[][],
     outputs: Float32Array[][],

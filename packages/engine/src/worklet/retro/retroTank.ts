@@ -165,8 +165,33 @@ class RetroTank {
   }
 
   configure(settings: RetroTankSettings): void {
-    const { size, ticks, decay, tone, diffusion, driftRate, driftDepth, density, finite } =
-      settings;
+    const { size, decay, tone, diffusion, density, finite } = settings;
+    this.aim(settings);
+    const share = 1 - finite;
+    this.diffusion = diffusion * C.maxDiffusion;
+    this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / C.rate);
+    for (let i = 0; i < this.lines.length; i++)
+      this.gains[i] = Math.pow(C.decayTarget, (C.tankSeconds[i] * size) / decay);
+    const low = this.low;
+    low.configure(settings, share > C.silenceFloor && settings.lowDecay !== 1, this.gains);
+    this.density = share > C.silenceFloor ? density * share : 0;
+    // The outputs' low-band lowpasses run only while both play; idle, they wait at silence.
+    if (this.density === 0 || !low.on) low.stateLeft = low.stateRight = 0;
+    if (this.density === 0) return;
+    this.placeTaps();
+    this.level.point[0] = tone;
+    this.level.point[1] = size;
+    this.level.point[2] = decay;
+    this.level.match();
+    this.weighTaps();
+  }
+
+  /**
+   * The block's Size move and Drift's LFO: `configure`'s first part, and all of it an asleep
+   * block needs (windsor#802), since `idle` steps only these.
+   */
+  aim(settings: RetroTankSettings): void {
+    const { size, ticks, driftRate, driftDepth, finite } = settings;
     this.sizeTarget = size;
     this.sizeStep = 0;
     this.sizeTicks = ticks;
@@ -187,22 +212,23 @@ class RetroTank {
       for (let i = 0; i < right.length; i++) right[i] = this.right;
     }
     this.detune = detune;
-    this.diffusion = diffusion * C.maxDiffusion;
-    this.pole = 1 - Math.exp(-(2 * Math.PI * tone) / C.rate);
-    for (let i = 0; i < this.lines.length; i++)
-      this.gains[i] = Math.pow(C.decayTarget, (C.tankSeconds[i] * size) / decay);
-    const low = this.low;
-    low.configure(settings, share > C.silenceFloor && settings.lowDecay !== 1, this.gains);
-    this.density = share > C.silenceFloor ? density * share : 0;
-    // The outputs' low-band lowpasses run only while both play; idle, they wait at silence.
-    if (this.density === 0 || !low.on) low.stateLeft = low.stateRight = 0;
-    if (this.density === 0) return;
-    this.placeTaps();
-    this.level.point[0] = tone;
-    this.level.point[1] = size;
-    this.level.point[2] = decay;
-    this.level.match();
-    this.weighTaps();
+  }
+
+  /**
+   * One asleep internal tick (windsor#802): `tick`'s LFO step and `stepSize`'s, in their
+   * arithmetic, with no audio, so a woken tank's Drift and Size are where an awake one's are. The
+   * taps are placed again by the waking block's `configure`, before its first tick.
+   */
+  idle(): void {
+    if (this.detune !== 0) {
+      let phase = this.driftPhase + this.driftStep;
+      if (phase >= 1) phase -= 2;
+      this.driftPhase = phase;
+    }
+    if (this.sizeStep === 0) return;
+    this.sizeTicks--;
+    this.size = this.sizeTicks > 0 ? this.size + this.sizeStep : this.sizeTarget;
+    if (this.sizeTicks === 0) this.sizeStep = 0;
   }
 
   /**

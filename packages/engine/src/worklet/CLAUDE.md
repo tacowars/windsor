@@ -35,14 +35,15 @@ pattern). After an awake block whose input is under `TAPE_SLEEP.inputFloor`
 plus the core's 48 samples; the DC block's settle is the wait before the count
 starts, about 0.2 s after a tone. Asleep, the EQ, the core, the DC block and
 the ring are frozen where they stood, not cleared, so a woken tape keeps its
-remanence and renders within a float32 ulp of one that never slept. The hiss
-stays audible: while it sounds or the motion moves, an asleep frame runs
-`TapeDsp.advance` (the controls, motion, dropouts, noise and glide, as awake)
-and mixes the noise over the dry ring with the ring's read at 0; with both off
-(a hiss gain under `hissSnap` lands at 0) the controls land on their targets
-and the dry ring runs alone, a wet of exactly 0. The processor reads each
-block's input before rendering it, and any sample over the floor wakes the
-tape on that block, rendered in full. `renderAsleep` is the asleep block,
+remanence and renders within a float32 ulp of one that never slept. Every
+asleep frame runs `TapeDsp.advance` as awake (the controls, the switch's
+fade, the motion's clocks and draws, the dropouts, the noise, the model
+weights and the core's glide; windsor#802), so a control moved in a gap
+wakes mid-glide on a never-sleeping tape's bits, and mixes the noise over
+the dry ring with the ring's read at 0: the hiss stays audible, and with its
+target off a gain under `hissSnap` lands at 0, a wet of exactly 0. The
+processor reads each block's input before rendering it, and any sample over
+the floor wakes the tape on that block, rendered in full. `renderAsleep` is the asleep block,
 dispatched outside the awake loop; `processorOptions.sleep: false` renders
 without the sleep, for tests. `inserts/tapeSleep.test.ts` pins the tail, the
 frozen path, the wake and the hiss against that.
@@ -178,15 +179,16 @@ every double field is first written as NaN.
 `__fixtures__/phaserChangeScenario.ts`.
 It sleeps on silence (windsor#793, `PHASER_SLEEP`): a block whose input is
 within the floor, once every all-pass, bass and feedback state is under the
-output floor, zeroes that state and writes zeros, with no `tick`; asleep, the
-controls land on their targets and the sweep and the follower move on a
-block at a time, and the first loud block wakes it and renders in full. Its
-tail is the lattice's settle, read off the state, 1.26 s at the slowest
-corner (`tailSeconds` bounds it). The bookkeeping is written out in
-`configure`, which runs every block and so is optimised; a method only a
-silence calls stays in a tier that boxes doubles. `sleep: false` in
+output floor, zeroes that state and writes zeros, with no `tick`; asleep,
+`PhaserDsp.rest` steps `tick`'s control path a sample at a time with no
+audio (the controls' glides, the switch's fade, the follower's release and
+the sweep's phase, on an awake phaser's bits; windsor#802), and the first
+loud block wakes it and renders in full. Its tail is the lattice's settle,
+read off the state, 1.26 s at the slowest corner (`tailSeconds` bounds it). The sleep's count is written out in
+`configure`, which runs every block and so is optimised. `sleep: false` in
 `processorOptions` is the tests' render without it;
-`inserts/phaserSleep.test.ts` holds the tail, the wake and the bits.
+`inserts/phaserSleep.test.ts` holds the tail, the wake, the changes made
+asleep and the bits.
 
 `filter/` is the Filter insert (windsor#622), built as
 `generated/filter-processor.js` with its own `tsconfig.json` (`fm/`'s flags,
@@ -258,13 +260,18 @@ counts the frames the input and that peak have both held under their
 floors. Past `spanSeconds` (0.85 s, the longest a sample can go unseen: the
 longest pre-delay, then the longer of the finite field's history and the
 diffusers with the longest tank line at Size 10) it empties the networks as
-the switch's off does and sleeps: the processor writes zeros with no `tick`,
-`configure` smooths only the block-rate controls, lands Mix and the switch
-and keeps the internal clock's phase, and the first loud block wakes it and
-renders in full. Its tail is its own decay to the output floor plus the
-span, so no fixed bound covers it (Decay 20 s with Low decay ×4).
-`sleep: false` in `processorOptions` is the tests' render without it;
-`inserts/retroReverbSleep.test.ts` holds the tail, the wake and the bits.
+the switch's off does, keeping the converters' detectors, and sleeps: the
+processor writes zeros with no `tick`, `configure` smooths the block-rate
+controls and aims the tank's Size move and Drift (`RetroTank.aim`), and
+`RetroReverbDsp.rest` steps what `tick` moves that is not audio a sample at a
+time (windsor#802): the internal clock, Drift's LFO and the Size move on each
+internal tick (`RetroTank.idle`), the detectors on the silence while
+ranging, Mix's glide and the switch's fade, on an awake reverb's bits. The
+first loud block wakes it and renders in full. Its tail is its own decay to
+the output floor plus the span, so no fixed bound covers it (Decay 20 s with
+Low decay ×4). `sleep: false` in `processorOptions` is the tests' render
+without it; `inserts/retroReverbSleep.test.ts` holds the tail, the wake, the
+changes made asleep and the bits.
 
 `meter/` holds the two sample meters, bundled together from
 `meter/meterProcessors.ts` to `generated/peak-meter-processor.js` (so the

@@ -21,11 +21,13 @@
  * Sleep (windsor#793, `PHASER_SLEEP`): on a block whose input is silent,
  * `configure` reads the all-pass, bass and feedback state, and once all of it
  * is under the floor it zeroes it and sleeps; the processor then writes the
- * block's zeros and runs no `tick`. Asleep, the controls land on their targets
- * and the sweep's phase and the follower's release move on a block at a time,
- * so the sweep keeps its time across a gap. The first block whose input
- * crosses the floor wakes it and renders in full. `phaserSleep.test.ts` holds
- * the tail, the sleep and the wake.
+ * block's zeros and runs no `tick`. Asleep, `rest` steps `tick`'s control path
+ * a sample at a time with no audio (windsor#802): the controls glide, the
+ * switch fades, the follower releases and the sweep's phase integrates the
+ * smoothed rate, so a control moved in a gap wakes mid-glide on the bits of a
+ * phaser that never slept. The first block whose input crosses the floor
+ * wakes it and renders in full. `phaserSleep.test.ts` holds the tail, the
+ * sleep, the wake and the changes made asleep.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { PHASER_DEFAULTS, PHASER_DSP as C, PHASER_SLEEP as Z } from '../../inserts/phaserConstants';
@@ -112,11 +114,10 @@ class PhaserDsp {
    * not called: `configure` runs every block, so V8 optimises it, where a
    * method that only a silence calls stays in a tier that boxes its doubles.
    * `quiet` is every input sample of the block within the floor. A quiet block
-   * puts the phaser to sleep once every audio state has rung out; an asleep
-   * one lands the controls on their targets and moves the sweep and the
-   * follower on a block; a loud one wakes it to render in full.
+   * puts the phaser to sleep once every audio state has rung out, and the
+   * block is then an asleep one (`rest`); a loud one wakes it to render in full.
    */
-  configure(params: PhaserParams, frames: number, quiet: boolean): void {
+  configure(params: PhaserParams, quiet: boolean): void {
     const t = this.targets;
     for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
     if (this.controls[SLOT.enabled] === 0 && t[SLOT.enabled] !== 0) this.clear();
@@ -124,24 +125,44 @@ class PhaserDsp {
       this.asleep = false;
       return;
     }
-    if (!this.asleep) {
-      const floor = Z.stateFloor;
-      let rung = true;
-      for (let i = 0; i < this.state.length; i++)
-        if (Math.abs(this.state[i]) >= floor) rung = false;
-      for (let c = 0; c < 2; c++) {
-        if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
-        if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
-      }
-      if (!rung) return;
-      this.clear();
-      this.asleep = true;
+    if (this.asleep) return;
+    const floor = Z.stateFloor;
+    let rung = true;
+    for (let i = 0; i < this.state.length; i++) if (Math.abs(this.state[i]) >= floor) rung = false;
+    for (let c = 0; c < 2; c++) {
+      if (Math.abs(this.bass[c]) >= floor || Math.abs(this.feedbackLow[c]) >= floor) rung = false;
+      if (Math.abs(this.feedbackOut[c]) >= floor) rung = false;
     }
-    const s = this.controls;
-    for (let slot = 0; slot < s.length; slot++) s[slot] = t[slot];
-    this.follower *= Math.pow(1 - this.release, frames);
-    this.phase += (s[SLOT.rate] * frames) / this.rate;
-    this.phase -= Math.floor(this.phase);
+    if (!rung) return;
+    this.clear();
+    this.asleep = true;
+  }
+
+  /**
+   * One asleep block of `frames` (windsor#802, the rule of Advanced Drive's `rest`): `tick`'s
+   * control path a sample at a time, with no audio. The controls smooth, the switch fades, the
+   * follower releases towards the silence and the sweep's phase integrates the smoothed rate,
+   * each in `tick`'s arithmetic, so a wake finds them on the bits of a phaser that never slept.
+   */
+  rest(frames: number): void {
+    const s = this.controls,
+      t = this.targets,
+      k = this.smooth,
+      on = SLOT.enabled;
+    for (let n = 0; n < frames; n++) {
+      for (let slot = 0; slot < s.length; slot++)
+        if (slot !== on) s[slot] += k * (t[slot] - s[slot]);
+      const enabled = s[on],
+        to = t[on];
+      s[on] =
+        to > enabled
+          ? Math.min(to, enabled + this.switchStep)
+          : Math.max(to, enabled - this.switchStep);
+      // A silent input's level is 0, never above the follower, so `tick` releases.
+      this.follower += this.release * (0 - this.follower);
+      this.phase += s[SLOT.rate] / this.rate;
+      this.phase -= Math.floor(this.phase);
+    }
   }
 
   /** Back on from fully off, or asleep: the all-passes and the feedback start from rest. */
