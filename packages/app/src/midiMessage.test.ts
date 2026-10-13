@@ -30,11 +30,18 @@ describe('decodeMidi', () => {
     expect(decodeMidi([0xe0, 0x7f, 0x7f], 12)).toEqual({ type: 'bend', semitones: 12 });
   });
 
+  it('reads every other controller as a cc event with its channel, 1-16', () => {
+    expect(decodeMidi([0xb0, 74, 100])).toEqual({ type: 'cc', channel: 1, cc: 74, value: 100 });
+    expect(decodeMidi([0xbf, 7, 0])).toEqual({ type: 'cc', channel: 16, cc: 7, value: 0 });
+    expect(decodeMidi([0xb9, 0, 127])).toEqual({ type: 'cc', channel: 10, cc: 0, value: 127 });
+    expect(decodeMidi([0xb3, 1, 64])).toEqual({ type: 'modWheel', value: 64 / 127 });
+    expect(decodeMidi([0xb3, 64, 0])).toEqual({ type: 'sustain', down: false });
+  });
+
   it('ignores what the console does not play', () => {
     expect(decodeMidi([0xa0, 60, 50])).toBeNull(); // poly aftertouch
     expect(decodeMidi([0xd0, 50])).toBeNull(); // channel aftertouch
     expect(decodeMidi([0xc0, 5])).toBeNull(); // program change
-    expect(decodeMidi([0xb0, 7, 100])).toBeNull(); // volume CC
     expect(decodeMidi([0xf8])).toBeNull(); // clock
     expect(decodeMidi([])).toBeNull();
   });

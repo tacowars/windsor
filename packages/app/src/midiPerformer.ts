@@ -61,6 +61,9 @@ export class MidiPerformer {
       case 'modWheel':
         this.sink.modWheel(event.value);
         break;
+      case 'cc':
+        // A knob or fader: the CC router's, never the keys' (windsor#783).
+        break;
     }
   }
 

@@ -2,7 +2,12 @@
  * Decode one Web MIDI message (#523). Web MIDI delivers whole messages with
  * their status byte, so running status never reaches here. Every channel is
  * accepted (omni). Anything the console does not play — aftertouch, program
- * change, other controllers, system messages — decodes to null.
+ * change, system messages — decodes to null.
+ *
+ * Every controller but the mod wheel and sustain decodes to a `cc` event
+ * (windsor#783, record `2026-10-13-midi-cc-mapping` decision 11), the one
+ * event that carries its channel, 1–16: a CC mapping listens on a channel,
+ * while the keys stay omni. The CC router decides what it moves.
  */
 import {
   BEND_CENTRE,
@@ -10,6 +15,7 @@ import {
   BEND_SPAN,
   CC_MOD_WHEEL,
   CC_SUSTAIN,
+  CHANNEL_MASK,
   DATA_MAX,
   STATUS_CONTROL_CHANGE,
   STATUS_NOTE_OFF,
@@ -23,7 +29,9 @@ export type MidiEvent =
   | { type: 'noteOff'; note: number }
   | { type: 'sustain'; down: boolean }
   | { type: 'modWheel'; value: number }
-  | { type: 'bend'; semitones: number };
+  | { type: 'bend'; semitones: number }
+  /** Any other controller: `channel` 1–16, `cc` and `value` 0–127. */
+  | { type: 'cc'; channel: number; cc: number; value: number };
 
 const DATA_BITS = 7;
 const STATUS_MASK = 0xf0;
@@ -46,7 +54,7 @@ export function decodeMidi(
     case STATUS_CONTROL_CHANGE:
       if (a === CC_MOD_WHEEL) return { type: 'modWheel', value: b / DATA_MAX };
       if (a === CC_SUSTAIN) return { type: 'sustain', down: b >= SUSTAIN_ON_AT };
-      return null;
+      return { type: 'cc', channel: ((data[0] ?? 0) & CHANNEL_MASK) + 1, cc: a, value: b };
     case STATUS_PITCH_BEND: {
       const raw = (b << DATA_BITS) | a;
       const norm = Math.max(-1, Math.min(1, (raw - BEND_CENTRE) / BEND_SPAN));
