@@ -321,7 +321,7 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
     <li><b>MIDI CC</b> is a part-bar button after the sequencer picker. Its badge counts the selected part's mappings
       (6 for Acid). It opens the panel as a popover under the button.</li>
     <li><b>The panel</b> has one row per mapping. The columns are Part, Parameter (with the lane picker's kind
-      line), Source (device and channel, each Any by default and narrowable, the CC, and what learn heard), Range
+      line), Source (the device and channel learn heard, each widenable to Any by hand, the CC, and what learn heard), Range
       (min and max in the target's units, which you drag like a knob or double-click to type), Inv, Live (the CC's
       value, or a status: Waiting for pickup, Automated, Inert), Learn (remap the source) and Delete. The header
       holds <b>This part | All parts</b>, <b>Pickup | Jump</b> and <b>Reset performance</b>. The foot holds
@@ -356,13 +356,13 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
   LFO 1 Amt (its lane, which the CC shares), Op A Level, Cutoff, Squelch and Op B Decay: <b>Voice 5/8</b>. Send A is a
   strip target and takes none.
 
-  <h3>To decide</h3>
+  <h3>Decided</h3>
   <ul>
-    <li><b>A popover or a docked pane?</b> Recommended: a <b>popover</b> under the MIDI CC button, as drawn. Mapping is
+    <li><b>A popover or a docked pane?</b> Decided: a <b>popover</b> under the MIDI CC button, as drawn. Mapping is
       setup you open, change and close. A docked pane would take height from the operator rows on every visit, and
       the Song tab's shape panel went the same way (<code>2026-10-01-song-automation-lanes</code> decision 13). "Edit
       mapping…" from a knob on another tab opens the same popover over that tab.</li>
-    <li><b>Where the CC tag sits.</b> Recommended: <b>in the tag slot under the value</b>, as drawn, where AUTO, ENV and a
+    <li><b>Where the CC tag sits.</b> Decided: <b>in the tag slot under the value</b>, as drawn, where AUTO, ENV and a
       macro's name sit. Every knob size has that slot, including the rack's and the Song tab's compact knobs (whose
       bubble carries the tag). A lane's AUTO wins it, since a lane locks the knob and the CC is ignored, and a CC wins
       over ENV. The other choice, a corner badge on the dial, would crowd the 38 px dial and the ring that CC and ENV
@@ -472,11 +472,11 @@ body.show-new .is-new { outline: 1px dashed var(--carrier); outline-offset: 2px;
     }
     if (m.listen === 'heard') {
       cell.append(el('span', 'cc-heard-now', `Heard <b>CC ${m.cc}</b> · ch 1 · USB MIDI Controller`));
-      cell.append(el('span', 'cc-heard', 'device and channel stay Any; narrow them here'));
+      cell.append(el('span', 'cc-heard', 'device and channel as heard; widen either to Any here'));
       return cell;
     }
-    const dev = m.dev ?? 'Any device';
-    const ch = m.ch ? `ch ${m.ch}` : 'Any ch';
+    const dev = m.dev ?? 'USB MIDI Controller';
+    const ch = `ch ${m.ch ?? '1'}`;
     const line = el('div', 'line');
     line.innerHTML = `<select class="field" aria-label="Device"><option>${dev}</option></select><select class="field ch" aria-label="Channel"><option>${ch}</option></select><span class="cc-chip">CC ${m.cc}</span>`;
     cell.append(line, el('span', 'cc-heard', `heard ${m.heard ?? HEARD}`));

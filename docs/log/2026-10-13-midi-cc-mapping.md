@@ -1,7 +1,8 @@
 # MIDI CC mapping: a controller's knobs move a part's parameters as a performance
 
 - **Date:** 2026-10-13
-- **Status:** proposed, accepted when tacowars approves the mockup
+- **Status:** accepted. tacowars approved the mockup on 2026-10-13 and
+  settled its open questions the same day
 - **Links:** this record's issue, windsor#778 · the mockup,
   `docs/research/2026-10-13-midi-cc-mapping-mockup/mockup.html` · song lanes
   `2026-10-01-song-automation-lanes` · macros `2026-10-04-patch-macro-knobs` ·
@@ -58,13 +59,14 @@ What the engine and the console had, read from the code on 2026-10-13:
 
 ## Decisions
 
-The decisions were agreed with tacowars on 2026-10-12 and 2026-10-13. The
-mockup draws the parts that show. Where the brief's wording and the code
+The decisions were agreed with tacowars on 2026-10-12 and 2026-10-13, and
+tacowars approved the mockup on 2026-10-13. The mockup draws the parts that
+show. Where the brief's wording and the code
 differ, the difference is stated under the decision.
 
 1. **A mapping binds a source to one part's target.**
    - The source is a device (a name, or Any), a channel (1–16, or Any) and a
-     CC number.
+     CC number. The channel is part of every mapping.
    - The device is matched by name, as the input selector matches it
      (`listensTo` in `midiInputs.ts`), because Web MIDI ids are not promised
      stable across sessions. So two connected inputs with the same name are
@@ -82,18 +84,32 @@ differ, the difference is stated under the decision.
      mapping names its part and keeps driving that part whichever part is
      selected. With a mapping on part A, selecting part B (which then
      receives the keys) leaves the CC moving A, and it never moves B.
-   - A new mapping's device and channel default to Any. The panel shows what
-     learn heard, and a row can narrow either.
+   - Learn records the device and the channel it heard, not Any. A row can
+     widen either to Any by hand.
+   - Only a part's targets can be mapped: the Parts tab's knobs, and a
+     part's strip and inserts on the Song and Mixer tabs. A group's, a
+     return's and the master's knobs are wired to the same catalog targets
+     (`groupsPanel.ts`, `returnsPanel.ts`) but belong to no part, so they
+     cannot be mapped (decision 12). Mapping them is under Later.
 2. **Performance, not an edit.**
    - A CC never changes the patch, the song or the undo history. Its value
      lives only in the console while the song is open. Reloading or
      reopening the song starts from the patch's own values.
    - The on-screen knob keeps its position. A ring shows the live value, as
      the Roll's clip envelopes do today: the ENV ring's geometry and
-     behaviour, with a `CC 74` tag in the tag slot instead of `ENV`.
+     behaviour, with a `CC 74` tag in the tag slot under the value instead
+     of `ENV` (decision 3 says which tag wins).
    - The ring shows what plays: the CC's value with any clip envelope
      playing over it (decision 3). The panel's live value shows the CC's own
      value.
+   - **Mouse and CC: last in wins.** Turning the on-screen knob of a mapped
+     target edits the patch (or the strip or insert value) as today, with
+     its undo step. It also drops that target's CC value, so the sound
+     follows the new value, the ring goes away and the CC's slot is given
+     back, and it re-arms that mapping's pickup (decision 7): under Pickup
+     the hardware knob takes over again once it crosses the new value,
+     under Jump on its next message. A preset change and Reset performance
+     do the same. Only the mouse ever writes the patch.
 3. **The value path.** The CC value sets the target's performance base, in
    the target's own units, through the mapping's range and invert
    (decision 5).
@@ -104,23 +120,37 @@ differ, the difference is stated under the decision.
      patch at the moment of the move, so its floors are a lane's: a CC
      that sets a decay time to 0 plays 1 ms, as a lane at 0 does and as a
      macro at its bottom does (`2026-10-04-patch-macro-knobs` decision 4).
-     For the same reason, a slot that a CC alone writes is absolute
-     (floored), not `relative`.
+     So a slot that a CC writes alone is absolute and floored, as a lane's
+     is, not `relative`.
    - **Strip and insert targets.** The base is written to the target's
      AudioParams directly, through the same params a lane writes. These
      targets have no offset and take no slot.
-   - **Precedence on one target**, checked against the engine's order:
-     - A **song lane that is on** wins, and the CC is ignored. An automated
-       knob is locked today (`2026-10-01-song-automation-lanes` decision 6).
-       The lane holds the slot as an absolute value and writes it every
-       tick. The mapping's row in the panel says **Automated**. A lane that
-       is off locks nothing, and the CC plays.
-     - A **clip envelope** is relative. It applies on top of the CC's base,
-       as it applies on top of the patch's value today: the slot carries the
-       CC's offset plus the envelope's. `ClipEnvelopeTracks` adds the
-       lane's offset there today. It adds the CC's where no lane plays.
+   - **Lane, envelope and CC on one target.** All three may be mapped to
+     one target together, and they share its one voice slot. Checked
+     against the engine's order:
+     - While a **song lane** on the target **is on**, the lane sets the
+       value and the CC is ignored. An automated knob is locked today
+       (`2026-10-01-song-automation-lanes` decision 6). The lane holds the
+       slot as an absolute value and writes it every tick. The mapping's
+       row in the panel reads **Automated**. A lane that is off locks
+       nothing, and the CC plays.
+     - A **clip envelope** is relative. It rides on top of whichever sets
+       the value: the lane, else the CC, else the patch. The slot carries
+       that offset plus the envelope's. `ClipEnvelopeTracks` adds the lane's
+       offset there today. It adds the CC's where no lane is on.
      - A **step-mod push** stacks on top, as today. The worklet adds it over
        the slot's clamped value, in the row's curve, and clamps again.
+   - **The knob's tag and ring.** In `knobLock.ts`'s terms: `paintLock`
+     writes the lock's tag (AUTO under a lane) whenever a lane holds the
+     knob, and `paintEnvelope` writes ENV only while an envelope plays and
+     no lock holds. The CC slots in between: with no lock, the tag reads
+     `CC <n>` while a mapping exists, whether or not an envelope plays, and
+     ENV otherwise. So the tag reads AUTO while a lane is on, else `CC <n>`
+     while a mapping exists, else ENV. (A macro's lock, with the macro's
+     name as its tag, never meets a mapping: decision 6 does not offer its
+     targets.) The `.env` ring shows the value that plays: from the pin,
+     which a lane's lock moves to the lane's value, to the lane's, the CC's
+     or the patch's value with any envelope over it.
    - **The formula.** Let `x = cc / 127`, inverted `x = 1 − cc / 127`.
      - A **ratio row**, the cutoff:
        - the CC's value is `min × (max / min)^x`;
@@ -204,12 +234,15 @@ differ, the difference is stated under the decision.
      The voice has no handle on that target (`voiceAutomationHandle` returns
      none), so a CC there could not move it.
 7. **Takeover.**
-   - **Pickup** is the default. After a song opens, a preset changes, or a
-     range changes, a CC does nothing until it picks up. It picks up when
+   - **Pickup** is the default. After a song opens, a preset changes, a
+     range changes, the target is turned on screen (decision 2) or Reset
+     performance, a CC does nothing until it picks up. It picks up when
      its value reaches or crosses the target's current value. The current
      value is the CC's base where one is held, else the patch's (or the
      strip's or insert's) own value. A clip envelope's offset is not part of
      it.
+   - Pickup state is keyed by device name and channel, per mapping. One
+     device sending the mapped CC on two channels has two pickup states.
    - A **Jump** toggle in the panel's header applies each value at once.
    - Takeover is a console preference, held in `localStorage` (wrapped in
      try/catch, with Pickup when storage is empty or fails). It is not song
@@ -244,8 +277,8 @@ differ, the difference is stated under the decision.
      already mapped.
    - **When the engine takes it.** The slot is taken at the mapping's first
      applied value, after pickup or at once under Jump. The CC holds it until
-     Reset performance, the mapping's removal, a preset change or the song's
-     close. A mapping that has applied no value writes nothing, so a song
+     Reset performance, an on-screen edit of the target (decision 2), the
+     mapping's removal, a preset change or the song's close. A mapping that has applied no value writes nothing, so a song
      with mappings and no CC moves plays bit for bit as it does without them.
    - **Order:** lanes, then CC mappings holding a value, then clip
      envelopes in the roll's order. A lane is the song's and plays the same
@@ -306,7 +339,8 @@ differ, the difference is stated under the decision.
       - the channel mode messages (120–127).
     - While listening, the panel shows "Move a knob on your controller…"
       with Cancel. Once a CC moves far enough, it shows "Heard CC 74 · ch 1 ·
-      <device>" and commits. Escape or Cancel leaves nothing behind.
+      <device>" and commits, recording that device and channel (decision 1).
+      Escape or Cancel leaves nothing behind.
     - Learn listens to the inputs the MIDI selector listens to
       (`listensTo` in `midiInputs.ts`). So do the mappings while they play,
       as the keys do. If MIDI is not enabled, the panel offers the keyboard
@@ -319,7 +353,11 @@ differ, the difference is stated under the decision.
     - **The panel.**
       - A **MIDI CC** button sits on the Parts tab's part bar, next to the
         sequencer picker. It shows the selected part's mapping count.
-      - It opens a panel of mappings with the columns Part, Parameter,
+      - It opens the panel as a popover under the button. Mapping is setup
+        you open, change and close, and a docked pane would take height from
+        the operator rows on every visit. "Edit mapping…" from a knob on
+        another tab opens the same popover over that tab.
+      - The panel lists the mappings with the columns Part, Parameter,
         Source (device · ch · CC), Range (min–max with units), Inv, Live
         value or status, Learn and Delete. Learn remaps the source.
       - The statuses are **Waiting for pickup**, **Automated**, **Inert**
@@ -334,10 +372,17 @@ differ, the difference is stated under the decision.
         insert) value, gives back the CCs' slots, and re-arms pickup.
     - **Right-click on a knob whose target is in the catalog**, on any tab:
       - **Learn MIDI CC…** starts learn for this target, with the knob
-        highlighted while listening.
+        highlighted while listening. It is enabled only on a knob whose
+        target belongs to a part: the Parts tab's, and a part's strip and
+        inserts on the Song and Mixer tabs. On a group's, a return's or the
+        master's knob it is shown disabled, titled "Only a part's knobs can
+        be mapped".
       - On a mapped knob, the menu also has **Edit mapping…**, which opens
         the panel at its row, and **Remove CC 74**.
-      - A mapped knob shows a small `CC 74` tag under its value.
+      - A mapped knob shows a small `CC 74` tag in the tag slot under its
+        value, where AUTO, ENV and a macro's name sit, which every knob size
+        has (decision 3 says which wins). A corner badge would crowd the
+        38 px dial and its ring.
       - A knob outside the catalog (Coarse, Detune, Vel) keeps the
         browser's own menu.
       - A knob a macro maps is locked today, with the macro's name as its
@@ -346,8 +391,8 @@ differ, the difference is stated under the decision.
 
 ## Boundary cases
 
-The issue asked for these. Each answer is recommended here and drawn where
-it shows.
+The issue asked for these. Each answer is decided here and drawn where it
+shows.
 
 - **`min` equal to `max`.** Allowed. Every CC value maps to that one value,
   so the mapping is a "set to" knob. The range has nothing to cross, so
@@ -363,25 +408,29 @@ it shows.
   its mappings re-arm pickup, since the knob may have moved meanwhile. Under
   Jump, the next value applies.
 - **Two inputs sending the same CC.** With the selector on All inputs, a
-  mapping whose device is Any hears both. Pickup is tracked per device name,
-  so a second controller with another name, its knob at another position,
-  must pick up on its own before it moves the target. Under Jump, the last
-  value wins. Narrowing the row's device to one name stops an input with
-  another name. Two inputs that share a name are one source (decision 1):
-  narrowing cannot stop either, they share one pickup state, and only
-  setting them to different channels and narrowing the row's channel
-  separates them.
+  mapping widened to Any device hears both. Pickup is keyed by device name
+  and channel (decision 7), so a second controller with another name, its
+  knob at another position, must pick up on its own before it moves the
+  target. One device sending the mapped CC on two channels, to a mapping
+  widened to Any channel, likewise has two pickup states, one per channel.
+  Under Jump, the last value wins. A row's device left at the name learn
+  heard stops an input with another name. Two inputs that share a name are
+  one source (decision 1): the device cannot stop either, and on one
+  channel they share one pickup state. Only setting them to different
+  channels, with the row's channel on one of them, separates them.
 - **Pickup on a target outside the mapping's range.** The current value is
   clamped into the range first. A 1 kHz cutoff under a 2–6 kHz mapping picks
   up when the CC reaches CC 0 (2 kHz), and the cutoff steps up an octave
   there. That step is the range's own bottom, and it cannot be avoided
   without a value the range excludes. Inverted, the same mapping picks up at
   CC 127.
-- **An on-screen edit of a mapped target** (recommended; the brief did not
-  say). Turning the knob, or a preset change, drops that target's CC value
-  and re-arms pickup. The knob and the patch agree again, and the hardware
-  must pick up from there. This is the same for all three kinds of target,
-  including strip and insert ones, which have no offset to keep.
+- **An on-screen edit of a mapped target.** Last in wins (decision 2).
+  Turning the knob edits the patch (or the strip or insert value), drops
+  that target's CC value and re-arms pickup, and so does a preset change or
+  Reset performance. The knob and the sound agree again, and the hardware
+  picks up from there, or under Jump takes over on its next message. This
+  is the same for all three kinds of target, including strip and insert
+  ones, which have no offset to keep.
 - **A lane switched off under a mapping.** The lane's release gives the
   slot back at the patch's value. The mapping re-arms pickup.
 
@@ -392,7 +441,7 @@ project's headless Chrome on 2026-10-13 at a 1440 px window. The song has
 one part, Acid (Acid Saw, a Grid sequencer, three macros, a Dub delay
 insert, lanes on the delay's Feedback and on LFO 1 Amt). The capture shows
 the part bar around the sequencer picker and operator A's row of knobs, with
-their markup and styles taken from that build. It proposes:
+their markup and styles taken from that build. It draws:
 
 - the **MIDI CC** button after the sequencer picker, with the part's
   mapping count;
@@ -407,13 +456,13 @@ their markup and styles taken from that build. It proposes:
   hollow marker), and highlighted while learning;
 - the panel with **MIDI not enabled**.
 
-Two questions are left open in the mockup's notes, each with a
-recommendation: whether the panel is a popover or a docked pane, and where on
-the knob the CC tag sits.
+The mockup's two open questions were settled with its approval: the panel is
+a popover under the MIDI CC button, and the CC tag sits in the tag slot
+under the value, as drawn (decision 12).
 
 ## Consequences
 
-- The build tickets, written once the mockup is approved, cover:
+- The build tickets, written now that the mockup is approved, cover:
   - the decoder's `cc` event and learn;
   - the console's performance state (values, pickup, the slot's handle);
   - the clip envelope tracks' sum with a CC's offset;
@@ -430,8 +479,10 @@ the knob the CC tag sits.
 
 ## Later
 
-- Recording CC moves into the Roll as clip envelope points (decision 4),
-  with its answer to the span limit.
+- Recording CC moves into the Roll as clip envelope points (decision 4). A
+  CC's absolute range can exceed a clip envelope's ±span, so that ticket
+  clips the recording or rescales the envelope, and says which.
+- Mapping a group's, a return's or the master's knobs.
 - Mappings that follow the selected part.
 - Relative (endless) encoders, and 14-bit CC or NRPN.
 - MIDI out (LED rings), program change to switch parts, and per-part receive
