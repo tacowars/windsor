@@ -14,6 +14,7 @@
 import { AppContext } from './appContext';
 import { renderArrangementTab } from './arrangementTab';
 import { mountAudioGate } from './audioGate';
+import { mountCcPanel } from './ccPanelMount';
 import { $ } from './dom';
 import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
@@ -49,6 +50,8 @@ const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
 // The Roll's Rec records what the keyboard plays (windsor#663).
 mountRollRecorder(ctx, keyboard);
+// A controller's knobs move the parts' mapped parameters (windsor#784).
+mountCcPanel(ctx, midi);
 // The bend and the mod wheel follow the selected part, whichever view picked it.
 ctx.parts.onSelect(() => keyboard.followPart());
 

@@ -15,6 +15,7 @@ import type {
   ApplyResult,
   ArrangementDocument,
   AudioPart,
+  CcTargetId,
   DocumentPartial,
   RegionStep,
   WorkletUrls,
@@ -34,6 +35,12 @@ import { HARMONY_AUDITION_PATCH } from './harmonyAuditionTables';
 import { nextTransportState, type TransportState } from './transportModel';
 
 export type HostLog = (message: string) => void;
+
+/** What `AudioSystem.setPerformance` did with a value (windsor#781); the engine's index does not name it. */
+export type PerformanceResult = ReturnType<AudioSystem['setPerformance']>;
+
+/** Told of a performance value the engine dropped on its own: a part's slot and the target. */
+export type PerformanceDropped = (slot: number, target: CcTargetId) => void;
 
 /** What a rebuild may carry beyond its document. */
 export interface BuildOptions {
@@ -220,6 +227,14 @@ export class EngineHost {
   private readonly audioChanged = (): void => {
     for (const listener of this.audioListeners) listener();
   };
+  /**
+   * The MIDI CC router's ears on the engine (windsor#784, record
+   * `2026-10-13-midi-cc-mapping`): told of each value the live system drops
+   * on its own (a lane switched on, a preset swap, a target gone), on
+   * whichever system stands, and of each new system, which holds none.
+   */
+  performanceDropped: PerformanceDropped | null = null;
+  systemBuilt: (() => void) | null = null;
 
   constructor(log: HostLog) {
     this.log = log;
@@ -389,8 +404,26 @@ export class EngineHost {
     // The console's knobs retune the voices already ringing (off by default in the engine).
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
+    this.system.performanceDropped = (slot, target): void =>
+      this.performanceDropped?.(slot, target);
+    // The old system's performance values went with it.
+    this.systemBuilt?.();
     await this.system.unlock();
     return this.system;
+  }
+
+  /**
+   * Play a MIDI CC's `value` on `target` of the part on `slot`, as a
+   * performance (windsor#781): never written into the patch or the song.
+   * Null while audio is off, when there is nothing to play it on.
+   */
+  setPerformance(slot: number, target: CcTargetId, value: number): PerformanceResult | null {
+    return this.system?.setPerformance(slot, target, value) ?? null;
+  }
+
+  /** Give `target` of the part on `slot` back its own value, and its voice slot. */
+  clearPerformance(slot: number, target: CcTargetId): void {
+    this.system?.clearPerformance(slot, target);
   }
 
   /** Live tuning over the document model; null while audio is not enabled. */
