@@ -13,9 +13,32 @@
  * target exactly, so fully off is the input to the bit. The first quantum
  * that starts fully off clears the lines and filters, in place: the tail is
  * cut, never resumed, and switching back on starts from silence.
+ *
+ * Sleep (windsor#793, `DELAY_SLEEP`): `write` notes a write above the floor,
+ * or the first non-zero write into empty lines, and `drowse`, called from
+ * `configure` every block (so V8 optimises it), counts the frames since the
+ * last one. Once that is the line's whole length, or the lines hold exact
+ * zeros (built, or cleared), a block whose input is silent puts the delay to
+ * sleep, unless the loop can hold or grow what is in it: Feedback at or past
+ * unity in magnitude, current or target, keeps lines that are not empty awake
+ * and their count at zero, since a write under the floor can regenerate past
+ * it, and wakes them if they slept. Nothing else in
+ * the loop adds gain: the interpolated read, the ping-pong crossfade and the
+ * one-pole filters are at most unity, and the saturator's slope is at most
+ * one. Asleep: the processor writes zeros and runs no `tick`, the lines, filters
+ * and write position wait as they are (everything in them is under the
+ * floor), and `rest` moves the controls a sample at a time as `tick` would,
+ * with no audio. The first block whose
+ * input crosses the floor wakes it and renders in full.
+ * `delaySleep.test.ts` holds the tail, the wake and the bits.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
-import { DELAY_DSP as C, DELAY_DEFAULTS, DELAY_MODE_IDS } from '../../inserts/delayConstants';
+import {
+  DELAY_DSP as C,
+  DELAY_DEFAULTS,
+  DELAY_MODE_IDS,
+  DELAY_SLEEP as Z,
+} from '../../inserts/delayConstants';
 import { DELAY_KEYS as KEYS, DELAY_SLOT as S } from './delaySlots';
 import type { DelayControls } from './delaySlots';
 
@@ -43,11 +66,24 @@ class DelayDsp {
   /** `tick`'s results. */
   left: number;
   right: number;
+  /** Whether it may sleep: `sleep: false` is a test's, to render the delay without it. */
+  readonly sleepEnabled: boolean;
+  /** The lines hold nothing audible and the input is silent: the block is zeros, no `tick`. */
+  asleep: boolean;
+  /** A line write crossed the output floor since the last block began. */
+  loudWrite: boolean;
+  /** Frames since the last write above the floor; a line's length or more once it is empty. */
+  quietFrames: number;
+  /** The lines hold exact zeros: built or cleared, and nothing non-zero written since. */
+  empty: boolean;
+  /** The loop gain can reach unity (|Feedback| >= 1, current or target): no sleep. */
+  held: boolean;
 
-  constructor(rate: number, _params: DelayParams) {
+  constructor(rate: number, _params: DelayParams, sleep = true) {
     // Doubles first written as doubles (worklet rule 7).
     this.rate = this.smooth = this.timeSmooth = this.switchStep = NaN;
     this.inputLeft = this.inputRight = this.value = this.left = this.right = NaN;
+    this.quietFrames = NaN;
     this.rate = rate;
     const length = Math.ceil(rate * C.maxSeconds) + 2;
     this.buffer = [new Float32Array(length), new Float32Array(length)];
@@ -67,9 +103,14 @@ class DelayDsp {
     this.left = this.right = 0;
     this.first = true;
     this.cleared = true;
+    this.sleepEnabled = sleep;
+    this.asleep = this.loudWrite = this.held = false;
+    this.empty = true;
+    this.quietFrames = length;
   }
 
-  configure(params: DelayParams, _frames: number): void {
+  /** The block's controls; `quiet` is every input sample of it within the sleep floor. */
+  configure(params: DelayParams, frames: number, quiet: boolean): void {
     const t = this.targets;
     for (let k = 0; k < KEYS.length; k++) {
       if (k !== S.ping && k !== S.mid) t[k] = params[KEYS[k]][0];
@@ -87,6 +128,51 @@ class DelayDsp {
     }
     if (this.controls[S.enabled] !== 0) this.cleared = false;
     else if (!this.cleared) this.clear();
+    this.held = Math.abs(t[S.feedback]) >= 1 || Math.abs(this.controls[S.feedback]) >= 1;
+    this.drowse(frames, quiet);
+  }
+
+  /**
+   * One asleep block of `frames`: `tick`'s control path a sample at a time, with no audio.
+   * Every glide and the switch move in `tick`'s arithmetic, so a wake finds them on the bits
+   * an awake delay fed silence would hold (Codex on PR #801), not snapped to their targets.
+   */
+  rest(frames: number): void {
+    const s = this.controls;
+    const t = this.targets;
+    const k = this.smooth;
+    const time = this.timeSmooth;
+    for (let n = 0; n < frames; n++) {
+      s[S.leftMs] += time * (t[S.leftMs] - s[S.leftMs]);
+      s[S.rightMs] += time * (t[S.rightMs] - s[S.rightMs]);
+      s[S.feedback] += k * (t[S.feedback] - s[S.feedback]);
+      s[S.highpass] += k * (t[S.highpass] - s[S.highpass]);
+      s[S.lowpass] += k * (t[S.lowpass] - s[S.lowpass]);
+      s[S.drive] += k * (t[S.drive] - s[S.drive]);
+      s[S.mix] += k * (t[S.mix] - s[S.mix]);
+      s[S.outputDb] += k * (t[S.outputDb] - s[S.outputDb]);
+      const enabled = s[S.enabled];
+      s[S.enabled] =
+        t[S.enabled] > enabled
+          ? Math.min(t[S.enabled], enabled + this.switchStep)
+          : Math.max(t[S.enabled], enabled - this.switchStep);
+      s[S.ping] += k * (t[S.ping] - s[S.ping]);
+      s[S.mid] += k * (t[S.mid] - s[S.mid]);
+    }
+  }
+
+  /** The sleep's count, every block: a loud or held block wakes it; a silent one sleeps once the lines are. */
+  drowse(frames: number, quiet: boolean): void {
+    // Held, a write under the floor can grow past it; lines of exact zeros stay zeros.
+    const holding = this.held && !this.empty;
+    if (!quiet || holding) this.asleep = false;
+    if (this.asleep) return;
+    if (this.loudWrite || holding) {
+      this.quietFrames = 0;
+      this.empty = false;
+    } else this.quietFrames += frames;
+    this.loudWrite = false;
+    if (quiet && this.quietFrames >= this.buffer[0].length) this.asleep = true;
   }
 
   /** Fully off: the tail goes, so the lines and their filters start from silence. */
@@ -95,6 +181,9 @@ class DelayDsp {
     this.buffer[1].fill(0);
     this.filter.fill(0);
     this.cleared = true;
+    this.loudWrite = false;
+    this.empty = true;
+    this.quietFrames = this.buffer[0].length;
   }
 
   /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
@@ -178,7 +267,11 @@ class DelayDsp {
   /** `value`, saturated, into line `channel` at the write position. */
   write(channel: number): void {
     const limit = C.feedbackCeiling / this.controls[S.drive];
-    this.buffer[channel][this.position] = limit * Math.tanh(this.value / limit);
+    const value = limit * Math.tanh(this.value / limit);
+    this.buffer[channel][this.position] = value;
+    if (value > Z.outputFloor || value < -Z.outputFloor || (this.empty && value !== 0)) {
+      this.loudWrite = true;
+    }
   }
 }
 

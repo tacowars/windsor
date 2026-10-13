@@ -1,5 +1,14 @@
-/** Delay adapter: block controls, stereo audio, shutdown and existing load telemetry. */
-import { DELAY_NAME, DELAY_BOUNDS, DELAY_DEFAULTS, DELAY_DSP } from '../../inserts/delayConstants';
+/**
+ * Delay adapter: block controls, stereo audio, shutdown and existing load telemetry.
+ * An asleep block (windsor#793, `delayDsp.ts`) is `rest`, outside the awake loop.
+ */
+import {
+  DELAY_NAME,
+  DELAY_BOUNDS,
+  DELAY_DEFAULTS,
+  DELAY_DSP,
+  DELAY_SLEEP,
+} from '../../inserts/delayConstants';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
 import { DelayDsp } from './delayDsp';
@@ -37,7 +46,8 @@ class DelayProcessor extends AudioWorkletProcessor {
         Number(options.parameterData?.[name] ?? descriptor.defaultValue),
       ]);
     }
-    this.dsp = new DelayDsp(sampleRate, params);
+    // `sleep: false` is a test's, to prove the renders with and without it agree.
+    this.dsp = new DelayDsp(sampleRate, params, options.processorOptions?.sleep !== false);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
@@ -54,12 +64,29 @@ class DelayProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
+    const dsp = this.dsp;
+    dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
+    if (dsp.asleep) this.rest(out, frames);
+    else this.render(left, right, out, frames);
+    this.load.end(frames);
+    return true;
+  }
+
+  /**
+   * One awake block, in a method of its own as the plate's `_renderBlock` is (windsor#793): V8
+   * optimises it on sound alone, never inside a `process` that has so far only slept.
+   */
+  render(
+    left: Float32Array | undefined,
+    right: Float32Array | undefined,
+    out: Float32Array[],
+    frames: number,
+  ): void {
     // `left?.[i] ?? 0` would read the same, but its load may be undefined, so V8
     // keeps it tagged and boxes every sample; a bounded load stays a double.
     const leftFrames = left ? left.length : 0,
       rightFrames = right ? right.length : 0;
     const dsp = this.dsp;
-    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
       // Through fields, not arguments, which V8 boxes across a call it does not inline.
       dsp.inputLeft = i < leftFrames ? left![i] : 0;
@@ -68,8 +95,22 @@ class DelayProcessor extends AudioWorkletProcessor {
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
-    this.load.end(frames);
+  }
+
+  /** Every sample of the block within the sleep floor; an absent channel is silent. */
+  silent(left: Float32Array | undefined, right: Float32Array | undefined): boolean {
+    const floor = DELAY_SLEEP.inputFloor;
+    if (left) for (let i = 0; i < left.length; i++) if (Math.abs(left[i]) > floor) return false;
+    if (right && right !== left)
+      for (let i = 0; i < right.length; i++) if (Math.abs(right[i]) > floor) return false;
     return true;
+  }
+
+  /** One asleep block: zeros, the input's silence to within its floor, and the controls' glides. */
+  rest(out: Float32Array[], frames: number): void {
+    this.dsp.rest(frames);
+    out[0].fill(0);
+    if (out[1]) out[1].fill(0);
   }
 }
 

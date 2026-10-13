@@ -14,9 +14,13 @@
  * mix and output at their bounds, free and synced times from 1 ms to the
  * 12-second clamp, and song tempo changes alone (new `leftMs` and `rightMs`,
  * as `tempoInsertRegistry.ts` writes them). The input is stereo, mono or has
- * no channels (an inactive source). It warms up with the cycle four times, the
- * load meter on for the first, then reads `used_heap_size` in ten windows over
- * one more cycle, with the meter off (each reading calls `Date.now()` twice,
+ * no channels (an inactive source). The silence after each switch-off puts
+ * the emptied delay to sleep and the next step wakes it (windsor#793); the
+ * scenario throws unless the measured cycle took both. It warms up with the
+ * cycle six times (four left `process`, lighter once the awake loop moved to
+ * `render`, to reach V8's top tier inside the measured cycle, whose compile
+ * read 14 KB there), the load meter on for the first, then reads
+ * `used_heap_size` in ten windows over one more cycle, with the meter off (each reading calls `Date.now()` twice,
  * and V8 returns each as a new heap number, 32 bytes a quantum), and counts
  * the collections in it, which must be none, or the reading means nothing.
  *
@@ -104,7 +108,7 @@ function probe(): ProbeRun {
       messages: [],
       inputChannels: 2,
       loadQuanta: 0,
-      warmup: 4 * CYCLE,
+      warmup: 6 * CYCLE,
       measure: CYCLE,
       scenario: probeScenario('delayChangeScenario.ts'),
       scenarioConfig,

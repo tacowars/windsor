@@ -16,12 +16,18 @@ export interface CompressorProcessorLike {
   port: { posted: unknown[]; onmessage: (event: { data: unknown }) => void };
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: CompressorParams): boolean;
 }
-export function loadCompressor(rate = 48000, params = compressorParams()): CompressorProcessorLike {
+/** `sleep: false` renders without the sleep (windsor#793), for a test to compare against. */
+export function loadCompressor(
+  rate = 48000,
+  params = compressorParams(),
+  options: { sleep?: boolean } = {},
+): CompressorProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => CompressorProcessorLike>({
     file: 'compressor-processor.js',
     sampleRate: rate,
   });
   return new Processor({
     parameterData: firstValues(params),
+    processorOptions: options,
   });
 }

@@ -56,3 +56,20 @@ export const DELAY_DSP = {
   feedbackCeiling: 2,
   cutoffRateRatio: 0.45,
 } as const;
+/**
+ * Sleep (windsor#793), the plate's pattern (record
+ * `2026-09-15-silent-voices-and-plate-sleep-floors`) and its floors: an input
+ * sample within `inputFloor` of 0 is silence, and a line write within
+ * `outputFloor` is an inaudible repeat. The feedback runs past unity, so no
+ * span its controls set bounds the repeats; instead each write is checked
+ * against the floor, and once no write has crossed it for the line's whole
+ * length (`maxSeconds`, the longest time it can hold: any older write has
+ * been overwritten, and a time move can reach every sample in it), the lines
+ * hold nothing audible and the delay sleeps on a silent block. So the tail is
+ * the repeats' decay to the floor plus 12 s, and a line that has held nothing
+ * since it was built or switched off sleeps on its first silent block.
+ */
+export const DELAY_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+} as const;

@@ -38,3 +38,24 @@ export const COMPRESSOR_DSP = {
   meterHz: 30,
   meterCeilingDb: 24,
 } as const;
+/** The plate's output floor, as a gain's distance from its rest (record 2026-09-15). */
+const SLEEP_GAIN_FLOOR = 1e-7;
+/**
+ * Sleep (windsor#793), the plate's pattern (record
+ * `2026-09-15-silent-voices-and-plate-sleep-floors`). An input sample (the
+ * program's, and the key's when it is external) within `inputFloor` of 0 is
+ * silence. The compressor's output is its input times its gain, so on silence
+ * all it holds is the envelope: once that has released to `reductionFloorDb`
+ * (a gain within the plate's output floor, 1e-7, of its rest) and the
+ * detector's highpass has settled, a silent block puts it to sleep, and a
+ * woken compressor renders what one that never slept would, to that floor.
+ * So its tail is its release: `tailSeconds` is the slowest (Release 1.2 s, or
+ * Auto's slow envelope) from the deepest reduction (Range 60 dB) to the floor.
+ */
+export const COMPRESSOR_SLEEP = {
+  inputFloor: 1e-9,
+  reductionFloorDb: SLEEP_GAIN_FLOOR / COMPRESSOR_DSP.dbToLog,
+  tailSeconds:
+    Math.max(COMPRESSOR_DSP.autoSlowSeconds, COMPRESSOR_BOUNDS.release[1]) *
+    Math.log((COMPRESSOR_BOUNDS.range[1] * COMPRESSOR_DSP.dbToLog) / SLEEP_GAIN_FLOOR),
+} as const;

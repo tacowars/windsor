@@ -102,3 +102,17 @@ export function peakFrom(run: SleepRun, from: number): number {
   }
   return peak;
 }
+
+/** One leg of `runLegs`: `source` through the processor for `blocks` quanta at `params`. */
+export interface SleepLeg {
+  params: Record<string, Float32Array>;
+  source: Float32Array[];
+  blocks: number;
+}
+
+/** `legs` through `processor` one after another, as one run: a control change between legs. */
+export function runLegs(processor: SleepingProcessor, legs: SleepLeg[]): SleepRun {
+  const runs = legs.map((leg) => runBlocks(processor, leg.params, leg.source, leg.blocks));
+  const [left, right] = join(...runs.map((run) => [run.left, run.right]));
+  return { left: left!, right: right!, asleep: runs.flatMap((run) => run.asleep) };
+}
