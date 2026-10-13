@@ -29,10 +29,9 @@ export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
-import { formatTargetId, isCcMappableTarget } from '@windsor/engine';
 import { makeKnob, type KnobSpec } from './knob';
 import { insertKnobAutomation, knobSongTick } from './knobAutomation';
-import { type KnobCcAt, type KnobCcBinding, knobCcScope } from './knobCc';
+import { insertCcTarget, type KnobCcAt, type KnobCcBinding, knobCcScope } from './knobCc';
 
 /** The id a chain's insert stands under when it has none, to ask whether its field is mappable. */
 const NO_INSERT_ID = 'unsaved';
@@ -40,7 +39,8 @@ const NO_INSERT_ID = 'unsaved';
 /**
  * The CC binding of the knob over `field` of the insert at `index` in
  * `target`'s chain: its catalog target by the insert's stable id, on the
- * part a part's chain is, else on no part. None for a field no CC can move.
+ * part a part's chain is, else on no part. None for a field no CC can move
+ * (`insertCcTarget`, which never throws on a field the catalog leaves out).
  */
 function insertFieldCc(
   ctx: AppCtx,
@@ -55,10 +55,11 @@ function insertFieldCc(
     const scope = insertLaneScope(ctx, target, index);
     // A bus's or the master's default chain carries no ids; its menu only refuses learn.
     const insertId = scope.spec?.id ?? (part === null && scope.spec ? NO_INSERT_ID : undefined);
-    if (insertId === undefined) return null;
-    const id = formatTargetId({ kind: 'insert', insertId, field: `${scope.fieldPrefix}${field}` });
-    if (last?.target === id) return last;
-    last = isCcMappableTarget(id) ? { part, target: id } : null;
+    if (insertId === undefined || !scope.spec) return null;
+    // A field the kind's catalog rows leave out (Bloom's Octave) is no target: no tag, no menu.
+    const id = insertCcTarget(scope.spec.kind, insertId, `${scope.fieldPrefix}${field}`);
+    if (id === null) return (last = null);
+    if (last?.target !== id) last = { part, target: id };
     return last;
   };
   return { scope: knobCcScope(ctx), at };

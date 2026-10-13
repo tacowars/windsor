@@ -8,16 +8,32 @@ import {
   type CcMapping,
   type CcTargetId,
   type DocumentPart,
+  type InsertKindName,
   makeArrangement,
   partAt,
 } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 
 import type { CcStatus } from './ccStatus';
-import { type KnobCcState, knobCcAt } from './knobCc';
+import { COMPRESSOR_KNOBS } from './compressorTables';
+import { DELAY_KNOBS } from './delayTables';
+import { EQ_GLOBAL_KNOBS } from './eqTables';
+import {
+  BLOOM_KNOBS,
+  CHORUS_KNOBS,
+  DRIVE_KNOBS,
+  ECHO_KNOBS,
+  ENSEMBLE_KNOBS,
+  FILTER_INSERT_KNOBS,
+  REVERB_KNOBS,
+} from './insertKnobTables';
+import { type KnobCcState, insertCcTarget, knobCcAt } from './knobCc';
 import { knobTagText } from './knobLock';
 import { knobRing } from './knobRing';
 import { newSong } from './songParts';
+import { PHASER_KNOBS } from './phaserTables';
+import { RETRO_REVERB_KNOBS } from './retroReverbTables';
+import { TAPE_KNOBS } from './tapeTables';
 
 const LEVEL: CcTargetId = 'voice.ops.0.level';
 const AT = { part: 0, target: LEVEL } as const;
@@ -96,5 +112,41 @@ describe('knobRing', () => {
     expect(knobRing(env, null, { held: 0.3 }, 0.8, out)).toBe(env);
     expect(knobRing(null, LANE, { held: 0.3 }, 0.4, out)).toBeNull();
     expect(knobRing(null, null, { held: null }, 0.8, out)).toBeNull();
+  });
+});
+
+describe('insertCcTarget', () => {
+  // Each kind's knob table; advanced drive builds its knobs from its own spec.
+  const TABLES: Partial<Record<InsertKindName, readonly { readonly f: string }[]>> = {
+    drive: DRIVE_KNOBS,
+    chorus: CHORUS_KNOBS,
+    compressor: COMPRESSOR_KNOBS,
+    'retro-reverb': RETRO_REVERB_KNOBS,
+    phaser: PHASER_KNOBS,
+    tape: TAPE_KNOBS,
+    delay: DELAY_KNOBS,
+    ensemble: ENSEMBLE_KNOBS,
+    reverb: REVERB_KNOBS,
+    echo: ECHO_KNOBS,
+    eq: EQ_GLOBAL_KNOBS,
+    filter: FILTER_INSERT_KNOBS,
+    bloom: BLOOM_KNOBS,
+  };
+  const fields = Object.values(TABLES).flatMap((table) => table.map((entry) => entry.f));
+
+  it('answers every knob of every kind, and a slot child of every host, without throwing', () => {
+    for (const [kind, table] of Object.entries(TABLES) as [InsertKindName, { f: string }[]][]) {
+      for (const { f } of table) {
+        const id = insertCcTarget(kind, 'fx1', f);
+        expect(id === null || id === `insert.fx1.${f}`, `${kind} ${f}`).toBe(true);
+      }
+      for (const f of fields) expect(() => insertCcTarget(kind, 'fx1', `slot.${f}`)).not.toThrow();
+    }
+  });
+
+  it("leaves Bloom's Octave, Low and High unmapped, and maps its continuous fields", () => {
+    for (const f of ['octave', 'low', 'high']) expect(insertCcTarget('bloom', 'fx1', f)).toBeNull();
+    expect(insertCcTarget('bloom', 'fx1', 'mix')).toBe('insert.fx1.mix');
+    expect(insertCcTarget('bloom', 'fx1', 'freeze')).toBeNull();
   });
 });

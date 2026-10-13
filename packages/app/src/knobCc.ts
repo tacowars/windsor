@@ -20,8 +20,15 @@ import type {
   CcTargetId,
   DocumentPart,
   DocumentPartial,
+  InsertKindName,
 } from '@windsor/engine';
-import { partAt, voiceTargetId } from '@windsor/engine';
+import {
+  INSERT_AUTOMATION_FIELDS,
+  formatTargetId,
+  isCcMappableTarget,
+  partAt,
+  voiceTargetId,
+} from '@windsor/engine';
 
 import type { CcStatus } from './ccStatus';
 import type { AppCtx } from './context';
@@ -55,6 +62,26 @@ export interface KnobCcBinding {
    * half of the ratio (`ratioKnobs.ts`). Absent, the value itself.
    */
   readonly view?: (value: number) => number;
+}
+
+/**
+ * The catalog target a CC may drive on `field` of an insert of kind `kind`
+ * standing under `insertId`, or null: a field the catalog lists no row for
+ * on that kind (Bloom's stepped Octave, its Low and High), a switch, or no
+ * id. The kind's rows are checked before the id is formed, so asking never
+ * throws (`formatTargetId` does on a field the catalog does not hold).
+ */
+export function insertCcTarget(
+  kind: InsertKindName,
+  insertId: string,
+  field: string,
+  fields = INSERT_AUTOMATION_FIELDS,
+): CcTargetId | null {
+  if (insertId.length === 0) return null;
+  const rows: readonly { readonly target: string }[] = fields[kind];
+  if (!rows.some((row) => row.target === field)) return null;
+  const id = formatTargetId({ kind: 'insert', insertId, field });
+  return isCcMappableTarget(id) ? id : null;
 }
 
 /** The part's target `target`, as one answer per part: the same object while the part stays. */
