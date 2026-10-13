@@ -41,9 +41,9 @@ fade, the motion's clocks and draws, the dropouts, the noise, the model
 weights and the core's glide; windsor#802), so a control moved in a gap
 wakes mid-glide on a never-sleeping tape's bits, and mixes the noise over
 the dry ring with the ring's read at 0: the hiss stays audible, and with its
-target off a gain under `hissSnap` lands at 0, a wet of exactly 0. The processor reads each
-block's input before rendering it, and any sample over the floor wakes the
-tape on that block, rendered in full. `renderAsleep` is the asleep block,
+target off a gain under `hissSnap` lands at 0, a wet of exactly 0. The
+processor reads each block's input before rendering it, and any sample over
+the floor wakes the tape on that block, rendered in full. `renderAsleep` is the asleep block,
 dispatched outside the awake loop; `processorOptions.sleep: false` renders
 without the sleep, for tests. `inserts/tapeSleep.test.ts` pins the tail, the
 frozen path, the wake and the hiss against that.
@@ -163,9 +163,8 @@ output floor, zeroes that state and writes zeros, with no `tick`; asleep,
 `PhaserDsp.rest` steps `tick`'s control path a sample at a time with no
 audio (the controls' glides, the switch's fade, the follower's release and
 the sweep's phase, on an awake phaser's bits; windsor#802), and the first
-loud block wakes it and renders in full. Its
-tail is the lattice's settle, read off the state, 1.26 s at the slowest
-corner (`tailSeconds` bounds it). The sleep's count is written out in
+loud block wakes it and renders in full. Its tail is the lattice's settle,
+read off the state, 1.26 s at the slowest corner (`tailSeconds` bounds it). The sleep's count is written out in
 `configure`, which runs every block and so is optimised. `sleep: false` in
 `processorOptions` is the tests' render without it;
 `inserts/phaserSleep.test.ts` holds the tail, the wake, the changes made
