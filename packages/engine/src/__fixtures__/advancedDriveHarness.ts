@@ -15,15 +15,19 @@ export function advancedDriveParams(
 }
 export interface AdvancedDriveProcessorLike {
   port: { posted: unknown[]; onmessage(event: { data: unknown }): void };
+  /** The sleep's state (windsor#793, `worklet/advancedDrive/driveSleep.ts`). */
+  sleep: { asleep: boolean; quiet: number; hold: number };
   process(
     inputs: Float32Array[][],
     outputs: Float32Array[][],
     params: Record<string, Float32Array>,
   ): boolean;
 }
+/** `sleep: false` renders the drive without its sleep (windsor#793), for a test to compare. */
 export function loadAdvancedDrive(
   rate = 48000,
   params = advancedDriveParams(),
+  options: { sleep?: boolean } = {},
 ): AdvancedDriveProcessorLike {
   const { Processor } = generatedProcessor<new (options: unknown) => AdvancedDriveProcessorLike>({
     file: 'advanced-drive-processor.js',
@@ -31,5 +35,6 @@ export function loadAdvancedDrive(
   });
   return new Processor({
     parameterData: firstValues(params),
+    processorOptions: options,
   });
 }

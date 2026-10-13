@@ -29,6 +29,14 @@
  * fix the run traced 42: the drive's doubles first written as small integers,
  * and `DriveFilter`'s fields defined as `undefined` first.
  *
+ * Sleep (windsor#793): a second run plays the same cycle with `SLEEPY_QUIET`
+ * quanta of silence at the end of each step, so the drive sleeps, rests and
+ * is woken by the next step's noise, and reads the heap and the trace the same
+ * way. It warms up for six cycles, not three: the watch and the rest run once
+ * a quantum, not once a sample, and after three cycles V8 was still
+ * optimising them during the measured run, whose first tenths then read 9 and
+ * 13 KB of the lower tiers' boxes.
+ *
  * What this does not cover: the first runs of a path V8 has not optimised yet,
  * which box, as the EQ's research README describes.
  */
@@ -59,6 +67,13 @@ const TOLERANCE_BYTES = 16 * 1024;
 const STEPS = 20;
 const PERIOD = 384;
 const QUIET = 16;
+/**
+ * The sleep run's silence (windsor#793): 0.68 s at 48 kHz, past every step's
+ * ring under the floor and the hold, so most steps sleep and rest before the
+ * next step's noise wakes them; the scenario fails unless the measured run
+ * sleeps and wakes.
+ */
+const SLEEPY_QUIET = 256;
 const CYCLE = STEPS * PERIOD;
 
 /** Stage `s` of step `i`: every shaper and filter in turn, and each switch off now and then. */
@@ -117,11 +132,12 @@ function step(i: number): DriveChangeStep {
   return { names: Object.keys(values), values: Object.values(values) };
 }
 
-function probe(): ProbeRun {
+function probe(quiet = QUIET, sleeps = false): ProbeRun {
   const scenarioConfig: DriveChangeConfig = {
     steps: Array.from({ length: STEPS }, (_, i) => step(i)),
     period: PERIOD,
-    quiet: QUIET,
+    quiet,
+    sleeps,
   };
   return runAllocationProbe(
     {
@@ -132,7 +148,7 @@ function probe(): ProbeRun {
       messages: [],
       inputChannels: 2,
       loadQuanta: 0,
-      warmup: 3 * CYCLE,
+      warmup: (sleeps ? 6 : 3) * CYCLE,
       measure: CYCLE,
       scenario: probeScenario('advancedDriveChangeScenario.ts'),
       scenarioConfig,
@@ -144,6 +160,12 @@ function probe(): ProbeRun {
 describe('Advanced Drive on V8', () => {
   it('plays and changes every route, shaper and filter without allocating or changing a field representation', () => {
     const run = probe();
+    expect(run.changes).toEqual([]);
+    expectAllocationFree(run, TOLERANCE_BYTES);
+  }, 120_000);
+
+  it('goes silent, sleeps, rests and wakes on every route without allocating or changing a field representation', () => {
+    const run = probe(SLEEPY_QUIET, true);
     expect(run.changes).toEqual([]);
     expectAllocationFree(run, TOLERANCE_BYTES);
   }, 120_000);

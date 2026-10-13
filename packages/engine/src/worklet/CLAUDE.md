@@ -82,6 +82,26 @@ decibel gains and clamps are written in place, since the render exhausts
 V8's inlining budget and then even a tiny helper stays a call), and every
 double field is first written as one. `inserts/advancedDriveAllocation.test.ts`
 pins it on V8 through `__fixtures__/advancedDriveChangeScenario.ts`.
+It sleeps on silence (windsor#793, the plate's pattern): `driveSleep.ts`
+counts each awake block quiet when the input is within its floor,
+`DRIVE_SLEEP.inputFloor` (1e-9) divided by the worst-case linear gain of the
+current settings (`gauge`, once a block, recomputed only when the targets
+change; a crushing stage leaves only exact zeros quiet), and the output, as
+heard and at the graph's last wet and dry samples before Mix and the switch,
+is within `outputFloor`
+(1e-7), and after `holdSeconds` (50 ms) of quiet the DSP empties its graph
+and oversamplers and sleeps. The tail is the output's own: a resonant stage
+modulated down rings for seconds, so no fixed span bounds it. Asleep, `rest`
+writes the dry input and the DSP runs `update`'s control path a sample at a
+time with no audio (smoothing, the fade, the follower's release and the LFO's
+phase, on an awake drive's bits), with no tick; the first block whose input crosses
+the same floor wakes it and renders in full, from the empty state of a switch-on.
+The constants are in `inserts/advancedDriveSleepConstants.ts`, not
+`advancedDriveConstants.ts`, which the FM bundle carries whole. The awake
+loop is `render`, apart from `process`'s dispatch, as the plate keeps its
+asleep quantum out of its tank loop. `sleep: false` in `processorOptions`
+renders without it, for a test; `inserts/advancedDriveSleep.test.ts` holds
+the tail, the wake and the Mix 0 ring.
 
 `delay/` is the stereo/dub insert (#698), built as
 `generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
