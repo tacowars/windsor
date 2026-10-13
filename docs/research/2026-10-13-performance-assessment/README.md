@@ -54,7 +54,8 @@ the cost, are the result; the absolute microseconds are this machine's.
   (the tape's and the drive's 1× settings) and sharing on a group or a send
   costs one instance.
 - **The fixed tax is second-order**: 16 idle parts, their strips and the
-  standing graph cost 17 % of a core here, of which
+  standing graph cost about 15 % of a core here (the render phase alone),
+  of which
   the FM part's eleven k-rate parameters are the largest piece and the
   strip's eleven native nodes are cheap. Worth trimming only after the
   inserts.
@@ -167,8 +168,20 @@ machine or browser.
 - **Offline** (`bench.offline`): the engine's own `renderSong` at 48 kHz,
   the export path, which builds the same parts, strips, returns and master
   as live playback on an `OfflineAudioContext` and renders as fast as the
-  graph allows. Wall time per second of audio is the graph's render-thread
-  cost; 10 ms a second is 1 % of a core. 8 bars at 120 BPM plus a 1 s
+  graph allows. The timer wraps the whole call, so it holds the two
+  system builds `renderSong` makes first (`captureOpening`, then the real
+  one) and the scheduler's stops inside the render as well as the render
+  itself; 10 ms a second is 1 % of a core. A calibration run
+  (`--cases`, the `-calibration` results files, timed apart at
+  `startRendering`) puts that setup at 290–600 ms a render on this
+  machine, a fixed cost that the ms-a-second figures spread over the
+  audio length: about 35 ms a second of the 17 s cases and 35–65 of the
+  9 s kinds cases, so 1–2 % of a loud case and up to a fifth of a silent
+  one (the table under Results). The differences between cases, which the
+  per-part and per-insert figures are, carry only the difference between
+  two setups, a few ms a second at most; the one kinds run paired with
+  the 8-bar baseline carries up to about 2 ms a second an insert of that
+  bias, inside its range. 8 bars at 120 BPM plus a 1 s
   tail. Cases: 16 silent parts (every voice inactive, so the graph alone)
   with and without three inserts each; 1, 4, 8 and 16 playing parts with
   no inserts; 16 parts at the patch's `spread` 12 (twice the voices);
@@ -279,6 +292,20 @@ row). Raw results are in `results/`.
 | oneGain | 4.7 (3.6–6.1) | 0.26 | 0.71 |
 | rotationOnly | 19.8 (18.1–24.3) | 1.21 | 3.23 |
 
+### Calibration: the whole `renderSong` against its render phase alone (`startRendering`), ms per audio second
+
+| Case | Audio s | Whole, ms/s | Render phase, ms/s | Setup, ms | Setup share of the whole |
+|---|---:|---:|---:|---:|---:|
+| 16-silent | 17.0 | 184.5 | 149.6 | 593 | 18.9 % |
+| 16-none | 17.0 | 656.6 | 630.7 | 440 | 3.9 % |
+| 16-3ins | 17.0 | 3306.5 | 3271.0 | 603 | 1.1 % |
+| kind-none | 9.0 | 742.3 | 704.9 | 336 | 5.0 % |
+| kind-none-silent | 9.0 | 170.6 | 138.6 | 288 | 18.8 % |
+| kind-tape | 9.0 | 3419.5 | 3381.6 | 341 | 1.1 % |
+| kind-tape-silent | 9.0 | 2088.4 | 2052.1 | 326 | 1.7 % |
+
+: one knob tick on the 16-part, three-insert song, ms (median of 30 calls, median over rounds)
+
 ### Main thread: one knob tick on the 16-part, three-insert song, ms (median of 30 calls, median over rounds)
 
 | Call | ms |
@@ -294,7 +321,9 @@ Document: 52316 bytes of export text, 16 parts.
 Notes on the tables:
 
 - **Offline.** `16-silent` is the standing graph plus 16 idle parts and
-  strips: 168 ms a second, 17 % of a core here, before a voice sounds.
+  strips: 168 ms a second as timed, 17 % of a core here, before a voice
+  sounds, of which about 35 ms a second is `renderSong`'s setup spread
+  over the 17 s (the calibration's render phase alone read 150).
   Each `pad-drift` part (a chord struck a bar over the last one's release:
   six voices most of the bar, nine for 0.4 s) adds about 32 ms a second
   over it, and `spread` 12
@@ -394,7 +423,8 @@ findings carry the assessment:
 
 3. **The fixed tax of the graph is real but second-order.** Before any
    voice sounds, 16 idle FM parts with their strips and the standing graph
-   cost 168 ms a second here (about 17 % of a core). The micro cases put
+   cost 168 ms a second here as timed, about 150 for the render phase
+   alone (15 % of a core). The micro cases put
    it in pieces: Chrome's
    per-worklet call about 1.7 µs a quantum, each declared k-rate parameter
    about 0.6 µs (the FM part's 11 parameters are most of its idle 9.3 µs),
@@ -658,3 +688,7 @@ so it sits behind 1–3.
 - The realtime traces carry the trace's own cost and the container's
   scheduling jitter in their maxima; the means and medians are the
   readings.
+- The offline figures time the whole of `renderSong`, setup included; the
+  calibration bounds the setup at 1–2 % of a loud case and about a fifth
+  of a silent one, and a retake that wants the render phase alone has
+  `renderPhaseMsPerAudioSecond` on every new offline row.
