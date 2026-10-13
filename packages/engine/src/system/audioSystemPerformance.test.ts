@@ -4,8 +4,9 @@
  * insert's field follow a set value on the params a lane writes and go back
  * to the document's on clear; a value a lane takes over, or whose insert
  * goes, is dropped and reported; and the calls change nothing on a song
- * that holds no value. A preset switch drops a voice value and frees its
- * slot, and a patch edit keeps it. The voice path is
+ * that holds no value. A preset switch keeps a voice value at its absolute
+ * value on the slot it holds, and drops only a macro the new patch lacks;
+ * a patch edit keeps it. The voice path is
  * `automation/performancePlayer.test.ts`'s.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -23,7 +24,7 @@ import {
 import { ENGINE_WORKLETS, installParamWorklet } from '../__fixtures__/insertParamRig';
 import { DEFAULT_PHASER } from '../inserts/phaserSpec';
 import type { InsertSpec } from '../inserts/insertRegistry';
-import { makePatch } from '../patch/patch';
+import { makeMacro, makePatch } from '../patch/patch';
 import { musicPartName } from '../song/documentParts';
 import { FmEngine } from '../synth/fmEngine';
 import { AudioSystem } from './audioSystem';
@@ -117,7 +118,7 @@ describe('performance values on a part’s strip and inserts', () => {
     ]);
   });
 
-  it('drops a voice value on a preset switch, frees its slot, and keeps a strip value', async () => {
+  it('keeps a voice value through a preset switch, at its absolute value on the slot it holds', async () => {
     const { sys, level, dropped, context } = await rig();
     const part = () => sys.strip(musicPartName(hat))!.part;
     const cutoff = (hz: number) => makePatch({ filter: { cutoff: hz } });
@@ -133,13 +134,30 @@ describe('performance values on a part’s strip and inserts', () => {
     expect(part().voiceSlotOf('filter.cutoff')).toBe(slot);
     expect(dropped).toEqual([]);
 
+    // The new preset's cutoff is 3 kHz: the held 2 kHz is an offset below it now.
     context.currentTime = 1;
     sys.apply({ patches: { cutB: cutoff(3000) }, parts: { [hat]: { preset: 'cutB' } } });
-    expect(dropped).toEqual([[hat, 'voice.filter.cutoff']]);
-    expect(part().voiceSlotOf('filter.cutoff')).toBeUndefined();
-    expect(param.valueAt(1)).toBe(0);
+    expect(dropped).toEqual([]);
     expect(part().patch.filter.cutoff).toBe(3000);
+    expect(part().voiceSlotOf('filter.cutoff')).toBe(slot);
+    expect(param.valueAt(1)).toBeCloseTo(Math.log2(2000 / 3000), 12);
+    expect(3000 * 2 ** param.valueAt(1)).toBeCloseTo(2000, 9);
     expect(level().value).toBe(0.25);
+  });
+
+  it('drops a macro value on a switch to a preset that lacks the macro, and frees its slot', async () => {
+    const { sys, dropped, context } = await rig();
+    const part = () => sys.strip(musicPartName(hat))!.part;
+    const macros = makePatch({ macros: [makeMacro(), makeMacro()] });
+    sys.apply({ patches: { twoMacros: macros }, parts: { [hat]: { preset: 'twoMacros' } } });
+    context.currentTime = 0.5;
+    expect(sys.setPerformance(hat, 'voice.macros.1.value', 0.7)).toBe('applied');
+    expect(part().voiceSlotOf('macros.1.value')).toBeDefined();
+
+    context.currentTime = 1;
+    sys.apply({ patches: { none: makePatch() }, parts: { [hat]: { preset: 'none' } } });
+    expect(dropped).toEqual([[hat, 'voice.macros.1.value']]);
+    expect(part().voiceSlotOf('macros.1.value')).toBeUndefined();
   });
 
   it('writes nothing on a song that holds no value', async () => {

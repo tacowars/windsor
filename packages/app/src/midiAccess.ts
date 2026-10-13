@@ -5,13 +5,28 @@
  * stamped with their own `timeStamp` (windsor#663).
  * Whatever the connection stops hearing — a deselected or unplugged device —
  * has its notes and pedal released, so nothing sticks.
+ *
+ * A knob or fader (`decodeMidi`'s `cc` event) goes to the CC listener
+ * instead (windsor#784, record `2026-10-13-midi-cc-mapping`), with its
+ * input's name and channel; so does each input the connection starts
+ * listening to again (plugged back in, or selected again), whose knobs may
+ * have moved unheard. A lost or deselected input needs no word: a CC value
+ * it set holds.
  */
+import type { CcMessage } from './ccEngine';
 import { INPUT_STORAGE_KEY } from './midiConstants';
 import { ALL_INPUTS, listensTo, type InputInfo } from './midiInputs';
 import { decodeMidi } from './midiMessage';
 import { MidiPerformer, type PerformerSink } from './midiPerformer';
 
 export type MidiState = 'unsupported' | 'off' | 'requesting' | 'denied' | 'ready';
+
+/** Who hears the controllers: the console's CC session. */
+export interface CcListener {
+  hear(message: CcMessage): void;
+  /** The connection listens to the input named `device` (null: unnamed) again, or for the first time. */
+  listened(device: string | null): void;
+}
 
 const readSelection = (): string => {
   try {
@@ -35,9 +50,12 @@ export class MidiAccessor {
   error = '';
   /** The panel's redraw; one slot, because the Parts tab rebuilds its panel. */
   onChange: (() => void) | null = null;
+  /** The controllers' listener (windsor#784); none until the console sets it. */
+  cc: CcListener | null = null;
 
   private access: MIDIAccess | null = null;
   private listening = new Set<string>();
+  private readonly watchers = new Set<() => void>();
   private readonly performers = new Map<string, MidiPerformer>();
 
   /** `sinkFor` gives each input its own place to play into, by input id. */
@@ -109,10 +127,17 @@ export class MidiAccessor {
       if (listensTo(info, this.selection)) {
         now.add(input.id);
         const performer = this.performer(input.id);
+        const device = input.name ?? null;
         input.onmidimessage = (e): void => {
           const event = e.data ? decodeMidi(e.data) : null;
-          if (event) performer.handle(event, e.timeStamp);
+          if (event?.type !== 'cc') {
+            if (event) performer.handle(event, e.timeStamp);
+            return;
+          }
+          const { channel, cc, value } = event;
+          this.cc?.hear({ device, channel, cc, value });
         };
+        if (!this.listening.has(input.id)) this.cc?.listened(device);
       } else {
         input.onmidimessage = null;
       }
@@ -122,7 +147,14 @@ export class MidiAccessor {
     this.changed();
   }
 
+  /** Hear every change of state, inputs or selection, beside `onChange`; returns the unsubscribe. */
+  watch(listener: () => void): () => void {
+    this.watchers.add(listener);
+    return () => void this.watchers.delete(listener);
+  }
+
   private changed(): void {
     this.onChange?.();
+    for (const watcher of this.watchers) watcher();
   }
 }

@@ -48,9 +48,10 @@ export interface AppCtx {
    * merged into the document. Refused by the engine → nothing changes.
    * Parts are addressed by slot: `{ parts: { 2: { velocity: 0.5 } } }` (#597);
    * a whole part at a free slot adds one, `null` at a slot or a patch id
-   * removes it (#629) — `partEdits.ts` builds those.
+   * removes it (#629) — `partEdits.ts` builds those. `label` names its
+   * undo step, by default its sections.
    */
-  change(partial: DocumentPartial): ApplyResult;
+  change(partial: DocumentPartial, label?: string): ApplyResult;
   /**
    * The open-song session (windsor#433): whether the open song is untitled
    * or a named song stored in this browser, and the library's operations.

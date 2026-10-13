@@ -22,8 +22,14 @@
  * - **Clearing a voice target** sets its offset back to 0 and frees the
  *   slot, so the voice plays the patch's own value; with a track on it, the
  *   track keeps the slot for the envelope alone.
- * - **A preset switch** drops every voice and macro value (`dropVoices`),
- *   reported as `rebind` reports a drop; a strip or insert value stays.
+ * - **A preset switch** keeps every value (tacowars's decision of
+ *   2026-10-13, record decision 2): a mapping is the song's setup, and its
+ *   value is absolute in the target's units, so the new preset sounds with
+ *   the same value. `rebind` reckons each voice and macro value's offset
+ *   again against the new patch (`reckon`), as a lane's is, on the slot it
+ *   holds. Only a value whose target the new patch does not offer (a macro
+ *   it lacks, a target its macros map) is dropped, its slot given back,
+ *   and reported. A strip or insert value stays as it is.
  * - **The lanes win** (decision 3): the player never sets a target a lane
  *   plays, and `rebind` drops a value whose target a lane now plays, without
  *   writing: the lane already holds the param. A lane switched off later
@@ -32,7 +38,7 @@
  * A part with nothing held changes nothing anywhere it is read.
  * `performancePlayer.test.ts`, and `system/audioSystemPerformance.test.ts` live.
  */
-import type { AutomationHandle } from './automationHandles';
+import type { AutomationHandle, OffsetHandle } from './automationHandles';
 import { isOffsetHandle } from './automationHandles';
 import type { AutomationTargetId } from './automationLane';
 import type { ResolvedTarget } from './automationPlayer';
@@ -51,8 +57,8 @@ export interface HeldPerformance {
   handle: AutomationHandle;
   /** The value, in the target's own units, clamped to its row. */
   readonly value: number;
-  /** A voice target's offset, reckoned at the move; 0 on a strip or insert target. */
-  readonly offset: number;
+  /** A voice target's offset, reckoned at the move or a preset switch; 0 on a strip or insert target. */
+  offset: number;
 }
 
 /** When and how a set writes. */
@@ -174,11 +180,11 @@ export class PartPerformance {
    * part no longer has (its insert gone or its field unread, a macro now
    * mapping the voice target, a macro the patch lacks) gives its handle back
    * and is dropped; a strip or insert target found on a new handle (a rebuilt
-   * stage) holds its value there. With `preset`, a preset switch, every
-   * voice and macro value is dropped first (`dropVoices`).
+   * stage) holds its value there. With `preset`, a preset switch, each voice
+   * and macro value the new patch offers sounds over it at the same value
+   * (`reckon`).
    */
   rebind(lanes: readonly { readonly target: string }[], now: number, preset = false): void {
-    if (preset) this.dropVoices(now);
     for (const list of [this.voices, this.knobs]) {
       for (let i = list.length - 1; i >= 0; i--) {
         const held = list[i]!;
@@ -188,6 +194,12 @@ export class PartPerformance {
           continue;
         }
         const found = this.part.resolve(held.target)?.handle;
+        if (preset && found && isOffsetHandle(found) && found.defined()) {
+          if (this.reckon(held, found, now)) continue;
+          list.splice(i, 1);
+          this.part.dropped(held.target);
+          continue;
+        }
         if (stillWrites(held, found)) continue;
         held.handle.release(now);
         if (found && !isOffsetHandle(found)) {
@@ -202,15 +214,20 @@ export class PartPerformance {
   }
 
   /**
-   * A preset switch (record decision 2): every voice and macro value is
-   * dropped and reported, its slot given back at `now` so the voice plays
-   * the new patch's own value, or left to the envelope track that writes it.
-   * Strip and insert values stay: a preset is no part of them.
+   * A preset switch (record decision 2): the voice or macro value `held`
+   * sounds over the new patch at the same value, its offset reckoned again
+   * against it through `handle` (`voiceOffset`, floored as a lane's) and
+   * held from `now` on the slot it keeps, or left in the entry for the
+   * envelope track that writes the slot. `handle` is defined on the new
+   * patch. Whether it holds: false where no slot is left (a rebuilt part).
    */
-  private dropVoices(now: number): void {
-    for (const held of this.voices.splice(0)) {
-      if (!this.part.tracked(held.target)) held.handle.release(now);
-      this.part.dropped(held.target);
-    }
+  private reckon(held: HeldPerformance, handle: OffsetHandle, now: number): boolean {
+    if (handle !== held.handle) held.handle.release(now);
+    held.handle = handle;
+    held.offset = handle.offsetOf(held.value);
+    if (this.part.tracked(held.target)) return true;
+    handle.setRelative(false);
+    handle.holdOffset(held.offset, now);
+    return handle.slotted();
   }
 }

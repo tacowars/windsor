@@ -8,6 +8,7 @@
  */
 import type { SequencerKind } from '@windsor/engine';
 import { SEQUENCER_KINDS, partAt } from '@windsor/engine';
+import { ccPanelButton } from './ccPanelEntry';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { KIND_LABELS } from './sequencerConstants';
@@ -31,11 +32,19 @@ function kindPicker(ctx: AppCtx, slot: number): HTMLSelectElement {
   return picker;
 }
 
-/** `PART`, the name field and the sequencer select, for the start of the bar. */
+/**
+ * `PART`, the name field, the sequencer select and the MIDI CC button
+ * (windsor#784, `ccPanelEntry.ts`), for the start of the bar.
+ */
 export function partListControls(ctx: AppCtx): HTMLElement[] {
   const slot = ctx.parts.selected;
   if (!partAt(ctx.model.doc, slot)) return [];
   const name = partNameField(ctx, slot);
   name.classList.add('bar-name');
-  return [el('span', 'field-label bar-label', 'Part'), name, kindPicker(ctx, slot)];
+  return [
+    el('span', 'field-label bar-label', 'Part'),
+    name,
+    kindPicker(ctx, slot),
+    ...ccPanelButton(),
+  ];
 }

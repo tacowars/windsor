@@ -39,10 +39,13 @@ export interface CcTargetNow {
 }
 
 /**
- * What the engine did with a CC's value: `applied`, or `noSlot` when a voice
- * target found none of the part's eight slots free (decision 8).
+ * What the engine did with a CC's value, as it reported it. Only `applied`
+ * moved the target and holds the value. `noSlot`: a voice target found none
+ * of the part's eight slots free (decision 8). `automated`: a lane holds the
+ * target. `inert`: the target cannot play now (an insert field its current
+ * mode lacks). `off`: audio is off, so the next value tries again.
  */
-export type CcApplyResult = 'applied' | 'noSlot';
+export type CcApplyResult = 'applied' | 'noSlot' | 'automated' | 'inert' | 'off';
 
 /**
  * The engine as the CC router sees it. The MIDI panel implements it over the
