@@ -90,3 +90,85 @@ describe('SystemLoadMeter', () => {
     expect(port.onmessage).toBeNull();
   });
 });
+
+/** A context whose audio clock and wall clock the test moves by hand. */
+function clockedContext(stats?: { underrunEvents: number }) {
+  const clock = { wallMs: 0 };
+  const context = {
+    sampleRate: SAMPLE_RATE,
+    currentTime: 0,
+    state: 'running' as AudioContextState,
+    playbackStats: stats,
+  };
+  const meter = new SystemLoadMeter(
+    context as unknown as BaseAudioContext,
+    true,
+    () => clock.wallMs,
+  );
+  /** Let `seconds` of wall time pass, the audio clock advancing at `rate`. */
+  const advance = (seconds: number, rate: number): void => {
+    clock.wallMs += seconds * 1000;
+    context.currentTime += seconds * rate;
+  };
+  return { context, meter, advance };
+}
+
+describe('SystemLoadMeter: the audio clock and the device (windsor#794)', () => {
+  it('reads a clock that advances 0.9 s per wall second as 0.9', () => {
+    const { meter, advance } = clockedContext();
+    meter.readout();
+    advance(AUDIO_LOAD_REPORT_SECONDS, 0.9);
+    expect(meter.readout().clockRate).toBeCloseTo(0.9, 6);
+  });
+
+  it('reads a clock that keeps up as 1.0', () => {
+    const { meter, advance } = clockedContext();
+    meter.readout();
+    advance(AUDIO_LOAD_REPORT_SECONDS, 1.003);
+    expect(Math.abs((meter.readout().clockRate ?? 0) - 1)).toBeLessThan(0.005);
+  });
+
+  it('is null before a whole interval has passed, and while suspended', () => {
+    const { context, meter, advance } = clockedContext();
+    expect(meter.readout().clockRate).toBeNull();
+    advance(AUDIO_LOAD_REPORT_SECONDS / 2, 1);
+    expect(meter.readout().clockRate).toBeNull();
+    advance(AUDIO_LOAD_REPORT_SECONDS / 2, 1);
+    expect(meter.readout().clockRate).toBe(1);
+    context.state = 'suspended';
+    advance(AUDIO_LOAD_REPORT_SECONDS, 0);
+    expect(meter.readout().clockRate).toBeNull();
+    // Resumed, it starts a fresh interval rather than averaging over the pause.
+    context.state = 'running';
+    expect(meter.readout().clockRate).toBeNull();
+  });
+
+  it('reads no device figure where the context has no playbackStats', () => {
+    const { meter } = clockedContext();
+    expect(meter.readout().deviceUnderruns).toBeNull();
+  });
+
+  it('holds the device count monotone where playbackStats is present', () => {
+    const stats = { underrunEvents: 2 };
+    const { meter } = clockedContext(stats);
+    expect(meter.readout().deviceUnderruns).toBe(2);
+    stats.underrunEvents = 5;
+    expect(meter.readout().deviceUnderruns).toBe(5);
+    stats.underrunEvents = 1;
+    expect(meter.readout().deviceUnderruns).toBe(5);
+  });
+
+  it('reads neither on a system that does not meter', () => {
+    const disabled = new SystemLoadMeter(
+      {
+        ...context,
+        currentTime: 0,
+        state: 'running',
+        playbackStats: { underrunEvents: 3 },
+      } as unknown as BaseAudioContext,
+      false,
+    );
+    expect(disabled.readout().clockRate).toBeNull();
+    expect(disabled.readout().deviceUnderruns).toBeNull();
+  });
+});

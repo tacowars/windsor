@@ -3,11 +3,22 @@ import { CPU_METER_FLASH_MS, CPU_METER_TOAST_GAP_MS } from './cpuMeterConstants'
 import {
   INITIAL_OVERRUN_STATE,
   type OverrunState,
+  type CpuLoad,
   cpuMeterView,
   formatLoad,
   meterSampleAt,
   stepOverrun,
 } from './cpuMeterModel';
+
+/** A reading with no clock or device figure, overridden per case. */
+const reading = (over: Partial<CpuLoad> = {}): CpuLoad => ({
+  loadPct: 0,
+  peakPct: 0,
+  underruns: 0,
+  clockRate: null,
+  deviceUnderruns: null,
+  ...over,
+});
 
 describe('formatLoad', () => {
   it('rounds to a whole percent', () => {
@@ -27,24 +38,44 @@ describe('formatLoad', () => {
 
 describe('cpuMeterView', () => {
   it('draws an idle system as an empty bar at 0%', () => {
-    expect(cpuMeterView({ loadPct: 0, peakPct: 0, underruns: 0 })).toEqual({
+    expect(cpuMeterView(reading())).toEqual({
       fill: 0,
       peak: 0,
       label: '0%',
       over: false,
+      summary: 'CPU 0%, peak 0%, underruns 0',
     });
   });
 
   it('places the bar and the peak tick as fractions of the budget', () => {
-    const view = cpuMeterView({ loadPct: 25, peakPct: 60, underruns: 0 });
+    const view = cpuMeterView(reading({ loadPct: 25, peakPct: 60 }));
     expect(view.fill).toBeCloseTo(0.25);
     expect(view.peak).toBeCloseTo(0.6);
     expect(view.over).toBe(false);
   });
 
   it('clamps a load past the budget to a full bar and flags it', () => {
-    const view = cpuMeterView({ loadPct: 180, peakPct: 400, underruns: 3 });
-    expect(view).toEqual({ fill: 1, peak: 1, label: '180%', over: true });
+    const view = cpuMeterView(reading({ loadPct: 180, peakPct: 400, underruns: 3 }));
+    expect(view).toMatchObject({ fill: 1, peak: 1, label: '180%', over: true });
+  });
+
+  it('goes full-scale over while the audio clock is behind, whatever the sampler reads', () => {
+    const losing = cpuMeterView(reading({ loadPct: 40, peakPct: 20, clockRate: 0.95 }));
+    expect(losing).toMatchObject({ fill: 1, label: '40%', over: true });
+    expect(losing.summary).toBe('CPU 40%, peak 20%, underruns 0, clock 0.95');
+    const keepingUp = cpuMeterView(reading({ loadPct: 40, peakPct: 20, clockRate: 1.0 }));
+    expect(keepingUp).toMatchObject({ fill: 0.4, over: false });
+    expect(keepingUp.summary).toBe('CPU 40%, peak 20%, underruns 0');
+  });
+
+  it('names the device underruns only when the browser gives a count', () => {
+    expect(cpuMeterView(reading({ loadPct: 12, deviceUnderruns: 4 })).summary).toBe(
+      'CPU 12%, peak 0%, underruns 0, device underruns 4',
+    );
+    expect(
+      cpuMeterView(reading({ loadPct: 12, deviceUnderruns: 0, clockRate: 0.93 })).summary,
+    ).toBe('CPU 12%, peak 0%, underruns 0, clock 0.93, device underruns 0');
+    expect(cpuMeterView(reading({ loadPct: 12 })).summary).not.toContain('device');
   });
 });
 
@@ -61,7 +92,7 @@ describe('meterSampleAt', () => {
 function run(readings: Array<[number, number]>): Array<ReturnType<typeof stepOverrun>> {
   let state: OverrunState = INITIAL_OVERRUN_STATE;
   return readings.map(([count, ms]) => {
-    const step = stepOverrun(state, count, ms);
+    const step = stepOverrun(state, { underruns: count, deviceUnderruns: null }, ms);
     state = step.state;
     return step;
   });
@@ -111,5 +142,25 @@ describe('stepOverrun', () => {
     ]);
     expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 0 });
     expect(steps[2]).toMatchObject({ toast: true, added: 1 });
+  });
+});
+
+describe('stepOverrun with the device count', () => {
+  it('fires once on a rise in the device count', () => {
+    const first = stepOverrun(INITIAL_OVERRUN_STATE, reading({ deviceUnderruns: 2 }), 0);
+    const rise = stepOverrun(first.state, reading({ deviceUnderruns: 3 }), 100);
+    const steady = stepOverrun(rise.state, reading({ deviceUnderruns: 3 }), 200);
+    expect([first.toast, rise.toast, steady.toast]).toEqual([false, true, false]);
+    expect(rise.added).toBe(1);
+  });
+
+  it('still toasts a device rise when a rebuilt system restarts the sampler', () => {
+    const first = stepOverrun(
+      INITIAL_OVERRUN_STATE,
+      reading({ underruns: 10, deviceUnderruns: 100 }),
+      0,
+    );
+    const rebuild = stepOverrun(first.state, reading({ underruns: 0, deviceUnderruns: 105 }), 250);
+    expect(rebuild).toMatchObject({ toast: true, flashing: true, added: 5 });
   });
 });

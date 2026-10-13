@@ -64,8 +64,8 @@ const CLOCK_RESOLUTION_MS = 1;
 
 /**
  * The audio thread's cost, as `AudioSystem.loadReadout()` reports it.
- * All four fields are zero on a page with no audio, and on one whose
- * processors have not reported yet.
+ * The four DSP fields are zero on a page with no audio, and on one whose
+ * processors have not reported yet; the two clock fields are null.
  */
 export interface AudioLoadReadout {
   /**
@@ -90,6 +90,20 @@ export interface AudioLoadReadout {
   underruns: number;
   /** How many processors reported in the interval just read. */
   processors: number;
+  /**
+   * The audio clock's advance over the wall clock's in the last whole report
+   * interval (`audioClock.ts`, windsor#794): below `CLOCK_RATE_LOSING` the
+   * render is behind real time, whatever `loadPct` says. Null until a whole
+   * interval has passed, while the context is not running, and on a system
+   * that does not meter.
+   */
+  clockRate: number | null;
+  /**
+   * The output device's underrun events (`AudioContext.playbackStats`),
+   * cumulative and monotone as `underruns` is. Null where the browser has no
+   * `playbackStats`, and on a system that does not meter.
+   */
+  deviceUnderruns: number | null;
 }
 
 export const ZERO_AUDIO_LOAD: AudioLoadReadout = {
@@ -97,6 +111,8 @@ export const ZERO_AUDIO_LOAD: AudioLoadReadout = {
   peakPct: 0,
   underruns: 0,
   processors: 0,
+  clockRate: null,
+  deviceUnderruns: null,
 };
 
 /**
@@ -250,6 +266,9 @@ export class AudioLoadMeter {
       peakPct,
       underruns,
       processors,
+      // The main thread's readings; `SystemLoadMeter` fills them from its context.
+      clockRate: null,
+      deviceUnderruns: null,
     };
   }
 

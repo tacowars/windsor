@@ -107,6 +107,8 @@ describe('AudioLoadMeter', () => {
       peakPct: 0,
       underruns: 7,
       processors: 0,
+      clockRate: null,
+      deviceUnderruns: null,
     });
   });
 
