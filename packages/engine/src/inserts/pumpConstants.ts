@@ -116,6 +116,9 @@ export const PUMP_DSP = {
   scopeBins: 96,
   /** How often the open card is told where the cycle is. */
   phaseHz: 30,
-  /** The processor's `lengthMs` param range: every synced length from 20 to 300 BPM. */
-  lengthParamMs: [5, 8000],
+  /**
+   * The processor's `lengthMs` param range: every synced length from `BPM_MIN`
+   * to 300 BPM, the longest being 1/1 at 20 BPM.
+   */
+  lengthParamMs: [5, 12000],
 } as const;

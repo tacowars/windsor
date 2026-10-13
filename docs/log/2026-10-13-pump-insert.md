@@ -60,6 +60,14 @@ on every kick, and shows the kick under the shape while you draw.
 7. **Additive to the song format.** It is a new kind, so there is no
    version bump.
 
+## Deviation
+
+The `lengthMs` param's ceiling was raised from 8,000 to 12,000 ms, so a
+synced 1/1 cycle (4 beats at 3,000 ms each) plays whole down to 20 BPM,
+the transport's minimum. Before, the drawn shape finished early for 1/1
+below 30 BPM. Codex raised it as a P1 on windsor#805; tacowars approved
+the change on 2026-10-14.
+
 ## Not done
 
 There is no free-running, tempo-locked mode, because a worklet never learns

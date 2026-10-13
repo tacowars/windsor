@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { BPM_MAX, BPM_MIN } from '../audioConstants';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PUMP_MAX_POINTS } from './pumpConstants';
 import { bendShape, pumpLengthMs, pumpLevelAt } from './pumpCurves';
+import { pumpParameters } from './pumpParameters';
 import { DEFAULT_PUMP, normalisePump } from './pumpSpec';
 
 const normalise = (raw: Record<string, unknown>) => {
@@ -85,5 +87,12 @@ describe('the Pump curves', () => {
       9,
     );
     expect(pumpLengthMs({ sync: false, division: '1/8T', lengthMs: 99 }, 120)).toBe(99);
+  });
+
+  it('plays every synced cycle whole across the tempo range', () => {
+    const synced = (division: '1/1' | '1/32', bpm: number) =>
+      pumpParameters({ ...DEFAULT_PUMP, sync: true, division }, bpm).lengthMs;
+    expect(synced('1/1', BPM_MIN)).toBe(12000);
+    expect(synced('1/32', BPM_MAX)).toBeCloseTo(25, 9);
   });
 });
