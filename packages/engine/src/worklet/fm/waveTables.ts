@@ -1,4 +1,3 @@
-/* global sampleRate */
 /**
  * Waveforms (#644): the wave ids, the exact sine table, the bandlimited
  * per-octave mip tables built from harmonic partials, each sized to the
@@ -7,8 +6,13 @@
  * operator's wave selects. PULSE (#55) is two reads of the saw set, so its
  * waves are the saw's and the cache holds one copy. Invariants: `SIN_TAB` and `WAVE_CACHE` are
  * single-instance module state, never duplicated; `WAVE` mirrors `patch.ts`
- * (`patch.test.ts` pins the copy until #656 shares it); the warm-up at the end
- * runs inside `addModule()`, never in a render. `fmProcessorUserWave.test.ts`
+ * (`patch.test.ts` pins the copy until #656 shares it). The module touches no
+ * worklet scope at load: the main thread imports it too (windsor#795), builds
+ * a set with `waveSetFor` under the key `waveSetKey` gives, the same code and
+ * so the same bits, into its own cache, and sends it ahead of a patch; the
+ * processor installs it (`installWaveSet`) and builds only what it was not
+ * sent. The warm-up is `warmWaveCache`, which the processor runs once inside
+ * `addModule()`, never in a render. `fmProcessorUserWave.test.ts`
  * and the golden test pin the tables' contents. A synced note at twice the
  * rate (windsor#656) reads a second set built at that rate, the same sizing
  * rule over twice the harmonics, each table scaled by the gain that
@@ -58,7 +62,7 @@ function partialsFor(waveId: number, userPartials: number[] | null): Float32Arra
       break;
     case WAVE.USER:
       if (userPartials) {
-        for (let i = 0; i < Math.min(N, userPartials.length); i++) a[i] = userPartials[i];
+        for (let i = 0; i < Math.min(N, userPartials.length); i++) a[i] = userPartials[i]!;
       } else {
         a[0] = 1;
       }
@@ -108,33 +112,34 @@ function buildMips(
     if (size > TABLE_SIZE) sineSeriesByFft(partials, maxH, size, t);
     else {
       for (let h = 1; h <= maxH; h++) {
-        const amp = partials[h - 1];
+        const amp = partials[h - 1]!;
         if (amp === 0) continue;
         let idx = 0;
         for (let i = 0; i < TABLE_SIZE; i++) {
-          t[i] += amp * SIN_TAB[idx];
+          t[i] = t[i]! + amp * SIN_TAB[idx]!;
           idx = (idx + h) & TABLE_MASK;
         }
       }
     }
 
     if (fixed) {
-      const g = gains[k];
-      for (let i = 0; i < size; i++) t[i] *= g;
+      const g = gains[k]!;
+      for (let i = 0; i < size; i++) t[i] = t[i]! * g;
     } else {
       let peak = 0;
       for (let i = 0; i < size; i++) {
-        const v = t[i] < 0 ? -t[i] : t[i];
+        const x = t[i]!;
+        const v = x < 0 ? -x : x;
         if (v > peak) peak = v;
       }
       gains[k] = 1;
       if (peak > 1e-9) {
         const g = 1 / peak;
         gains[k] = g;
-        for (let i = 0; i < size; i++) t[i] *= g;
+        for (let i = 0; i < size; i++) t[i] = t[i]! * g;
       }
     }
-    t[size] = t[0];
+    t[size] = t[0]!;
     mips[k] = t;
   }
   return mips;
@@ -143,9 +148,9 @@ function buildMips(
 /** Quantise a mip set in place to `levels` steps — the 4-bit / 8-bit sines. */
 function quantiseMips(mips: Float32Array[], levels: number): Float32Array[] {
   for (let k = 0; k < mips.length; k++) {
-    const t = mips[k];
+    const t = mips[k]!;
     for (let i = 0; i < t.length; i++) {
-      t[i] = Math.round(t[i] * levels) / levels;
+      t[i] = Math.round(t[i]! * levels) / levels;
     }
   }
   return mips;
@@ -168,10 +173,56 @@ interface WaveSet {
  * harmonic edit kept playing the old one. `null` (a sine) and `[]` (silence)
  * keep distinct keys. Equal partials still share a table,
  * so the scoring bank's User presets render exactly as before. Only a `patch`
- * message reaches here, never the audio loop, so the string is fine.
+ * or `waves` message reaches here, never the audio loop, so the string is fine.
+ *
+ * `WAVE_CACHE_LIMIT` slots, filled in order and then overwritten oldest
+ * first, as the `Map` it replaced evicted (windsor#795): a slot is written in
+ * place, so installing a set the main thread sent allocates nothing but the
+ * arrays it was handed, where the map's insert and eviction did
+ * (`fmProcessorAllocation.test.ts`: 51 KB over the run against none). A
+ * lookup scans the slots: at most 64 string compares, at a message.
  */
-const WAVE_CACHE = new Map<string, WaveSet>();
 const WAVE_CACHE_LIMIT = 64;
+const WAVE_CACHE = {
+  keys: new Array<string>(WAVE_CACHE_LIMIT).fill(''),
+  sets: new Array<WaveSet | null>(WAVE_CACHE_LIMIT).fill(null),
+  /** Slots in use, from 0. */
+  size: 0,
+  /** Once every slot is in use, the oldest, which the next set overwrites. */
+  oldest: 0,
+};
+
+/** Sets built in this scope since load, rather than found or installed: how a test sees a message build nothing. */
+let waveSetBuilds = 0;
+
+/** The cached set under `key`, or null. */
+function cachedWaveSet(key: string): WaveSet | null {
+  const cache = WAVE_CACHE;
+  for (let i = 0; i < cache.size; i++) if (cache.keys[i] === key) return cache.sets[i]!;
+  return null;
+}
+
+/** Cache `set` under `key`, a key not held, over the oldest once every slot is in use. */
+function cacheWaveSet(key: string, set: WaveSet): void {
+  const cache = WAVE_CACHE;
+  let slot = cache.size;
+  if (slot < WAVE_CACHE_LIMIT) cache.size++;
+  else {
+    slot = cache.oldest;
+    cache.oldest = (slot + 1) % WAVE_CACHE_LIMIT;
+  }
+  cache.keys[slot] = key;
+  cache.sets[slot] = set;
+}
+
+/**
+ * Cache a set built elsewhere, on the main thread (windsor#795), under the
+ * key it was built for, as handed over, never copied; a key already held
+ * keeps its set.
+ */
+function installWaveSet(key: string, set: WaveSet): void {
+  if (cachedWaveSet(key) === null) cacheWaveSet(key, set);
+}
 
 /**
  * The mip set for `wave` at `sampleRate`. A set at another rate than the
@@ -189,37 +240,66 @@ function getMips(
   return waveSetFor(wave, sampleRate, tone, userPartials, baseRate).mips;
 }
 
+/** `tone` (0..1) quantised to the twentieths a set is built at, from 0.02. */
+function toneStep(tone: number): number {
+  return Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
+}
+
+/**
+ * The cache key of `wave`'s set at `sampleRate`, normalised to `baseRate`
+ * (windsor#656): the one both threads compute for the same inputs
+ * (windsor#795). PULSE is two reads of the saw's tables (#55): one key, one copy.
+ */
+function waveSetKey(
+  wave: number,
+  sampleRate: number,
+  tone: number,
+  userPartials: number[] | null,
+  baseRate: number = sampleRate,
+): string {
+  const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
+  // null plays a sine and [] plays silence: the two must never share a key.
+  let content = '';
+  if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
+  const rate = baseRate === sampleRate ? '' + sampleRate : sampleRate + '/' + baseRate;
+  return waveId + '|' + toneStep(tone) + '|' + rate + '|' + content;
+}
+
+/** The cached set `waveSetKey` names, built and cached on a miss: the builder both threads run. */
 function waveSetFor(
   wave: number,
   sampleRate: number,
   tone: number,
   userPartials: number[] | null,
-  baseRate: number,
+  baseRate: number = sampleRate,
 ): WaveSet {
-  // PULSE is two reads of the saw's tables (#55): one key, one copy.
-  const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
-  const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
-  // null plays a sine and [] plays silence: the two must never share a key.
-  let content = '';
-  if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
-  const rate = baseRate === sampleRate ? '' + sampleRate : sampleRate + '/' + baseRate;
-  const key = waveId + '|' + toneQ + '|' + rate + '|' + content;
-  let set = WAVE_CACHE.get(key);
+  const key = waveSetKey(wave, sampleRate, tone, userPartials, baseRate);
+  let set = cachedWaveSet(key);
   if (set) return set;
 
+  const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
   const gains = new Float64Array(MIP_COUNT);
   const fixed = baseRate !== sampleRate;
   if (fixed) gains.set(waveSetFor(wave, baseRate, tone, userPartials, baseRate).gains);
-  const mips = buildMips(partialsFor(waveId, userPartials), sampleRate, toneQ, gains, fixed);
+  const mips = buildMips(
+    partialsFor(waveId, userPartials),
+    sampleRate,
+    toneStep(tone),
+    gains,
+    fixed,
+  );
   if (waveId === WAVE.SINE_4BIT) quantiseMips(mips, 8);
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
 
-  if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
-    WAVE_CACHE.delete(WAVE_CACHE.keys().next().value!);
-  }
+  waveSetBuilds++;
   set = { mips, gains };
-  WAVE_CACHE.set(key, set);
+  cacheWaveSet(key, set);
   return set;
+}
+
+/** How many sets this scope has built since load (`waveSetBuilds`). */
+function waveSetBuildCount(): number {
+  return waveSetBuilds;
 }
 
 /**
@@ -229,7 +309,7 @@ function waveSetFor(
  * a double passed to a call V8 does not inline is a new heap number.
  */
 function mipIndexAt(freqs: Float64Array, i: number): number {
-  const freq = freqs[i];
+  const freq = freqs[i]!;
   if (freq <= MIP_BASE_HZ) return 0;
   const k = Math.floor(Math.log2(freq / MIP_BASE_HZ));
   return k < 0 ? 0 : k >= MIP_COUNT ? MIP_COUNT - 1 : k;
@@ -269,16 +349,27 @@ function waveKind(wave: number): number {
   }
 }
 
-/* Warm the common waveforms at module-load time — this runs inside
- * addModule(), before the context renders anything, so the table build never
- * stalls a live audio callback. */
-for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
-  getMips(w, sampleRate, 1, null);
+/** The waves `warmWaveCache` builds, in order, at Tone 1. */
+const WARM_WAVES: readonly number[] = [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE];
+
+/**
+ * Warm the common waveforms at `rate`. The processor calls this once at
+ * module load, inside addModule(), before the context renders anything, so
+ * the build never stalls a live audio callback; the main thread, which
+ * imports this module too, never does (windsor#795).
+ */
+function warmWaveCache(rate: number): void {
+  for (const w of WARM_WAVES) getMips(w, rate, 1, null);
 }
 
+export type { WaveSet };
 export {
   SIN_TAB,
+  WARM_WAVES,
+  WAVE_CACHE_LIMIT,
+  cachedWaveSet,
   getMips,
+  installWaveSet,
   mipIndex,
   mipIndexAt,
   KIND_TABLE,
@@ -286,5 +377,9 @@ export {
   KIND_SAW_D,
   KIND_SQUARE_D,
   KIND_PULSE,
+  warmWaveCache,
   waveKind,
+  waveSetBuildCount,
+  waveSetFor,
+  waveSetKey,
 };

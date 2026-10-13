@@ -126,6 +126,8 @@ export interface LoadedProcessor {
   envelope(params: unknown): EnvelopeLike;
   /** The floor a segment's time is held to, seconds. */
   minSegmentTime: number;
+  /** Wave sets this bundle's scope has built since it loaded, not found or installed (windsor#795). */
+  waveSetBuilds(): number;
 }
 
 /** What the evaluated worklet hands back: a frame setter and the constants tests read. */
@@ -140,6 +142,7 @@ interface WorkletHandle {
   DORMANT_FILTER_STATE: number;
   Envelope: new () => EnvelopeLike;
   MIN_SEG_TIME: number;
+  waveSetBuildCount: () => number;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
@@ -163,6 +166,7 @@ export function loadProcessor(): LoadedProcessor {
       DORMANT_FILTER_STATE,
       Envelope,
       MIN_SEG_TIME,
+      waveSetBuildCount,
     };`,
   });
 
@@ -193,6 +197,7 @@ export function loadProcessor(): LoadedProcessor {
       return envelope;
     },
     minSegmentTime: handle.MIN_SEG_TIME,
+    waveSetBuilds: handle.waveSetBuildCount,
   };
 }
 

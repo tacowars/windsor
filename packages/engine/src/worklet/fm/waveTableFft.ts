@@ -10,6 +10,8 @@
  * smaller size gives `Math.sin` the argument its own table would; the
  * scratch is preallocated at module load, so a build allocates only the
  * table it fills. `waveTables.test.ts` holds a built table to the summation.
+ * The main thread builds sets too (windsor#795), so it compiles under the
+ * engine project's flags as well, an indexed read taking a `!`.
  */
 
 import { TABLE_SIZE_MAX } from './fmConstants';
@@ -33,7 +35,7 @@ function sineSeriesByFft(amp: Float32Array, maxH: number, size: number, t: Float
   const im = FFT_IM;
   re.fill(0, 0, size);
   im.fill(0, 0, size);
-  for (let h = 1; h <= maxH; h++) re[h] = amp[h - 1];
+  for (let h = 1; h <= maxH; h++) re[h] = amp[h - 1]!;
 
   // Bit-reversed order.
   for (let i = 1, j = 0; i < size; i++) {
@@ -41,11 +43,11 @@ function sineSeriesByFft(amp: Float32Array, maxH: number, size: number, t: Float
     for (; (j & bit) !== 0; bit >>= 1) j ^= bit;
     j ^= bit;
     if (i < j) {
-      const r = re[i];
-      re[i] = re[j];
+      const r = re[i]!;
+      re[i] = re[j]!;
       re[j] = r;
-      const m = im[i];
-      im[i] = im[j];
+      const m = im[i]!;
+      im[i] = im[j]!;
       im[j] = m;
     }
   }
@@ -60,20 +62,24 @@ function sineSeriesByFft(amp: Float32Array, maxH: number, size: number, t: Float
     for (let i = 0; i < size; i += len) {
       for (let k = 0; k < half; k++) {
         const idx = k * step;
-        const wr = FFT_SIN[((idx + quarter) & mask) * stride];
-        const wi = FFT_SIN[idx * stride];
+        const wr = FFT_SIN[((idx + quarter) & mask) * stride]!;
+        const wi = FFT_SIN[idx * stride]!;
         const a = i + k;
         const b = a + half;
-        const tr = re[b] * wr - im[b] * wi;
-        const ti = re[b] * wi + im[b] * wr;
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
+        const rb = re[b]!;
+        const ib = im[b]!;
+        const tr = rb * wr - ib * wi;
+        const ti = rb * wi + ib * wr;
+        const ra = re[a]!;
+        const ia = im[a]!;
+        re[b] = ra - tr;
+        im[b] = ia - ti;
+        re[a] = ra + tr;
+        im[a] = ia + ti;
       }
     }
   }
-  for (let i = 0; i < size; i++) t[i] = im[i];
+  for (let i = 0; i < size; i++) t[i] = im[i]!;
 }
 
 export { sineSeriesByFft };

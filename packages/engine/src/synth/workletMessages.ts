@@ -81,6 +81,30 @@ export interface PatchMessage {
   patch: Patch;
 }
 
+/**
+ * One wave set built on the main thread (windsor#795): a waveform's
+ * per-octave mip tables and each octave's normalising gain, under the key
+ * `worklet/fm/waveTables.ts`'s `waveSetKey` gives it, which the processor's
+ * own build would compute for the same patch. The same code builds it, so
+ * the same bits.
+ */
+export interface WaveSetEntry {
+  key: string;
+  mips: Float32Array[];
+  gains: Float64Array;
+}
+
+/**
+ * Wave sets a patch about to arrive will read (windsor#795), posted before
+ * its `patch` message on the same port with their arrays transferred. The
+ * processor installs each into its wave cache, ignoring a key it holds, and
+ * builds nothing; a set never sent it still builds itself.
+ */
+export interface WavesMessage {
+  type: 'waves';
+  sets: WaveSetEntry[];
+}
+
 export interface ControlMessage {
   type: 'allNotesOff' | 'panic' | 'stop';
 }
@@ -112,7 +136,12 @@ export interface ReportLoadMessage {
 }
 
 export type WorkletMessage =
-  ScheduledMessage | PatchMessage | ControlMessage | LiveRetuneMessage | ReportLoadMessage;
+  | ScheduledMessage
+  | PatchMessage
+  | WavesMessage
+  | ControlMessage
+  | LiveRetuneMessage
+  | ReportLoadMessage;
 
 /**
  * One processor's audio-thread cost over the interval just ended (#445) — the
@@ -162,6 +191,12 @@ export type ProcessorMessage = LoadReportMessage;
 export interface ProcessorOptions {
   maxVoices: number;
   patch: Patch;
+  /**
+   * The wave sets `patch` reads that the context's processors may not hold
+   * (windsor#795, `WavesMessage`), installed before the processor builds its
+   * own. A live part's; an offline render's processor builds its own.
+   */
+  waves?: WaveSetEntry[];
   /**
    * Notes present before the first render block. Offline renders must use this
    * rather than `postMessage`, which is asynchronous and loses the race against

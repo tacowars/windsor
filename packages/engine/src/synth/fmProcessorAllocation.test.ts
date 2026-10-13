@@ -106,6 +106,15 @@
  * first other write deoptimises the render that read it, which read 2 MB
  * when it fell in the measured run.
  *
+ * The first run also posts a `waves` message at every parameter change
+ * (windsor#795), each a set the main thread built under a key the part has
+ * not seen, which the part installs into its wave cache, over the oldest
+ * once it is full: the install allocates nothing but the arrays it is
+ * handed, which the scenario made once, as the port makes them in Chrome.
+ * The run reads the probe's own 6.2 KB; with the cache a `Map` evicting
+ * through `keys().next()`, as it was, it read 51 KB, all of it the map's
+ * insert and eviction.
+ *
  * Two more play the pad through the Formant filter (windsor#331), in the
  * kernel and in the generic loop, its three sections running in parallel,
  * while every parameter change also writes the next of seven vowels into
@@ -170,6 +179,13 @@ const DRONE_AGE = SMI_END - (MEASURE_QUANTA / 2) * QUANTUM;
  * before the heap is read.
  */
 const CROSSING_FRAME = SMI_END - ((WARMUP_QUANTA * 3) / 4) * QUANTUM;
+
+/**
+ * The `waves` messages the first run cycles through, one at each parameter
+ * change (windsor#795): more than the part's wave cache holds, so every one
+ * installs its set, over the oldest once the cache is full.
+ */
+const WAVES_POOL = 80;
 
 const TOGGLES: [string, number][] = [
   ['pitchBend', 2],
@@ -503,7 +519,7 @@ function expectLanesClean(voiceSlots: string[]): void {
 }
 
 describe('the FM part on V8', () => {
-  it('plays a held chord and changing notes in the kernel, stealing and releasing, for 8 000 quanta without allocating or changing a field representation', () => {
+  it('plays a held chord and changing notes in the kernel, stealing and releasing, and installs the wave sets it is sent, for 8 000 quanta without allocating or changing a field representation', () => {
     expectClean(
       probe(pad(), 8, true, {
         events: PAD_EVENTS,
@@ -512,6 +528,7 @@ describe('the FM part on V8', () => {
         rest: 16,
         idStride: 64,
         paths: ['held', 'stolen', 'released', 'ended', 'silent'],
+        waves: WAVES_POOL,
       }),
     );
   }, 120_000);

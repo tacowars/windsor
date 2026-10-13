@@ -38,8 +38,9 @@ import type { Voice } from './voice';
 import { DRIVE_OVERSAMPLE_FIR } from '../advancedDrive/driveOversample';
 import { CTRL_INTERVAL_LONG, DORMANT_AMP, SYNC_OVERSAMPLE } from './fmConstants';
 import { OPERATOR_COUNT } from './patchDefaults';
+// The main thread reads which patches oversample too, so it lives with the wave sets (windsor#795).
+import { patchOversamples } from './partWaveSets';
 import { renderVoiceOperators, renderVoicePost } from './voiceRender';
-import { WAVE } from './waveIds';
 
 /** The decimator's taps, and its half: the centre tap and the delay in samples at the doubled rate. */
 const OVERSAMPLE_TAPS = DRIVE_OVERSAMPLE_FIR.length;
@@ -64,17 +65,6 @@ class VoiceOversample {
     this.ring = new Float64Array(2 * OVERSAMPLE_TAPS);
     this.at = 0;
   }
-}
-
-/** Whether a note of `patch` runs at twice the rate: a synced operator, and none fed or Noise. */
-function patchOversamples(patch: Patch): boolean {
-  let synced = false;
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const op = patch.ops[i]!;
-    if (op.wave === WAVE.NOISE || op.feedback !== 0) return false;
-    if (op.sync !== 'off') synced = true;
-  }
-  return synced;
 }
 
 /**

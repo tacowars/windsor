@@ -1328,12 +1328,16 @@ function sineSeriesByFft(amp, maxH, size, t) {
         const wi = FFT_SIN[idx * stride];
         const a = i + k;
         const b = a + half;
-        const tr = re[b] * wr - im[b] * wi;
-        const ti = re[b] * wi + im[b] * wr;
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
+        const rb = re[b];
+        const ib = im[b];
+        const tr = rb * wr - ib * wi;
+        const ti = rb * wi + ib * wr;
+        const ra = re[a];
+        const ia = im[a];
+        re[b] = ra - tr;
+        im[b] = ia - ti;
+        re[a] = ra + tr;
+        im[a] = ia + ti;
       }
     }
   }
@@ -1392,25 +1396,26 @@ function buildMips(partials, sampleRate2, tone, gains, fixed) {
         if (amp === 0) continue;
         let idx = 0;
         for (let i = 0; i < TABLE_SIZE; i++) {
-          t[i] += amp * SIN_TAB[idx];
+          t[i] = t[i] + amp * SIN_TAB[idx];
           idx = idx + h & TABLE_MASK;
         }
       }
     }
     if (fixed) {
       const g = gains[k];
-      for (let i = 0; i < size; i++) t[i] *= g;
+      for (let i = 0; i < size; i++) t[i] = t[i] * g;
     } else {
       let peak = 0;
       for (let i = 0; i < size; i++) {
-        const v = t[i] < 0 ? -t[i] : t[i];
+        const x = t[i];
+        const v = x < 0 ? -x : x;
         if (v > peak) peak = v;
       }
       gains[k] = 1;
       if (peak > 1e-9) {
         const g = 1 / peak;
         gains[k] = g;
-        for (let i = 0; i < size; i++) t[i] *= g;
+        for (let i = 0; i < size; i++) t[i] = t[i] * g;
       }
     }
     t[size] = t[0];
@@ -1427,32 +1432,72 @@ function quantiseMips(mips, levels) {
   }
   return mips;
 }
-var WAVE_CACHE = /* @__PURE__ */ new Map();
 var WAVE_CACHE_LIMIT = 64;
+var WAVE_CACHE = {
+  keys: new Array(WAVE_CACHE_LIMIT).fill(""),
+  sets: new Array(WAVE_CACHE_LIMIT).fill(null),
+  /** Slots in use, from 0. */
+  size: 0,
+  /** Once every slot is in use, the oldest, which the next set overwrites. */
+  oldest: 0
+};
+var waveSetBuilds = 0;
+function cachedWaveSet(key) {
+  const cache = WAVE_CACHE;
+  for (let i = 0; i < cache.size; i++) if (cache.keys[i] === key) return cache.sets[i];
+  return null;
+}
+function cacheWaveSet(key, set) {
+  const cache = WAVE_CACHE;
+  let slot = cache.size;
+  if (slot < WAVE_CACHE_LIMIT) cache.size++;
+  else {
+    slot = cache.oldest;
+    cache.oldest = (slot + 1) % WAVE_CACHE_LIMIT;
+  }
+  cache.keys[slot] = key;
+  cache.sets[slot] = set;
+}
+function installWaveSet(key, set) {
+  if (cachedWaveSet(key) === null) cacheWaveSet(key, set);
+}
 function getMips(wave, sampleRate2, tone, userPartials, baseRate = sampleRate2) {
   return waveSetFor(wave, sampleRate2, tone, userPartials, baseRate).mips;
 }
-function waveSetFor(wave, sampleRate2, tone, userPartials, baseRate) {
+function toneStep(tone) {
+  return Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
+}
+function waveSetKey(wave, sampleRate2, tone, userPartials, baseRate = sampleRate2) {
   const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
-  const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
   let content = "";
   if (waveId === WAVE.USER) content = userPartials ? "[" + userPartials.join(",") + "]" : "null";
   const rate = baseRate === sampleRate2 ? "" + sampleRate2 : sampleRate2 + "/" + baseRate;
-  const key = waveId + "|" + toneQ + "|" + rate + "|" + content;
-  let set = WAVE_CACHE.get(key);
+  return waveId + "|" + toneStep(tone) + "|" + rate + "|" + content;
+}
+function waveSetFor(wave, sampleRate2, tone, userPartials, baseRate = sampleRate2) {
+  const key = waveSetKey(wave, sampleRate2, tone, userPartials, baseRate);
+  let set = cachedWaveSet(key);
   if (set) return set;
+  const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
   const gains = new Float64Array(MIP_COUNT);
   const fixed = baseRate !== sampleRate2;
   if (fixed) gains.set(waveSetFor(wave, baseRate, tone, userPartials, baseRate).gains);
-  const mips = buildMips(partialsFor(waveId, userPartials), sampleRate2, toneQ, gains, fixed);
+  const mips = buildMips(
+    partialsFor(waveId, userPartials),
+    sampleRate2,
+    toneStep(tone),
+    gains,
+    fixed
+  );
   if (waveId === WAVE.SINE_4BIT) quantiseMips(mips, 8);
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
-  if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
-    WAVE_CACHE.delete(WAVE_CACHE.keys().next().value);
-  }
+  waveSetBuilds++;
   set = { mips, gains };
-  WAVE_CACHE.set(key, set);
+  cacheWaveSet(key, set);
   return set;
+}
+function waveSetBuildCount() {
+  return waveSetBuilds;
 }
 function mipIndexAt(freqs, i) {
   const freq = freqs[i];
@@ -1480,8 +1525,9 @@ function waveKind(wave) {
       return KIND_TABLE;
   }
 }
-for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
-  getMips(w, sampleRate, 1, null);
+var WARM_WAVES = [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE];
+function warmWaveCache(rate) {
+  for (const w of WARM_WAVES) getMips(w, rate, 1, null);
 }
 
 // packages/engine/src/worklet/fm/lfo.ts
@@ -3940,6 +3986,45 @@ var DriveFir = class {
   }
 };
 
+// packages/engine/src/worklet/fm/partWaveSets.ts
+function patchOversamples(patch) {
+  let synced = false;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const op = patch.ops[i];
+    if (op.wave === WAVE.NOISE || op.feedback !== 0) return false;
+    if (op.sync !== "off") synced = true;
+  }
+  return synced;
+}
+function readsWaveSet(wave) {
+  return wave !== WAVE.NOISE && wave !== WAVE.SAW_D && wave !== WAVE.SQUARE_D;
+}
+function installWaveSets(sets) {
+  if (!sets) return;
+  for (let i = 0; i < sets.length; i++) installWaveSet(sets[i].key, sets[i]);
+}
+var PartWaveSets = class {
+  constructor(allowed) {
+    this.sets = [null, null, null, null];
+    this.sets2x = [null, null, null, null];
+    this.allowed = allowed;
+  }
+  /**
+   * The sets for `patch` at `rate` and, while allowed, at twice it when a
+   * note of `patch` would take it or `sounding2x`, a voice sounding at it,
+   * may rebind to `patch`.
+   */
+  rebuild(patch, rate, sounding2x) {
+    const twice = this.allowed && (patchOversamples(patch) || sounding2x);
+    for (let i = 0; i < OPERATOR_COUNT; i++) {
+      const op = patch.ops[i];
+      const none = !readsWaveSet(op.wave);
+      this.sets[i] = none ? null : getMips(op.wave, rate, patch.tone, op.userPartials);
+      this.sets2x[i] = none || !twice ? null : getMips(op.wave, SYNC_OVERSAMPLE * rate, patch.tone, op.userPartials, rate);
+    }
+  }
+};
+
 // packages/engine/src/worklet/fm/voiceOversample.ts
 var OVERSAMPLE_TAPS = FIR.length;
 var OVERSAMPLE_HALF = OVERSAMPLE_TAPS - 1 >> 1;
@@ -3952,15 +4037,6 @@ var VoiceOversample = class {
     this.at = 0;
   }
 };
-function patchOversamples(patch) {
-  let synced = false;
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const op = patch.ops[i];
-    if (op.wave === WAVE.NOISE || op.feedback !== 0) return false;
-    if (op.sync !== "off") synced = true;
-  }
-  return synced;
-}
 function startVoiceOversample(voice, patch) {
   const os = voice.oversample;
   os.factor = os.allowed && patchOversamples(patch) ? SYNC_OVERSAMPLE : 1;
@@ -4487,23 +4563,6 @@ function allocateVoice(voices, maxVoices, dormancy) {
   return last;
 }
 
-// packages/engine/src/worklet/fm/partWaveSets.ts
-var PartWaveSets = class {
-  constructor() {
-    this.sets = [null, null, null, null];
-    this.sets2x = [null, null, null, null];
-  }
-  /** The sets for `patch` at `rate`, and at twice it when `twice`. */
-  rebuild(patch, rate, twice) {
-    for (let i = 0; i < OPERATOR_COUNT; i++) {
-      const op = patch.ops[i];
-      const none = op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D;
-      this.sets[i] = none ? null : getMips(op.wave, rate, patch.tone, op.userPartials);
-      this.sets2x[i] = none || !twice ? null : getMips(op.wave, SYNC_OVERSAMPLE * rate, patch.tone, op.userPartials, rate);
-    }
-  }
-};
-
 // packages/engine/src/worklet/fm/fmProcessor.ts
 var NOTE_IN_NOTE = 0, NOTE_IN_VELOCITY = 1, NOTE_IN_MOD = 2, NOTE_IN_COUNT = 3;
 var FmPartProcessor = class extends AudioWorkletProcessor {
@@ -4542,8 +4601,9 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.syncOversample = opts.syncOversample !== false;
     for (const v of this.voices) v.oversample.allowed = this.syncOversample;
     this.patch = compileMacros(normalisePatch(opts.patch));
-    this.waves = new PartWaveSets();
-    this.rebuildWaves();
+    installWaveSets(opts.waves);
+    this.waves = new PartWaveSets(this.syncOversample);
+    this.waves.rebuild(this.patch, sampleRate, false);
     this.events = new EventQueue();
     this.lastNote = NaN;
     this.running = true;
@@ -4559,21 +4619,14 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     }
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
-  /**
-   * The patch's wave sets, at a patch message, never in a render. The sets
-   * at twice the rate (windsor#656) are built while a note of this patch
-   * would take it, or a sounding voice at it may rebind to this patch.
-   */
-  rebuildWaves() {
-    const p = this.patch;
-    const twice = this.syncOversample && (patchOversamples(p) || anyVoiceOversampled(this.voices));
-    this.waves.rebuild(p, sampleRate, twice);
-  }
   onMessage(msg) {
     switch (msg.type) {
+      case "waves":
+        installWaveSets(msg.sets);
+        break;
       case "patch": {
         this.patch = compileMacros(normalisePatch(msg.patch));
-        this.rebuildWaves();
+        this.waves.rebuild(this.patch, sampleRate, anyVoiceOversampled(this.voices));
         if (this.liveRetune) {
           const slots = this.slotTargets;
           for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waves, slots);
@@ -4852,4 +4905,5 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return this.running;
   }
 };
+warmWaveCache(sampleRate);
 registerProcessor("fm-part", FmPartProcessor);

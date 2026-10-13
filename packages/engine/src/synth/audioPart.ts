@@ -14,6 +14,8 @@ import type {
   VoiceSlotsMessage,
   WorkletMessage,
 } from './workletMessages';
+import type { WaveSetSender } from './waveSetSender';
+import { waveSetSenderFor, wavesTransfer } from './waveSetSender';
 import { frameForTime } from './workletMessages';
 
 /** The processor's slot parameter for slot `i` (`voiceSlot0` …, windsor#346). */
@@ -53,6 +55,8 @@ export class AudioPart {
   private readonly noteByHandle = new Map<number, number>();
   /** Note messages kept back instead of posted while held (`holdNotes`); null when not. */
   private held: ScheduledMessage[] | null = null;
+  /** Builds the wave sets a patch needs and sends them ahead of it (windsor#795); null offline. */
+  private readonly waves: WaveSetSender | null;
 
   /**
    * `voiceSlots` is the slot map the processor was built with
@@ -78,6 +82,7 @@ export class AudioPart {
     );
     this.slotPaths = Array.from({ length: FM_LANES_MAX }, (_, i) => voiceSlots?.[i] ?? null);
     this.slotRelative = Array.from({ length: FM_LANES_MAX }, (_, i) => !!voiceSlotsRelative?.[i]);
+    this.waves = waveSetSenderFor(node.context);
   }
 
   get patch(): Patch {
@@ -260,10 +265,14 @@ export class AudioPart {
 
   /**
    * Swap the patch. Voices already sounding keep the old one until they finish,
-   * so turning a knob mid-note does not click.
+   * so turning a knob mid-note does not click. The wave sets it reads that
+   * the processor may not hold go first, on the same port, so the processor
+   * installs them rather than building them between renders (windsor#795).
    */
   setPatch(patch: Patch): void {
     this.patchValue = patch;
+    const sets = this.waves?.setsFor(patch);
+    if (sets?.length) this.node.port.postMessage({ type: 'waves', sets }, wavesTransfer(sets));
     this.post({ type: 'patch', patch: structuredClone(patch) });
   }
 
