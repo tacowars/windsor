@@ -22,6 +22,8 @@
  * - **Clearing a voice target** sets its offset back to 0 and frees the
  *   slot, so the voice plays the patch's own value; with a track on it, the
  *   track keeps the slot for the envelope alone.
+ * - **A preset switch** drops every voice and macro value (`dropVoices`),
+ *   reported as `rebind` reports a drop; a strip or insert value stays.
  * - **The lanes win** (decision 3): the player never sets a target a lane
  *   plays, and `rebind` drops a value whose target a lane now plays, without
  *   writing: the lane already holds the param. A lane switched off later
@@ -67,6 +69,8 @@ export interface PerformanceBinding {
   readonly resolve: (target: AutomationTargetId) => ResolvedTarget | undefined;
   /** Told of each target `rebind` drops. */
   readonly dropped: (target: AutomationTargetId) => void;
+  /** Whether a clip envelope's track writes the voice target's slot now. */
+  readonly tracked: (target: AutomationTargetId) => boolean;
 }
 
 const clampTo = (value: number, lo: number, hi: number): number =>
@@ -170,9 +174,11 @@ export class PartPerformance {
    * part no longer has (its insert gone or its field unread, a macro now
    * mapping the voice target, a macro the patch lacks) gives its handle back
    * and is dropped; a strip or insert target found on a new handle (a rebuilt
-   * stage) holds its value there.
+   * stage) holds its value there. With `preset`, a preset switch, every
+   * voice and macro value is dropped first (`dropVoices`).
    */
-  rebind(lanes: readonly { readonly target: string }[], now: number): void {
+  rebind(lanes: readonly { readonly target: string }[], now: number, preset = false): void {
+    if (preset) this.dropVoices(now);
     for (const list of [this.voices, this.knobs]) {
       for (let i = list.length - 1; i >= 0; i--) {
         const held = list[i]!;
@@ -192,6 +198,19 @@ export class PartPerformance {
         list.splice(i, 1);
         this.part.dropped(held.target);
       }
+    }
+  }
+
+  /**
+   * A preset switch (record decision 2): every voice and macro value is
+   * dropped and reported, its slot given back at `now` so the voice plays
+   * the new patch's own value, or left to the envelope track that writes it.
+   * Strip and insert values stay: a preset is no part of them.
+   */
+  private dropVoices(now: number): void {
+    for (const held of this.voices.splice(0)) {
+      if (!this.part.tracked(held.target)) held.handle.release(now);
+      this.part.dropped(held.target);
     }
   }
 }

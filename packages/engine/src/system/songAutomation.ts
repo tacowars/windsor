@@ -55,8 +55,11 @@
  * - **Performance values** (windsor#781, record `2026-10-13-midi-cc-mapping`).
  *   A MIDI CC's value on a part's target goes to the player as the part's
  *   (`perform`), held until it is cleared or the part leaves the song. A
- *   resync, after a patch edit, a preset switch, a lane edit or an insert
- *   edit or re-wire, finds each target again: a value on a rebuilt insert
+ *   preset switch (the part's `preset` named in a partial) drops its voice
+ *   and macro values, frees their slots and reports each through `dropped`;
+ *   a patch edit (only `patches`) keeps them. A resync, after a patch edit,
+ *   a preset switch, a lane edit or an insert edit or re-wire, finds each
+ *   target again: a value on a rebuilt insert
  *   stage is held there again, and one whose target a lane now plays or the
  *   part no longer has is dropped and reported through `dropped`, so the
  *   console can re-arm its pickup. A part removed takes its values with it,
@@ -170,6 +173,12 @@ export class SongAutomation {
       player.setSongTicks(this.songTicks);
       this.refit(player);
     }
+    // A part's `preset` in the partial is a preset switch, never a knob edit (which names
+    // only `patches`): it replaced the part's patch, so its lanes and envelopes find their
+    // targets again, and its voice values go before another resync counts the slots.
+    for (const [slot, part] of parts) {
+      if (isRecord(part) && 'preset' in part) player.resync(partOwner(slot), true);
+    }
     if (partial.transport !== undefined || partial.patches !== undefined) player.resync();
     for (const [slot, part] of parts) {
       if (!isRecord(part)) continue;
@@ -182,9 +191,6 @@ export class SongAutomation {
       ) {
         // A kind change drops the sequencer lanes the new kind does not offer, as the document does.
         this.reinsert(player, owner, kind(slot));
-      } else if ('preset' in part) {
-        // A preset switch replaced the part's patch: its lanes and envelopes find their targets again.
-        player.resync(owner);
       }
     }
     for (const [id, group] of groups) if (isRecord(group)) this.applyGroup(player, id, group);

@@ -264,14 +264,16 @@ export class AutomationPlayer {
    * a song-length change, or a part or group whose inserts or patch changed,
    * or whose insert chain was rebuilt (windsor#345). One owner, or every one
    * the player knows: a part's envelope tracks find their targets again
-   * with its lanes, whether or not it has any.
+   * with its lanes, whether or not it has any. `preset`, a preset switch
+   * (windsor#781, record decision 2): every voice and macro value held is
+   * dropped and reported first (`PartPerformance.rebind`).
    */
-  resync(owner?: AutomationOwner): void {
+  resync(owner?: AutomationOwner, preset = false): void {
     const now = this.options.now();
     const keys = new Set(this.lanes.keys());
     for (const key of this.envelopes.keys()) keys.add(key);
     for (const key of owner === undefined ? keys : [ownerKey(owner)]) {
-      if (keys.has(key)) this.replay(key, now);
+      if (keys.has(key)) this.replay(key, now, preset);
     }
   }
 
@@ -357,6 +359,7 @@ export class AutomationPlayer {
       found = new PartPerformance({
         resolve: (target) => resolve(owner, target),
         dropped: (target) => dropped?.(owner, target),
+        tracked: (target) => this.envelopes.get(key)?.tracking(target) ?? false,
       });
       this.performances.set(key, found);
     }
@@ -452,14 +455,14 @@ export class AutomationPlayer {
    * Resolve one owner's lanes again and restart them from `now`. A handle no
    * lane plays through any more gives its target back first: the lane is
    * off or gone, or its target moved (an insert on a rebuilt or reordered
-   * stage) or went unread (windsor#345).
+   * stage) or went unread (windsor#345). `preset`: `resync`'s.
    */
-  private replay(key: string, now: number): void {
+  private replay(key: string, now: number, preset = false): void {
     const before = this.playing.get(key) ?? [];
     const next = this.resolveOwner(key);
     // Before the tracks count the slots: a value whose target a lane now plays is the lane's.
     const performance = this.performances.get(key);
-    if (performance && !performance.idle) performance.rebind(next, now);
+    if (performance && !performance.idle) performance.rebind(next, now, preset);
     const tracks = this.envelopes.get(key);
     for (const lane of before) {
       const kept = next.some((p) => p.handle === lane.handle) || tracks?.plays(lane.handle);

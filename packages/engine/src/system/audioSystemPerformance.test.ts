@@ -4,7 +4,9 @@
  * insert's field follow a set value on the params a lane writes and go back
  * to the document's on clear; a value a lane takes over, or whose insert
  * goes, is dropped and reported; and the calls change nothing on a song
- * that holds no value. The voice path is `automation/performancePlayer.test.ts`'s.
+ * that holds no value. A preset switch drops a voice value and frees its
+ * slot, and a patch edit keeps it. The voice path is
+ * `automation/performancePlayer.test.ts`'s.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -21,6 +23,7 @@ import {
 import { ENGINE_WORKLETS, installParamWorklet } from '../__fixtures__/insertParamRig';
 import { DEFAULT_PHASER } from '../inserts/phaserSpec';
 import type { InsertSpec } from '../inserts/insertRegistry';
+import { makePatch } from '../patch/patch';
 import { musicPartName } from '../song/documentParts';
 import { FmEngine } from '../synth/fmEngine';
 import { AudioSystem } from './audioSystem';
@@ -112,6 +115,31 @@ describe('performance values on a part’s strip and inserts', () => {
       [hat, 'strip.level'],
       [hat, 'insert.phase1.rate'],
     ]);
+  });
+
+  it('drops a voice value on a preset switch, frees its slot, and keeps a strip value', async () => {
+    const { sys, level, dropped, context } = await rig();
+    const part = () => sys.strip(musicPartName(hat))!.part;
+    const cutoff = (hz: number) => makePatch({ filter: { cutoff: hz } });
+    sys.apply({ patches: { cutA: cutoff(1000) }, parts: { [hat]: { preset: 'cutA' } } });
+    context.currentTime = 0.5;
+    expect(sys.setPerformance(hat, 'voice.filter.cutoff', 2000)).toBe('applied');
+    expect(sys.setPerformance(hat, 'strip.level', 0.25)).toBe('applied');
+    const slot = part().voiceSlotOf('filter.cutoff')!;
+    const param = part().voiceSlotParams[slot] as unknown as FakeParam;
+    expect(param.valueAt(0.5)).toBe(1);
+    // A knob edit on the patch it plays keeps the value.
+    sys.apply({ patches: { cutA: cutoff(1500) } });
+    expect(part().voiceSlotOf('filter.cutoff')).toBe(slot);
+    expect(dropped).toEqual([]);
+
+    context.currentTime = 1;
+    sys.apply({ patches: { cutB: cutoff(3000) }, parts: { [hat]: { preset: 'cutB' } } });
+    expect(dropped).toEqual([[hat, 'voice.filter.cutoff']]);
+    expect(part().voiceSlotOf('filter.cutoff')).toBeUndefined();
+    expect(param.valueAt(1)).toBe(0);
+    expect(part().patch.filter.cutoff).toBe(3000);
+    expect(level().value).toBe(0.25);
   });
 
   it('writes nothing on a song that holds no value', async () => {
