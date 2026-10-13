@@ -18,8 +18,8 @@
  * Sleep (windsor#793, `COMPRESSOR_SLEEP`): `drowse`, which the worklet calls
  * every block (so V8 optimises it), puts the compressor to sleep on a silent
  * block once the envelope has released to the floor; asleep, the worklet
- * writes zeros and runs no `advance`, the smoothed controls land on their
- * targets, and a loud block wakes it. `compressorSleep.test.ts` holds it.
+ * writes zeros and runs no `advance`, `rest` moves the smoothed controls and
+ * the switch a sample at a time as `advance` would, and a loud block wakes it. `compressorSleep.test.ts` holds it.
  */
 import { COMPRESSOR_DSP as C, COMPRESSOR_SLEEP as Z } from './compressorConstants';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
@@ -137,7 +137,7 @@ export class CompressorDsp {
   /**
    * The sleep, once a block after `configure`: a loud block (`quiet` false) wakes it; a silent
    * one puts it to sleep once the envelope is under the floor and the detector's highpass has
-   * settled; asleep, the smoothed controls land on their targets.
+   * settled; asleep, `rest` moves the smoothed controls and the switch.
    */
   drowse(quiet: boolean): void {
     if (!quiet) {
@@ -153,13 +153,15 @@ export class CompressorDsp {
       this.fast = this.slow = this.reductionDb = this.lowL = this.lowR = 0;
       this.asleep = true;
     }
-    const p = this.params;
-    this.threshold = p.threshold![0]!;
-    this.makeup = p.makeup![0]!;
-    this.mix = p.mix![0]!;
-    this.range = p.range![0]!;
-    this.ratio = p.ratio![0]!;
-    this.enabled = p.enabled![0]!;
+  }
+
+  /**
+   * One asleep block of `frames`: `advance`'s smoothing and switch fade a sample at a time,
+   * with no audio, so a wake finds the controls on the bits an awake compressor fed silence
+   * would hold (Codex on PR #801), not snapped to their targets.
+   */
+  rest(frames: number): void {
+    for (let n = 0; n < frames; n++) this.smooth();
   }
 
   /** One sample from `left` and `right`, returning the gain: the tests' form of `advance`. */

@@ -9,8 +9,9 @@
  * under the output floor that its loop grows; a fresh delay seeded under the
  * floor waits the line's length before it sleeps; fed noise again it wakes
  * on that block and renders what a delay built with `sleep: false` renders,
- * to within the floor; and a render that never goes silent is the same bits
- * with the sleep or without it.
+ * to within the floor, also when its times changed while it slept (the glide
+ * moves asleep as awake); and a render that never goes silent is the same
+ * bits with the sleep or without it.
  */
 import { describe, expect, it } from 'vitest';
 import { delayParams, loadDelay } from '../__fixtures__/delayHarness';
@@ -21,6 +22,7 @@ import {
   peakFrom,
   QUANTUM,
   runBlocks,
+  runLegs,
   silence,
   type SleepingProcessor,
 } from '../__fixtures__/insertSleepRun';
@@ -103,6 +105,22 @@ describe('the Dub delay asleep', () => {
     },
     20_000,
   );
+
+  it('glides its times while asleep as it would awake', () => {
+    const short = delayParams({ leftSync: false, rightSync: false, leftMs: 1, rightMs: 1 });
+    const impulse = silence(1);
+    impulse[0]![0] = impulse[1]![0] = 1;
+    const legs = (): Parameters<typeof runLegs>[1] => [
+      { params: delayParams(), source: silence(1), blocks: 1 },
+      { params: short, source: silence(1), blocks: 1 },
+      { params: short, source: impulse, blocks: 8 },
+    ];
+    const sleeping = runLegs(delay({}), legs());
+    const awake = runLegs(delay({}, false), legs());
+    expect(sleeping.asleep.slice(0, 2)).toEqual([true, true]);
+    expect(peakFrom(awake, 2)).toBeGreaterThan(0.1);
+    expect(largestDifference(sleeping, awake)).toBeLessThan(DELAY_SLEEP.outputFloor);
+  });
 
   it('renders a signal that never goes silent to the same bits as without the sleep', () => {
     const source = noise(400, 3);

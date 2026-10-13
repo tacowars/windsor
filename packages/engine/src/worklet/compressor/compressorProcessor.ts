@@ -87,7 +87,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
       const quiet = this.silent(source?.[0], source?.[1]);
       dsp.drowse(quiet && (detector === source || this.silent(detector?.[0], detector?.[1])));
     }
-    if (dsp.asleep) this.rest(out);
+    if (dsp.asleep) this.rest(out, out[0].length);
     else this.render(source, detector, out);
     this.report(params, out[0].length);
     this.load.end(out[0].length);
@@ -135,8 +135,9 @@ class CompressorProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out: Float32Array[]): void {
+  /** One asleep block: zeros, the input's silence to within its floor, and the controls' glides. */
+  rest(out: Float32Array[], frames: number): void {
+    this.dsp.rest(frames);
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
   }

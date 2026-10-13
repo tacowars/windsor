@@ -218,7 +218,31 @@ var DelayDsp = class {
     else if (!this.cleared) this.clear();
     this.held = Math.abs(t[DELAY_SLOT.feedback]) >= 1 || Math.abs(this.controls[DELAY_SLOT.feedback]) >= 1;
     this.drowse(frames, quiet);
-    if (this.asleep) for (let k = 0; k < DELAY_KEYS.length; k++) this.controls[k] = t[k];
+  }
+  /**
+   * One asleep block of `frames`: `tick`'s control path a sample at a time, with no audio.
+   * Every glide and the switch move in `tick`'s arithmetic, so a wake finds them on the bits
+   * an awake delay fed silence would hold (Codex on PR #801), not snapped to their targets.
+   */
+  rest(frames) {
+    const s = this.controls;
+    const t = this.targets;
+    const k = this.smooth;
+    const time = this.timeSmooth;
+    for (let n = 0; n < frames; n++) {
+      s[DELAY_SLOT.leftMs] += time * (t[DELAY_SLOT.leftMs] - s[DELAY_SLOT.leftMs]);
+      s[DELAY_SLOT.rightMs] += time * (t[DELAY_SLOT.rightMs] - s[DELAY_SLOT.rightMs]);
+      s[DELAY_SLOT.feedback] += k * (t[DELAY_SLOT.feedback] - s[DELAY_SLOT.feedback]);
+      s[DELAY_SLOT.highpass] += k * (t[DELAY_SLOT.highpass] - s[DELAY_SLOT.highpass]);
+      s[DELAY_SLOT.lowpass] += k * (t[DELAY_SLOT.lowpass] - s[DELAY_SLOT.lowpass]);
+      s[DELAY_SLOT.drive] += k * (t[DELAY_SLOT.drive] - s[DELAY_SLOT.drive]);
+      s[DELAY_SLOT.mix] += k * (t[DELAY_SLOT.mix] - s[DELAY_SLOT.mix]);
+      s[DELAY_SLOT.outputDb] += k * (t[DELAY_SLOT.outputDb] - s[DELAY_SLOT.outputDb]);
+      const enabled = s[DELAY_SLOT.enabled];
+      s[DELAY_SLOT.enabled] = t[DELAY_SLOT.enabled] > enabled ? Math.min(t[DELAY_SLOT.enabled], enabled + this.switchStep) : Math.max(t[DELAY_SLOT.enabled], enabled - this.switchStep);
+      s[DELAY_SLOT.ping] += k * (t[DELAY_SLOT.ping] - s[DELAY_SLOT.ping]);
+      s[DELAY_SLOT.mid] += k * (t[DELAY_SLOT.mid] - s[DELAY_SLOT.mid]);
+    }
   }
   /** The sleep's count, every block: a loud or held block wakes it; a silent one sleeps once the lines are. */
   drowse(frames, quiet) {
@@ -369,7 +393,7 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
     const frames = out[0].length;
     const dsp = this.dsp;
     dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
-    if (dsp.asleep) this.rest(out);
+    if (dsp.asleep) this.rest(out, frames);
     else this.render(left, right, out, frames);
     this.load.end(frames);
     return true;
@@ -400,8 +424,9 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
     }
     return true;
   }
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out) {
+  /** One asleep block: zeros, the input's silence to within its floor, and the controls' glides. */
+  rest(out, frames) {
+    this.dsp.rest(frames);
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
   }

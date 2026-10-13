@@ -66,7 +66,7 @@ class DelayProcessor extends AudioWorkletProcessor {
     const frames = out[0].length;
     const dsp = this.dsp;
     dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
-    if (dsp.asleep) this.rest(out);
+    if (dsp.asleep) this.rest(out, frames);
     else this.render(left, right, out, frames);
     this.load.end(frames);
     return true;
@@ -106,8 +106,9 @@ class DelayProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  /** One asleep block: zeros, the input's silence to within its floor. */
-  rest(out: Float32Array[]): void {
+  /** One asleep block: zeros, the input's silence to within its floor, and the controls' glides. */
+  rest(out: Float32Array[], frames: number): void {
+    this.dsp.rest(frames);
     out[0].fill(0);
     if (out[1]) out[1].fill(0);
   }

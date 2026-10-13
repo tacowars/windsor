@@ -27,7 +27,8 @@
  * one-pole filters are at most unity, and the saturator's slope is at most
  * one. Asleep: the processor writes zeros and runs no `tick`, the lines, filters
  * and write position wait as they are (everything in them is under the
- * floor), and the controls land on their targets. The first block whose
+ * floor), and `rest` moves the controls a sample at a time as `tick` would,
+ * with no audio. The first block whose
  * input crosses the floor wakes it and renders in full.
  * `delaySleep.test.ts` holds the tail, the wake and the bits.
  */
@@ -129,8 +130,35 @@ class DelayDsp {
     else if (!this.cleared) this.clear();
     this.held = Math.abs(t[S.feedback]) >= 1 || Math.abs(this.controls[S.feedback]) >= 1;
     this.drowse(frames, quiet);
-    // Asleep, nothing renders: the glides land.
-    if (this.asleep) for (let k = 0; k < KEYS.length; k++) this.controls[k] = t[k];
+  }
+
+  /**
+   * One asleep block of `frames`: `tick`'s control path a sample at a time, with no audio.
+   * Every glide and the switch move in `tick`'s arithmetic, so a wake finds them on the bits
+   * an awake delay fed silence would hold (Codex on PR #801), not snapped to their targets.
+   */
+  rest(frames: number): void {
+    const s = this.controls;
+    const t = this.targets;
+    const k = this.smooth;
+    const time = this.timeSmooth;
+    for (let n = 0; n < frames; n++) {
+      s[S.leftMs] += time * (t[S.leftMs] - s[S.leftMs]);
+      s[S.rightMs] += time * (t[S.rightMs] - s[S.rightMs]);
+      s[S.feedback] += k * (t[S.feedback] - s[S.feedback]);
+      s[S.highpass] += k * (t[S.highpass] - s[S.highpass]);
+      s[S.lowpass] += k * (t[S.lowpass] - s[S.lowpass]);
+      s[S.drive] += k * (t[S.drive] - s[S.drive]);
+      s[S.mix] += k * (t[S.mix] - s[S.mix]);
+      s[S.outputDb] += k * (t[S.outputDb] - s[S.outputDb]);
+      const enabled = s[S.enabled];
+      s[S.enabled] =
+        t[S.enabled] > enabled
+          ? Math.min(t[S.enabled], enabled + this.switchStep)
+          : Math.max(t[S.enabled], enabled - this.switchStep);
+      s[S.ping] += k * (t[S.ping] - s[S.ping]);
+      s[S.mid] += k * (t[S.mid] - s[S.mid]);
+    }
   }
 
   /** The sleep's count, every block: a loud or held block wakes it; a silent one sleeps once the lines are. */

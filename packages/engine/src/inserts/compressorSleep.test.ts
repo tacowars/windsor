@@ -5,7 +5,8 @@
  * floor, within `tailSeconds` at the deepest reduction, and writes exact
  * zeros; a loud external key keeps it awake under a silent program; fed noise
  * again it wakes on that block and renders what a compressor built with
- * `sleep: false` renders, to within the floor; and a render that never goes
+ * `sleep: false` renders, to within the floor, also when it was switched off
+ * while it slept (the switch fades asleep as awake); and a render that never goes
  * silent is the same bits with the sleep or without it.
  */
 import { describe, expect, it } from 'vitest';
@@ -17,6 +18,7 @@ import {
   peakFrom,
   QUANTUM,
   runBlocks,
+  runLegs,
   silence,
   type SleepingProcessor,
 } from '../__fixtures__/insertSleepRun';
@@ -85,6 +87,21 @@ describe('the Compressor asleep', () => {
     },
     20_000,
   );
+
+  it('fades its switch while asleep as it would awake', () => {
+    const spec = { threshold: -40, ratio: 10, attack: 0.01 };
+    const bypassed = compressorParams(spec);
+    bypassed.enabled![0] = 0;
+    const legs = (): Parameters<typeof runLegs>[1] => [
+      { params: compressorParams(spec), source: silence(1), blocks: 1 },
+      { params: bypassed, source: silence(1), blocks: 1 },
+      { params: bypassed, source: noise(8), blocks: 8 },
+    ];
+    const sleeping = runLegs(compressor(spec), legs());
+    const awake = runLegs(compressor(spec, false), legs());
+    expect(sleeping.asleep.slice(0, 2)).toEqual([true, true]);
+    expect(largestDifference(sleeping, awake)).toBeLessThan(FLOOR);
+  });
 
   it('renders a signal that never goes silent to the same bits as without the sleep', () => {
     const source = noise(400, 3);

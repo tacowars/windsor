@@ -91,7 +91,8 @@ the saturator add no gain, so that is the loop's only way to reach unity.
 Held lines that are not empty never sleep (a write under the floor can grow
 past it) and wake if they slept, and their count restarts. Asleep: the
 processor writes zeros with no `tick`, the lines, filters and write position
-wait as they are and the controls land on their targets, and the first loud
+wait as they are, `rest` moves every glide and the switch a sample at a time
+in `tick`'s arithmetic with no audio, and the first loud
 block wakes it and renders in full. Its tail is the repeats' fall to the
 floor plus 12 s (21 s at the defaults); a delay held up by its feedback never
 sleeps. `sleep: false` in `processorOptions` is the tests' render without it;
@@ -267,7 +268,8 @@ input times its gain, so on silence it holds only the envelope.
 program (and key, when external) is silent once the envelope has released to
 `reductionFloorDb` (a gain within 1e-7 of its rest) and the detector's
 highpass has settled; asleep, the processor writes zeros and posts the meter
-with no `advance`, the smoothed controls land on their targets, and the first
+with no `advance`, `rest` moves the smoothed controls and the switch fade a
+sample at a time in `advance`'s arithmetic, and the first
 loud block wakes it and renders in full. Its tail is its release, 18 s at the
 defaults and at most `tailSeconds` (21.7 s, the slowest release from Range
 60 dB); one at rest sleeps on its first silent block. `sleep: false` in
