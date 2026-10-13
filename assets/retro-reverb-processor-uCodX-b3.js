@@ -152,6 +152,14 @@ var RETRO_REVERB_DSP = {
   densityMaxBoost: 10 ** (6 / 20),
   millisecondsPerSecond: 1e3
 };
+var RETRO_REVERB_SLEEP = {
+  inputFloor: 1e-9,
+  outputFloor: 1e-7,
+  spanSeconds: RETRO_REVERB_BOUNDS.preDelay[1] + Math.max(
+    RETRO_REVERB_BOUNDS.duration[1],
+    RETRO_REVERB_DSP.diffuserSeconds.reduce((sum, seconds) => sum + seconds, 0) + Math.max(...RETRO_REVERB_DSP.tankSeconds) * RETRO_REVERB_BOUNDS.size[1] + RETRO_REVERB_DSP.driftExcursion + 2 * RETRO_REVERB_DSP.detuneExcursion
+  )
+};
 
 // packages/engine/src/worklet/loadSampler.ts
 var LOAD_MS_PER_SECOND = 1e3;
@@ -1028,7 +1036,7 @@ var RetroConverter = class {
 
 // packages/engine/src/worklet/retro/retroReverbDsp.ts
 var RetroReverbDsp = class {
-  constructor(rate, params) {
+  constructor(rate, params, sleep = true) {
     this.rate = this.phase = this.previousInput = this.heldLeft = this.heldRight = NaN;
     this.left = this.right = this.size = this.decay = this.tone = this.diffusion = NaN;
     this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
@@ -1038,6 +1046,11 @@ var RetroReverbDsp = class {
     this.early = this.earlyLevel = NaN;
     this.driftRate = this.driftDepth = this.density = this.ticks = NaN;
     this.lowDecay = this.lowCross = NaN;
+    this.wetPeak = this.quietFrames = this.sleepSpan = NaN;
+    this.wetPeak = this.quietFrames = 0;
+    this.sleepSpan = RETRO_REVERB_SLEEP.spanSeconds * rate;
+    this.sleepEnabled = sleep;
+    this.asleep = false;
     this.ticks = 0;
     this.inputLeft = this.inputRight = this.internalInput = 0;
     this.rate = rate;
@@ -1082,7 +1095,9 @@ var RetroReverbDsp = class {
     this.earlyTaps.configure();
     this.configureConverters();
   }
-  configure(params, frames) {
+  /** The block's controls; `quiet` is every input sample of it within the sleep floor. */
+  configure(params, frames, quiet) {
+    this.drowse(frames, quiet);
     const k = 1 - Math.exp(-frames / (RETRO_REVERB_DSP.smoothSeconds * this.rate));
     const slew = RETRO_REVERB_DSP.sizeSlew * frames / this.rate;
     this.size += Math.max(-slew, Math.min(slew, k * (params.size[0] - this.size)));
@@ -1114,6 +1129,13 @@ var RetroReverbDsp = class {
     this.earlyLevel = this.early * (1 - this.finite);
     this.targetMix = params.mix[0];
     this.targetLevel = params.enabled[0] ? 1 : 0;
+    if (this.asleep) {
+      this.mix = this.targetMix;
+      this.level = this.targetLevel;
+      this.phase += RETRO_REVERB_DSP.rate / this.rate * frames;
+      this.phase -= Math.floor(this.phase);
+      return;
+    }
     if (this.level !== 0) this.dormant = false;
     else if (!this.dormant) this.clear();
     if (this.targetLevel !== 0) this.dormant = false;
@@ -1126,6 +1148,21 @@ var RetroReverbDsp = class {
       this.earlyTaps.configure();
     }
     this.configureConverters();
+  }
+  /**
+   * The sleep's count, every block (so V8 optimises it): a loud block wakes the reverb; a quiet
+   * one after a quiet wet block counts, and past the span the networks empty and it sleeps.
+   */
+  drowse(frames, quiet) {
+    if (!quiet) this.asleep = false;
+    if (this.asleep) return;
+    if (quiet && this.wetPeak < RETRO_REVERB_SLEEP.outputFloor) this.quietFrames += frames;
+    else this.quietFrames = 0;
+    this.wetPeak = 0;
+    if (this.quietFrames <= this.sleepSpan) return;
+    this.empty();
+    this.quietFrames = 0;
+    this.asleep = true;
   }
   /** The block's Character and converter share, into each conversion point. */
   configureConverters() {
@@ -1157,6 +1194,11 @@ var RetroReverbDsp = class {
   }
   /** Fully off: every line, network and filter state to zero, so nothing old is heard again. */
   clear() {
+    this.empty();
+    this.dormant = true;
+  }
+  /** Every line, network and filter state to zero, for the switch's off and for sleep. */
+  empty() {
     const tank = this.tank;
     for (let i = 0; i < tank.lines.length; i++) tank.lines[i].buffer.fill(0);
     for (let i = 0; i < tank.diffusers.length; i++) tank.diffusers[i].buffer.fill(0);
@@ -1176,7 +1218,6 @@ var RetroReverbDsp = class {
     this.previousInput = this.heldLeft = this.heldRight = 0;
     this.wetToneLeft = this.wetToneRight = 0;
     this.resetConverters();
-    this.dormant = true;
   }
   /** One sample of the internal clock, of `internalInput`. */
   internal() {
@@ -1214,6 +1255,9 @@ var RetroReverbDsp = class {
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < RETRO_REVERB_DSP.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < RETRO_REVERB_DSP.silenceFloor) this.wetToneRight = 0;
+    const wetLeft = Math.abs(this.wetToneLeft), wetRight = Math.abs(this.wetToneRight);
+    if (wetLeft > this.wetPeak) this.wetPeak = wetLeft;
+    if (wetRight > this.wetPeak) this.wetPeak = wetRight;
     this.leftConverter.input = this.wetToneLeft;
     this.leftConverter.tick();
     this.heldLeft = this.leftConverter.output;
@@ -1284,7 +1328,7 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
         Number(options.parameterData?.[name] ?? descriptor.defaultValue)
       ]);
     }
-    this.dsp = new RetroReverbDsp(sampleRate, params);
+    this.dsp = new RetroReverbDsp(sampleRate, params, options.processorOptions?.sleep !== false);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
@@ -1300,9 +1344,20 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
+    const dsp = this.dsp;
+    dsp.configure(params, frames, dsp.sleepEnabled && this.silent(left, right));
+    if (dsp.asleep) this.rest(out);
+    else this.render(left, right, out, frames);
+    this.load.end(frames);
+    return true;
+  }
+  /**
+   * One awake block, in a method of its own as the plate's `_renderBlock` is (windsor#793): V8
+   * optimises it on sound alone, never inside a `process` that has so far only slept.
+   */
+  render(left, right, out, frames) {
     const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
     const dsp = this.dsp;
-    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
       dsp.inputLeft = i < leftFrames ? left[i] : 0;
       dsp.inputRight = i < rightFrames ? right[i] : 0;
@@ -1310,8 +1365,22 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
       out[0][i] = dsp.left;
       if (out[1]) out[1][i] = dsp.right;
     }
-    this.load.end(frames);
+  }
+  /** Every sample of the block within the sleep floor; an absent channel is silent. */
+  silent(left, right) {
+    const floor = RETRO_REVERB_SLEEP.inputFloor;
+    if (left) {
+      for (let i = 0; i < left.length; i++) if (Math.abs(left[i]) > floor) return false;
+    }
+    if (right && right !== left) {
+      for (let i = 0; i < right.length; i++) if (Math.abs(right[i]) > floor) return false;
+    }
     return true;
+  }
+  /** One asleep block: zeros, the input's silence to within its floor. */
+  rest(out) {
+    out[0].fill(0);
+    if (out[1]) out[1].fill(0);
   }
 };
 registerProcessor(RETRO_REVERB_NAME, RetroReverbProcessor);
