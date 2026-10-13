@@ -17,7 +17,8 @@
  * rather than as a step into cold filters (fully on, the input times 1 is the
  * input to the bit). The follower and the LFO keep running; they carry no audio.
  * Asleep (windsor#793, `driveSleep.ts`), `rest` replaces `tick` for a whole
- * block: the controls land, the follower releases and the LFO moves on.
+ * block: `update`'s control path runs a sample at a time with no audio, so the
+ * controls, the follower and the LFO move on as an awake drive's would.
  */
 import { INSERT_SWITCH_FADE_S } from '../../inserts/insertConstants';
 import { ADVANCED_DRIVE_PARAMETERS } from '../../inserts/advancedDriveParameters';
@@ -113,30 +114,60 @@ export class AdvancedDriveDsp implements DriveLfoState {
   }
   /**
    * On the way to sleep (windsor#793, `driveSleep.ts`): the graph and the
-   * oversamplers empty, as a switch-on from off leaves them, and the controls
-   * at their targets. The next tick sets the graph's controls outright.
+   * oversamplers empty, as a switch-on from off leaves them. The controls,
+   * the fade, the follower and the LFO carry on in `rest`; the next tick sets
+   * the graph's controls outright.
    */
   sleep(): void {
     this.clear();
-    this.rest(0);
     this.counter = 0;
   }
   /**
-   * One asleep block of `frames`: every control lands on its target at once
-   * (the empty graph cannot zipper, and a fade through dry has nothing to
-   * fade), the follower releases towards the silence and the LFO's phase
-   * moves on, so a wake finds both where an awake drive would have them.
+   * One asleep block of `frames`: `update`'s control path a sample at a time,
+   * with no audio. The controls smooth, the switch and the fade through dry
+   * move and land, the follower releases towards the silence and the LFO's
+   * phase integrates the smoothed frequency, each in `update`'s arithmetic, so
+   * a wake finds them on the bits an awake drive fed silence would have
+   * (Codex on PR #797). The graph is empty and stays so; the release's
+   * coefficient is worked out again only when its control moves.
    */
   rest(frames: number): void {
-    const s = this.controls;
-    s.set(this.targets);
-    this.activeCount = 0;
-    this.pending = false;
-    this.transition = 1;
-    this.follower *= Math.exp(-frames / ((this.rate * s[S.release]) / C.ms));
-    const hz = s[S.sync] >= 1 / 2 ? s[S.bpm] / (C.secondsPerMinute * s[S.beats]) : s[S.rate];
-    this.phase += (hz * frames) / this.rate;
-    this.phase -= Math.floor(this.phase);
+    const s = this.controls,
+      t = this.targets,
+      keys = this.activeKeys;
+    let release = NaN,
+      keep = 0;
+    for (let n = 0; n < frames; n++) {
+      for (let i = 0; i < this.activeCount; i++) {
+        const k = keys[i];
+        s[k] += this.smooth * (t[k] - s[k]);
+        if (Math.abs(s[k] - t[k]) < C.silence) s[k] = t[k];
+      }
+      const enabled = s[S.enabled];
+      if (enabled !== t[S.enabled])
+        s[S.enabled] =
+          t[S.enabled] > enabled
+            ? Math.min(t[S.enabled], enabled + this.switchStep)
+            : Math.max(t[S.enabled], enabled - this.switchStep);
+      this.transition = Math.max(
+        0,
+        Math.min(1, this.transition + (this.pending ? -this.step : this.step)),
+      );
+      if (this.pending && this.transition === 0) {
+        for (let i = 0; i < DISCRETE.length; i++) s[DISCRETE[i]] = t[DISCRETE[i]];
+        this.pending = false;
+        this.counter = 0;
+      }
+      // A silent input's level is 0, never above the follower, so `update` releases.
+      if (s[S.release] !== release) {
+        release = s[S.release];
+        keep = 1 - Math.exp(-1 / (this.rate * (release / C.ms)));
+      }
+      this.follower += keep * (0 - this.follower);
+      const hz = s[S.sync] >= 1 / 2 ? s[S.bpm] / (C.secondsPerMinute * s[S.beats]) : s[S.rate];
+      this.phase += hz / this.rate;
+      this.phase -= Math.floor(this.phase);
+    }
   }
   /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
   update(): void {

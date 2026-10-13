@@ -5,7 +5,7 @@
  * block starts the count again. Once the count reaches the hold, the DSP
  * empties its graph and oversamplers (`AdvancedDriveDsp.sleep`) and the drive
  * sleeps: `rest` writes the dry path (the input, under the floor) and keeps the
- * controls, the follower and the LFO moving at block rate, with no DSP. The
+ * controls, the follower and the LFO moving sample by sample, with no audio DSP. The
  * first block whose input crosses the floor wakes it, and that block renders
  * in full. `floor` is `DRIVE_SLEEP.inputFloor` divided by the worst-case
  * linear gain of the current targets, which `gauge` bounds when they change,
@@ -165,7 +165,7 @@ export class DriveSleep {
     this.asleep = true;
   }
   /**
-   * One asleep block: the dry path, and the DSP's block-rate rest. False when
+   * One asleep block: the dry path, and the DSP's control-only rest. False when
    * the input has crossed the floor: the drive wakes, and the caller renders
    * the block in full.
    */

@@ -74,8 +74,9 @@ is within `outputFloor`
 (1e-7), and after `holdSeconds` (50 ms) of quiet the DSP empties its graph
 and oversamplers and sleeps. The tail is the output's own: a resonant stage
 modulated down rings for seconds, so no fixed span bounds it. Asleep, `rest`
-writes the dry input and the DSP lands its controls and moves its follower
-and LFO a block at a time, with no tick; the first block whose input crosses
+writes the dry input and the DSP runs `update`'s control path a sample at a
+time with no audio (smoothing, the fade, the follower's release and the LFO's
+phase, on an awake drive's bits), with no tick; the first block whose input crosses
 the same floor wakes it and renders in full, from the empty state of a switch-on.
 The constants are in `inserts/advancedDriveSleepConstants.ts`, not
 `advancedDriveConstants.ts`, which the FM bundle carries whole. The awake

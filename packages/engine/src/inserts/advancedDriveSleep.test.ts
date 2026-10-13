@@ -9,8 +9,9 @@
  *   while the graph's wet still rings above the floor;
  * - the first block whose input crosses the floor wakes it and renders in
  *   full, and the woken render follows a drive that never slept to within
- *   `WAKE_BOUND`, modulation and all; with no modulation it is the bits of a
- *   fresh drive;
+ *   `WAKE_BOUND`, modulation and all, also when Rate, Sync and BPM change
+ *   while it sleeps (Codex on PR #797); with no modulation it is the bits of
+ *   a fresh drive;
  * - at the most gain the controls allow, an input under the unity floor still
  *   wakes it, since the floor is divided by the settings' gain (Codex on PR #797);
  * - with no input connected it sleeps too, and `sleep: false` never sleeps.
@@ -35,12 +36,13 @@ const TAIL = 1;
 /** Seconds of silence for the resonant ring's cases. */
 const RING_TAIL = 3;
 /**
- * The woken render against a drive that never slept: the LFO's phase and the
- * follower move a block at a time asleep and a sample at a time awake, which
- * differ in their last bits, so a modulated render differs by a rounding.
- * Measured 1.2e-7 at a peak near 4 across the allocation test's settings.
+ * The woken render against a drive that never slept. Asleep, the controls, the
+ * follower and the LFO's phase move a sample at a time in `update`'s
+ * arithmetic, so they wake on its bits; what is left is the graph's control
+ * block, which restarts on the woken block, a few samples off the awake one's.
+ * Measured 7.1e-9 at a peak near 4, with and without control changes asleep.
  */
-const WAKE_BOUND = 1e-6;
+const WAKE_BOUND = 1e-7;
 
 /** A drive that does something: driven, every stage shaping, modulated by the LFO and the follower. */
 const MODULATED: Partial<AdvancedDriveSpec> = {
@@ -185,6 +187,32 @@ describe('Advanced Drive sleeps on silence (windsor#793)', () => {
       for (let i = 0; i < QUANTUM; i++) worst = Math.max(worst, Math.abs(a[i]! - y[i]!));
     }
     expect(awake.processor.sleep.asleep).toBe(false);
+    expect(worst).toBeLessThanOrEqual(WAKE_BOUND);
+  });
+
+  it("keeps the LFO on an awake drive's phase through Rate, Sync and BPM changes made asleep", () => {
+    const asleep = rig(MODULATED),
+      awake = rig(MODULATED, false);
+    const toneBlocks = Math.round((TONE * RATE) / QUANTUM),
+      quietBlocks = Math.round((TAIL * RATE) / QUANTUM);
+    // Asleep by a third of the silence; each change lands a few blocks apart, the wake mid-glide.
+    const changes = new Map<number, (r: Rig) => void>([
+      [toneBlocks + Math.round(quietBlocks / 3), (r) => void (r.params.rate![0] = 11)],
+      [toneBlocks + Math.round(quietBlocks / 2), (r) => void (r.params.sync![0] = 1)],
+      [toneBlocks + quietBlocks - 4, (r) => void (r.params.bpm![0] = 174)],
+    ]);
+    let worst = 0;
+    for (let b = 0; b < toneBlocks + quietBlocks + toneBlocks; b++) {
+      changes.get(b)?.(asleep);
+      changes.get(b)?.(awake);
+      const x = b < toneBlocks || b >= toneBlocks + quietBlocks ? tone : silence;
+      if (b === toneBlocks + Math.round(quietBlocks / 3))
+        expect(asleep.processor.sleep.asleep).toBe(true);
+      const a = Float32Array.from(block(asleep, b * QUANTUM, x)),
+        y = block(awake, b * QUANTUM, x);
+      for (let i = 0; i < QUANTUM; i++) worst = Math.max(worst, Math.abs(a[i]! - y[i]!));
+    }
+    expect(asleep.processor.sleep.asleep).toBe(false);
     expect(worst).toBeLessThanOrEqual(WAKE_BOUND);
   });
 
