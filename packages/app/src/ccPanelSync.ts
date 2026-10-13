@@ -4,8 +4,15 @@
  * document before and after it, so no control has to report itself:
  *
  * - **Last in wins.** A mapped target whose own value moved (a knob turned
- *   on screen on any tab, an undo, a preset swap) has its CC value dropped
- *   and its mapping re-armed.
+ *   on screen on any tab, an undo of one) has its CC value dropped and its
+ *   mapping re-armed.
+ * - **A preset swap is not an edit** (tacowars's decision of 2026-10-13,
+ *   record decision 2). A part whose preset id changed (a swap, or its undo
+ *   or redo) plays a new patch, so its voice targets' own values move, but
+ *   the engine keeps every held value over it at the same absolute value.
+ *   Nothing on that part is cleared or re-armed here; a value the engine
+ *   drops, on a target the new patch lacks, reaches the router as
+ *   `performanceDropped`.
  * - **A lane let go.** A lane on a mapped target that was on and is now off
  *   or gone gave its slot back at the patch's value, so the mapping re-arms.
  *
@@ -54,9 +61,10 @@ export function ccDocumentEvents(
     const now = partAt(after, slot);
     if (!was || !now) continue;
     const { target } = mapping;
+    const swapped = was.preset !== now.preset;
     const ownWas = currentValue(was, partPatch(before, was), target);
     const ownNow = currentValue(now, partPatch(after, now), target);
-    if (ownWas !== ownNow) edited.push({ part: slot, target });
+    if (!swapped && ownWas !== ownNow) edited.push({ part: slot, target });
     if (laneOn(was, target) && !laneOn(now, target)) released.push({ part: slot, target });
   }
   return { edited, released };

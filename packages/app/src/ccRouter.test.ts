@@ -86,7 +86,6 @@ const edit = (after: CcMapping, from?: Partial<CcMessage>): Rearm => ({
 /** Decision 4's re-arm events, each on the router. */
 const REARMS: Readonly<Record<string, Rearm>> = {
   'a song opening': { act: (r) => r.router.songOpened([{ part: 0, mapping: learned() }]) },
-  'a preset change': { act: (r) => r.router.presetChanged(0) },
   'a range edit': edit(learned({ max: 0.5 })),
   'Inv toggled': edit(learned({ inverted: true })),
   'Learn onto another CC': edit(learned({ source: { device: 'Keys', channel: 1, cc: 75 } }), {
@@ -147,14 +146,13 @@ describe('re-arming pickup (decision 4)', () => {
 });
 
 describe('last in wins (decision 2)', () => {
-  it('clears the held CC value on an on-screen edit, a preset change and Reset', () => {
+  it('clears the held CC value on an on-screen edit and Reset', () => {
     const r = rig();
     r.router.songOpened([{ part: 0, mapping: learned() }]);
     r.router.targetEdited(0, LEVEL);
     expect(r.log).toEqual([]);
     for (const event of [
       () => r.router.targetEdited(0, LEVEL),
-      () => r.router.presetChanged(0),
       () => r.router.resetPerformance(),
     ]) {
       r.log.length = 0;

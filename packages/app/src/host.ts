@@ -230,8 +230,9 @@ export class EngineHost {
   /**
    * The MIDI CC router's ears on the engine (windsor#784, record
    * `2026-10-13-midi-cc-mapping`): told of each value the live system drops
-   * on its own (a lane switched on, a preset swap, a target gone), on
-   * whichever system stands, and of each new system, which holds none.
+   * on its own (a lane switched on, a target a new preset lacks, a target
+   * gone), on whichever system stands, and of each new system, which holds
+   * none.
    */
   performanceDropped: PerformanceDropped | null = null;
   systemBuilt: (() => void) | null = null;

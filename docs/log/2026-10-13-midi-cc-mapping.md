@@ -108,8 +108,9 @@ differ, the difference is stated under the decision.
      follows the new value, the ring goes away and the CC's slot is given
      back, and it re-arms that mapping's pickup (decision 7): under Pickup
      the hardware knob takes over again once it crosses the new value,
-     under Jump on its next message. A preset change and Reset performance
-     do the same. Only the mouse ever writes the patch.
+     under Jump on its next message. Reset performance does the same. A
+     preset swap does not: it is not an edit of the target, and the CC's
+     value stays (decision 10). Only the mouse ever writes the patch.
 3. **The value path.** The CC value sets the target's performance base, in
    the target's own units, through the mapping's range and invert
    (decision 5).
@@ -236,14 +237,16 @@ differ, the difference is stated under the decision.
 7. **Takeover.**
    - **Pickup** is the default. The rule: anything that changes what a
      hardware position means, or lets the knob move while Windsor does not
-     hear it, re-arms pickup. That is, after a song opens, a preset
-     changes, a range changes, `Inv` is toggled, the mapping's source
+     hear it, re-arms pickup. That is, after a song opens, a range
+     changes, `Inv` is toggled, the mapping's source
      changes (a new CC from Learn, or an edit of its device or channel),
      the target is turned on screen (decision 2), Reset performance, the
      input is unplugged and comes back (see the boundary cases), or the
      MIDI selector stops listening to the input and later listens again
      (`midiAccess.ts` detaches the input's handler on deselection as it
-     does on a disconnect). Until then a CC does nothing. It picks up when
+     does on a disconnect). A preset swap is not on the list: the CC's value
+     plays on at the same absolute value (decision 10), so the hardware
+     position still means it. Until then a CC does nothing. It picks up when
      its value reaches or crosses the target's current value. The current
      value is the CC's base where one is held, else the patch's (or the
      strip's or insert's) own value. A clip envelope's offset is not part of
@@ -285,8 +288,10 @@ differ, the difference is stated under the decision.
    - **When the engine takes it.** The slot is taken at the mapping's first
      applied value, after pickup or at once under Jump. The CC holds it until
      Reset performance, an on-screen edit of the target (decision 2), the
-     mapping's removal, a preset change or the song's close. A mapping that has applied no value writes nothing, so a song
-     with mappings and no CC moves plays bit for bit as it does without them.
+     mapping's removal or the song's close. A preset swap keeps it, unless
+     the new patch no longer offers the target (decision 10). A mapping that
+     has applied no value writes nothing, so a song with mappings and no CC
+     moves plays bit for bit as it does without them.
    - **Order:** lanes, then CC mappings holding a value, then clip
      envelopes in the roll's order. A lane is the song's and plays the same
      on every pass. A CC is what the performer is touching now, and it must
@@ -324,6 +329,20 @@ differ, the difference is stated under the decision.
       14).
     - Swapping a part's preset keeps its voice mappings, each range clamped
       to the target's range.
+      - It also keeps every held CC value, on every kind of target: voice,
+        macro, strip and insert. tacowars decided this on 2026-10-13. A
+        mapping is the song's setup, and its value is absolute in the
+        target's own units (decision 3), so the new preset sounds with the
+        same value: a cutoff held at 3.4 kHz stays 3.4 kHz. The engine
+        reckons each voice and macro value's offset again against the new
+        patch, by `voiceOffset` with a lane's floors, as a lane keeps its
+        absolute value over a new patch, and the value keeps its slot.
+        Pickup is not re-armed, and the swap is not an on-screen edit
+        (decision 2). Its undo and redo are swaps too.
+      - The one exception is a held value whose target the new patch no
+        longer offers: a macro it does not define, or a target its macros
+        now map. That value is dropped, its slot given back and the drop
+        reported, and the mapping's row reads Inert as below.
       - A macro mapping whose macro the new patch does not define stays,
         inert, and its row says so ("Inert · no Macro 2 in this patch").
       - So does a mapping whose target the new patch's macros now map
@@ -444,11 +463,13 @@ shows.
   CC 127.
 - **An on-screen edit of a mapped target.** Last in wins (decision 2).
   Turning the knob edits the patch (or the strip or insert value), drops
-  that target's CC value and re-arms pickup, and so does a preset change or
-  Reset performance. The knob and the sound agree again, and the hardware
+  that target's CC value and re-arms pickup, and so does Reset performance.
+  The knob and the sound agree again, and the hardware
   picks up from there, or under Jump takes over on its next message. This
   is the same for all three kinds of target, including strip and insert
-  ones, which have no offset to keep.
+  ones, which have no offset to keep. A preset swap is not an on-screen
+  edit: it moves a voice target's patch value, but the CC's value plays on
+  over the new patch (decision 10).
 - **A lane switched off under a mapping.** The lane's release gives the
   slot back at the patch's value. The mapping re-arms pickup.
 

@@ -14,8 +14,9 @@
  *   value arms the mapping's other keys, since the target has moved away
  *   from them.
  * - **Last in wins** (decision 2). An on-screen edit of a target clears its
- *   CC base in the engine and re-arms its mapping, and so do a preset change
- *   and Reset performance.
+ *   CC base in the engine and re-arms its mapping, and so does Reset
+ *   performance. A preset swap is not an edit: the engine keeps every held
+ *   value over the new patch, and reports only the one it drops.
  * - **Re-arming** (decision 7's list). A range edit, `Inv` and a lane let go
  *   re-arm with the hardware position still known, so the hollow marker
  *   stays. Song open, a source edit and an input the console listens to
@@ -120,11 +121,6 @@ export class CcRouter {
   targetEdited(part: number, target: CcTargetId): void {
     const entry = this.entries.get(entryKey(part, target));
     if (entry) this.release(entry);
-  }
-
-  /** The part's preset changed: its targets play the new patch, and its mappings re-arm. */
-  presetChanged(part: number): void {
-    for (const entry of this.entries.values()) if (entry.part === part) this.release(entry);
   }
 
   /** Reset performance: every target back to its own value, every mapping re-armed. */

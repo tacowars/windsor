@@ -2,20 +2,23 @@
  * The console's MIDI CC state (windsor#784, record `2026-10-13-midi-cc-mapping`)
  * over a real document model and a fake host: learn commits one mapping as
  * one edit, a message plays its own part whichever part is selected, an
- * on-screen edit of a mapped target drops its CC value (last in wins), and a
- * song opened, a new system and a value the engine dropped re-arm.
+ * on-screen edit of a mapped target drops its CC value (last in wins), a
+ * preset swap drops none, and a song opened, a new system and a value the
+ * engine dropped re-arm.
  */
-import { type CcTargetId, partAt } from '@windsor/engine';
+import { type CcTargetId, DEFAULT_PHASER, partAt } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 
 import type { CcMessage } from './ccEngine';
 import type { PerformanceHost } from './ccPanelEngine';
 import { CcSession, watchDocument } from './ccPanelSession';
 import { DocumentModel } from './documentModel';
+import { initPatchDefaults } from './patchActions';
 import { addPart, newSong } from './songParts';
 
 const LEVEL: CcTargetId = 'voice.ops.0.level';
 const STRIP: CcTargetId = 'strip.level';
+const RATE: CcTargetId = 'insert.ph.rate';
 
 const cc = (value: number, o: Partial<CcMessage> = {}): CcMessage => ({
   device: 'Keys',
@@ -52,11 +55,17 @@ function rig() {
   return { model, session, log, edits };
 }
 
-/** Learn `target` on `part` from a knob moved 0 → 10. */
-function learn(r: ReturnType<typeof rig>, part: number, target: CcTargetId): void {
+/** Learn `target` on `part` from a knob, CC 74 unless `number` names another, moved 0 → 10. */
+function learn(r: ReturnType<typeof rig>, part: number, target: CcTargetId, number = 74): void {
   r.session.learn(part, target);
-  r.session.hear(cc(0));
-  r.session.hear(cc(10));
+  r.session.hear(cc(0, { cc: number }));
+  r.session.hear(cc(10, { cc: number }));
+}
+
+/** The Init patch with operator 1's level at `level`. */
+function initAtLevel(level: number) {
+  const patch = initPatchDefaults();
+  return { ...patch, ops: patch.ops.map((op, i) => (i === 0 ? { ...op, level } : op)) };
 }
 
 describe('CcSession', () => {
@@ -114,6 +123,31 @@ describe('CcSession', () => {
     r.model.merge({ parts: { 0: { strip: { level: 0.25 } } } });
     expect(r.log).toEqual([`clear 0 ${STRIP}`]);
     expect(r.session.status(0, STRIP)?.kind).toBe('waiting');
+  });
+
+  it('drops nothing on a preset swap, its undo or its redo, and a knob edit still clears its target', () => {
+    const r = rig();
+    r.model.merge({ parts: { 0: { strip: { inserts: [{ ...DEFAULT_PHASER, id: 'ph' }] } } } });
+    learn(r, 0, STRIP, 74);
+    learn(r, 0, RATE, 75);
+    learn(r, 0, LEVEL, 76);
+    r.session.takeover = 'pickup';
+    for (const number of [74, 75, 76]) r.session.hear(cc(100, { cc: number }));
+    const before = r.model.doc;
+    r.log.length = 0;
+    // The new preset's operator 1 level differs: the swap moves the voice target's own value.
+    r.model.merge({ patches: { other: initAtLevel(0.123) }, parts: { 0: { preset: 'other' } } });
+    const swapped = r.model.doc;
+    r.model.replace(before);
+    r.model.replace(swapped);
+    expect(r.log).toEqual([]);
+    for (const target of [STRIP, RATE, LEVEL]) {
+      expect(r.session.status(0, target)).toMatchObject({ kind: 'live', held: true });
+    }
+
+    r.model.merge({ patches: { other: initAtLevel(0.5) } });
+    expect(r.log).toEqual([`clear 0 ${LEVEL}`]);
+    expect(r.session.status(0, LEVEL)?.kind).toBe('waiting');
   });
 
   it('re-arms on a new system and on a value the engine dropped, and starts fresh on a song opened', () => {

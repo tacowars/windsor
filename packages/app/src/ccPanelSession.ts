@@ -208,7 +208,7 @@ export class CcSession {
     this.changed('live');
   }
 
-  /** The engine dropped a value on its own (a lane on, a preset swap, a target gone). */
+  /** The engine dropped a value on its own (a lane on, a target a new preset lacks, a target gone). */
   dropped(part: number, target: CcTargetId): void {
     this.router.laneReleased(part, target);
     this.changed('live');

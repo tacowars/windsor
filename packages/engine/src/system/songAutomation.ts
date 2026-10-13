@@ -55,9 +55,12 @@
  * - **Performance values** (windsor#781, record `2026-10-13-midi-cc-mapping`).
  *   A MIDI CC's value on a part's target goes to the player as the part's
  *   (`perform`), held until it is cleared or the part leaves the song. A
- *   preset switch (the part's `preset` named in a partial) drops its voice
- *   and macro values, frees their slots and reports each through `dropped`;
- *   a patch edit (only `patches`) keeps them. A resync, after a patch edit,
+ *   preset switch (the part's `preset` named in a partial) keeps every
+ *   value (tacowars's decision of 2026-10-13): a voice or macro value is
+ *   reckoned again against the new patch on the slot it holds, so it plays
+ *   the same absolute value, and one whose target the new patch lacks (a
+ *   macro it lacks, a target its macros map) is dropped, its slot freed;
+ *   a patch edit (only `patches`) keeps them as they are. A resync, after a patch edit,
  *   a preset switch, a lane edit or an insert edit or re-wire, finds each
  *   target again: a value on a rebuilt insert
  *   stage is held there again, and one whose target a lane now plays or the
@@ -175,7 +178,8 @@ export class SongAutomation {
     }
     // A part's `preset` in the partial is a preset switch, never a knob edit (which names
     // only `patches`): it replaced the part's patch, so its lanes and envelopes find their
-    // targets again, and its voice values go before another resync counts the slots.
+    // targets again, and its voice values are reckoned against the new patch before
+    // another resync counts the slots.
     for (const [slot, part] of parts) {
       if (isRecord(part) && 'preset' in part) player.resync(partOwner(slot), true);
     }

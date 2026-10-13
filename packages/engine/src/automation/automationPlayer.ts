@@ -265,8 +265,10 @@ export class AutomationPlayer {
    * or whose insert chain was rebuilt (windsor#345). One owner, or every one
    * the player knows: a part's envelope tracks find their targets again
    * with its lanes, whether or not it has any. `preset`, a preset switch
-   * (windsor#781, record decision 2): every voice and macro value held is
-   * dropped and reported first (`PartPerformance.rebind`).
+   * (windsor#781, record decision 2): each voice and macro value held keeps
+   * its value and slot, its offset reckoned again against the new patch,
+   * and only one whose target the new patch lacks is dropped and reported
+   * (`PartPerformance.rebind`).
    */
   resync(owner?: AutomationOwner, preset = false): void {
     const now = this.options.now();
