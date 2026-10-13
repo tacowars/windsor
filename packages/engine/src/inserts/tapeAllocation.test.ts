@@ -26,8 +26,9 @@
  *   a quantum at a time across each control's range and all three at once,
  *   and cleared back to the model's row, and four steps for the sleep
  *   (windsor#793): silence long enough to fall asleep, changes while
- *   asleep, a wake, asleep with the hiss and Wear's motion running, and
- *   the hiss turned off asleep. The
+ *   asleep (the switch's fade among them, windsor#802), a wake, asleep
+ *   with the hiss and Wear's motion running, and the hiss turned off
+ *   asleep. The
  *   input arrives stereo, mono or with no channels (an inactive source). It
  *   warms up with the cycle twelve times, the load meter on for the first:
  *   after six, V8 compiled the block's `configure` to its top tier inside
@@ -151,16 +152,17 @@ const STEPS: [number[], TapeInput, Sweep?, number?][] = [
   ],
   [[2, 1, 3.3, 10, 20, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 1, 0.85, 1], 'stereo'],
   // The sleep (windsor#793): silent long enough to fall asleep with the hiss and motion off, then
-  // asleep through a factor, model, Drive, Mix and trim change; woken by mono input and asleep
-  // again with the hiss and Wear on; the hiss and Wear turned off asleep, landing on the dry ring;
-  // and woken by the cycle's first step.
+  // asleep through a factor, model, Drive, Mix and trim change and the insert switched off, each
+  // gliding a frame at a time asleep (windsor#802); woken by mono input, switched back on, and
+  // asleep again with the hiss and Wear on; the hiss and Wear turned off asleep, landing on the
+  // dry ring; and woken by the cycle's first step.
   [
     [2, 0, 12, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 0.16, 0.28, 0.32],
     'stereo',
     undefined,
     140,
   ],
-  [[4, 4, -10, 30, 0, 0, 0, 0, 0, 1, 7, -70, 3, 0.5, 9, 1, 0, 0.16, 0.28, 0.32], 'none'],
+  [[4, 4, -10, 30, 0, 0, 0, 0, 0, 1, 7, -70, 3, 0.5, 9, 0, 0, 0.16, 0.28, 0.32], 'none'],
   [
     [2, 1, 6, 0, 40, 0, 0, 0, 0, 1, 7, -40, 0, 0.8, 5, 1, 0, 0.16, 0.28, 0.32],
     'mono',

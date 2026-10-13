@@ -12,16 +12,15 @@
  *   and its magnetization, the DC block, the ring and its write head. Every output it holds is
  *   under the floor, and a woken tape resumes the state a tape that never slept would have, but
  *   for that inaudible residue, so the core keeps its remanence across a rest.
- * - The hiss stays audible (the issue's decision 3, its second option: the core and the EQ
- *   sleep while a cheap noise path runs). Its noise is generated, not fed, so while the hiss
- *   sounds, or the motion moves (Wear, or the split dials), an asleep frame runs
- *   `TapeDsp.advance` (the controls, the motion, the dropouts, the noise and the core's glide,
- *   exactly as awake) and adds the noise through the dropout and trim to the dry ring: the awake
- *   channel's arithmetic with the frozen ring's read at 0. The motion runs for a woken tape's
- *   sake, so its wow, flutter and dropouts resume where a tape that never slept has them. While
- *   the hiss's target is off and its gain has fallen under `hissSnap` the gain lands at 0, and
- *   with the motion still too, an asleep block lands the controls and the model weights on their
- *   targets and runs the dry ring alone: the wet output is exactly 0 there.
+ * - Every asleep frame runs `TapeDsp.advance`, exactly as awake: the controls' glides, the
+ *   switch's fade, the motion's clocks and random draws, the dropouts, the noise, the model
+ *   weights and the core's glide (windsor#802, the rule of Advanced Drive's `rest`). So a
+ *   control moved in a gap, or the motion turned on there, wakes mid-glide on the bits of a tape
+ *   that never slept, its wow, flutter and dropouts where that tape has them. The hiss stays
+ *   audible (windsor#793's decision 3, its second option: the core and the EQ sleep while a cheap
+ *   noise path runs): the frame adds the noise through the dropout and trim to the dry ring, the
+ *   awake channel's arithmetic with the frozen ring's read at 0. While the hiss's target is off
+ *   and its gain has fallen under `hissSnap`, the gain lands at 0, so the wet is exactly 0.
  * - The wake: the processor checks each block's input before rendering it, and a block with any
  *   sample over the input floor wakes the tape and renders in full, so nothing is lost.
  *
@@ -32,7 +31,7 @@
  * Pinned by `inserts/tapeSleep.test.ts`, and on V8 by `inserts/tapeAllocation.test.ts` through
  * `__fixtures__/tapeChangeScenario.ts`'s silence, sleep and wake.
  */
-import { TAPE_BOUNDS, TAPE_MODELS, TAPE_SLEEP } from '../../inserts/tapeConstants';
+import { TAPE_BOUNDS, TAPE_SLEEP } from '../../inserts/tapeConstants';
 import type { TapeDsp } from './tapeDsp';
 
 /** True when every sample of the block's input is within the floor; an absent channel is silence. */
@@ -74,41 +73,19 @@ function settle(dsp: TapeDsp, from: number, frames: number): void {
 }
 
 /**
- * Once an asleep block, after `configure`: whether its frames `advance`, for the hiss or the
- * motion. When they do not, the controls and the model weights land on their targets, as an
- * awake tape's would within their glide: with the wet path frozen there is nothing to zipper.
+ * Once an asleep block, after `configure`: with the hiss's target off, a gain fallen under
+ * `hissSnap` lands at 0, so the noise it scales is exactly 0 and the asleep output with it.
  */
 function rest(dsp: TapeDsp): void {
-  const s = dsp.controls,
-    t = dsp.targets;
-  const off = t.hiss <= TAPE_BOUNDS.hiss[0];
-  if (off && dsp.noiseGain < TAPE_SLEEP.hissSnap) dsp.noiseGain = 0;
-  const still = t.split ? t.wow === 0 && t.flutter === 0 && t.dropouts === 0 : t.wear === 0;
-  dsp.advancing = !(off && dsp.noiseGain === 0 && still);
-  if (dsp.advancing) return;
-  s.drive = t.drive;
-  s.wear = t.wear;
-  s.wow = t.wow;
-  s.flutter = t.flutter;
-  s.dropouts = t.dropouts;
-  s.wowRate = t.wowRate;
-  s.flutterRate = t.flutterRate;
-  s.hiss = t.hiss;
-  s.trim = t.trim;
-  s.mix = t.mix;
-  s.enabled = t.enabled;
-  dsp.updateGains();
-  dsp.mix = s.mix * s.enabled;
-  for (let model = 0; model < TAPE_MODELS.length; model++)
-    dsp.weights[model] = model === dsp.model ? 1 : 0;
+  if (dsp.targets.hiss <= TAPE_BOUNDS.hiss[0] && dsp.noiseGain < TAPE_SLEEP.hissSnap)
+    dsp.noiseGain = 0;
 }
 
 /**
  * An asleep block, the processor's dispatch outside its awake loop: `rest`, then each frame from
- * `left` and `right` (an absent channel is silence) through `advance` while the hiss sounds or
- * the motion moves, or the core's glide alone while neither does, and the wet over the dry ring
- * as the awake channel mixes it with the frozen ring's read at 0: the noise through the dropout
- * and the trim, or 0.
+ * `left` and `right` (an absent channel is silence) through `advance`, and the wet over the dry
+ * ring as the awake channel mixes it with the frozen ring's read at 0: the noise through the
+ * dropout and the trim.
  */
 function renderAsleep(
   dsp: TapeDsp,
@@ -118,8 +95,7 @@ function renderAsleep(
   frames: number,
 ): void {
   rest(dsp);
-  const advancing = dsp.advancing,
-    frame = dsp.input,
+  const frame = dsp.input,
     magnetic = dsp.magnetic,
     ring = magnetic.dry,
     latency = magnetic.latency,
@@ -128,9 +104,8 @@ function renderAsleep(
   for (let i = 0; i < frames; i++) {
     frame[0] = left === undefined ? 0 : (left[i] ?? 0);
     frame[1] = right === undefined ? 0 : (right[i] ?? 0);
-    if (advancing) dsp.advance();
-    else if (magnetic.gliding) magnetic.glide();
-    const wet = advancing ? dsp.noise * (1 - dsp.motion.dropout) * dsp.trim : 0,
+    dsp.advance();
+    const wet = dsp.noise * (1 - dsp.motion.dropout) * dsp.trim,
       mix = dsp.mix,
       at = magnetic.dryAt;
     let dry = ring[at];

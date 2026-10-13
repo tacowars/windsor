@@ -35,12 +35,13 @@ pattern). After an awake block whose input is under `TAPE_SLEEP.inputFloor`
 plus the core's 48 samples; the DC block's settle is the wait before the count
 starts, about 0.2 s after a tone. Asleep, the EQ, the core, the DC block and
 the ring are frozen where they stood, not cleared, so a woken tape keeps its
-remanence and renders within a float32 ulp of one that never slept. The hiss
-stays audible: while it sounds or the motion moves, an asleep frame runs
-`TapeDsp.advance` (the controls, motion, dropouts, noise and glide, as awake)
-and mixes the noise over the dry ring with the ring's read at 0; with both off
-(a hiss gain under `hissSnap` lands at 0) the controls land on their targets
-and the dry ring runs alone, a wet of exactly 0. The processor reads each
+remanence and renders within a float32 ulp of one that never slept. Every
+asleep frame runs `TapeDsp.advance` as awake (the controls, the switch's
+fade, the motion's clocks and draws, the dropouts, the noise, the model
+weights and the core's glide; windsor#802), so a control moved in a gap
+wakes mid-glide on a never-sleeping tape's bits, and mixes the noise over
+the dry ring with the ring's read at 0: the hiss stays audible, and with its
+target off a gain under `hissSnap` lands at 0, a wet of exactly 0. The processor reads each
 block's input before rendering it, and any sample over the floor wakes the
 tape on that block, rendered in full. `renderAsleep` is the asleep block,
 dispatched outside the awake loop; `processorOptions.sleep: false` renders

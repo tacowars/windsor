@@ -104,7 +104,6 @@ describe('the tape asleep on silence (windsor#793)', () => {
       energy += out[0]!.reduce((sum, v) => sum + v * v, 0);
     }
     expect(sleeping.tape.dsp.asleep).toBe(true);
-    expect(sleeping.tape.dsp.advancing).toBe(true);
     expect(energy).toBeGreaterThan(0);
     sleeping.params.hiss![0] = awake.params.hiss![0] = -70;
     let last: Float32Array[] = [];
@@ -112,7 +111,74 @@ describe('the tape asleep on silence (windsor#793)', () => {
       last = block(sleeping, b * Q, null);
       expect(peakDiff(last, block(awake, b * Q, null))).toBeLessThan(1e-9);
     }
-    expect(sleeping.tape.dsp.advancing).toBe(false);
     expect(last.every((channel) => channel.every((v) => v === 0))).toBe(true);
+  });
+});
+
+/**
+ * Controls moved while the tape sleeps (windsor#802): an asleep frame steps the controls, the
+ * switch's fade, the motion and the noise as an awake one does, so a wake mid-glide renders what
+ * a tape that never slept renders, within `GLIDE_BOUND`.
+ */
+describe('the tape asleep through control changes (windsor#802)', () => {
+  /** The block the tone ends on, and the first block of the tone that wakes it, at 48 kHz. */
+  const TONE_END = 75;
+  const WAKE = 250;
+  const END = WAKE + 120;
+  const GLIDE_BOUND = 1e-7;
+  type Change = (params: Record<string, Float32Array>) => void;
+  const set =
+    (values: Record<string, number>): Change =>
+    (params) => {
+      for (const [name, value] of Object.entries(values)) params[name]![0] = value;
+    };
+
+  /** `spec` through `changes` (by block) with and without the sleep; the worst difference. */
+  function glide(spec: Partial<TapeSpec>, changes: Map<number, Change>, level = 0.5): number {
+    const signal = (n: number): number =>
+      n < TONE_END * Q || n >= WAKE * Q ? level * Math.sin((2 * Math.PI * 220 * n) / 48000) : 0;
+    const sleeping = tape(spec, true),
+      awake = tape(spec, false);
+    let worst = 0;
+    for (let b = 0; b < END; b++) {
+      const change = changes.get(b);
+      if (change) {
+        expect(sleeping.tape.dsp.asleep, `asleep at the change on block ${b}`).toBe(true);
+        change(sleeping.params);
+        change(awake.params);
+      }
+      const out = block(sleeping, b * Q, signal);
+      worst = Math.max(worst, peakDiff(out, block(awake, b * Q, signal)));
+      if (b === WAKE) expect(sleeping.tape.dsp.asleep, 'woken by the tone').toBe(false);
+    }
+    return worst;
+  }
+
+  // The last changes land a block or two before the wake, so the tape wakes mid-glide.
+  const everything = new Map<number, Change>([
+    [200, set({ model: 3, bias: 40, wowRate: 3, flutterRate: 15 })],
+    [WAKE - 3, set({ drive: 18, trim: -6, wear: 50, wow: 10, flutter: 20, dropouts: 30 })],
+    [WAKE - 2, set({ mix: 0.4, hiss: -30 })],
+  ]);
+
+  it.each<[string, Partial<TapeSpec>]>([
+    ['the hiss off and the motion still', {}],
+    ['Wear on', { wear: 60 }],
+    ['the split dials on', { split: true, wow: 40, flutter: 70, dropouts: 100 }],
+  ])('with %s, wakes mid-glide on the render of a tape that never slept', (_, spec) => {
+    expect(glide(spec, everything)).toBeLessThan(GLIDE_BOUND);
+  });
+
+  it.each<[string, Partial<TapeSpec>]>([
+    ['the hiss off and the motion still', {}],
+    ['Wear on', { wear: 60 }],
+  ])('with %s, a bypass toggled asleep fades as awake into a full-scale tone', (_, spec) => {
+    const off = new Map<number, Change>([[WAKE - 1, set({ enabled: 0 })]]);
+    expect(glide(spec, off, 1)).toBeLessThan(GLIDE_BOUND);
+    const on = new Map<number, Change>([
+      [200, set({ enabled: 0 })],
+      [WAKE - 1, set({ enabled: 1 })],
+    ]);
+    expect(glide(spec, on, 1)).toBeLessThan(GLIDE_BOUND);
   });
 });

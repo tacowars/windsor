@@ -1152,12 +1152,10 @@ var TapeDsp = class {
     this.noise = NaN;
     this.mix = NaN;
     /**
-     * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, whether an
-     * asleep block runs `advance` (the hiss or the motion), the quiet frames counted toward
-     * `sleepSpan`, and that span.
+     * The sleep on silence (windsor#793, `tapeSleep.ts`): whether the wet path is frozen, the quiet
+     * frames counted toward `sleepSpan`, and that span.
      */
     this.asleep = false;
-    this.advancing = false;
     this.quietFrames = 0;
     this.sleepSpan = 0;
     this.hissGain = this.noiseLow = this.noiseHigh = this.left = this.right = this.sample = 0;
@@ -1396,37 +1394,17 @@ function settle(dsp, from, frames) {
   dsp.asleep = true;
 }
 function rest(dsp) {
-  const s = dsp.controls, t = dsp.targets;
-  const off = t.hiss <= TAPE_BOUNDS.hiss[0];
-  if (off && dsp.noiseGain < TAPE_SLEEP.hissSnap) dsp.noiseGain = 0;
-  const still = t.split ? t.wow === 0 && t.flutter === 0 && t.dropouts === 0 : t.wear === 0;
-  dsp.advancing = !(off && dsp.noiseGain === 0 && still);
-  if (dsp.advancing) return;
-  s.drive = t.drive;
-  s.wear = t.wear;
-  s.wow = t.wow;
-  s.flutter = t.flutter;
-  s.dropouts = t.dropouts;
-  s.wowRate = t.wowRate;
-  s.flutterRate = t.flutterRate;
-  s.hiss = t.hiss;
-  s.trim = t.trim;
-  s.mix = t.mix;
-  s.enabled = t.enabled;
-  dsp.updateGains();
-  dsp.mix = s.mix * s.enabled;
-  for (let model = 0; model < TAPE_MODELS.length; model++)
-    dsp.weights[model] = model === dsp.model ? 1 : 0;
+  if (dsp.targets.hiss <= TAPE_BOUNDS.hiss[0] && dsp.noiseGain < TAPE_SLEEP.hissSnap)
+    dsp.noiseGain = 0;
 }
 function renderAsleep(dsp, left, right, out, frames) {
   rest(dsp);
-  const advancing = dsp.advancing, frame = dsp.input, magnetic = dsp.magnetic, ring = magnetic.dry, latency = magnetic.latency, outLeft = out[0], outRight = out[1];
+  const frame = dsp.input, magnetic = dsp.magnetic, ring = magnetic.dry, latency = magnetic.latency, outLeft = out[0], outRight = out[1];
   for (let i = 0; i < frames; i++) {
     frame[0] = left === void 0 ? 0 : left[i] ?? 0;
     frame[1] = right === void 0 ? 0 : right[i] ?? 0;
-    if (advancing) dsp.advance();
-    else if (magnetic.gliding) magnetic.glide();
-    const wet = advancing ? dsp.noise * (1 - dsp.motion.dropout) * dsp.trim : 0, mix = dsp.mix, at = magnetic.dryAt;
+    dsp.advance();
+    const wet = dsp.noise * (1 - dsp.motion.dropout) * dsp.trim, mix = dsp.mix, at = magnetic.dryAt;
     let dry = ring[at];
     ring[at] = frame[0];
     outLeft[i] = mix < Number.EPSILON ? dry : dry + mix * (wet - dry);
