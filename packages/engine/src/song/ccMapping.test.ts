@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fromDisplay } from '../automation/automationDisplay';
+import { insertKindFields } from '../automation/automationInsertFields';
 import type { AutomationTargetRow } from '../automation/automationLane';
 import { SEQ_AUTOMATION_ROWS } from '../automation/automationSeqTables';
 import { requireCatalogRow } from '../automation/automationTargets';
@@ -10,6 +11,8 @@ const LEVEL = requireCatalogRow('voice.ops.0.level');
 const STRIP_LEVEL = requireCatalogRow('strip.level');
 const RATIO = requireCatalogRow('voice.ops.0.ratio');
 const DECAY = requireCatalogRow('voice.ops.0.env.decayTime');
+/** The Echo's time: a log row from 0 with its sweep floored at 20 ms. */
+const ECHO_TIME = insertKindFields('echo').find((row) => row.target === 'delayTime')!;
 
 const range = (min: number, max: number, inverted = false): CcRange => ({ min, max, inverted });
 
@@ -88,6 +91,40 @@ describe('ccValue and ccPosition on each kind of row', () => {
 
   it('defaults a new mapping to the target’s full range', () => {
     expect(ccDefaultRange(STRIP_LEVEL)).toEqual({ min: STRIP_LEVEL.min, max: STRIP_LEVEL.max });
+  });
+});
+
+describe('a range under or across a log row’s floor stays inside the range', () => {
+  it('spreads an Echo time of 5–10 ms, wholly under the 20 ms floor, linearly', () => {
+    expect(ECHO_TIME.floor).toBeGreaterThan(0.01);
+    const values = [0, 64, 127].map((cc) => ccValue(ECHO_TIME, range(0.005, 0.01), cc));
+    expect(values[0]).toBe(0.005);
+    expect(values[1]).toBeCloseTo(0.005 + (64 / 127) * 0.005, 12);
+    expect(values[2]).toBe(0.01);
+    expect(values[0]! < values[1]! && values[1]! < values[2]!).toBe(true);
+    for (const inverted of [false, true]) {
+      const r = range(0.005, 0.01, inverted);
+      const position = ccPosition(ECHO_TIME, r, 0.0072)!;
+      expect(position).toBeGreaterThan(0);
+      expect(position).toBeLessThan(127);
+      expect(ccValue(ECHO_TIME, r, position)).toBeCloseTo(0.0072, 12);
+    }
+  });
+
+  it('holds an Echo time of 5 ms–1 s, straddling the floor, inside its ends', () => {
+    for (const inverted of [false, true]) {
+      const r = range(0.005, 1, inverted);
+      for (let cc = 0; cc <= 127; cc++) {
+        const value = ccValue(ECHO_TIME, r, cc);
+        expect(value).toBeGreaterThanOrEqual(0.005);
+        expect(value).toBeLessThanOrEqual(1);
+      }
+      expect(ccValue(ECHO_TIME, r, inverted ? 127 : 0)).toBe(0.005);
+      expect(ccValue(ECHO_TIME, r, inverted ? 0 : 127)).toBe(1);
+      expect(ccPosition(ECHO_TIME, r, 0.005)).toBe(inverted ? 127 : 0);
+      const position = ccPosition(ECHO_TIME, r, 0.3)!;
+      expect(ccValue(ECHO_TIME, r, position)).toBeCloseTo(0.3, 9);
+    }
   });
 });
 

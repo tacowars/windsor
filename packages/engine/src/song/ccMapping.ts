@@ -16,6 +16,10 @@
  *   lane's display space (`automationDisplay.ts`): geometrically on a log,
  *   octaves or dB row, linearly on a linear one. A range wider than the row is
  *   clamped to it, and its two ends map exactly.
+ * - **Under a log row's floor** display space is flat, so the value always
+ *   stays inside the mapping's own range: a range wholly under the floor
+ *   (the Echo's 5–10 ms) spreads linearly in the row's units instead, and a
+ *   range straddling it is clamped into its ends.
  * - **`min` equal to `max`** sets that one value for every CC, and has no
  *   pickup position (the record's boundary case).
  *
@@ -99,10 +103,16 @@ function rangeEnds(row: AutomationTargetRow, range: CcRange): readonly [number, 
   return [clampTo(range.min, row.min, row.max), clampTo(range.max, row.min, row.max)];
 }
 
+/** Whether both ends sit at one display height though they differ: both under a log row's floor. */
+const collapsed = (a: number, b: number, from: number, to: number): boolean =>
+  a === b && from !== to;
+
 /**
  * The target's value at controller value `cc` (decisions 3 and 5): `x` is
  * `cc / ccMax`, or `1 − cc / ccMax` inverted, clamped to 0..1, and the value
- * is the display-space blend of the range's ends at `x`.
+ * is the display-space blend of the range's ends at `x`, held inside them.
+ * When both ends share a display height (the collapsed case) the blend is
+ * linear in the row's units.
  */
 export function ccValue(
   row: AutomationTargetRow,
@@ -116,15 +126,18 @@ export function ccValue(
   if (from === to || x <= 0) return from;
   if (x >= 1) return to;
   const a = toDisplay(row, from);
-  return fromDisplay(row, a + x * (toDisplay(row, to) - a));
+  const b = toDisplay(row, to);
+  if (collapsed(a, b, from, to)) return from + x * (to - from);
+  return clampTo(fromDisplay(row, a + x * (b - a)), Math.min(from, to), Math.max(from, to));
 }
 
 /**
  * Where on the controller, a real number in 0..`ccMax`, the mapping plays
  * `value`: the inverse of `ccValue`, with `value` first clamped into the
- * mapping's range (the record's "pickup outside the range" case). Null when
- * the range has no width to cross, `min === max` among them, so there is no
- * pickup.
+ * mapping's range (the record's "pickup outside the range" case), linear in
+ * the collapsed case. A value between a straddling range's end and the row's
+ * floor, which the display curve steps over, picks up at that end. Null only
+ * when `min === max`: there is no width to cross, so no pickup.
  */
 export function ccPosition(
   row: AutomationTargetRow,
@@ -133,10 +146,12 @@ export function ccPosition(
   ccMax = CC_DATA_MAX,
 ): number | null {
   const [from, to] = rangeEnds(row, range);
+  if (from === to) return null;
+  const held = clampTo(value, Math.min(from, to), Math.max(from, to));
   const a = toDisplay(row, from);
   const b = toDisplay(row, to);
-  if (from === to || a === b) return null;
-  const held = clampTo(value, Math.min(from, to), Math.max(from, to));
-  const x = clampTo((toDisplay(row, held) - a) / (b - a), 0, 1);
+  const x = collapsed(a, b, from, to)
+    ? (held - from) / (to - from)
+    : clampTo((toDisplay(row, held) - a) / (b - a), 0, 1);
   return (range.inverted ? 1 - x : x) * ccMax;
 }
