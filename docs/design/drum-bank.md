@@ -193,7 +193,7 @@ that is tacowars's, in the console with velocity and the keyboard.
 
 ## Fitting more references
 
-The TR references are the From Mars packs' recordings, kept outside the
+The TR references are recordings of the machines, kept outside the
 repository. A fitted drum keeps its machine pitch on C4, the sequencer's
 default note, tuned to the recording's own pitch rather than to one shared
 frequency. A clean fit is accepted where processing can add the grit, and

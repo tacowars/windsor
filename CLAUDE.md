@@ -200,8 +200,8 @@ bash scripts/pr-wait.sh <N>       # wait for a PR's verify and Codex review of i
     lane drives is drawn locked. Once tacowars approves a mockup, a finding
     on its demo script gets no fix round, unless the build could copy a
     wrong value from it.
-  - A mockup that loads Google Fonts carries the OFL provenance comment
-    from `docs/design/song-library-mockup.html`.
+  - A mockup that loads a web font carries the font's licence provenance
+    comment, copied from `docs/design/song-library-mockup.html`.
   - New UI is zoom-safe: it wraps by container width, not screen
     breakpoints, and sizes a canvas from its CSS box × `devicePixelRatio`
     (`docs/log/2026-10-03-parts-tab-layout.md` decision 9).

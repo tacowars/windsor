@@ -2,10 +2,10 @@
 
 Three rules hold for every worklet:
 
-- **Portable maths in anything a golden pins.** V8's `Math.sin`, `cos`,
-  `tanh` and `**` with a non-integer exponent differ by 1–3 ulps between
-  arm64 and x64 (`Math.sqrt` agrees), so a render that uses them on the hot
-  path or to build coefficients passes on an M1 and fails on CI. Use
+- **Portable maths in anything a golden pins.** `Math.sin`, `cos`, `tanh`
+  and `**` with a non-integer exponent differ by 1–3 ulps between arm64 and
+  x64 (`Math.sqrt` agrees), so a render that uses them on the hot path or
+  to build coefficients passes on an arm64 machine and fails on CI. Use
   `inserts/tapePortableMath.ts` or a table. A golden that passes locally
   and fails on CI with no code difference is this.
 - **Asleep advances as if awake.** A sleeping stage still steps its
