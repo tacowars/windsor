@@ -9,12 +9,17 @@ What workers have tripped on. The protocol itself is `CLAUDE.md`
 - **Node.** The project needs the Node major in `.nvmrc` (24). The machine
   default may be older, so use that one. Don't run `npm ci` unless a test
   can't run otherwise.
+- **Push.** If `git push` hangs on credentials:
+  `git -c credential.helper='!gh auth git-credential' push`.
+- **Paths with "git" inside a word**, like a sample pack's `Clean/Digital/`,
+  trip the worktree path guard. Read them through a symlink in the
+  scratchpad.
 - **Labels.** `gh pr edit` fails on this repo. Add a label with
   `gh api repos/tacowars/windsor/issues/<N>/labels -f 'labels[]=<label>'`.
 - **Browser.** A UI change is looked at before the PR opens, in the
   project's headless Chrome (the `mcp__chrome-devtools__*` tools,
-  registered in `.mcp.json`). Never use Claude in Chrome: it runs on
-  another machine and can't reach this one's `localhost`.
+  registered in `.mcp.json`). Never use Claude in Chrome: its extension
+  may be connected from another machine, whose `localhost` isn't this one.
   - Serve the worktree on your own port, `5200 + N % 100` for issue N:
     `npm run dev -w packages/app -- --port <port> --host 127.0.0.1`, as a
     `run_in_background` Bash call with no trailing `&`.
