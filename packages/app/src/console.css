@@ -5069,8 +5069,9 @@ body.chord-dragging {
     color-mix(in srgb, var(--group-accent, var(--modulator)) 15%, var(--ground)) var(--lane-h)
   );
 }
-/* The header's row: the member fold, the lanes fold (▸ beside "lanes" or
-   the lane count, windsor#616), then the name over the count. */
+/* The header's row: the member fold, the lanes fold (the arrow, with the
+   lane count in a circle while folded with lanes, windsor#616 and
+   windsor#808), then the name over the count. */
 .folder-row {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
@@ -5946,7 +5947,7 @@ select.field.compact {
    arrows option C): the button is the whole fold cell, the SVG triangle
    with a folded part's lane count beside it, so a press anywhere in the
    cell folds. A part's cell is the row's 50 x 40 fold column; a group's two
-   folds are as wide as their arrow and caption ("lanes" or the count). */
+   folds are as wide as their arrow and, folded with lanes, the count. */
 .lane-fold button.tri {
   flex: 1;
   display: inline-flex;
@@ -5988,14 +5989,6 @@ select.field.compact {
   .disclosure .disclosure-arrow {
     transition: none;
   }
-}
-.lane-fold .fold-caption {
-  font-family: var(--f-num);
-  font-size: 9px;
-  line-height: 14px;
-  letter-spacing: 0.04em;
-  color: var(--ink-faint);
-  white-space: nowrap;
 }
 /* A folded part's lane count. */
 .lane-fold .auto-badge {
