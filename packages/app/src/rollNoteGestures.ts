@@ -22,7 +22,7 @@ import {
   resizeNotes,
 } from './rollEdits';
 import type { RollEditor } from './rollEditor';
-import { boxPitches, edgeScroll, isTap, onResizeEdge } from './rollHit';
+import { boxPitches, clampToNotes, edgeScroll, isTap, onResizeEdge } from './rollHit';
 import { velocityOf } from './rollNoteLook';
 import type { RollPanes } from './rollPanes';
 import { rowIndexAt } from './rollRows';
@@ -70,6 +70,8 @@ type Drag =
 class NoteGestures {
   private drag: Drag | null = null;
   private frameId = 0;
+  /** While a drag lasts, the page's text is not selected under it. */
+  private readonly noSelect = (e: Event): void => e.preventDefault();
 
   constructor(private readonly target: NoteGestureTarget) {
     const { body } = target.panes;
@@ -128,7 +130,7 @@ class NoteGestures {
       this.drag = { ...this.drag, added: true };
       this.capture(e.pointerId);
     }
-    this.watchEdges();
+    this.started();
   }
 
   /** A press on a note: select it (Shift adds), then a move, or a resize on its right edge. */
@@ -148,6 +150,12 @@ class NoteGestures {
     const tap = e.shiftKey ? null : hit.index;
     this.drag = this.noteDrag(this.press(e), kind, origin, { anchor: hit.index, tap });
     this.capture(e.pointerId);
+    this.started();
+  }
+
+  /** A drag has begun: follow the pane's edges and keep the page's text unselected. */
+  private started(): void {
+    this.target.panes.body.ownerDocument.addEventListener('selectstart', this.noSelect);
     this.watchEdges();
   }
 
@@ -196,7 +204,7 @@ class NoteGestures {
     drag.moved = true;
     if (drag.kind === 'move') this.moveTo(drag, scene, x, y);
     else if (drag.kind === 'resize') this.resizeTo(drag, scene, x);
-    else if (drag.kind === 'box') placeBox(drag.box, drag, { x, y });
+    else if (drag.kind === 'box') placeBox(drag.box, drag, boxCorner({ x, y }, scene));
   }
 
   private moveTo(drag: NoteDrag, scene: RollScene, x: number, y: number): void {
@@ -259,7 +267,7 @@ class NoteGestures {
     drag.box.remove();
     const scene = this.target.scene();
     if (!scene || !drag.moved) return;
-    const { x, y } = this.local(drag.client.x, drag.client.y);
+    const { x, y } = boxCorner(this.local(drag.client.x, drag.client.y), scene);
     const box = {
       from: Math.min(x, drag.x) / scene.pxPerTick,
       to: Math.max(x, drag.x) / scene.pxPerTick,
@@ -283,6 +291,7 @@ class NoteGestures {
     this.drag = null;
     cancelAnimationFrame(this.frameId);
     const { body } = this.target.panes;
+    body.ownerDocument.removeEventListener('selectstart', this.noSelect);
     if (drag && body.hasPointerCapture(drag.pointerId)) body.releasePointerCapture(drag.pointerId);
   }
 
@@ -314,6 +323,10 @@ class NoteGestures {
     this.frameId = requestAnimationFrame(step);
   }
 }
+
+/** A box's far corner at the pointer, stopped at the notes' edge. */
+const boxCorner = (point: { x: number; y: number }, scene: RollScene): { x: number; y: number } =>
+  clampToNotes(point, { width: scene.width, height: scene.rows.height });
 
 /** Draw the box between the press and the pointer. */
 function placeBox(

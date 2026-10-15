@@ -1,8 +1,9 @@
 /**
  * Where a press lands on the Roll (windsor#603 decisions 1 and 2), without
  * the DOM: a note's resize edge, the stem a press on the velocity lane
- * takes, the velocity at a height in the lane, the rows a box touches, and
- * how fast a drag at the pane's edge scrolls it.
+ * takes, the velocity at a height in the lane, the rows a box touches, where
+ * a box's corner stops at the notes' edge, and how fast a drag at the pane's
+ * edge scrolls it.
  */
 import type { RollNote } from '@windsor/engine';
 import { stemPx, velocityOf } from './rollNoteLook';
@@ -65,6 +66,19 @@ export function boxPitches(rows: readonly RollRow[], y0: number, y1: number): Se
     rows.filter((row) => row.top < bottom && row.top + row.h > top).map((r) => r.pitch),
   );
 }
+
+/**
+ * A point in the notes' px held inside the notes, `width` by `height`: a
+ * box's corner stops at their edge, so the box never adds to the pane's
+ * overflow for edge scrolling to chase (windsor#812).
+ */
+export const clampToNotes = (
+  point: { readonly x: number; readonly y: number },
+  size: { readonly width: number; readonly height: number },
+): { x: number; y: number } => ({
+  x: Math.min(Math.max(point.x, 0), size.width),
+  y: Math.min(Math.max(point.y, 0), size.height),
+});
 
 /**
  * The px a drag `at` px along a pane `size` px long scrolls it by this
