@@ -47,7 +47,7 @@ there.
   `songs/` are read-only to agents.
 - **Techno first.** Windsor is named for the city across the river from
   Detroit. tacowars's music is drum-heavy, with very snappy attacks, mixed
-  with pads, so the TR drums are core, and an engine change a drum sound
+  with pads, so the classic drum-machine sounds are core, and an engine change a drum sound
   needs is on the table. A saving that softens an attack or moves an
   envelope edge is a non-starter. Benchmark an FM cost change on a
   drum-heavy program as well as a pad-heavy one, and keep drum paths bit
