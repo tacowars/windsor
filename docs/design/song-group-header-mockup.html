@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Song Group Header Mockups</title>
+<!-- The Song tab's group header in the collapsed mixer column (166 px):
+     today, and three ways to give the group's name more room by drawing its
+     lane count as the part's circle instead of "n lanes" and dropping the
+     "lanes" caption. Sizes and colours are copied from
+     packages/app/src/console.css and songViewTables.ts. Static and
+     self-contained. The controls above the columns are the mockup's own
+     switches, not part of the console. Group names: the screenshot shows
+     "D…", "ACID", "S…" and "PADS"; "Drums" and "Synths" are guesses and can
+     be edited in the boxes. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a reading column of notes over four real-size frozen columns side
+   by side (today, A, B, C). Tokens copied from console.css; the app is dark
+   only, so the page is too. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --tab-ink: #14181a;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --bad: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  /* songViewTables.ts, collapsed mixer */
+  --tab: 20px;
+  --tab-gap: 4px;
+  --row-pad: 2px;
+  --fold: 50px;
+  --fold-gap: 4px;
+  --frozen: 166px;
+  --row-gap: 4px;
+  --lane-h: 40px;
+  --auto-lane-h: 56px;
+  --indent: 6px;
+  --rail: 2px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+h1, h2, h3 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.04em; text-wrap: balance; margin: 0; }
+h1 { font-size: 22px; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.12em; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; }
+p { margin: 0; max-width: 70ch; color: var(--ink-dim); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+section { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+.notes { margin: 0; padding: 0 0 0 18px; color: var(--ink-dim); max-width: 74ch; display: flex; flex-direction: column; gap: 6px; }
+code { font-family: var(--f-num); font-size: 12px; color: var(--ink); }
+.rec { border: 1px solid var(--line-bright); border-left: 3px solid var(--carrier); border-radius: var(--r); background: var(--panel); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.rec p { max-width: none; }
+
+/* ---------- the mockup's own switches ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label, .check { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.field input { width: 120px; font: 13px var(--f-ui); color: var(--ink); background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 5px 8px; }
+.field input:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding-block: 6px; }
+.check input { accent-color: var(--carrier); width: 16px; height: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg button { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; padding: 6px 12px; background: var(--panel); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed='true'] { background: var(--carrier); color: var(--ground); }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+/* ---------- the four columns ---------- */
+.board { display: flex; flex-wrap: wrap; gap: 20px; align-items: start; }
+.variant { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.variant-head { display: flex; align-items: baseline; gap: 8px; }
+.variant-head .tag { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; background: var(--carrier); color: var(--ground); }
+.variant-head .tag.decide { background: var(--line-bright); color: var(--ink); }
+.variant-sub { font-size: 12px; color: var(--ink-faint); max-width: calc(var(--frozen) * var(--z) + 16px); }
+.frame { padding: 8px; background: var(--ground); border: 1px solid var(--line); border-radius: var(--r); width: max-content; }
+.zoom { zoom: var(--z); }
+.metric { font-family: var(--f-num); font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; display: grid; grid-template-columns: repeat(4, auto); gap: 0 8px; width: max-content; }
+.metric b { color: var(--ink); font-weight: 500; }
+.metric .cut { color: var(--bad); }
+.metric .fits { color: var(--modulator); }
+
+/* The frozen column, as console.css draws it. */
+.col { width: var(--frozen); display: flex; flex-direction: column; gap: var(--row-gap); user-select: none; }
+.mix-head { display: flex; align-items: center; gap: 5px; height: 22px; padding-left: var(--row-pad); font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+.mix-head svg { color: var(--ink-dim); }
+
+.arrow { display: block; flex: none; transition: transform 120ms ease-out; }
+[aria-expanded='true'] > .arrow { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .arrow { transition: none; } }
+
+/* A part's block: number tab, then its row (fold, strip), then open lanes. */
+.lane-col { position: relative; display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: var(--tab-gap); row-gap: var(--row-gap); }
+.lane-col.in-folder { grid-template-columns: calc(var(--tab) - var(--indent)) minmax(0, 1fr); padding-left: var(--indent); }
+.lane-col.in-folder::before { content: ''; position: absolute; top: calc(-1 * var(--row-gap)); bottom: 0; left: 0; width: var(--rail); background: var(--group-accent); }
+.lane-col.selected { outline: 1px solid var(--pc); outline-offset: 2px; border-radius: 2px; }
+.lane-tab { display: flex; justify-content: center; border-radius: 2px; background: var(--pc); }
+.lane-tab b { font-family: var(--f-num); font-size: 11px; font-weight: 600; letter-spacing: -0.02em; line-height: var(--lane-h); color: var(--tab-ink); }
+.lane-part { display: grid; grid-template-columns: var(--fold) minmax(0, 1fr); align-items: center; column-gap: var(--fold-gap); height: var(--lane-h); padding: 0 var(--row-pad); border-radius: var(--r); background: var(--panel); }
+.lane-col.selected .lane-part { background: var(--panel-hi); }
+
+/* The fold buttons: the whole cell is the target. */
+.lane-fold { display: flex; align-self: stretch; }
+button.tri { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 28px; height: 100%; padding: 0 4px; color: var(--ink-faint); border: 1px solid transparent; border-radius: var(--r); background: none; cursor: pointer; font: inherit; }
+button.tri:hover, button.tri:focus-visible { border-color: var(--line-bright); background: var(--panel-hi); color: var(--ink); outline: none; }
+button.tri[aria-expanded='true'] { color: var(--carrier); }
+.fold-caption { font-family: var(--f-num); font-size: 9px; line-height: 14px; letter-spacing: 0.04em; color: var(--ink-faint); white-space: nowrap; }
+.auto-badge { flex: none; padding: 0 5px; border: 1px solid rgba(224, 164, 78, 0.45); border-radius: 8px; font-family: var(--f-num); font-size: 9px; line-height: 14px; color: var(--carrier); white-space: nowrap; }
+/* B: an empty group's circle, dimmed; an open group's circle stays. */
+.auto-badge.zero { color: var(--ink-faint); border-color: var(--line-bright); }
+
+/* The compact strip: Level, M, S. */
+.mix-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.knob { display: block; }
+.dial-face { fill: var(--inset); stroke: var(--line); }
+.dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-arc { stroke: var(--modulator); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.ms { display: flex; gap: 3px; }
+.ms span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); font-family: var(--f-panel); font-size: 10px; font-weight: 600; color: var(--ink-dim); }
+.ms span.on { border-color: var(--carrier); color: var(--carrier); }
+
+/* A group's folder: tab, header row, open lanes. */
+.lane-folder { display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: var(--tab-gap); row-gap: var(--row-gap); }
+.folder-tab { grid-column: 1; border-radius: 2px; background: linear-gradient(var(--group-accent) 0 var(--lane-h), color-mix(in srgb, var(--group-accent) 15%, var(--ground)) var(--lane-h)); padding: 0; border: 0; }
+.lane-folder > :not(.folder-tab) { grid-column: 2; }
+/* C: the member fold on the folder tab, the arrow in the tab's ink. */
+button.folder-tab { display: flex; justify-content: center; align-items: start; cursor: pointer; color: var(--tab-ink); }
+button.folder-tab .tab-hit { display: grid; place-items: center; width: 100%; height: var(--lane-h); }
+button.folder-tab .arrow { width: 16px; height: 16px; }
+button.folder-tab:hover .tab-hit, button.folder-tab:focus-visible .tab-hit { background: rgba(255, 255, 255, 0.18); }
+button.folder-tab:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
+button.folder-tab[aria-expanded='true'] .arrow { transform: rotate(90deg); }
+
+.folder-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; column-gap: var(--fold-gap); height: var(--lane-h); padding: 0 var(--row-pad); border-radius: var(--r); background: var(--panel); }
+.folder-row.aligned { grid-template-columns: var(--fold) minmax(0, 1fr); }
+.folder-row .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; font-family: var(--f-panel); }
+.folder-row .nm b { overflow: hidden; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; color: var(--group-accent); }
+.folder-row .nm small { overflow: hidden; font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); letter-spacing: 0.04em; text-overflow: ellipsis; white-space: nowrap; }
+
+/* An open automation lane's label (stand-in: chip, name over kind). */
+.lane-auto { display: grid; grid-template-columns: 3px minmax(0, 1fr); align-items: center; column-gap: 6px; height: var(--auto-lane-h); padding: 0 var(--row-pad) 0 4px; border-radius: var(--r); background: var(--panel); }
+.auto-chip { align-self: stretch; margin: 8px 0; border-radius: 2px; background: var(--modulator); }
+.lane-auto .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.lane-auto .nm b { font-family: var(--f-panel); font-size: 11px; font-weight: 600; color: var(--ink); }
+.lane-auto .nm small { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); }
+</style>
+
+<div class="page">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Song tab · Mixer column, collapsed · 166 px</span>
+    <h1>Group header: the lane count as a circle</h1>
+    <p><strong>Approved by tacowars on 2026-10-15: A with "4 parts"</strong>, the right-hand column of the first section below. It is the spec. The comparison of today, A, B and C follows it as the record of what was weighed.</p>
+    <p>Today a group's header spends most of its 138 px on two folds: the member arrow, then the lanes arrow with <code>2 lanes</code> or <code>lanes</code> beside it. The name gets what is left: 17 px with <code>2 lanes</code>, 23 px with <code>1 lane</code>, 38 px with <code>lanes</code>. A part's fold already shows its count as a circle. Each option below swaps the group's pill for that circle and drops the <code>lanes</code> caption. Press the arrows: they fold and unfold as the console's do. The readout under each column is the name's width, measured live.</p>
+  </header>
+
+  <section>
+    <div class="controls">
+      <div class="field"><label for="n0">Group 1</label><input id="n0" value="Drums"></div>
+      <div class="field"><label for="n1">Group 2</label><input id="n1" value="Acid"></div>
+      <div class="field"><label for="n2">Group 3</label><input id="n2" value="Synths"></div>
+      <div class="field"><label for="n3">Group 4</label><input id="n3" value="Pads"></div>
+      <div class="field"><label>Size</label>
+        <div class="seg" id="zoom-seg"><button type="button" data-z="1" aria-pressed="true">1×</button><button type="button" data-z="2" aria-pressed="false">2×</button></div>
+      </div>
+    </div>
+    <p style="font-size:12.5px">Group 1 and 3 names are guesses from the screenshot's "D…" and "S…": type the real ones.</p>
+  </section>
+
+  <section>
+    <h2>A, second line: "4 parts"</h2>
+    <p>The group's second line drops <code>group · </code> and keeps the count. The tab colour, the folder rail and the uppercase name already say it is a group, and the count is what the line is for. In A the second line shares the name's width, so it is 50 px on a group with lanes and 70 px on one without. <code>group · 4 parts</code> needs 86 px and is cut on every group, even in C; <code>4 parts</code> needs 40 px and fits on every group. The readout below each column now says whether the name and the count fit.</p>
+    <div class="board" id="board-pick"></div>
+  </section>
+
+  <section>
+    <h2>The options compared</h2>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section>
+    <h2>The options</h2>
+    <ul class="notes">
+      <li><strong>Today.</strong> The member arrow (30 px), the lanes arrow with its caption (62 px for <code>lanes</code>, 83 px for <code>2 lanes</code>), then the name.</li>
+      <li><strong>A · Circle, as a part's.</strong> Folded with lanes, the lanes fold is the arrow and the circle (50 px), exactly as a part's fold draws it. With no lanes, or open, it is the bare arrow (30 px). The name gets 50 px with a count and 70 px without. Two bare arrows sit side by side on an empty group; the tooltips name them ("Show the parts in Acid", "Show automation for Acid").</li>
+      <li><strong>B · Circle always.</strong> As A, but the circle is always there: a dim <code>0</code> on an empty group, and it stays while the lanes are open. The lanes fold never looks like the member fold, and the name's room never changes when lanes come and go. The name gets 50 px on every group.</li>
+      <li><strong>C · Line up with the parts</strong> (to decide: it moves a control). The member arrow moves onto the group's coloured folder tab, as a part's number sits on its tab. The lanes fold takes the same 50 px cell as every part's fold, so the circles run down one column. The name gets 84 px on every group, enough for <code>PERCUSSION</code>. The tab is 20 × 40 px, the size of a part's number tab, which is smaller than today's 30 × 40 member fold.</li>
+    </ul>
+  </section>
+
+  <div class="rec">
+    <h3>Approved: A with "4 parts"</h3>
+    <p>A is the change you described and matches the part rows exactly, with no moved control. It takes the worst case from 17 px to 50 px, which fits a name of up to five letters (<code>DRUMS</code>, <code>STABS</code>); <code>SYNTHS</code> with lanes still cuts to <code>SYNT…</code>. With the second line shortened to <code>4 parts</code>, the count shows in full on every group, with or without lanes. A two-digit count (<code>12 parts</code>, 46 px) fits too. The header's tooltip keeps the long form: <code>Drums: a group · 4 parts</code>.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SVG = 'http://www.w3.org/2000/svg';
+  const TRI = 'M4 2.5 L13.5 8 L4 13.5 Z';
+  const TEAL = '#5fa8a0', VIOLET = '#9c7bd0', AMBER = '#e0a44e';
+
+  // The song in the screenshot: four groups and part 8 on its own.
+  // Lane counts per part and per group read from the screenshot.
+  const song = [
+    { group: 0, accent: TEAL, lanes: [['Level', 'mixer'], ['Pan', 'mixer']], parts: [
+      { n: 1, c: '#a8405e', lanes: 0, sel: true }, { n: 2, c: '#d8d25c', lanes: 1 },
+      { n: 3, c: '#bfc25e', lanes: 1 }, { n: 4, c: '#8c7a56', lanes: 1 }] },
+    { group: 1, accent: VIOLET, lanes: [], parts: [
+      { n: 5, c: '#9ed2ea', lanes: 2 }, { n: 6, c: '#a6dc5c', lanes: 6, solo: true },
+      { n: 7, c: '#7e984c', lanes: 4 }, { n: 16, c: '#a43e5c', lanes: 2 }] },
+    { part: { n: 8, c: '#6c88c8', lanes: 1 } },
+    { group: 2, accent: AMBER, lanes: [['Level', 'mixer']], parts: [
+      { n: 9, c: '#8aa4da', lanes: 4 }, { n: 10, c: '#e6dee0', lanes: 2 }, { n: 11, c: '#a9a8ea', lanes: 3 }] },
+    { group: 3, accent: TEAL, lanes: [], parts: [
+      { n: 12, c: '#bf6ec2', lanes: 2 }, { n: 13, c: '#c9a1a2', lanes: 3 }, { n: 14, c: '#9fd8c8', lanes: 3 }] },
+  ];
+
+  const VARIANTS = [
+    { key: 'today', title: 'Today', sub: 'As the screenshot.' },
+    { key: 'A', title: 'A', sub: 'Circle as a part’s; bare arrow when empty or open.' },
+    { key: 'B', title: 'B', sub: 'Circle always, a dim 0 when empty.' },
+    { key: 'C', title: 'C', tag: 'To decide', decide: true, sub: 'Member fold on the folder tab; circles in one column.' },
+  ];
+
+  const PICKED = [
+    { key: 'A-long', title: 'A', sub: 'Second line as today: “group · 4 parts”.' },
+    { key: 'A-short', title: 'A + “4 parts”', tag: 'Approved', short: true, sub: 'Second line is the count alone.' },
+  ];
+  const BOARDS = [['board-pick', PICKED], ['board', VARIANTS]];
+
+  // View state per column, so each one folds on its own.
+  const state = Object.fromEntries([...PICKED, ...VARIANTS].map((v) => [v.key, { closed: new Set(), open: new Set() }]));
+  let zoom = 1;
+
+  const h = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  const arrow = (px) => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('class', 'arrow');
+    s.setAttribute('width', px); s.setAttribute('height', px);
+    s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS(SVG, 'path');
+    p.setAttribute('d', TRI); p.setAttribute('fill', 'currentColor');
+    s.appendChild(p);
+    return s;
+  };
+  const knob = () => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('class', 'knob'); s.setAttribute('width', '26'); s.setAttribute('height', '26'); s.setAttribute('viewBox', '0 0 26 26');
+    s.innerHTML = '<circle class="dial-face" cx="13" cy="13" r="8"/>' +
+      '<path class="dial-track" d="M6.1 19.9 A10 10 0 1 1 19.9 19.9"/>' +
+      '<path class="dial-arc" d="M6.1 19.9 A10 10 0 0 1 13 3"/>' +
+      '<line class="dial-pin" x1="13" y1="13" x2="13" y2="7.5"/>';
+    return s;
+  };
+  const groupName = (i) => document.getElementById('n' + i).value || ' ';
+  const partsLabel = (n) => `${n} part${n === 1 ? '' : 's'}`;
+  const laneLabel = (n) => `${n} lane${n === 1 ? '' : 's'}`;
+
+  function foldButton({ open, label, caption, onFlip }) {
+    const b = h('button', 'tri');
+    b.type = 'button';
+    b.setAttribute('aria-expanded', String(open));
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.appendChild(arrow(20));
+    if (caption) b.appendChild(caption);
+    b.onclick = () => { onFlip(); render(); };
+    const cell = h('div', 'lane-fold');
+    cell.appendChild(b);
+    return cell;
+  }
+
+  function partBlock(p, inFolder) {
+    const col = h('div', 'lane-col' + (inFolder ? ' in-folder' : '') + (p.sel ? ' selected' : ''));
+    col.style.setProperty('--pc', p.c);
+    const tab = h('div', 'lane-tab'); tab.appendChild(h('b', '', String(p.n)));
+    const row = h('div', 'lane-part');
+    const fold = h('div', 'lane-fold');
+    const b = h('button', 'tri'); b.type = 'button'; b.setAttribute('aria-expanded', 'false');
+    b.appendChild(arrow(20));
+    if (p.lanes > 0) { b.appendChild(h('span', 'auto-badge', String(p.lanes))); b.title = laneLabel(p.lanes); }
+    fold.appendChild(b);
+    const mix = h('div', 'mix-cell');
+    const ms = h('div', 'ms'); ms.append(h('span', '', 'M'), h('span', p.solo ? 'on' : '', 'S'));
+    mix.append(knob(), ms);
+    row.append(fold, mix);
+    col.append(tab, row);
+    return col;
+  }
+
+  // The lanes fold's caption, per variant.
+  function lanesCaption(variant, count, open) {
+    if (variant === 'today') {
+      return !open && count > 0 ? h('span', 'auto-badge', laneLabel(count)) : h('span', 'fold-caption', 'lanes');
+    }
+    if (variant === 'B') return h('span', 'auto-badge' + (count === 0 ? ' zero' : ''), String(count));
+    return !open && count > 0 ? h('span', 'auto-badge', String(count)) : null;
+  }
+
+  function groupBlock(variant, short, g, members, accentHost) {
+    const st = state[variant];
+    const name = groupName(g.group);
+    const membersOpen = !st.closed.has(g.group);
+    const lanesOpen = st.open.has(g.group);
+    const count = g.lanes.length;
+    const flipMembers = () => (membersOpen ? st.closed.add(g.group) : st.closed.delete(g.group));
+    const flipLanes = () => (lanesOpen ? st.open.delete(g.group) : st.open.add(g.group));
+    const memberLabel = `${membersOpen ? 'Hide' : 'Show'} the parts in ${name}`;
+    const lanesLabel = `${lanesOpen ? 'Hide' : 'Show'} automation for ${name}`;
+
+    const block = h('div', 'lane-folder');
+    const rows = 1 + (lanesOpen ? count : 0);
+    let tab;
+    if (variant === 'C') {
+      tab = h('button', 'folder-tab');
+      tab.type = 'button';
+      tab.setAttribute('aria-expanded', String(membersOpen));
+      tab.setAttribute('aria-label', memberLabel);
+      tab.title = memberLabel;
+      const hit = h('span', 'tab-hit'); hit.appendChild(arrow(16));
+      tab.appendChild(hit);
+      tab.onclick = () => { flipMembers(); render(); };
+    } else {
+      tab = h('div', 'folder-tab');
+    }
+    tab.style.gridRow = `1 / span ${rows}`;
+
+    const row = h('div', 'folder-row' + (variant === 'C' ? ' aligned' : ''));
+    const nm = h('span', 'nm');
+    const sub = short ? partsLabel(members) : `group · ${partsLabel(members)}`;
+    nm.append(h('b', '', name), h('small', '', sub));
+    nm.dataset.measure = name;
+    const lanes = foldButton({ open: lanesOpen, label: lanesLabel, caption: lanesCaption(variant, count, lanesOpen), onFlip: flipLanes });
+    if (variant === 'C') row.append(lanes, nm);
+    else row.append(foldButton({ open: membersOpen, label: memberLabel, onFlip: flipMembers }), lanes, nm);
+
+    block.append(tab, row);
+    if (lanesOpen) {
+      for (const [ln, kind] of g.lanes) {
+        const l = h('div', 'lane-auto');
+        const n = h('span', 'nm'); n.append(h('b', '', ln), h('small', '', kind));
+        l.append(h('span', 'auto-chip'), n);
+        block.appendChild(l);
+      }
+    }
+    accentHost.appendChild(block);
+    if (membersOpen) for (const p of g.parts) accentHost.appendChild(partBlock(p, true));
+  }
+
+  function column(variant, short) {
+    const col = h('div', 'col');
+    const head = h('div', 'mix-head'); head.append(arrow(18), h('span', '', 'Mixer'));
+    col.appendChild(head);
+    for (const item of song) {
+      if (item.part) { col.appendChild(partBlock(item.part, false)); continue; }
+      const host = h('div', 'col');
+      host.style.setProperty('--group-accent', item.accent);
+      host.style.width = 'auto';
+      groupBlock(variant, short, item, item.parts.length, host);
+      col.appendChild(host);
+    }
+    return col;
+  }
+
+  function measure(variantEl, metric) {
+    metric.replaceChildren();
+    // The text's own width, unrounded, against the box: scrollWidth rounds.
+    const cut = (node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return range.getBoundingClientRect().width > node.getBoundingClientRect().width + 0.01;
+    };
+    const verdict = (what, isCut) => h('span', isCut ? 'cut' : 'fits', `${what} ${isCut ? 'cut' : 'fits'}`);
+    for (const nm of variantEl.querySelectorAll('.folder-row .nm')) {
+      metric.append(
+        h('b', '', nm.dataset.measure.toUpperCase()),
+        h('span', '', `${Math.round(nm.getBoundingClientRect().width / zoom)} px`),
+        verdict('name', cut(nm.querySelector('b'))),
+        verdict('count', cut(nm.querySelector('small'))),
+      );
+    }
+  }
+
+  function render() {
+    const focusKey = document.activeElement?.closest('.variant') ? document.activeElement.getAttribute('aria-label') : null;
+    for (const [id, variants] of BOARDS) renderBoard(document.getElementById(id), variants, focusKey);
+  }
+
+  function renderBoard(board, variants, focusKey) {
+    board.replaceChildren();
+    board.style.setProperty('--z', zoom);
+    for (const v of variants) {
+      const wrap = h('div', 'variant');
+      wrap.style.setProperty('--z', zoom);
+      const head = h('div', 'variant-head');
+      head.appendChild(h('h3', '', v.title));
+      if (v.tag) head.appendChild(h('span', 'tag' + (v.decide ? ' decide' : ''), v.tag));
+      const frame = h('div', 'frame');
+      const z = h('div', 'zoom'); z.appendChild(column(v.key, Boolean(v.short)));
+      frame.appendChild(z);
+      const metric = h('div', 'metric');
+      wrap.append(head, h('p', 'variant-sub', v.sub), frame, metric);
+      board.appendChild(wrap);
+      measure(wrap, metric);
+      if (focusKey) {
+        const again = [...wrap.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === focusKey);
+        if (again && wrap.contains(again) && document.activeElement === document.body) again.focus();
+      }
+    }
+  }
+
+  for (let i = 0; i < 4; i++) document.getElementById('n' + i).addEventListener('input', render);
+  for (const b of document.querySelectorAll('#zoom-seg button')) {
+    b.addEventListener('click', () => {
+      zoom = Number(b.dataset.z);
+      for (const o of document.querySelectorAll('#zoom-seg button')) o.setAttribute('aria-pressed', String(o === b));
+      render();
+    });
+  }
+  render();
+  if (document.fonts) document.fonts.ready.then(render);
+})();
+</script>

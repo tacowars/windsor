@@ -10,8 +10,8 @@
  * The lanes fold (windsor#616 decision 1) opens the group's own automation
  * lanes beneath the header and above its members: the part's lane rows
  * (`songAutomationLane.ts`) with the group as their owner, their curves
- * ghosted over the outline. Folded, it shows the lane count, as a part's
- * fold does. The two folds are independent: folding the members leaves the
+ * ghosted over the outline. Folded with lanes, it shows their count alone
+ * in the circle, as a part's fold does (windsor#808 decision 1). The two folds are independent: folding the members leaves the
  * lanes as they are, and folding the lanes leaves the members.
  *
  * Which groups are folded is view state for the session, as `openParts` is:
@@ -27,29 +27,33 @@ import type { Readout } from './songAutomationLane';
 import { automationRows } from './songAutomationLane';
 import { laneCountLabel } from './songAutomationModel';
 import type { GroupRowEntry } from './songFolderModel';
-import { LANES_CAPTION, memberCountLabel, outlineSpans } from './songFolderModel';
+import { memberCountLabel, outlineSpans } from './songFolderModel';
 import type { SongView } from './songTab';
 import { blockBox, partBlockRows } from './songViewTables';
 
+/** What a fold button shows and says: its state, focus key and label, and an optional badge. */
+interface FoldSpec {
+  readonly open: boolean;
+  readonly focus: string;
+  readonly label: string;
+  /** The circle beside the arrow and the title it gives the button, the label otherwise. */
+  readonly badge?: { readonly text: string; readonly title: string } | undefined;
+}
+
 /**
  * A fold button: the arrow (windsor#768 decisions 1 and 3), down open and
- * right folded, then `caption` inside the button, so the whole of it is
+ * right folded, then the badge inside the button, so the whole of it is
  * the target; a press flips `open` and repaints, keeping the focus on it.
  */
-function foldButton(
-  view: SongView,
-  fold: { readonly open: boolean; readonly focus: string; readonly label: string },
-  flip: () => void,
-  caption?: HTMLElement,
-): HTMLButtonElement {
+function foldButton(view: SongView, fold: FoldSpec, flip: () => void): HTMLButtonElement {
   const button = el('button', 'tri disclosure') as HTMLButtonElement;
   button.appendChild(disclosureArrow('fold'));
-  if (caption) button.appendChild(caption);
+  if (fold.badge) button.appendChild(el('span', 'auto-badge', fold.badge.text));
   button.type = 'button';
   button.dataset['focus'] = fold.focus;
   button.setAttribute('aria-expanded', String(fold.open));
   button.setAttribute('aria-label', fold.label);
-  button.title = fold.label;
+  button.title = fold.badge?.title ?? fold.label;
   button.onclick = (e): void => {
     e.stopPropagation();
     const grid = button.closest('.lanes');
@@ -77,38 +81,35 @@ function memberFold(view: SongView, group: GroupSpec): HTMLElement {
 }
 
 /**
- * The lanes fold (windsor#616 decision 1): the arrow beside "lanes", or
- * beside the lane count while folded with lanes, as a part's fold shows its
- * badge; the caption sits inside the button (windsor#768 decision 3).
+ * The lanes fold (windsor#616 decision 1): the bare arrow, with the lane
+ * count alone in a circle beside it while folded with lanes, titled with
+ * the count's label, as a part's fold draws it (windsor#808 decisions 1
+ * and 2); the circle sits inside the button (windsor#768 decision 3).
  */
 function lanesFold(view: SongView, group: GroupSpec): HTMLElement {
   const { openGroups } = view.state;
   const open = openGroups.has(group.id);
   const label = `${open ? 'Hide' : 'Show'} automation for ${group.name}`;
   const count = group.automation?.length ?? 0;
-  const badge = !open && count > 0;
-  const caption = el(
-    'span',
-    badge ? 'auto-badge' : 'fold-caption',
-    badge ? laneCountLabel(count) : LANES_CAPTION,
-  );
+  const badge =
+    !open && count > 0 ? { text: String(count), title: laneCountLabel(count) } : undefined;
   const flip = (): void => {
     if (open) openGroups.delete(group.id);
     else openGroups.add(group.id);
   };
   const fold = el('div', 'lane-fold folder-lanes');
   fold.appendChild(
-    foldButton(view, { open, focus: `lanes:group:${group.id}`, label }, flip, caption),
+    foldButton(view, { open, focus: `lanes:group:${group.id}`, label, badge }, flip),
   );
   return fold;
 }
 
-/** The header's row: the two folds, then the name over the member count. */
+/** The header's row: the two folds, then the name over the member count (windsor#808 decision 3). */
 function headerRow(view: SongView, group: GroupSpec, members: number): HTMLElement {
   const row = el('div', 'folder-row');
   row.title = `${group.name}: a group · ${memberCountLabel(members)}`;
   const name = el('span', 'nm');
-  name.append(el('b', '', group.name), el('small', '', `group · ${memberCountLabel(members)}`));
+  name.append(el('b', '', group.name), el('small', '', memberCountLabel(members)));
   row.append(memberFold(view, group), lanesFold(view, group), name);
   return row;
 }

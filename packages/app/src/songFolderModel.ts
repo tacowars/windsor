@@ -172,9 +172,6 @@ export function followGroupFolds(
   });
 }
 
-/** The lanes fold's caption under its `▸` while it shows no lane count (windsor#616 decision 1). */
-export const LANES_CAPTION = 'lanes';
-
 /** Which parts (by slot) and which groups (by id) have their automation lanes open. */
 export interface OpenLanes {
   readonly parts: ReadonlySet<number>;
