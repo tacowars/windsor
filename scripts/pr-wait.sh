@@ -18,9 +18,12 @@ N=$1
 R=repos/tacowars/windsor
 POLL_SECONDS=300
 while :; do
+  # A failed lookup leaves a value empty: poll again rather than match on it.
   STATE=$(gh pr view "$N" --json state --jq .state 2>/dev/null)
+  if [ -z "$STATE" ]; then sleep "$POLL_SECONDS"; continue; fi
   if [ "$STATE" != "OPEN" ]; then echo "PR #$N is $STATE"; exit 0; fi
   HEAD=$(gh pr view "$N" --json headRefOid --jq .headRefOid 2>/dev/null)
+  if ! [[ "$HEAD" =~ ^[0-9a-f]{40}$ ]]; then sleep "$POLL_SECONDS"; continue; fi
   SHORT=${HEAD:0:7}
   VERIFY=$(gh pr view "$N" --json statusCheckRollup --jq '[.statusCheckRollup[]|select(.name=="verify")][0]|"\(.status)/\(.conclusion)"' 2>/dev/null)
   CODEX=$(gh api "$R/issues/$N/comments" --paginate --jq '.[]|select(.user.login|test("codex";"i"))|.body' 2>/dev/null |
