@@ -190,3 +190,21 @@ mid and late windows, the strongest partials and a 1 ms amplitude view of
 the clap bursts, so the numbers in the descriptions are what the engine
 renders, not what the knobs suggest. None of that is a listening verdict;
 that is tacowars's, in the console with velocity and the keyboard.
+
+## Fitting more references
+
+The drum references are recordings of the original machines, kept outside
+the repository. A fitted drum keeps its machine pitch on C4, the sequencer's
+default note, tuned to the recording's own pitch rather than to one shared
+frequency. A clean fit is accepted where processing can add the grit, and
+the transient matters most: units vary, so there is no single perfect
+target.
+
+On 2026-10-02 tacowars paused new reference fits. The toolkit's scores kept
+improving while the listens disagreed: a hi-hat fit scored better and
+sounded tonal, and the snares and claps were better than before but off
+target. The engine changes the pause waited for (per-operator noise colour
+and the noise carrier's cost, windsor#362, windsor#381, windsor#382) have
+landed. The next step is to measure how well `scripts/sound-match/`
+predicts what tacowars hears; no new fit, including the snare refit
+(windsor#365), starts before that.

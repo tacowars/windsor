@@ -1,5 +1,21 @@
 # The DSP worklets
 
+Three rules hold for every worklet:
+
+- **Portable maths in anything a golden pins.** `Math.sin`, `cos`, `tanh`
+  and `**` with a non-integer exponent differ by 1–3 ulps between arm64 and
+  x64 (`Math.sqrt` agrees), so a render that uses them on the hot path or
+  to build coefficients passes on an arm64 machine and fails on CI. Use
+  `inserts/tapePortableMath.ts` or a table. A golden that passes locally
+  and fails on CI with no code difference is this.
+- **Asleep advances as if awake.** A sleeping stage still steps its
+  smoothers, glides, LFO and motion phases and bypass fades each sample.
+  Snapping them to their targets wakes wrong.
+- **A sleep floor scales with the gain after it.** The wake threshold is
+  divided by the worst-case gain downstream (a drive stage, an Output, a
+  makeup, feedback at or above 1), or a quiet input the stage would
+  amplify sleeps.
+
 `tape/` is the `tape` insert: REELS Lite's controls, EQ, motion and noise
 (CC0, `docs/log/2026-09-30-reels-inspired-tape-insert.md`, which stands as
 history) around Windsor's magnetic core, which replaced REELS's saturation

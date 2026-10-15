@@ -36,6 +36,36 @@ engine's index. Don't build a second synth, graph or sequencer in the app:
 `packages/app/src/consoleBoundary.test.ts` fails on a Web Audio node built
 there.
 
+## Product direction
+
+- **Early, with one user.** tacowars is Windsor's only user, so a breaking
+  change to the song or patch format, or a short outage of the site, never
+  blocks work. Pick the cleanest data shape and propose a format change
+  when it gives one. "Old exports still load" is not a pro, and "keeps the
+  format unchanged" is not a benefit. A break is still detected and
+  refused, never loaded wrong (Format versions, below). tacowars's songs in
+  `songs/` are read-only to agents.
+- **Techno first.** Windsor is named for the city across the river from
+  Detroit. tacowars's music is drum-heavy, with very snappy attacks, mixed
+  with pads, so the classic drum-machine sounds are core, and an engine change a drum sound
+  needs is on the table. A saving that softens an attack or moves an
+  envelope edge is a non-starter. Benchmark an FM cost change on a
+  drum-heavy program as well as a pad-heavy one, and keep drum paths bit
+  identical.
+- **Capacity is uncapped, CPU is spent carefully.** A user who reaches
+  their machine's limit freezes or drops parts, as in a DAW, so part and
+  insert counts are never capped to fit a weak machine, and a CPU
+  measurement is never a gate on a capacity change. Economy is still a goal
+  of every DSP design: measure new inserts and hot paths, and prefer the
+  cheaper design at equal sound.
+- **Mouse and touch.** Keyboard-only access is not a design constraint:
+  don't raise it as a gap, and don't add a keyboard replacement when a
+  control goes. Touch targets matter.
+- **The ear decides.** For a sound-design choice tacowars can't judge in
+  advance (a model's rows, a default), propose researched values and let
+  tacowars listen, rather than asking them to choose. An analysis score is
+  unproven until heard.
+
 ## Invariants (do not break)
 
 1. **The worklet bundles are generated.** `packages/engine/src/worklet/generated/*.js`
@@ -49,7 +79,11 @@ there.
 3. **A song document is self-contained.** It carries a snapshot of every
    patch it plays, and a library edit never changes a saved song until that
    song is re-exported. Preserve `patches`, `returns`, strips, harmony,
-   sequencers and captured patterns through every round trip.
+   sequencers and captured patterns through every round trip. Each part
+   owns its patch: two parts playing one document patch is a bug
+   (`docs/log/2026-10-10-each-part-owns-its-patch.md`). An unplayed patch
+   copy stays in the song, since tacowars comes back to them; the one
+   exception is an unedited automatic copy whose part moved on.
 4. **Hot paths stay allocation-free.** The worklets allocate nothing per
    block. The golden tests (`fmProcessorGolden`, `reverbGolden`) pin the DSP
    bit for bit.
@@ -60,7 +94,14 @@ there.
    secret. `.env` and `*.kubeconfig` are never tracked, and CI enforces it.
 7. **Licence.** Windsor is AGPL-3.0. A third-party asset, preset source or
    dependency must be AGPL-compatible, and its provenance goes in the file
-   or doc that uses it.
+   or doc that uses it. Code and docs name another project only where code
+   or a measured value came from it, never as an inspiration or a
+   comparison. Docs prose names no hardware model or brand, and cites a
+   measured value's source by author and publication; an existing patch id
+   that carries a model name is a file name and stays.
+   Research code under another licence (the GPL-3.0 Tape reference core) is
+   a ruler for tests only. Shipping code is Windsor's own, written from the
+   published maths, and never imports or transcribes it.
 
 ## Code structure
 
@@ -88,7 +129,9 @@ Enforced by ESLint (`eslint.config.js`):
 - **Tests sit beside the code** as `<name>.test.ts`. Engine fixtures live in
   `packages/engine/src/__fixtures__/`. Tests run in Node with no DOM, so the
   testable unit is the pure model, the table or the write function, never
-  the click handler.
+  the click handler. Fewer, simpler tests win: when a change makes a test
+  true by construction (one source of data instead of a parity check),
+  delete the test in the same change.
 
 ## Commands
 
@@ -102,6 +145,7 @@ npm run verify:quick       # typecheck, lint, format, test
 npm run test:research      # the finished Tape research's tests, on request only (never in CI)
 npm run format             # prettier --write (code only; prose is hand-formatted)
 bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (main session, before a launch)
+bash scripts/pr-wait.sh <N>       # wait for a PR's verify and Codex review of its head (main session, in the background)
 ```
 
 ## Conventions
@@ -115,7 +159,9 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   fail (a rename, a re-scale, a removed field, a changed meaning) bumps
   `ARRANGEMENT_VERSION` or `PATCH_FILE_FORMAT`, says so in its body, and
   either adds an upgrade to `songMigrations.ts` / `patchMigrations.ts` or
-  states that none is provided. An additive field whose default reproduces
+  states that none is provided; by default none is (Product direction). A
+  knob or automation row that changes scale (linear to log) is such a
+  change. An additive field whose default reproduces
   the old behaviour bumps nothing
   (`docs/log/2026-09-28-format-versions-refuse-never-destroy.md`).
   Tape phase 3 follows the user's greenfield direction in
@@ -132,6 +178,35 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   every test on a push to `main`
   (`docs/log/2026-10-02-ci-runs-affected-tests-on-prs.md`), and a ruleset on
   `main` requires that check and a PR.
+- **Staging:** `git add <exact path>`, never a folder or `.`, after a look
+  at `git status --short`. tacowars keeps untracked drafts in `docs/`.
+  Branch work goes in a worktree, so a checkout can't delete an untracked
+  file the branch happens to track.
+- **Listens:** audio never goes in git, not even a short demo. A listen is
+  a render script committed with the change that writes outside the repo,
+  and the main session hands tacowars the files in `~/Desktop/<name>/`,
+  never a worktree path, since worktrees go away. A listen song carries
+  its `version` and plays a patch that exposes the claim: mono and a
+  sustain above 0 for slides and gate, velocity sensitivity near 1, short
+  decays for ratchets. The PR names the pitches per bar.
+- **UI design:** a restyle keeps today's controls and changes the frame
+  (layout, grouping, height). It is mocked one device at a time from a
+  screenshot of today with its real values, and a new idea goes behind a
+  toggle or under "To decide".
+  - An approved mockup is the spec. It labels a stand-in control or draws
+    the real one, a brief never says "as today" where the mockup differs,
+    and the PR's screenshots, with example data loaded, are compared with
+    it row by row.
+  - Codex reviews records and mockups as specs, so every example value is
+    worked through the engine's own curve, and every knob a mapping or
+    lane drives is drawn locked. Once tacowars approves a mockup, a finding
+    on its demo script gets no fix round, unless the build could copy a
+    wrong value from it.
+  - A mockup that loads a web font carries the font's licence provenance
+    comment, copied from `docs/design/song-library-mockup.html`.
+  - New UI is zoom-safe: it wraps by container width, not screen
+    breakpoints, and sizes a canvas from its CSS box × `devicePixelRatio`
+    (`docs/log/2026-10-03-parts-tab-layout.md` decision 9).
 
 ## Temporary files and disk hygiene
 
@@ -154,8 +229,8 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   chrome-devtools MCP when done, so it removes its temporary profile.
 - **Large outputs:** audio dumps (`.f32`, `.wav`), screenshots, PDFs and
   other large generated files are temporary unless the deliverable needs
-  them, and go in the cleanup. A task that will generate more than about
-  1 GB says so in an update first.
+  them (never in git: Listens, above), and go in the cleanup. A task that
+  will generate more than about 1 GB says so in an update first.
 
 ## Working a ticket
 
@@ -203,19 +278,28 @@ owned files, declared in the PR, is not one); and CI is green with no open
 P0 or P1 in Codex's latest review. The main session checks all four.
 Anything audible still waits for tacowars's listen, and UI for tacowars's look.
 
-**The main session** dispatches and merges. Before launching a worker it
-runs `bash scripts/overlap.sh <owned paths>` against open PRs and local
-worktrees; an overlap means sequence, and a hotspot (the engine index,
+**The main session** dispatches and merges. Other sessions dispatch at the
+same time, so before launching or resuming a worker it runs `git fetch
+origin`, fast-forwards `main` and runs `bash scripts/overlap.sh <owned
+paths>` against open PRs and local worktrees, every time; the worker
+branches from `origin/main` after its own fetch and rebases right before it
+pushes. An overlap means sequence, and a hotspot (the engine index,
 `partGenerators.ts`, the insert registry, the patch index, `main.ts`,
-`package.json`) means a `seam` ticket lands first. At most two Claude
+`package.json`) means a `seam` ticket lands first. At most five Claude
 workers at once, one heavy test run at a time, and no new launch while two
 PRs wait for tacowars. It launches each worker with the profile the issue's
 "Worker" section names (`worker` or `worker-light`, in `.claude/agents/`).
+A markup or style edit with no behaviour needs no worker: the main session
+files the issue, edits in its own worktree, runs `npx prettier --check` on
+the touched files and opens a `routine` PR.
 It merges with `gh pr merge <N> --squash`. `--auto` waits only for
 `verify`, not for Codex, so a routine PR merges only after Codex's 👍, and
 without `--auto` when the check is already green. It adds labels through
 the REST API, as `.claude/worker-rules.md` shows. A Codex finding at P0 or
 P1 goes to a fresh round on the same branch, at most twice, then to tacowars.
+If a new PR shows no Codex summary within a few minutes, the main session
+comments `@codex review` and tells tacowars. A push to an open PR gets no
+review on its own, so every new head gets an `@codex review` comment.
 
 The main session also keeps itself small
 (`docs/log/2026-09-29-the-main-session-stays-small.md`):
@@ -227,10 +311,27 @@ The main session also keeps itself small
   comment names the commit each completed review covered. That review's
   findings are its inline comments whose `original_commit_id` is that
   commit; none means clean. Its 👍 reaction carries no commit, so it
-  never confirms a head on its own.
+  never confirms a head on its own. The watch is `bash scripts/pr-wait.sh
+  <N>` as a background command, one per head; it polls every 5 minutes.
+  Never report "waiting" without one running.
 - **Fix rounds.** A round goes to a fresh worker, usually `worker-light`,
   whose brief is the findings with file and line and the rule to follow.
-  It is not sent to the worker that wrote the PR.
+  It is not sent to the worker that wrote the PR. The first worker's
+  worktree still holds the branch: check it is clean and level with
+  origin, then `git worktree remove` it and delete the local branch. Never
+  bulk-delete `worktree-agent-*` branches; other sessions own some.
+- **When to stop a round.** A Codex P1 on tooling no run can reach, or on
+  the timing of what a card draws rather than what plays, goes to tacowars
+  with skipping proposed, not to a round. Past the round limit, propose a
+  merge with a `routine` follow-up issue for the findings a user would hit
+  and a PR comment for the rare or display-only ones.
+- **Briefs.** A DSP brief lists the interacting controls and asks for a
+  sweep up front: every bound × those controls, live switching and both
+  sample-rate cases, tabled in the research note. A brief for a sleep or
+  idle skip quotes the sleep rules at the top of
+  `packages/engine/src/worklet/CLAUDE.md`. A "git grep finds nothing"
+  check excludes `docs/log/`, or a worker edits an accepted record to pass
+  it.
 - **Size.** Work whose states interact (cancel, timing, selection, live
   edits) and that is expected past about 800 changed lines is split
   before launch, a seam first, with the interactions listed as boundary
