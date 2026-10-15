@@ -52,6 +52,14 @@ export const switchOn = (strip: ChannelStrip, which: StripSwitch): boolean => st
 export const switchEnabled = (strip: ChannelStrip, which: StripSwitch): boolean =>
   switchesApply(strip) || switchOn(strip, which);
 
+/**
+ * Why a switch can't be pressed on a sidechain-only part: the disabled
+ * button's title, and the toast the Song tab's M or S key shows
+ * (`songStripKeys.ts`).
+ */
+export const switchRefusal = (which: StripSwitch, partName: string): string =>
+  `${partName} only feeds a sidechain: it has no output to ${which}`;
+
 /** The strip's Output; a missing field plays to the master. */
 export const stripOutput = (strip: ChannelStrip): StripOutput => strip.output ?? 'master';
 

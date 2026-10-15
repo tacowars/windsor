@@ -112,7 +112,7 @@ function tools(state: EnvelopeColumnState, actions: EnvelopeColumnActions): HTML
   for (const entry of AUTOMATION_TOOLS) {
     const pick = button('', entry.label);
     pick.dataset['tool'] = entry.tool;
-    pick.title = `${entry.label} (${entry.key.toUpperCase()})`;
+    pick.title = entry.label;
     pick.setAttribute('aria-pressed', String(entry.tool === state.tool));
     pick.onclick = () => actions.pickTool(entry.tool);
     group.appendChild(pick);

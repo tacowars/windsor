@@ -6,19 +6,14 @@
  * (`automationEditHost.ts`, windsor#706): on the Song tab the view's, kept
  * for the session and never written to the document.
  *
- * E, D and S pick the tools while the Song tab shows the toolbar and no field
- * has focus. The audition keyboard plays on the Parts tab alone
- * (`keyboard.ts`'s `qwertyPlaysOn`), so a tool switch never sounds a note.
+ * The tools are picked by their buttons alone: the E, D and S keys of
+ * windsor#349 decision 6 are retired, and S is the Song tab's solo
+ * (record `2026-10-15-song-tab-mute-solo-keys`).
  */
 import { TICKS_PER_BAR } from '@windsor/engine';
 import type { AutomationToolState } from './automationEditHost';
 import { el } from './dom';
-import {
-  AUTOMATION_TOOLS,
-  snapChoices,
-  type AutomationTool,
-  type AutomationToolEntry,
-} from './songAutomationTables';
+import { AUTOMATION_TOOLS, snapChoices } from './songAutomationTables';
 
 const FIELD_TAGS: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
 
@@ -28,15 +23,6 @@ export function isFieldFocused(e: Event): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (FIELD_TAGS.has(target.tagName) || target.isContentEditable) return true;
   return target.closest('dialog[open]') !== null;
-}
-
-/** The tool a key picks: a plain press of its letter, no modifier, no repeat. */
-export function toolForKey(
-  e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'repeat'>,
-  tools: readonly AutomationToolEntry[] = AUTOMATION_TOOLS,
-): AutomationTool | null {
-  if (e.ctrlKey || e.metaKey || e.altKey) return null;
-  return tools.find((t) => t.key === e.key.toLowerCase())?.tool ?? null;
 }
 
 /** Show `state`'s tool: the pressed button, the hint, and the lanes' cursor. */
@@ -72,7 +58,7 @@ export function automationToolbar(
     const button = el('button', '', entry.label) as HTMLButtonElement;
     button.type = 'button';
     button.dataset['tool'] = entry.tool;
-    button.title = `${entry.label} (${entry.key.toUpperCase()})`;
+    button.title = entry.label;
     button.onclick = (): void => {
       state.automationTool = entry.tool;
       syncAutomationTool(root(), state);
@@ -105,26 +91,4 @@ export function automationToolbar(
     el('span', 'auto-hint'),
   );
   return bar;
-}
-
-/**
- * E, D and S on the window: they pick a tool while `body` is shown with its
- * toolbar and no field has focus, and `onPick` hears it. Wired once per tab,
- * since the tab's body outlives its renders.
- */
-export function wireToolKeys(
-  body: HTMLElement,
-  state: AutomationToolState,
-  onPick: () => void = () => undefined,
-): void {
-  window.addEventListener('keydown', (e) => {
-    const tool = toolForKey(e);
-    if (!tool || isFieldFocused(e) || body.closest('[hidden]') !== null) return;
-    if (!body.querySelector('.auto-toolbar:not([hidden])')) return;
-    e.preventDefault();
-    if (e.repeat) return;
-    state.automationTool = tool;
-    syncAutomationTool(body, state);
-    onPick();
-  });
 }

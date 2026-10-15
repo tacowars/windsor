@@ -2,7 +2,7 @@
  * The audition keyboard (#70): plays the Parts tab's selected part through
  * the real engine — `part.noteOn`/`noteOff`, nothing local. Its QWERTY keys
  * play only while the Parts tab is shown (windsor#349), so another tab's own
- * keys (the Song tab's E and D) never sound a note; MIDI input plays anywhere.
+ * keys (the Song tab's M and S) never sound a note; MIDI input plays anywhere.
  *
  * Its `tap` (windsor#663, the Roll recorder) hears each note where it really
  * starts and stops on the part: `play`, and a `lift` that sends the note-off,
