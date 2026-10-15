@@ -1,12 +1,16 @@
 /**
  * The Song tab's M and S (windsor#810; record
- * `2026-10-15-song-tab-mute-solo-keys`): M toggles the selected part's mute
+ * `2026-10-15-song-tab-mute-solo-keys`): M toggles the outlined part's mute
  * and S its solo, wherever the Song tab shows (the lanes, the detail pane,
- * the Roll, expanded or on its Envelopes tab). Each press goes through
+ * the Roll, expanded or on its Envelopes tab). The outlined part is the
+ * shared part selection the lanes draw (`outlinedSlot`), so the keys follow
+ * it whether the detail pane is open, closed or showing a chord. Each press
+ * goes through
  * `toggleStripSwitch`, the mixer column's own write, so it is one undo step
  * named "Mute <part>" or "Solo <part>".
  *
- * `stripKeyAction` and `pressStripKey` are the rule, pure and tested;
+ * `stripKeyAction`, `stripKeySlot` and `pressStripKey` are the rule, pure
+ * and tested;
  * `stripKeyFacts` reads the facts off a DOM event, and `wireStripKeys`
  * attaches the listener once per tab, beside the region keys.
  */
@@ -16,6 +20,7 @@ import { refreshMixerCells } from './songMixerCell';
 import type { StripSwitch } from './songMixerModel';
 import { switchEnabled, switchRefusal, toggleStripSwitch } from './songMixerModel';
 import type { SongView } from './songTab';
+import { outlinedSlot } from './songViewTables';
 
 /** What a keydown carries that decides a strip key. */
 export interface StripKeyFacts {
@@ -44,13 +49,29 @@ export function stripKeyAction(facts: StripKeyFacts): StripKeyAction {
   return KEYS[facts.key.toLowerCase()] ?? null;
 }
 
-/** The selected part's switches, as the key flips them. */
+/**
+ * The slot the keys act on: the outlined part, which is the shared part
+ * selection (`ctx.parts.selected`) when the document has that part. The
+ * detail pane's selection plays no part, so a closed pane or a selected
+ * chord still leaves the outlined part as the target. Null with no such
+ * part, and the key then goes on to the page.
+ */
+export const stripKeySlot = (
+  shared: number,
+  parts: readonly { readonly slot: number }[],
+): number | null =>
+  outlinedSlot(
+    shared,
+    parts.map((p) => p.slot),
+  );
+
+/** The outlined part's switches, as the key flips them. */
 export interface StripKeyTarget {
   toggle(which: StripSwitch): void;
 }
 
 /**
- * Act on a keydown for `target` (null when no part is selected); true when
+ * Act on a keydown for `target` (null when no part is outlined); true when
  * the key is ours and is swallowed. A held key acts on its first press, and
  * its repeats are swallowed without acting.
  */
@@ -73,16 +94,14 @@ export function stripKeyFacts(e: KeyboardEvent): StripKeyFacts {
 }
 
 /**
- * The view's selected part, when the selection is one: a sidechain-only
- * part refuses an off switch with a toast, as its disabled button's title
- * says; any other press flips the switch and redraws the mixer column.
+ * The outlined part's switches: a sidechain-only part refuses an off switch
+ * with a toast, as its disabled button's title says; any other press flips
+ * the switch and redraws the mixer column.
  */
 function targetOf(view: SongView, body: HTMLElement): StripKeyTarget | null {
   const { ctx } = view;
-  const selection = view.state.selection;
-  if (selection?.kind !== 'part') return null;
-  const { slot } = selection;
-  if (!partAt(ctx.model.doc, slot)) return null;
+  const slot = stripKeySlot(ctx.parts.selected, ctx.model.doc.parts);
+  if (slot === null) return null;
   return {
     toggle(which) {
       const part = partAt(ctx.model.doc, slot);

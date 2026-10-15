@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { StripSwitch } from './songMixerModel';
 import type { StripKeyFacts } from './songStripKeys';
-import { pressStripKey, stripKeyAction } from './songStripKeys';
+import { pressStripKey, stripKeyAction, stripKeySlot } from './songStripKeys';
 
 const facts = (over: Partial<StripKeyFacts>): StripKeyFacts => ({
   key: '',
@@ -46,5 +46,18 @@ describe('the strip keys', () => {
     expect(pressStripKey(facts({ key: 'x' }), target)).toBe(false);
     expect(pressStripKey(facts({ key: 's', command: true }), target)).toBe(false);
     expect(flips).toEqual([]);
+  });
+
+  // The pane's selection is no input: a closed pane (selection null) or a
+  // selected chord leaves the outlined part, the shared selection, as the target.
+  it('targets the outlined part with the pane closed or a chord selected', () => {
+    const parts = [{ slot: 0 }, { slot: 2 }, { slot: 5 }];
+    expect(stripKeySlot(2, parts)).toBe(2);
+    expect(stripKeySlot(5, parts)).toBe(5);
+  });
+
+  it('has no target with no parts or a shared slot the document lacks', () => {
+    expect(stripKeySlot(0, [])).toBeNull();
+    expect(stripKeySlot(3, [{ slot: 0 }, { slot: 2 }])).toBeNull();
   });
 });

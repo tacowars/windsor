@@ -1,4 +1,4 @@
-# M and S mute and solo the selected part on the Song tab
+# M and S mute and solo the outlined part on the Song tab
 
 - **Date:** 2026-10-15
 - **Status:** accepted (tacowars, 2026-10-15, windsor#810)
@@ -19,15 +19,17 @@ places.
 
 ## Decision
 
-1. **M toggles the selected part's mute, S its solo**, wherever the Song
+1. **M toggles the outlined part's mute, S its solo**, wherever the Song
    tab shows: the lanes, the detail pane with any sequencer card, the Roll
    (Expand included) and its Envelopes tab. Each press goes through
    `toggleStripSwitch`, the write the mixer column's buttons make, so it is
    one undo step named "Mute <part>" or "Solo <part>". There is no second
    write path.
-2. **The target is the selected part**, with or without a region. With a
-   chord event or nothing selected the key does nothing and goes on to the
-   page.
+2. **The target is the outlined part**: the shared part selection
+   (`ctx.parts.selected`, through `outlinedSlot`), which the lanes outline.
+   It holds whether the detail pane is open, closed with its x, or showing
+   a chord, since closing the pane hides the pane and never the selection.
+   With no parts the key does nothing and goes on to the page.
 3. **A plain press only.** Cmd, Ctrl or Alt means the key is someone
    else's; the match ignores case, so Shift or Caps Lock still counts. A
    held key acts once and its repeats are swallowed. Nothing happens while
@@ -47,8 +49,8 @@ places.
 
 ## Consequences
 
-- The rule is pure (`songStripKeys.ts`'s `stripKeyAction` and
-  `pressStripKey`) and tested; the listener sits on `document` beside the
+- The rule is pure (`songStripKeys.ts`'s `stripKeyAction`,
+  `stripKeySlot` and `pressStripKey`) and tested; the listener sits on `document` beside the
   region keys, so it runs before the window's listeners.
 - `rollEnvelopeKeys.ts`, `toolForKey`, `wireToolKeys` and the tool table's
   `key` field are gone.
