@@ -4917,6 +4917,16 @@ body.chord-dragging {
 
 /* ---------- the Song view (#709): ruler, lanes, regions, the pane ---------- */
 
+/* The Song tab is an instrument, not a page (windsor#814): a press that
+   starts off a control and drags selects no text. A field still selects. */
+.tab-panel:has(> .lanes-scroll) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tab-panel:has(> .lanes-scroll) :is(input, textarea, [contenteditable]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
 .lanes-scroll {
   --pad-top: 12px;
   --pad-x: 14px;
