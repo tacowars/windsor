@@ -15,7 +15,8 @@
  *   step through the roll editor (`RollEditor.commitEnvelopes`);
  * - the tools (`rollEnvelopeEditing.ts`, windsor#708) edit the shown
  *   envelope on the layer's lane with the Song tab's gestures and Shape
- *   tool, and E, D and S pick them (`rollEnvelopeKeys.ts`).
+ *   tool, picked by their buttons (the E, D and S keys of windsor#708
+ *   decision 6 are retired: record `2026-10-15-song-tab-mute-solo-keys`).
  *
  * Notes is today's tab, unchanged. The device calls `paint` after each
  * whole paint of the roll and `scrolled` on each scroll of the notes.
@@ -32,7 +33,6 @@ import {
 } from './rollEnvelopeColumn';
 import { type ShownEnvelope, envelopeEditing } from './rollEnvelopeEditing';
 import type { RollEnvelopeFrame } from './rollEnvelopeHost';
-import { envelopeKeys } from './rollEnvelopeKeys';
 import { type EnvelopeList, openEnvelopeList } from './rollEnvelopeList';
 import { envelopeLayer } from './rollEnvelopeOverlay';
 import {
@@ -138,10 +138,6 @@ export class RollEnvelopeMode {
         release: (close) => releaseRollPopover('shape', close),
       },
     });
-    envelopeKeys({
-      showing: () => this.on && host.attached() && host.body.closest('[hidden]') === null,
-      pick: (tool) => this.pickTool(tool),
-    });
   }
 
   private get on(): boolean {
@@ -173,7 +169,7 @@ export class RollEnvelopeMode {
     }
   }
 
-  /** A tool picked, by its button or its key: anything but Shape closes the Shape popover. */
+  /** A tool picked by its button: anything but Shape closes the Shape popover. */
   private pickTool(tool: AutomationTool): void {
     this.host.view.envelope.tool = tool;
     this.shape.toolChanged();

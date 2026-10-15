@@ -42,8 +42,6 @@ export type AutomationTool = 'edit' | 'draw' | 'shape';
 export interface AutomationToolEntry {
   readonly tool: AutomationTool;
   readonly label: string;
-  /** The key that picks it while no field has focus (decision 6), as `KeyboardEvent.key`. */
-  readonly key: string;
   /** What the tool does, under the toolbar's buttons. */
   readonly hint: string;
 }
@@ -52,19 +50,16 @@ export const AUTOMATION_TOOLS: readonly AutomationToolEntry[] = [
   {
     tool: 'edit',
     label: 'Edit',
-    key: 'e',
     hint: 'Click to add a point · drag a point to move it · drag the line to bend it · Alt-click a line to straighten it · double-click a point to delete it · Shift ignores snap',
   },
   {
     tool: 'draw',
     label: 'Draw',
-    key: 'd',
     hint: 'Drag across a lane to draw. Points land on the snap grid; Off draws at 1/32.',
   },
   {
     tool: 'shape',
     label: 'Shape',
-    key: 's',
     hint: 'Drag across a lane to select a range, then pick a shape. The dashed line previews it; Apply writes ordinary points you can edit afterwards.',
   },
 ];

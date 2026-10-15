@@ -54,6 +54,7 @@ import { pickedSlot, syncSongSelection } from './partSelectionSync';
 import type { RegionClip } from './regionClipboard';
 import { refreshMixerCells } from './songMixerCell';
 import { wireRegionKeys } from './songRegionKeys';
+import { wireStripKeys } from './songStripKeys';
 import type { OpenLanes } from './songFolderModel';
 import { followGroupFolds, lanesOpen, songRows, visibleRows } from './songFolderModel';
 import type { Readout } from './songAutomationLane';
@@ -63,7 +64,7 @@ import {
   DEFAULT_SNAP_TICKS,
   type AutomationTool,
 } from './songAutomationTables';
-import { automationToolbar, syncAutomationTool, wireToolKeys } from './songAutomationToolbar';
+import { automationToolbar, syncAutomationTool } from './songAutomationToolbar';
 import { shapeTool, type ShapeTool } from './songShapeRange';
 import { DEFAULT_SHAPE_SETTINGS, type ShapeSettings } from './songShapeTables';
 import { stripSignature } from './songMixerModel';
@@ -421,14 +422,14 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
   // A removed group's or part's folds go with it on the change itself, shown or not
   // (windsor#616, windsor#620).
   followGroupFolds(ctx.model, [state.closedGroups, state.openGroups], [state.openParts]);
-  // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
+  // The region keys and M and S (windsor#810): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
   // The view of the current render: its Shape tool (windsor#350), which a render closes, and the region keys' target.
   let view: SongView | null = null;
   return (body) => {
     if (keyed !== body) {
-      wireToolKeys(body, state, () => view?.shape.toolChanged());
       wireRegionKeys(body, () => view);
+      wireStripKeys(body, () => view);
     }
     keyed = body;
     view?.shape.close();

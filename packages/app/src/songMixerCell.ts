@@ -56,11 +56,12 @@ import {
   switchEnabled,
   switchLabel,
   switchOn,
+  switchRefusal,
   toggleStripSwitch,
 } from './songMixerModel';
 import { outputSelect } from './trackOutput';
 
-/** The letter each switch shows. */
+/** The letter each switch shows, and the Song tab's key that flips it (`songStripKeys.ts`). */
 const SWITCH_TEXT: Readonly<Record<StripSwitch, string>> = { mute: 'M', solo: 'S' };
 
 /** The expanded header's label over the Output select; the knobs' come from their specs. */
@@ -162,9 +163,7 @@ function switchButton(
     const enabled = switchEnabled(strip, which);
     button.setAttribute('aria-pressed', String(switchOn(strip, which)));
     button.disabled = !enabled;
-    button.title = enabled
-      ? label
-      : `${part.name} only feeds a sidechain: it has no output to ${which}`;
+    button.title = enabled ? `${label} (${SWITCH_TEXT[which]})` : switchRefusal(which, part.name);
   };
   button.onclick = (): void => {
     toggleStripSwitch(ctx, slot, which);
