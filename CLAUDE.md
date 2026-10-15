@@ -96,7 +96,9 @@ there.
    dependency must be AGPL-compatible, and its provenance goes in the file
    or doc that uses it. Code and docs name another project only where code
    or a measured value came from it, never as an inspiration or a
-   comparison; hardware names in patch names describe sounds and are fine.
+   comparison. Docs prose names no hardware model or brand, and cites a
+   measured value's source by author and publication; an existing patch id
+   that carries a model name is a file name and stays.
    Research code under another licence (the GPL-3.0 Tape reference core) is
    a ruler for tests only. Shipping code is Windsor's own, written from the
    published maths, and never imports or transcribes it.
