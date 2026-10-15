@@ -5,7 +5,14 @@
 import type { RollNote } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
 import { auditionFrom } from './rollAudition';
-import { boxPitches, edgeScroll, laneVelocity, onResizeEdge, stemAt } from './rollHit';
+import {
+  boxPitches,
+  clampToNotes,
+  edgeScroll,
+  laneVelocity,
+  onResizeEdge,
+  stemAt,
+} from './rollHit';
 import { stemPx } from './rollNoteLook';
 
 const LANE = { pxPerTick: 1, loop: 96, lanePx: 34 };
@@ -58,6 +65,19 @@ describe('boxPitches', () => {
     ];
     expect([...boxPitches(rows, 12, 5)]).toEqual([64, 63, 62]);
     expect([...boxPitches(rows, 8, 9)]).toEqual([63]);
+  });
+});
+
+describe('clampToNotes', () => {
+  it('holds a point inside the notes, past each edge and on a corner', () => {
+    const size = { width: 300, height: 200 };
+    expect(clampToNotes({ x: 120, y: 80 }, size)).toEqual({ x: 120, y: 80 });
+    expect(clampToNotes({ x: 380, y: 80 }, size)).toEqual({ x: 300, y: 80 });
+    expect(clampToNotes({ x: -40, y: 80 }, size)).toEqual({ x: 0, y: 80 });
+    expect(clampToNotes({ x: 120, y: 260 }, size)).toEqual({ x: 120, y: 200 });
+    expect(clampToNotes({ x: 120, y: -10 }, size)).toEqual({ x: 120, y: 0 });
+    expect(clampToNotes({ x: 999, y: 999 }, size)).toEqual({ x: 300, y: 200 });
+    expect(clampToNotes({ x: -5, y: -5 }, size)).toEqual({ x: 0, y: 0 });
   });
 });
 
