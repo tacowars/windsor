@@ -14,7 +14,9 @@
  * Bounce (`bouncePart`); the part color picker at the menu's opening
  * point; and the Parts tab's Seq picker's `setSequencerKindLive`. Their
  * previews draw on the lane and the loop strip and never touch the
- * document.
+ * document. The menu is built for the document it opened on: any change to
+ * it (a region key, an undo or redo, an edit from elsewhere) closes the menu,
+ * and a row of a stale menu refuses to run (`whileFresh`).
  */
 import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
@@ -32,7 +34,7 @@ import { copyRegion, cutRegion, duplicateRegion } from './regionClipboard';
 import { deleteRegion } from './regionModel';
 import type { Placement } from './regionPlacement';
 import type { LaneMenuCommands } from './songLaneMenuModel';
-import { laneMenu, lanePressAt } from './songLaneMenuModel';
+import { laneMenu, lanePressAt, whileFresh } from './songLaneMenuModel';
 import type { SongView } from './songTab';
 import { blockBox, tickToPx, timelineLeftCss } from './songViewTables';
 
@@ -209,10 +211,18 @@ function openLaneMenu(view: SongView, lane: HTMLElement, slot: number, press: Me
     clip: view.state.clipboard,
     added,
   };
-  const spec = laneMenu(facts, commands(view, slot, press, new LanePreview(view, grid, slot)));
-  afterRepaint(() =>
-    openContextMenu(spec, { ...press, lane: { top: rect.top, bottom: rect.bottom } }),
-  );
+  // The menu is for this document: a key edit, an undo or redo, or a change from elsewhere ends it.
+  const fresh = (): boolean => view.ctx.model.doc === doc;
+  const preview = new LanePreview(view, grid, slot);
+  const spec = whileFresh(laneMenu(facts, commands(view, slot, press, preview)), fresh);
+  afterRepaint(() => {
+    if (!fresh()) return;
+    const close = openContextMenu(spec, { ...press, lane: { top: rect.top, bottom: rect.bottom } });
+    const off = view.ctx.model.onChange(() => {
+      off();
+      close();
+    });
+  });
 }
 
 /**

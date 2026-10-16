@@ -16,8 +16,8 @@
  * to the region's own step (or the beat). A cancel puts the regions back.
  * A right-click or a long press opens the lane's context menu
  * (`songLaneMenu.ts`, windsor#826), which ends a live press; a touch or pen
- * drag starts at a long press's slop, the mouse's at 4 px
- * (`laneDragThresholdPx`), and once it starts, no long press opens.
+ * drag starts exactly where its long press cancels, the mouse's at 4 px
+ * (`laneDragStarts`), and once it starts, no long press opens.
  */
 import type { MusicPart, PartRegion } from '@windsor/engine';
 import type { LaneHit } from './laneEditModel';
@@ -34,14 +34,14 @@ import {
   regionDraft,
   spanAt,
 } from './partLaneModel';
-import { pointerDrag } from './pointerDrag';
+import { laneDragStarts, pointerDrag } from './pointerDrag';
 import type { LaneTransfer } from './partLaneTransfer';
 import { laneTransfer } from './partLaneTransfer';
 import { dragModifiers } from './regionTransfer';
 import { fitEmptyRolls } from './rollRegionFit';
 import type { SongView } from './songTab';
 import { wireLaneMenu } from './songLaneMenu';
-import { boxTick, laneDragThresholdPx, pxToTick } from './songViewTables';
+import { boxTick, pxToTick } from './songViewTables';
 
 /** Where a pointer event falls on the lane, in px and in ticks from the song start. */
 interface LanePointer {
@@ -331,6 +331,6 @@ export function wirePartLane(view: SongView, lane: HTMLElement, slot: number): v
   // A body press counts vertical travel too, so a drag straight down onto another part starts (decision 8).
   const drag = pointerDrag(lane, handlers, {
     bothAxes: () => press?.transfer != null,
-    thresholdPx: (down) => laneDragThresholdPx(down.pointerType),
+    startsDrag: (down, travel) => laneDragStarts(down.pointerType, travel),
   });
 }

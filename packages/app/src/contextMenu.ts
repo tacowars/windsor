@@ -323,11 +323,13 @@ class OpenMenu {
 /**
  * Open the menu `spec` describes for `press`, closing any other. A touch or
  * pen press that passes its `pointerId` is followed for slide-to-choose
- * until it lifts.
+ * until it lifts. Returns this menu's close, which does nothing once the
+ * menu has closed or another has replaced it.
  */
-export function openContextMenu(spec: MenuSpec, press: OpeningPress): void {
+export function openContextMenu(spec: MenuSpec, press: OpeningPress): () => void {
   closeOpen?.();
   const menu = new OpenMenu(spec, press);
   closeOpen = menu.close;
   menu.show();
+  return menu.close;
 }

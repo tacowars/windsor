@@ -294,3 +294,36 @@ export function laneMenu(
   const onRegion = press.region === null ? null : regionMenu(press, press.region, commands, kinds);
   return onRegion ?? gapMenu(press, commands);
 }
+
+/** `item`, its rows (and a submenu's) running and previewing only while `fresh()` holds. */
+function freshItem(item: MenuItem, fresh: () => boolean): MenuItem {
+  if (item.kind === 'separator') return item;
+  if (item.kind === 'submenu')
+    return { ...item, items: item.items.map((i) => freshItem(i, fresh)) };
+  const { preview } = item;
+  return {
+    ...item,
+    run: () => {
+      if (fresh()) item.run();
+    },
+    ...(preview && {
+      preview: () => {
+        if (fresh()) preview();
+      },
+    }),
+  };
+}
+
+/**
+ * `spec`, built for one document, refusing every row once `fresh()` says the
+ * document has changed (a region key, an undo or redo, or an edit made
+ * elsewhere while the menu is open): a stale row's region index and
+ * placements would act on the wrong region or overwrite that edit. The lane
+ * also closes the menu on that change (`songLaneMenu.ts`); this keeps a row
+ * that still runs from acting stale. An unpreview always runs, so nothing
+ * shown is left behind.
+ */
+export const whileFresh = (spec: MenuSpec, fresh: () => boolean): MenuSpec => ({
+  ...spec,
+  items: spec.items.map((item) => freshItem(item, fresh)),
+});

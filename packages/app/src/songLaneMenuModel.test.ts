@@ -21,7 +21,7 @@ import type { RegionClip } from './regionClipboard';
 import { copyRegion, pasteRegion } from './regionClipboard';
 import { splitPartRegion } from './partEdits';
 import type { LaneMenuCommands, LaneMenuPress } from './songLaneMenuModel';
-import { laneMenu, lanePressAt } from './songLaneMenuModel';
+import { laneMenu, lanePressAt, whileFresh } from './songLaneMenuModel';
 
 const BAR = TICKS_PER_BAR;
 const SONG = 16 * BAR;
@@ -341,5 +341,27 @@ describe('where a press lands', () => {
     const at = lanePressAt(regions, box.leftPx + box.widthPx - 0.5, tiny);
     expect(at.region).toBe(0);
     expect(at.tick).toBeLessThanOrEqual(BAR / 4);
+  });
+});
+
+describe('a menu built for one document', () => {
+  const rows = (items: readonly MenuItem[]): MenuRow[] =>
+    items.flatMap((i) => (i.kind === 'row' ? [i] : i.kind === 'submenu' ? rows(i.items) : []));
+
+  it('refuses every row, and every preview, once the document has changed', () => {
+    const { commands, calls } = spy();
+    let doc = 1;
+    const built = doc;
+    const spec = whileFresh(laneMenu(press(acid, 1, 5.5), commands), () => doc === built);
+    rowOf(spec, 'Delete').run();
+    expect(calls).toEqual([['delete', 1]]);
+    // A region key, an undo or an edit elsewhere replaces the document.
+    doc = 2;
+    calls.length = 0;
+    for (const row of rows(spec.items)) {
+      row.preview?.();
+      row.run();
+    }
+    expect(calls.filter(([name]) => name !== 'unpreview')).toEqual([]);
   });
 });
