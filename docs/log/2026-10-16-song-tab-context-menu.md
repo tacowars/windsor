@@ -3,7 +3,7 @@
 - **Date:** 2026-10-16
 - **Status:** accepted. tacowars approved both mockups on 2026-10-16
 - **Links:** windsor#823 · `docs/design/song-region-menu-mockup.html` (desktop) ·
-  `docs/design/song-region-menu-ipad-mockup.html` (iPad) · region editing
+  `docs/design/song-region-menu-tablet-mockup.html` (tablet) · region editing
   `2026-10-03-song-region-editing` · move, copy and paste
   `2026-10-06-song-region-move-copy-paste` · `2026-10-11-bounce-to-roll` ·
   the loop `2026-09-28-song-loop-in-the-transport`
@@ -43,10 +43,14 @@ other DAWs: a right-click on a clip opens its commands.
      - Chord: none.
 
      Fit region to pattern (new) sets the region's length to one pass
-     of its pattern: the Roll's loop, length × step on Grid, Euclid and
-     Basslead, and the Figure's schedule. Arp and a Figure canon have no
-     cycle and don't offer it. It is disabled (`already fits`) when the
-     region is one pass long.
+     of its pattern: the cycle the region's block already draws its
+     ticks from (`CYCLE_TICKS` in `songViewTables.ts`). That is the
+     Roll's loop, length × step on Grid and Basslead, steps × step on
+     Euclid, a Chord's steps' durations × repeats, and a Figure's
+     schedule in bars, else its line's length × step. Arp, a Figure
+     canon and an empty pattern have no cycle and don't offer it, so a
+     Chord region's group holds Fit alone. It is disabled
+     (`already fits`) when the region is one pass long.
    - Bounce part to Roll… follows `bounceButtonState` and is absent on
      a Roll or a part with no sequencer. Part color… opens the part
      color picker.
@@ -58,7 +62,7 @@ other DAWs: a right-click on a clip opens its commands.
    Roll's case included. A part that has a sequencer doesn't offer it.
 5. **One menu, sized by what opened it.** A press with `pointerType`
    touch or pen gets the following; a mouse gets 32 px rows and all
-   tags. A trackpad's right-click on an iPad is a mouse:
+   tags. A trackpad's right-click on a tablet is a mouse:
    - 44 px rows with 15 px labels;
    - no keyboard tags (⌘X, ⌥-click); a reason or amount tag stays;
    - a drill-in submenu with a back row, where the mouse gets a submenu
@@ -94,5 +98,5 @@ other DAWs: a right-click on a clip opens its commands.
 - **Set sequencer on a part that has one:** the kind change rebuilds the
   part at the kind's defaults, so a right-click would make losing the
   part's patterns too easy.
-- **Sizing by `@media (pointer: coarse)`:** an iPad with a trackpad
+- **Sizing by `@media (pointer: coarse)`:** a tablet with a trackpad
   matches it, so a right-click would get the touch menu.

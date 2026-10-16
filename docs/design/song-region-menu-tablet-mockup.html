@@ -2,13 +2,13 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- The Song tab's region menu on touch, for tacowars's 12.9-inch iPad Pro
-     (M2, Safari), for approval after the desktop mockup
+<!-- The Song tab's region menu on touch, for tacowars's 12.9-inch tablet
+     (Safari), for approval after the desktop mockup
      (song-region-menu-mockup.html), whose menu contents, rules and "Decided"
-     list this page takes as settled. The frame is the whole iPad screen,
+     list this page takes as settled. The frame is the whole tablet screen,
      1366 × 1024 CSS px landscape or 1024 × 1366 portrait (dpr 2, so 1 CSS px
      is 1 pt), redrawn from a screenshot of the dev build emulated at that
-     size with touch (song-tab-today-ipad.png): the header, the part chips,
+     size with touch (song-tab-today-tablet.png): the header, the part chips,
      the lanes at today's 96 px a bar (scrolled, not fitted), and the pane
      with acid's Grid device, whose body is a labelled stand-in. Sizes and
      colors are copied from packages/app/src/console.css (the tokens, .pchip,
@@ -17,7 +17,7 @@
      partColourPickerTables.ts's LONG_PRESS (450 ms, 8 px). Static and
      self-contained: open it in a browser. The controls above the frame are
      the mockup's own switches, not part of the console. -->
-<title>Song Region Menu iPad</title>
+<title>Song Region Menu Tablet</title>
 <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
      Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
      Google Fonts (fonts.google.com/specimen/Chakra+Petch,
@@ -45,7 +45,7 @@
   --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --r: 3px;
-  /* songViewTables.ts SONG_VIEW, collapsed mixer, at today's default zoom (96 px a bar on the iPad) */
+  /* songViewTables.ts SONG_VIEW, collapsed mixer, at today's default zoom (96 px a bar on the tablet) */
   --tab: 20px;
   --tab-gap: 4px;
   --row-pad: 2px;
@@ -95,7 +95,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
 .caption { font-size: 13px; color: var(--ink-dim); max-width: 110ch; }
 .caption b { color: var(--ink); font-weight: 600; }
 
-/* ---------- the frame: the whole iPad screen, scaled to fit the page ---------- */
+/* ---------- the frame: the whole tablet screen, scaled to fit the page ---------- */
 .fit { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--ground); overflow: hidden; user-select: none; }
 .abs { position: absolute; }
@@ -216,9 +216,9 @@ section { display: flex; flex-direction: column; gap: 12px; }
 
 <div class="page">
   <header style="display:flex;flex-direction:column;gap:8px">
-    <span class="eyebrow">Song tab · 12.9-inch iPad Pro · mockup for approval</span>
+    <span class="eyebrow">Song tab · 12.9-inch tablet · mockup for approval</span>
     <h1>The part lanes' menu, opened by touch</h1>
-    <p>The desktop mockup's menu, on tacowars's iPad. A long press on a region or a gap (450 ms, within 8 px) selects it as the desktop right-click does and opens the same menu, beside the finger rather than under it, with 44 px rows. The frame is the whole iPad screen with today's Song tab, five parts made in the dev build (the desktop mockup's song). Step through a press with the Moment switch.</p>
+    <p>The desktop mockup's menu, on tacowars's tablet. A long press on a region or a gap (450 ms, within 8 px) selects it as the desktop right-click does and opens the same menu, beside the finger rather than under it, with 44 px rows. The frame is the whole tablet screen with today's Song tab, five parts made in the dev build (the desktop mockup's song). Step through a press with the Moment switch.</p>
   </header>
 
   <div class="controls" role="group" aria-label="Mockup switches">
@@ -294,8 +294,8 @@ section { display: flex; flex-direction: column; gap: 12px; }
     <h2>The touch rules</h2>
     <ul class="notes">
       <li><strong>Opening:</strong> pointer-timed, because iOS Safari fires no <code>contextmenu</code> on a long press. A touch or pen press on a lane (<code>longPressOpens</code>) starts a 450 ms timer (<code>LONG_PRESS</code>); at 450 ms within 8 px (<code>longPressDue</code>) it selects the region, or for a gap the part, as the desktop right-click does, and opens the menu. Moving past the slop cancels the timer and the press carries on as today's drag. The release that ends an opening press does nothing: no tap select, no bar added on a gap (the <code>opened</code> flag <code>wireChipColour</code> already keeps for the chip). <code>pointercancel</code> cancels.</li>
-      <li><strong>No callout, no magnifier:</strong> <code>.lane</code> already has <code>touch-action: none</code> and <code>user-select: none</code>, and the Song tab's panel <code>-webkit-user-select: none</code> (windsor#814), so iOS starts no text selection or loupe. Nothing in <code>console.css</code> sets <code>-webkit-touch-callout</code>; the build adds <code>-webkit-touch-callout: none</code> to <code>.lane</code> so no system callout can appear, and the lane's <code>contextmenu</code> handler calls <code>preventDefault</code> (it is what a trackpad's two-finger click on the iPad fires, and opens the desktop menu).</li>
-      <li><strong>Size:</strong> 44 px rows (Apple's 44 pt minimum; on this screen 1 CSS px is 1 pt), labels 15 px, the header line 10.5 px, tags 11 px, at least 260 px wide, 16 px side padding. The Grid region menu is then about 640 px tall, which fits either orientation without scrolling. A screen too short for a menu caps it and it scrolls inside itself, as <code>.song-menu</code> does.</li>
+      <li><strong>No callout, no magnifier:</strong> <code>.lane</code> already has <code>touch-action: none</code> and <code>user-select: none</code>, and the Song tab's panel <code>-webkit-user-select: none</code> (windsor#814), so iOS starts no text selection or loupe. Nothing in <code>console.css</code> sets <code>-webkit-touch-callout</code>; the build adds <code>-webkit-touch-callout: none</code> to <code>.lane</code> so no system callout can appear, and the lane's <code>contextmenu</code> handler calls <code>preventDefault</code> (it is what a trackpad's two-finger click on the tablet fires, and opens the desktop menu).</li>
+      <li><strong>Size:</strong> 44 px rows (the common 44 pt touch-target minimum; on this screen 1 CSS px is 1 pt), labels 15 px, the header line 10.5 px, tags 11 px, at least 260 px wide, 16 px side padding. The Grid region menu is then about 640 px tall, which fits either orientation without scrolling. A screen too short for a menu caps it and it scrolls inside itself, as <code>.song-menu</code> does.</li>
       <li><strong>Placement:</strong> beside the finger, never under the hand. For a right hand the menu's right edge sits 32 px left of the touch point (the fingertip's radius plus a gap) and its top 4 px under the pressed lane, so the menu is below-left of the finger, clear of a right hand, and the pressed lane, the lanes above it and the ruler's loop strip stay in view for the preview. With no room on the left (under 32 + width + 8 px) it flips to the right of the finger. It is then clamped 8 px inside the screen on both axes, over the header and pane if it must; a menu too tall for the room under its lane slides up only as far as the bottom edge needs (the Arp state in landscape overlaps arp's lane by 26 px, left of the finger). The other hand mirrors it (the Hand switch). The menu is fixed over the page, as <code>.knob-cc-menu</code> is.</li>
       <li><strong>Choosing, and the preview:</strong> with the finger still down, sliding onto a row lights it and shows the desktop's hover preview (dashed box, loop brace, split line); lifting on that row runs it, lifting off every row runs nothing. A lift without sliding leaves the menu open, and a tap on a row runs it without a preview. A disabled row lights but runs nothing.</li>
       <li><strong>Set sequencer ▸</strong> drills in: a tap swaps the rows for "‹ Set sequencer" (back) and the seven kinds, in the same panel at the same top-left, so it needs no room beside the menu. A trackpad still opens it beside, on hover.</li>
@@ -304,7 +304,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
   </section>
 
   <section>
-    <h2>Desktop and iPad: one component</h2>
+    <h2>Desktop and tablet: one component</h2>
     <div class="two">
       <div>
         <h3>The same on both</h3>
@@ -327,7 +327,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
         </ul>
       </div>
     </div>
-    <p>The size is chosen by what opened the menu, not by the screen's width, so it is zoom-safe and the iPad with a trackpad gets the desktop menu on a right-click (the "Opened by" switch).</p>
+    <p>The size is chosen by what opened the menu, not by the screen's width, so it is zoom-safe and the tablet with a trackpad gets the desktop menu on a right-click (the "Opened by" switch).</p>
   </section>
 
   <section>
@@ -348,7 +348,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
   <section>
     <h2>Data</h2>
     <ul class="notes">
-      <li>The frame copies <code>song-tab-today-ipad.png</code>: the dev build in Chrome emulating 1366 × 1024 at dpr 2 with touch (it matches <code>pointer: coarse</code> and <code>hover: none</code>), with acid's bars 5–8 selected. At today's zoom a bar is 96 px, so landscape shows bars 1 to 12 and portrait bars 1 to 9, and the lanes scroll. In portrait the lanes are drawn scrolled to the long-pressed bar where it would be off-screen (Empty lane, Euclid and No-sequencer states).</li>
+      <li>The frame copies <code>song-tab-today-tablet.png</code>: the dev build in Chrome emulating 1366 × 1024 at dpr 2 with touch (it matches <code>pointer: coarse</code> and <code>hover: none</code>), with acid's bars 5–8 selected. At today's zoom a bar is 96 px, so landscape shows bars 1 to 12 and portrait bars 1 to 9, and the lanes scroll. In portrait the lanes are drawn scrolled to the long-pressed bar where it would be off-screen (Empty lane, Euclid and No-sequencer states).</li>
       <li>The song is the desktop mockup's: acid (Grid), kick (Euclid), lead (Roll, 4 notes on a 3-bar loop in its first region), arp (Arp), pad (no sequencer), 16 bars, with acid's gap at bars 9–12.</li>
     </ul>
   </section>
@@ -356,7 +356,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
 
 <script>
 (() => {
-  const PPB = 96;             // today's px per bar on the iPad (songViewTables.ts default zoom)
+  const PPB = 96;             // today's px per bar on the tablet (songViewTables.ts default zoom)
   const BLOCK_GAP = 2;        // songViewTables.ts blockBox
   const LANES_X = 188;        // the timeline's left edge in the screen: pad 14 + frozen 166 + gap 8
   const PART_TOP = 225;       // part 1's lane top in the screen (screenshot)
@@ -393,7 +393,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
   };
   // Before the hold opens anything, the selection is the screenshot's: acid, bars 5–8.
   const BEFORE = { part: 0, region: 1 };
-  const ui = { state: 'grid', moment: 'open', orient: 'land', hand: 'right', rowh: '44', input: 'touch', clip: 'grid', drill: false, kbd: false };
+  const ui = { state: 'grid', moment: 'open', orient: 'land', hand: 'right', rowh: '44', input: 'touch', clip: 'grid', drill: false, kbd: false, captured: false };
 
   const h = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -627,7 +627,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
     switch (p.kind) {
       case 'grid': return [{ label: 'Randomize' }, { label: 'Reverse' }, fitItem(p.regions[ri])];
       case 'arp': return [{ label: 'Randomize' }, { label: 'Reverse' }, { label: 'Reseed' }];
-      case 'euclidean': return [{ label: 'Capture' }, fitItem(p.regions[ri])];
+      case 'euclidean': return [{ label: ui.captured ? 'Release' : 'Capture' }, fitItem(p.regions[ri])];
       case 'roll': return [{ label: 'Quantize to 1/16', tag: 'all notes' }, fitItem(p.regions[ri])];
       case 'none': return [{ label: 'Set sequencer', sub: KIND_LABELS.map((l) => ({ label: l })) }];
       default: return [];
@@ -850,7 +850,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
     grid: 'acid\'s second region (bars 5–8), in bar 6',
     arp: 'arp\'s first region (bars 1–8), in bar 3',
     roll: 'lead\'s first region (bars 5–8), in bar 6',
-    euclid: 'kick\'s second region (bars 9–16), in bar 12',
+    euclid: 'kick\'s second region (bars 9–16), in bar 12; Capture, or Release once captured, as the desktop mockup\'s switch shows',
     gap: 'the gap in acid\'s lane (bars 9–12), in bar 10',
     none: 'pad\'s whole-song region (∞), in bar 10',
   };
@@ -858,7 +858,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
     const st = STATES[ui.state];
     const where = WHERE[ui.state];
     if (ui.input === 'mouse') {
-      return `<b>Right-click with a trackpad on the iPad:</b> ${where}. The opening event is a mouse, so it is the desktop menu: 32 px rows, the keyboard tags, at the pointer, hover previews, a submenu beside.`;
+      return `<b>Right-click with a trackpad on the tablet:</b> ${where}. The opening event is a mouse, so it is the desktop menu: 32 px rows, the keyboard tags, at the pointer, hover previews, a submenu beside.`;
     }
     const drilled = ui.drill && ui.state === 'none';
     const M = {
