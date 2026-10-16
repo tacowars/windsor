@@ -75,8 +75,8 @@ export function openPartColourPicker(
   closePartColourPicker();
   const menu = el('div', 'part-colour-picker');
   menu.setAttribute('role', 'dialog');
-  menu.setAttribute('aria-label', 'Part colour');
-  const title = el('div', 'pcp-title', 'Colour');
+  menu.setAttribute('aria-label', 'Part color');
+  const title = el('div', 'pcp-title', 'Color');
   title.appendChild(el('span', '', part.name));
   const caption = el('div', 'pcp-name', swatchCaption(null, part.colour));
   const grid = el('div', 'pcp-grid');

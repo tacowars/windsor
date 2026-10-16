@@ -126,7 +126,7 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       signal,
       onProgress: run.onProgress,
     });
-    if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+    if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     const { bytes, clipped } = await run.encode(
       rendered.channels,
       rendered.sampleRate,
@@ -156,7 +156,7 @@ export async function runToSink(
   let writing = false;
   try {
     const { file, clipped } = await make();
-    if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+    if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     // From here the sink decides: past its commit point a Cancel changes
     // nothing, and the write resolves (saved) or fails with its own error.
     writing = true;
@@ -176,7 +176,7 @@ export async function runToSink(
 export function exportNotice(outcome: AudioExportOutcome): { message: string; tone: ToastTone } {
   switch (outcome.kind) {
     case 'cancelled':
-      return { message: 'audio export cancelled — nothing was written', tone: 'info' };
+      return { message: 'audio export canceled — nothing was written', tone: 'info' };
     case 'failed':
       return { message: `audio export failed: ${outcome.error}`, tone: 'error' };
     case 'saved':

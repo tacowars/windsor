@@ -108,7 +108,7 @@ export async function encodeWavAsync(
   }
   const writer = new WavWriter(channels, sampleRate, bitDepth, options);
   for (;;) {
-    if (signal?.aborted) throw new DOMException('the encode was cancelled', 'AbortError');
+    if (signal?.aborted) throw new DOMException('the encode was canceled', 'AbortError');
     if (writer.done) return writer.result();
     writer.advance(chunkFrames);
     await yieldToLoop();

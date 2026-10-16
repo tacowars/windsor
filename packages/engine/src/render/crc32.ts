@@ -55,7 +55,7 @@ export async function crc32Async(
   }
   let crc = 0;
   for (let at = 0; ; at += chunkBytes) {
-    if (signal?.aborted) throw new DOMException('the checksum was cancelled', 'AbortError');
+    if (signal?.aborted) throw new DOMException('the checksum was canceled', 'AbortError');
     if (at >= bytes.length) return crc;
     crc = crc32(bytes.subarray(at, at + chunkBytes), crc);
     await yieldToLoop();

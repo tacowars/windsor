@@ -55,7 +55,7 @@ export function colourParts<P extends object>(
     const colour = colours[i] ?? 0;
     if (raw !== undefined && !isPartColour(raw)) {
       n.correction(
-        `${path}.colour: ${show(raw)} is not a part colour 0–${PART_COLOURS - 1} — assigned ${colour}`,
+        `${path}.colour: ${show(raw)} is not a part color 0–${PART_COLOURS - 1} — assigned ${colour}`,
       );
     }
     return { part: { ...part, colour }, path };
