@@ -26,15 +26,15 @@ steady render read 11.6 % and 15.6 % higher at 44.1 kHz in two rounds
 
 ## Setup
 
-- **Machine:** Apple M4 Pro (Mac mini, `Mac16,11`), macOS 26.5.1, Node
+- **Machine:** a 14-core arm64 desktop, Node
   24.16.0 (V8 13.6). Other sessions shared it; each result row carries the
   one-minute load average (2.7 to 8.3).
-- **Browser:** Google Chrome 155.0.8059.80, arm64, headless, launched with a
+- **Browser:** Chromium 155.0.8059.80, arm64, headless, launched with a
   temporary profile, no extensions and muted output
   (`../2026-10-13-performance-assessment/cdp.mjs`). The default output
   device runs at 44.1 kHz.
 - **Backend:** a realtime `AudioContext` (`latencyHint: 'interactive'`), at
-  the device's 44.1 kHz and at 48 kHz (resampled to the device). Chrome asked
+  the device's 44.1 kHz and at 48 kHz (resampled to the device). Chromium asked
   for 256 frames a callback with about 13.7 ms of playout delay.
 - **Bundles:** "before" is `origin/main` at `5d456d9`'s generated bundles;
   "after" is the WIP commit `5a31f33`'s, built on that base. The page's
@@ -42,7 +42,7 @@ steady render read 11.6 % and 15.6 % higher at 44.1 kHz in two rounds
 
 ## Method
 
-- **`coldStart.mjs`** (Chrome; `coldPage.mjs` is its page, `coldSongs.mjs`
+- **`coldStart.mjs`** (Chromium; `coldPage.mjs` is its page, `coldSongs.mjs`
   its songs). Each run is a fresh browser, so a fresh audio thread and a
   cold V8. It builds the song's system as the power button does (a fresh
   context, `FmEngine.init`, `AudioSystem.init`, `initMusic`, the part meter
@@ -62,7 +62,8 @@ steady render read 11.6 % and 15.6 % higher at 44.1 kHz in two rounds
 - **The songs.** `bench` is the issue's,
   `song('8-3ins', { parts: 8, inserts: 3, sends: true })` from the
   performance assessment: eight Chord Player pads on `pad-drift`, three
-  inserts a strip rotating through every kind, both sends. `drums` is the
+  inserts a strip rotating through every kind in that song's list (the pump is
+  not in it), both sends. `drums` is the
   same desk with a kit in the parts: eight drum voices (kick, snare, clap, two hats, rimshot,
   ride, tom) on fixed
   Euclidean lines at sixteenths, each strip with the inserts the bench
@@ -79,8 +80,8 @@ steady render read 11.6 % and 15.6 % higher at 44.1 kHz in two rounds
   build (a processor exists only inside a node's construction), used to
   size the real one. `--bundles <dir>` as above. Its arguments are plain
   arrays, the Node harness's shapes.
-- **`argumentMaps.mjs`** (Chrome with `--js-flags=--allow-natives-syntax`)
-  compares the V8 maps of what Chrome hands `process` with the warm-up's
+- **`argumentMaps.mjs`** (Chromium with `--js-flags=--allow-natives-syntax`)
+  compares the V8 maps of what Chromium hands `process` with the warm-up's
   scratch arguments. It imports `worklet/warmUp.ts`, which exists only on
   the WIP commits.
 - **`report.mjs`** prints the tables below from `results/`. The `--dump`
@@ -174,12 +175,12 @@ What was built (on the WIP commits; `worklet/warmUp.ts`,
   switching allocation run (`tapeAllocation.test.ts`) boxed 6 MB, because
   the optimised code then left the per-sample `driveGain` call out of its
   caller during a later Drive glide.
-- **The scratch arguments took the host's shapes.** Chrome hands `process`
+- **The scratch arguments took the host's shapes.** Chromium hands `process`
   frozen holey arrays and one frozen parameter object built key by key in
   descriptor order; `argumentMaps.mjs` showed the scratch had exactly those
-  maps in Chrome, and that literals do not. Under the Node harness (no
+  maps in Chromium, and that literals do not. Under the Node harness (no
   `AudioWorkletGlobalScope`) the scratch was plain arrays, as the harness
-  passes. A warm-up on Chrome's shapes made every allocation probe, which
+  passes. A warm-up on Chromium's shapes made every allocation probe, which
   passes plain arrays, allocate 2.8 MB in its first measured tenth.
 
 Tried and dropped:
@@ -251,7 +252,7 @@ from 23–35 to 58–76 ms.
 
 **Steady render.** Two ways (decision 6):
 
-- The second ▶'s mean render span a quantum in Chrome (whole graph, µs),
+- The second ▶'s mean render span a quantum in Chromium (whole graph, µs),
   two rounds of six runs: round 1 at `0582ec7`, round 2 at `5a31f33`.
 
   | Song | Rate | Before | After, round 1 | After, round 2 |
@@ -360,7 +361,7 @@ tacowars's decision, after the numbers above
   `declare`d fields, so the compiler no longer checks that a field is
   assigned; the same constructor block was pasted into 11 processors; the
   shipped scratch shapes branch on whether the scope is real, so the Node
-  tests do not run the path Chrome runs; and it carries special cases tuned
+  tests do not run the path Chromium runs; and it carries special cases tuned
   to V8 (the tape's Drive moves, the excluded pump and plate).
 - **The false alarm is handled elsewhere.** windsor#835's settling window
   already stops the CPU meter's toast about the first ▶.

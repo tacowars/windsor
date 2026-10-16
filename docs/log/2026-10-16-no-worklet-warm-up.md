@@ -15,7 +15,7 @@ script on its own patch, and each worklet insert kind's first processor
 rendered 16 quanta of noise at its own settings, then each built its state
 again from its options, so it was a fresh processor to the bit. The research
 folder records what was cold, the design, what was tried, and the numbers,
-on an Apple M4 Pro in headless Chrome 155. The code lives only on unpushed
+on a 14-core arm64 desktop in headless Chromium 155. The code lives only on unpushed
 WIP commits.
 
 ## Decision
@@ -38,7 +38,7 @@ WIP commits.
   `declare`d fields, which the compiler no longer checks for definite
   assignment; the same constructor block was pasted into 11 processors; the
   scratch arguments branch on whether the scope is real, so the Node tests
-  do not run the path Chrome runs; and it carries V8-tuned special cases
+  do not run the path Chromium runs; and it carries V8-tuned special cases
   (the tape's Drive moves in its run, the pump and the plate left out).
 - **The false alarm is handled.** windsor#835's settling window stops the
   CPU meter's toast about the first ▶.
@@ -47,5 +47,5 @@ WIP commits.
 
 - A first-downbeat dropout tacowars hears on a drum-heavy song.
 - A cheaper mechanism: one that needs no second `init` in every processor,
-  runs the same path under the tests as in Chrome, and leaves the drum
+  runs the same path under the tests as in Chromium, and leaves the drum
   song's steady render unchanged.
