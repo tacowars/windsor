@@ -47,10 +47,15 @@ other DAWs: a right-click on a clip opens its commands.
      ticks from (`CYCLE_TICKS` in `songViewTables.ts`). That is the
      Roll's loop, length × step on Grid and Basslead, steps × step on
      Euclid, a Chord's steps' durations × repeats, and a Figure's
-     schedule in bars, else its line's length × step. Arp, a Figure
-     canon and an empty pattern have no cycle and don't offer it, so a
-     Chord region's group holds Fit alone. It is disabled
-     (`already fits`) when the region is one pass long.
+     schedule in bars, else its line's length × step. Where
+     `CYCLE_TICKS` gives none (Arp, a Figure canon, a Chord or Grid with
+     no steps) Fit isn't offered; a Roll always has its loop, notes or
+     not. A Chord region's group holds Fit alone. The region's start
+     stays put, and its new end is clipped to the next region and to the
+     song's end, as a trim is, so a pass with no room fits as far as it
+     can and the tag shows that clipped length. It is disabled with
+     `already fits` when that length is the region's own (one pass long,
+     or no room to grow).
    - Bounce part to Roll… follows `bounceButtonState` and is absent on
      a Roll or a part with no sequencer. Part color… opens the part
      color picker.

@@ -247,12 +247,6 @@ section { display: flex; flex-direction: column; gap: 12px; }
         <button type="button" data-v="port" aria-pressed="false">Portrait 1024 × 1366</button>
       </div>
     </div>
-    <div class="field"><span>Hand</span>
-      <div class="seg" id="hand">
-        <button type="button" data-v="right" aria-pressed="true">Right: menu left of the finger</button>
-        <button type="button" data-v="left" aria-pressed="false">Left: menu right of it</button>
-      </div>
-    </div>
     <div class="field"><span>Touch row height</span>
       <div class="seg" id="rowh">
         <button type="button" data-v="40" aria-pressed="false">40 / 14 px</button>
@@ -296,7 +290,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
       <li><strong>Opening:</strong> pointer-timed, because iOS Safari fires no <code>contextmenu</code> on a long press. A touch or pen press on a lane (<code>longPressOpens</code>) starts a 450 ms timer (<code>LONG_PRESS</code>); at 450 ms within 8 px (<code>longPressDue</code>) it selects the region, or for a gap the part, as the desktop right-click does, and opens the menu. Moving past the slop cancels the timer and the press carries on as today's drag. The release that ends an opening press does nothing: no tap select, no bar added on a gap (the <code>opened</code> flag <code>wireChipColour</code> already keeps for the chip). <code>pointercancel</code> cancels.</li>
       <li><strong>No callout, no magnifier:</strong> <code>.lane</code> already has <code>touch-action: none</code> and <code>user-select: none</code>, and the Song tab's panel <code>-webkit-user-select: none</code> (windsor#814), so iOS starts no text selection or loupe. Nothing in <code>console.css</code> sets <code>-webkit-touch-callout</code>; the build adds <code>-webkit-touch-callout: none</code> to <code>.lane</code> so no system callout can appear, and the lane's <code>contextmenu</code> handler calls <code>preventDefault</code> (it is what a trackpad's two-finger click on the tablet fires, and opens the desktop menu).</li>
       <li><strong>Size:</strong> 44 px rows (the common 44 pt touch-target minimum; on this screen 1 CSS px is 1 pt), labels 15 px, the header line 10.5 px, tags 11 px, at least 260 px wide, 16 px side padding. The Grid region menu is then about 640 px tall, which fits either orientation without scrolling. A screen too short for a menu caps it and it scrolls inside itself, as <code>.song-menu</code> does.</li>
-      <li><strong>Placement:</strong> beside the finger, never under the hand. For a right hand the menu's right edge sits 32 px left of the touch point (the fingertip's radius plus a gap) and its top 4 px under the pressed lane, so the menu is below-left of the finger, clear of a right hand, and the pressed lane, the lanes above it and the ruler's loop strip stay in view for the preview. With no room on the left (under 32 + width + 8 px) it flips to the right of the finger. It is then clamped 8 px inside the screen on both axes, over the header and pane if it must; a menu too tall for the room under its lane slides up only as far as the bottom edge needs (the Arp state in landscape overlaps arp's lane by 26 px, left of the finger). The other hand mirrors it (the Hand switch). The menu is fixed over the page, as <code>.knob-cc-menu</code> is.</li>
+      <li><strong>Placement:</strong> beside the finger, never under the hand. The menu's right edge sits 32 px left of the touch point (the fingertip's radius plus a gap) and its top 4 px under the pressed lane, so the menu is below-left of the finger, clear of a right hand, and the pressed lane, the lanes above it and the ruler's loop strip stay in view for the preview. With no room on the left (under 32 + width + 8 px) it flips to the right of the finger. It is then clamped 8 px inside the screen on both axes, over the header and pane if it must; a menu too tall for the room under its lane slides up only as far as the bottom edge needs (the Arp state in landscape overlaps arp's lane by 26 px, left of the finger). There is no handedness setting: the menu always tries the finger's left first. The menu is fixed over the page, as <code>.knob-cc-menu</code> is.</li>
       <li><strong>Choosing, and the preview:</strong> with the finger still down, sliding onto a row lights it and shows the desktop's hover preview (dashed box, loop brace, split line); lifting on that row runs it, lifting off every row runs nothing. A lift without sliding leaves the menu open, and a tap on a row runs it without a preview. A disabled row lights but runs nothing.</li>
       <li><strong>Set sequencer ▸</strong> drills in: a tap swaps the rows for "‹ Set sequencer" (back) and the seven kinds, in the same panel at the same top-left, so it needs no room beside the menu. A trackpad still opens it beside, on hover.</li>
       <li><strong>Dismissal:</strong> a tap or press outside closes it and does nothing else, so it adds no bar and changes no selection. Scrolling the lanes or the page, a rotation, the tab losing focus, or Escape on a hardware keyboard close it. A second long press elsewhere closes this menu and, at 450 ms, opens one for the new spot: one gesture.</li>
@@ -684,7 +678,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
 
   // The touch placement: beside the finger, flipped, then clamped.
   function touchPlace(x, laneBottom, w, hgt) {
-    const leftFirst = ui.hand === 'right';
+    const leftFirst = true; // record decision 6: always left of the finger first, no handedness setting
     const leftSide = x - TOUCH.gapX - w;
     const rightSide = x + TOUCH.gapX;
     let left = leftFirst ? leftSide : rightSide;
@@ -901,7 +895,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
     const drill = document.getElementById('drill');
     drill.disabled = ui.state !== 'none' || (ui.input === 'touch' && ui.moment === 'hold');
     document.getElementById('kbd').disabled = ui.input !== 'touch';
-    document.querySelectorAll('#moment button, #hand button, #rowh button').forEach((b) => { b.disabled = ui.input !== 'touch'; });
+    document.querySelectorAll('#moment button, #rowh button').forEach((b) => { b.disabled = ui.input !== 'touch'; });
   }
 
   function wireSeg(id, key) {
@@ -914,7 +908,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
       render();
     });
   }
-  ['state', 'moment', 'orient', 'hand', 'rowh', 'input', 'clip'].forEach((k) => wireSeg(k, k));
+  ['state', 'moment', 'orient', 'rowh', 'input', 'clip'].forEach((k) => wireSeg(k, k));
   document.getElementById('drill').addEventListener('change', (e) => { ui.drill = e.target.checked; render(); });
   document.getElementById('kbd').addEventListener('change', (e) => { ui.kbd = e.target.checked; render(); });
   window.addEventListener('resize', render);
