@@ -36,6 +36,7 @@ import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
 import { beatTickPx, rulerLabelEvery, rulerLabels, timelineLeftCss } from './songViewTables';
 import type {
+  BarSpan,
   RulerDrag,
   RulerDragEvent,
   SongZoom,
@@ -48,6 +49,7 @@ import {
   fittedScale,
   followFit,
   stepRulerDrag,
+  zoomToBars,
   zoomToFit,
 } from './songZoomModel';
 
@@ -164,9 +166,16 @@ function refit(zoom: RulerZoom): void {
   applyZoom(zoom, { pxPerBar, scrollPx: clampScroll(zoom.scroll.scrollLeft, bounds, pxPerBar) });
 }
 
+/** Fit the view to `span`, measured now (windsor#826's Zoom to region). */
+function zoomToSpan(zoom: RulerZoom, span: BarSpan): void {
+  applyZoom(zoom, zoomToBars(measureBounds(zoom, zoom.state.pxPerBar), span));
+}
+
 /** The view's zoom handle: `refit` after anything that may move the fit besides a resize, which it follows itself. */
 export interface RulerZoomHandle {
   refit(): void;
+  /** Fit the view to `span`, as the lane menu's Zoom to region does (windsor#826). */
+  zoomTo(span: BarSpan): void;
 }
 
 /**
@@ -239,7 +248,7 @@ export function wireRulerZoom(zoom: RulerZoom): RulerZoomHandle {
     else observer.disconnect();
   });
   observer.observe(scroll);
-  return { refit: () => refit(zoom) };
+  return { refit: () => refit(zoom), zoomTo: (span) => zoomToSpan(zoom, span) };
 }
 
 /** Whether a click landed on the ruler, by position: the drag's capture makes the lanes its target. */

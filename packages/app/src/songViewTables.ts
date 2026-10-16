@@ -16,6 +16,8 @@
 import type { Meter, SequencerKind, SequencerSpec } from '@windsor/engine';
 import { TICKS_PER_BAR, meterBeats, ticksPerBar } from '@windsor/engine';
 import { BASS_MODE_OPTIONS } from './bassModel';
+import { LONG_PRESS } from './contextMenuTables';
+import { longPressOpens } from './longPressModel';
 import { divisorLabel } from './divisorLabels';
 import { lineSummary } from './figureModel';
 import { scheduleBars } from './figureProcessModel';
@@ -200,6 +202,15 @@ export const FIT_TOLERANCE_PX = 0.5;
 
 /** A pointer moved this far is a resize or a move; under it, a click. */
 export const SONG_DRAG_THRESHOLD_PX = 4;
+
+/**
+ * Where a part lane's drag starts for a press of `pointerType` (windsor#826;
+ * record `2026-10-16-song-tab-context-menu`, decision 9): a touch or pen
+ * press may move as far as a long press allows (`LONG_PRESS.slopPx`), so a
+ * resting finger can finish one; the mouse keeps `SONG_DRAG_THRESHOLD_PX`.
+ */
+export const laneDragThresholdPx = (pointerType: string): number =>
+  longPressOpens(pointerType) ? LONG_PRESS.slopPx : SONG_DRAG_THRESHOLD_PX;
 /** The primary (left) button's bit in `PointerEvent.buttons`. */
 export const PRIMARY_BUTTON_BIT = 1;
 

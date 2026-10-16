@@ -16,6 +16,7 @@
 import { PART_COLORS } from './consoleColors';
 import { el } from './dom';
 import { wireLongPress } from './longPress';
+import type { Box } from './partColourPickerModel';
 import { pickerPosition, swatchCaption } from './partColourPickerModel';
 
 /** The part the picker colours: its name for the title and its colour, ringed. */
@@ -49,9 +50,12 @@ function swatch(colour: number, current: number, caption: HTMLElement): HTMLButt
   return button;
 }
 
-function place(menu: HTMLElement, anchor: HTMLElement): void {
+/** What the picker opens under: a chip, or a point such as where a context menu opened (windsor#826). */
+export type PickerAnchor = HTMLElement | Box;
+
+function place(menu: HTMLElement, anchor: PickerAnchor): void {
   const { x, y } = pickerPosition(
-    anchor.getBoundingClientRect(),
+    anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : anchor,
     { width: menu.offsetWidth, height: menu.offsetHeight },
     { width: document.documentElement.clientWidth, height: window.innerHeight },
   );
@@ -61,7 +65,7 @@ function place(menu: HTMLElement, anchor: HTMLElement): void {
 
 /** Open the picker under `anchor` for `part`; `pick` writes the chosen colour. */
 export function openPartColourPicker(
-  anchor: HTMLElement,
+  anchor: PickerAnchor,
   part: PickedPart,
   pick: (colour: number) => void,
 ): void {
@@ -88,7 +92,7 @@ export function openPartColourPicker(
     if (e.key !== 'Escape') return;
     e.stopPropagation();
     close();
-    if (anchor.isConnected) anchor.focus();
+    if (anchor instanceof HTMLElement && anchor.isConnected) anchor.focus();
   };
   PART_COLORS.forEach((_, colour) => {
     const button = swatch(colour, part.colour, caption);

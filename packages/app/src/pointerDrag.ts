@@ -7,7 +7,10 @@
  * A drag starts on horizontal travel only, unless the caller opts a press
  * into both axes (`DragOptions.bothAxes`): the part lanes do for a body
  * press, which can drag a region straight down onto another part (record
- * `2026-10-07-song-region-drag-across-parts` decision 8).
+ * `2026-10-07-song-region-drag-across-parts` decision 8). A caller may set
+ * the threshold per press (`DragOptions.thresholdPx`): the part lanes give a
+ * touch or pen press a long press's slop (windsor#826), and cancel a live
+ * press when their context menu opens (`DragHandle.cancel`).
  */
 import { SONG_DRAG_THRESHOLD_PX, primaryHeld } from './songViewTables';
 
@@ -26,6 +29,14 @@ export interface DragHandlers {
 export interface DragOptions {
   /** True when this press (the `pointerdown` it accepted) counts vertical travel too; horizontal only when absent. */
   bothAxes?(down: PointerEvent): boolean;
+  /** The travel, in px, at which this press becomes a drag; `SONG_DRAG_THRESHOLD_PX` when absent. */
+  thresholdPx?(down: PointerEvent): number;
+}
+
+/** What `pointerDrag` hands back to its caller. */
+export interface DragHandle {
+  /** End the live press, if any, as a release it never saw: `abort`, and no `end`. */
+  cancel(): void;
 }
 
 /** Whether a press that has travelled `dx`, `dy` px is past `threshold` and so a drag: on x alone, or with `bothAxes` the farther axis. */
@@ -44,9 +55,15 @@ export function pointerDrag(
   node: HTMLElement,
   handlers: DragHandlers,
   options: DragOptions = {},
-): void {
-  let live: { pointerId: number; x: number; y: number; both: boolean; moved: boolean } | null =
-    null;
+): DragHandle {
+  let live: {
+    pointerId: number;
+    x: number;
+    y: number;
+    both: boolean;
+    threshold: number;
+    moved: boolean;
+  } | null = null;
   const finish = (release: PointerEvent | null): void => {
     if (!live) return;
     const { pointerId, moved } = live;
@@ -67,6 +84,7 @@ export function pointerDrag(
       x: down.clientX,
       y: down.clientY,
       both: options.bothAxes?.(down) ?? false,
+      threshold: options.thresholdPx?.(down) ?? SONG_DRAG_THRESHOLD_PX,
       moved: false,
     };
     try {
@@ -80,7 +98,7 @@ export function pointerDrag(
     if (!live || !mine(e)) return;
     if (!primaryHeld(e.buttons)) return void finish(null);
     const travel = { dx: e.clientX - live.x, dy: e.clientY - live.y, bothAxes: live.both };
-    if (!live.moved && !pastThreshold(travel)) return;
+    if (!live.moved && !pastThreshold(travel, live.threshold)) return;
     live.moved = true;
     handlers.move(e);
   });
@@ -92,4 +110,5 @@ export function pointerDrag(
       if (mine(e)) finish(null);
     });
   }
+  return { cancel: () => finish(null) };
 }

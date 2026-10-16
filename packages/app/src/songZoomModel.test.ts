@@ -17,6 +17,7 @@ import {
   stepRulerDrag,
   clickedBar,
   zoomForDrag,
+  zoomToBars,
   zoomToFit,
 } from './songZoomModel';
 import type { RulerDrag, RulerDragEvent, ZoomBounds, ZoomDragStart } from './songZoomModel';
@@ -250,5 +251,36 @@ describe('clickedBar', () => {
     expect(clickedBar(Number.NaN, 100, 8)).toBe(0);
     expect(clickedBar(50, 0, 8)).toBe(0);
     expect(clickedBar(50, 100, 0)).toBe(0);
+  });
+});
+
+describe('Zoom to region (windsor#826)', () => {
+  const lanesPx = VIEWPORT - CHROME;
+
+  it('fits the region’s bars to the visible lanes, its first bar at the left edge', () => {
+    expect(zoomToBars(bounds(16), { startBar: 4, bars: 4 })).toEqual({
+      pxPerBar: lanesPx / 4,
+      scrollPx: 4 * (lanesPx / 4),
+    });
+  });
+
+  it('zooms a 1-bar region in no further than the ceiling', () => {
+    const wide = { bars: 16, viewportPx: 2000, chromePx: CHROME };
+    expect(2000 - CHROME).toBeGreaterThan(SONG_VIEW.maxPxPerBar);
+    expect(zoomToBars(wide, { startBar: 0, bars: 1 }).pxPerBar).toBe(SONG_VIEW.maxPxPerBar);
+  });
+
+  it('zooms a whole-song region to the fit', () => {
+    expect(zoomToBars(bounds(16), { startBar: 0, bars: 16 })).toEqual(zoomToFit(bounds(16)));
+    expect(zoomToBars(bounds(BARS_MAX), { startBar: 0, bars: BARS_MAX })).toEqual(
+      zoomToFit(bounds(BARS_MAX)),
+    );
+  });
+
+  it('keeps the scroll inside the content, and fits before the view has a width', () => {
+    const last = zoomToBars(bounds(16), { startBar: 15, bars: 1 });
+    expect(last.scrollPx).toBe(maxScroll(bounds(16), last.pxPerBar));
+    const hidden = { bars: 16, viewportPx: 0, chromePx: CHROME };
+    expect(zoomToBars(hidden, { startBar: 4, bars: 4 })).toEqual(zoomToFit(hidden));
   });
 });

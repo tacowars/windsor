@@ -191,6 +191,31 @@ export function zoomToFit(bounds: ZoomBounds, scale: SongViewScale = SONG_VIEW):
   return { pxPerBar: fittedScale(bounds, scale).minPxPerBar, scrollPx: 0 };
 }
 
+/** A stretch of the song in bars from its start, 0-based: what Zoom to region fits. */
+export interface BarSpan {
+  readonly startBar: number;
+  readonly bars: number;
+}
+
+/**
+ * Zoom to region (windsor#826; record `2026-10-16-song-tab-context-menu`,
+ * decision 2): the scale at which `span` fills the visible lanes, clamped to
+ * the fitted bounds (`fittedScale`), so a short region stops at the
+ * ceiling and the whole song lands on the fit; the scroll puts the span's
+ * first bar at the left edge, clamped to the content. Before the view has a
+ * width, the fit (`zoomToFit`). View state only, as every zoom is.
+ */
+export function zoomToBars(
+  bounds: ZoomBounds,
+  span: BarSpan,
+  scale: SongViewScale = SONG_VIEW,
+): SongZoom {
+  const lanesPx = bounds.viewportPx - bounds.chromePx;
+  if (!(span.bars > 0) || !(lanesPx > 0)) return zoomToFit(bounds, scale);
+  const pxPerBar = clampZoom(lanesPx / span.bars, fittedScale(bounds, scale));
+  return { pxPerBar, scrollPx: clampScroll(span.startBar * pxPerBar, bounds, pxPerBar) };
+}
+
 /**
  * The 0-based bar under a click `px` from bar 1's line (a ruler click seeks
  * to its start, so a click anywhere in bar 5 is bar 5), clamped to the song's
