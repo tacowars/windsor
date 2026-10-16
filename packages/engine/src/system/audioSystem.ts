@@ -423,7 +423,7 @@ export class AudioSystem {
    */
   apply(partial: DocumentPartial): ApplyResult {
     const { player } = this.playback;
-    if (!player) return { ok: false, ignored: [], error: 'music is not initialised' };
+    if (!player) return { ok: false, ignored: [], error: 'music is not initialized' };
     // The song's name and tags are the document's, not the audio's (windsor#440):
     // a partial of only `meta` rebuilds and regates nothing.
     const keys = Object.keys(partial);

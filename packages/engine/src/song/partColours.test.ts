@@ -56,7 +56,7 @@ describe('a part colour in a song', () => {
       // Part 0 takes 1, the least-used colour once part 1 keeps its 0.
       expect(result.document.parts.map((part) => part.colour)).toEqual([1, 0, 2, 3]);
       expect(result.corrections).toEqual([
-        `parts[0].colour: ${JSON.stringify(junk)} is not a part colour 0–13 — assigned 1`,
+        `parts[0].colour: ${JSON.stringify(junk)} is not a part color 0–13 — assigned 1`,
       ]);
     }
   });

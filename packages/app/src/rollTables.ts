@@ -236,15 +236,15 @@ export const ROLL_AUDITION = { ms: 180, storageKey: 'windsor.roll.audition' } as
 
 /** Quantise (record `2026-10-09-roll-recording` decision 10): its label, undo step and the button's words. */
 export const ROLL_QUANTISE = {
-  label: 'Quantise',
-  undo: 'Quantise',
+  label: 'Quantize',
+  undo: 'Quantize',
   all: 'All notes',
   selected: 'selected',
   to: 'to',
   off: 'snap off',
   title:
     'Snap the onsets of the selected notes, or every note when none is selected, to the nearest Snap step. Lengths are kept.',
-  offTitle: 'Set a Snap to quantise to',
+  offTitle: 'Set a Snap to quantize to',
 } as const;
 
 /**

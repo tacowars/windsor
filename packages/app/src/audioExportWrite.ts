@@ -17,7 +17,7 @@ export interface ChunkWritable {
 }
 
 export function abortError(): DOMException {
-  return new DOMException('the export was cancelled', 'AbortError');
+  return new DOMException('the export was canceled', 'AbortError');
 }
 
 /** Write `file` and close, or abort the stream and throw when `signal` fires or a write fails. */

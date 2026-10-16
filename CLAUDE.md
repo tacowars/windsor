@@ -173,6 +173,11 @@ bash scripts/pr-wait.sh <N>       # wait for a PR's verify and Codex review of i
 - **Research and measurements:** `docs/research/<date>-<slug>/`.
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.
+- **Spelling:** user-visible text (labels, titles, `aria-label`s, hints,
+  toasts, report lines, error messages, built-in patch descriptions) is US English: color, quantize,
+  normalize, canceled, center, gray. Code identifiers, file names, CSS
+  classes, comments and the song format's `colour` field keep their spelling
+  (`docs/log/2026-10-16-ui-text-is-us-english.md`).
 - **Branching:** work on a branch and open a PR against `main`. CI runs
   `npm run verify`, with only the tests a PR's change can reach on a PR and
   every test on a push to `main`

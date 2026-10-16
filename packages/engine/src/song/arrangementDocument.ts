@@ -185,7 +185,7 @@ export function makeArrangement(raw: unknown, options: ResolveOptions = {}): Mak
   if (refused?.patch !== undefined) n.correction(`patches.${refused.patch}: ${refused.message}`);
   const document = refused?.patch === undefined ? normalise(upgraded, n) : null;
   if (!document) {
-    n.correction('nothing usable survives normalisation — falling back to the metronome');
+    n.correction('nothing usable survives normalization — falling back to the metronome');
     return {
       document: FALLBACK_ARRANGEMENT,
       corrections: n.corrections,

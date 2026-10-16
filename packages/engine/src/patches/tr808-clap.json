@@ -3,7 +3,7 @@
   "name": "808 Clap",
   "category": "Drums",
   "tags": ["808", "clap", "analog", "noise", "mono"],
-  "description": "Fitted to Samples From Mars 808 From Mars, Clap A 808 (non-accented): noise bursts at 0, 11 and 23 ms and the \"reverb\" tail from 31 ms, each on its own Trigger envelope (A plays the first two). A, B and C are sines that the Noise operator D, held at the depth that leaves no tone, turns into white noise. Coloured by a resonant 2-pole highpass at 590 Hz and the drive's tone pole. Pitch-independent.",
+  "description": "Fitted to Samples From Mars 808 From Mars, Clap A 808 (non-accented): noise bursts at 0, 11 and 23 ms and the \"reverb\" tail from 31 ms, each on its own Trigger envelope (A plays the first two). A, B and C are sines that the Noise operator D, held at the depth that leaves no tone, turns into white noise. Colored by a resonant 2-pole highpass at 590 Hz and the drive's tone pole. Pitch-independent.",
   "patch": {
     "name": "808 Clap",
     "algorithm": 5,

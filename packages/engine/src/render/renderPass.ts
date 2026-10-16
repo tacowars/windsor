@@ -146,5 +146,5 @@ export function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 function abortError(): DOMException {
-  return new DOMException('the render was cancelled', 'AbortError');
+  return new DOMException('the render was canceled', 'AbortError');
 }

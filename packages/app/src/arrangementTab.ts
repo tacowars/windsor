@@ -86,7 +86,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section(
     'Document',
     'Export downloads the whole piece — a snapshot of every patch any part plays, plus ' +
-      "returns, every part's strip, sequencers and harmony — as one normalised, self-contained " +
+      "returns, every part's strip, sequencers and harmony — as one normalized, self-contained " +
       'document. Import reads one back and plays it exactly as exported.',
   );
   const row = el('div', 'bar-row');
@@ -129,7 +129,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
 }
 
 function reportSection(ctx: AppCtx): HTMLElement {
-  const { root, body } = section('Normalisation report');
+  const { root, body } = section('Normalization report');
   const { corrections, dangling, filled, usable } = ctx.model;
   if (!usable)
     body.appendChild(el('p', 'hint hot', 'Nothing usable — the metronome fallback is playing.'));
