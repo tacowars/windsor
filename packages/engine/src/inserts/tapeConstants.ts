@@ -98,6 +98,13 @@ export const TAPE_DSP = {
   percent: 100,
   maxFrequencyRatio: 0.45,
   maxDelaySeconds: 0.025,
+  /**
+   * The Wow and Flutter dials' square law (windsor#818, `tapeMotionCurve.ts`): dial `d` drives the
+   * motion amount `motionMax · (d / 100) ^ motionPower`, so dial 100 swings the delay as the old
+   * linear dial's 30 % did, and a real deck's few cents sit in the dial's lower half.
+   */
+  motionMax: 0.3,
+  motionPower: 2,
   wowHz: 1,
   flutterHz: 7,
   flutterMinHz: 2,
@@ -214,8 +221,15 @@ export const TAPE_MODELS = [
 export const TAPE_RANDOM = {
   driveMax: 32,
   drivePower: 1.8,
+  /** Dropouts' draw: `wearMax · u ^ wearPower`, linear in their dial. */
   wearMax: 50,
   wearPower: 2.5,
+  /**
+   * Wow's and Flutter's draws (windsor#818): `motionMax · u ^ motionPower`, a median about dial
+   * 25 (about 6 cents on the square law) and a top of dial 70.
+   */
+  motionMax: 70,
+  motionPower: 1.5,
   wowRateMin: 0.2,
   wowRateMax: 1.2,
   flutterRateMin: 4,

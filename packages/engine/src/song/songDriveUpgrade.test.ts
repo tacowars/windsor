@@ -63,7 +63,7 @@ const play = (patch: Patch): Float32Array =>
 
 describe('a version-5 song (windsor#300)', () => {
   it("opens at this build's version, through 6 to 10, with no correction, its drive out of the filter", () => {
-    expect(ARRANGEMENT_VERSION).toBe(15);
+    expect(ARRANGEMENT_VERSION).toBe(16);
     expect(KICK_PATCH.drive.gain).not.toBe(1); // the case is a driven patch
     const result = open(versionFive());
     expect(result.refused).toBeUndefined();
