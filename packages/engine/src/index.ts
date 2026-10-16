@@ -402,7 +402,7 @@ export type { BakeOptions } from './render/offlineRender';
 export { renderRefusal, renderSong, songSeconds } from './render/renderSong';
 export type { RenderSongOptions, RenderedSong } from './render/renderSong';
 export { encodeWav, encodeWavAsync, encodeWavStream } from './render/wavEncoder';
-export type { EncodedWav, WavStreamOptions } from './render/wavEncoder';
+export type { EncodedWav, WavCounts, WavStreamOptions } from './render/wavEncoder';
 export {
   RENDER_MAX_FRAMES,
   RENDER_SAMPLE_RATES,

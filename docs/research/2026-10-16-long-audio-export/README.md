@@ -48,10 +48,10 @@ bytes per sample, and a file of exactly the header plus the data. Every file
 passed. Each file was deleted after its case, and the profile with the
 browser.
 
-**Machine:** Apple M4 Pro (14 cores), 64 GB, macOS 26.5.1, Chrome
-155.0.8059.80 headless (`--headless=new`), the same Chrome the project's
-headless browser runs, in an instance of its own so that the renderer
-process sampled is this page's alone. Offline rendering
+**Machine:** a 14-core arm64 laptop with 64 GB of memory, macOS 26.5.1,
+Chrome 155.0.8059.80 headless (`--headless=new`), the same Chrome the
+project's headless browser runs, in an instance of its own so that the
+renderer process sampled is this page's alone. Offline rendering
 (`OfflineAudioContext`). 2026-10-16, one run per case, the raw figures in
 `results/2026-10-16T14-39-05-386Z.json`.
 

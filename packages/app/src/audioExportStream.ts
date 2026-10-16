@@ -21,6 +21,7 @@ import type {
   RenderSongOptions,
   RenderedSong,
   WavBitDepth,
+  WavCounts,
 } from '@windsor/engine';
 import { RENDER_MAX_FRAMES, RENDER_STREAM_MAX_FRAMES, renderRefusal } from '@windsor/engine';
 import { DOWNLOAD_LENGTH_REMEDY } from './audioExportConstants';
@@ -87,7 +88,7 @@ export interface StreamedExportRun extends Omit<AudioExportRun, 'sink' | 'encode
     sampleRate: number,
     bitDepth: WavBitDepth,
     options: { signal: AbortSignal; write: (bytes: Uint8Array<ArrayBuffer>) => Promise<void> },
-  ) => Promise<{ clipped: number }>;
+  ) => Promise<WavCounts>;
 }
 
 /** Render, then stream the encode into the picked file and close it; or abort it and say why. */
@@ -109,7 +110,7 @@ export async function runStreamedExport(run: StreamedExportRun): Promise<AudioEx
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     const open = await sink.stream();
     writable = open;
-    const { clipped } = await run.encodeStream(
+    const { clipped, nonFinite } = await run.encodeStream(
       rendered.channels,
       rendered.sampleRate,
       settings.bitDepth,
@@ -119,7 +120,7 @@ export async function runStreamedExport(run: StreamedExportRun): Promise<AudioEx
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     closing = true;
     await open.close();
-    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
+    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped, nonFinite };
   } catch (error) {
     await writable?.abort().catch(() => undefined);
     await sink.discard().catch(() => undefined);

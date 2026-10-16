@@ -195,6 +195,7 @@ describe('runStreamedExport', () => {
       fileName: 'song.wav',
       where: 'song.wav, where you chose',
       clipped: 0,
+      nonFinite: 0,
     });
   });
 
@@ -224,7 +225,7 @@ describe('runStreamedExport', () => {
             sizes.push(size);
             await write(new Uint8Array(size));
           }
-          return { clipped: 0 };
+          return { clipped: 0, nonFinite: 0 };
         },
       }),
     );
@@ -307,7 +308,13 @@ describe('runStreamedExport', () => {
       expect(outcome).toEqual(
         failure
           ? { kind: 'failed', error: 'quota exceeded' }
-          : { kind: 'saved', fileName: 'song.wav', where: 'song.wav, where you chose', clipped: 0 },
+          : {
+              kind: 'saved',
+              fileName: 'song.wav',
+              where: 'song.wav, where you chose',
+              clipped: 0,
+              nonFinite: 0,
+            },
       );
       expect(log.filter((entry) => entry === 'close')).toHaveLength(1);
     }

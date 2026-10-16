@@ -12,7 +12,8 @@
  *
  * Float: every sample is written as it is, with no dither and no clip, and
  * one outside [-1, 1] is counted as kept. A non-finite sample (NaN, ±∞) has
- * no place in a file a tool reads back, so it is written as 0 and counted.
+ * no place in a file a tool reads back, so it is written as 0 and counted
+ * apart, as non-finite.
  *
  * `encodeWavAsync` writes the same bytes in chunks, yielding between them, so
  * a long song's encode can be cancelled (windsor#51). `encodeWavStream`
@@ -40,14 +41,16 @@ import {
   WAV_RIFF_SIZE_OFFSET,
 } from './renderConstants';
 
-export interface EncodedWav {
-  bytes: Uint8Array;
-  /**
-   * Samples, counted over every channel, outside [-1, 1]: clipped in a PCM
-   * file, kept in a float one. A float file counts its non-finite samples,
-   * written as 0, here too.
-   */
+/** What an encode counted, over every channel. */
+export interface WavCounts {
+  /** Finite samples outside [-1, 1]: clipped in a PCM file, kept in a float one. */
   clipped: number;
+  /** Non-finite samples (NaN, ±∞) a float file wrote as 0; always 0 for a PCM file. */
+  nonFinite: number;
+}
+
+export interface EncodedWav extends WavCounts {
+  bytes: Uint8Array;
 }
 
 export interface WavOptions {
@@ -177,7 +180,7 @@ export async function encodeWavStream(
   sampleRate: number,
   bitDepth: WavBitDepth,
   options: WavStreamOptions,
-): Promise<{ clipped: number }> {
+): Promise<WavCounts> {
   const { signal, write, chunkFrames = WAV_ENCODE_CHUNK_FRAMES } = options;
   checkChunkFrames(chunkFrames);
   const encoder = new SampleEncoder(channels, bitDepth, options);
@@ -188,7 +191,7 @@ export async function encodeWavStream(
   const view = new DataView(chunk.buffer);
   for (;;) {
     throwIfAborted(signal);
-    if (encoder.done) return { clipped: encoder.clipped };
+    if (encoder.done) return encoder.counts();
     const length = encoder.encode(chunk, view, 0, chunkFrames);
     await write(length === chunk.length ? chunk : chunk.subarray(0, length));
   }
@@ -234,15 +237,16 @@ class WholeFile {
   }
 
   result(): EncodedWav {
-    return { bytes: this.bytes, clipped: this.encoder.clipped };
+    return { bytes: this.bytes, ...this.encoder.counts() };
   }
 }
 
-/** One encode in progress: the dither PRNG, the count of samples past full scale, the next frame. */
+/** One encode in progress: the dither PRNG, the counts of samples past full scale and non-finite, the next frame. */
 class SampleEncoder {
   readonly frames: number;
   readonly blockAlign: number;
-  clipped = 0;
+  private clipped = 0;
+  private nonFinite = 0;
   private frame = 0;
   private readonly float: boolean;
   private readonly bytesPerSample: number;
@@ -263,6 +267,10 @@ class SampleEncoder {
       bitDepth === WAV_DITHERED_BIT_DEPTH
         ? mulberry32(options.ditherSeed ?? WAV_DITHER_SEED)
         : null;
+  }
+
+  counts(): WavCounts {
+    return { clipped: this.clipped, nonFinite: this.nonFinite };
   }
 
   get done(): boolean {
@@ -304,13 +312,13 @@ class SampleEncoder {
 
   private floats(view: DataView, start: number, end: number): void {
     const { bytesPerSample, channels } = this;
-    let { clipped } = this;
+    let { clipped, nonFinite } = this;
     let at = start;
     for (let frame = this.frame; frame < end; frame++) {
       for (const channel of channels) {
         let sample = channel[frame] ?? 0;
         if (!Number.isFinite(sample)) {
-          clipped++;
+          nonFinite++;
           sample = 0;
         } else if (sample > 1 || sample < -1) {
           clipped++;
@@ -320,6 +328,7 @@ class SampleEncoder {
       }
     }
     this.clipped = clipped;
+    this.nonFinite = nonFinite;
   }
 }
 

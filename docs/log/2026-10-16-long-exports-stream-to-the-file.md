@@ -42,11 +42,12 @@ the file as it was.
      20 BPM, 76.8 minutes by `songSeconds`. With the 10 s tail, the 60 ms
      lead-in and the output stage's latency it fits, less than two seconds
      under the cap, which `renderRefusal.test.ts` pins in every output stage
-     mode. Headless Chrome 155 on an Apple M4 Pro exported that song at
-     24-bit and at 32-bit float through the streamed run, with the
-     renderer's peak at 1 957 MiB, against 3 682 and 5 332 MiB for today's
-     whole-file path (`docs/research/2026-10-16-long-audio-export/`). So
-     the cap is the full length, not the issue's 35-minute fallback.
+     mode. Headless Chrome 155 on a 14-core arm64 laptop with 64 GB of
+     memory (macOS 26.5.1) exported that song at 24-bit and at 32-bit
+     float through the streamed run, with the renderer's peak at
+     1 957 MiB, against 3 682 and 5 332 MiB for today's whole-file path
+     (`docs/research/2026-10-16-long-audio-export/`). So the cap is the
+     full length, not the issue's 35-minute fallback.
    - `renderRefusal` and `renderSong` take the cap as a parameter that
      defaults to `RENDER_MAX_FRAMES`. The console's `exportRefusal` passes
      the stream cap for Save as with Stems off. `renderRefusal` also takes
@@ -68,9 +69,11 @@ the file as it was.
      `data`: 58 bytes. Every new number is in `renderConstants.ts`.
    - Samples are written as they are: little-endian float32, no dither, no
      clip. A non-finite sample is written as 0.
-   - `clipped` counts the samples beyond ±1 that a float file kept, and its
-     non-finite samples too. The toast is a `warning`: "saved a.wav to x —
-     3 samples over full scale, kept in the float file". A PCM file's toast
+   - `clipped` counts the samples beyond ±1 that a float file kept, and
+     `nonFinite` the non-finite ones it wrote as 0 (always 0 for PCM). The
+     toast is a `warning` that names each count that is not zero: "saved
+     a.wav to x — 3 samples over full scale, kept in the float file; 2
+     non-finite samples written as silence". A PCM file's toast
      is unchanged ("… clipped at full scale; lower the master level and
      export again").
    - The control's third option reads `32-bit float`; 16 and 24 keep their

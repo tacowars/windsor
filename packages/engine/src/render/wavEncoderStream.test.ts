@@ -37,11 +37,14 @@ describe('encodeWavStream', () => {
     for (const bits of [16, 24, 32] as WavBitDepth[]) {
       for (const frames of [1001, 1, 0]) {
         const channels = noisy(frames);
+        // A NaN, so the non-finite count is compared too (counted by float alone).
+        if (frames > 1) channels[0]![1] = NaN;
         const whole = encodeWav(channels, 44100, bits);
+        expect(whole.nonFinite).toBe(bits === 32 && frames > 1 ? 1 : 0);
         const { write, joined, pieces } = collector();
         const streamed = await encodeWavStream(channels, 44100, bits, { write, chunkFrames: 100 });
         expect(joined()).toEqual(whole.bytes);
-        expect(streamed).toEqual({ clipped: whole.clipped });
+        expect(streamed).toEqual({ clipped: whole.clipped, nonFinite: whole.nonFinite });
         // The header, then ceil(frames / 100) chunks: nothing more.
         expect(pieces).toHaveLength(1 + Math.ceil(frames / 100));
       }

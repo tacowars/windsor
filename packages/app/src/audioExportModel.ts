@@ -140,7 +140,7 @@ export interface AudioExportRun {
 }
 
 export type AudioExportOutcome =
-  | { kind: 'saved'; fileName: string; where: string; clipped: number }
+  | { kind: 'saved'; fileName: string; where: string; clipped: number; nonFinite: number }
   | { kind: 'cancelled' }
   | { kind: 'failed'; error: string };
 
@@ -154,20 +154,22 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       onProgress: run.onProgress,
     });
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
-    const { bytes, clipped } = await run.encode(
+    const { bytes, clipped, nonFinite } = await run.encode(
       rendered.channels,
       rendered.sampleRate,
       settings.bitDepth,
       { signal },
     );
-    return { file: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME }), clipped };
+    const file = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME });
+    return { file, clipped, nonFinite };
   });
 }
 
-/** What a run makes before it writes: the whole file, and the samples clipped making it. */
+/** What a run makes before it writes: the whole file, and the samples clipped or non-finite making it. */
 export interface MadeFile {
   file: Blob;
   clipped: number;
+  nonFinite: number;
 }
 
 /**
@@ -182,13 +184,13 @@ export async function runToSink(
   const { sink, signal } = run;
   let writing = false;
   try {
-    const { file, clipped } = await make();
+    const { file, clipped, nonFinite } = await make();
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     // From here the sink decides: past its commit point a Cancel changes
     // nothing, and the write resolves (saved) or fails with its own error.
     writing = true;
     await sink.write(file, signal);
-    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
+    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped, nonFinite };
   } catch (error) {
     await sink.discard().catch(() => undefined);
     return failureOutcome(error, signal, writing);
@@ -213,7 +215,8 @@ export function failureOutcome(
 /**
  * The toast for an outcome: where the file went, and a warning when samples
  * passed full scale, clipped in a PCM file and kept in a float one
- * (windsor#822 decision 4).
+ * (windsor#822 decision 4), or when a float file wrote non-finite samples as
+ * silence.
  */
 export function exportNotice(
   outcome: AudioExportOutcome,
@@ -225,13 +228,8 @@ export function exportNotice(
     case 'failed':
       return { message: `audio export failed: ${outcome.error}`, tone: 'error' };
     case 'saved':
-      if (outcome.clipped > 0 && bitDepth === WAV_FLOAT_BIT_DEPTH) {
-        return {
-          message:
-            `saved ${outcome.fileName} to ${outcome.where} — ${outcome.clipped} samples over ` +
-            'full scale, kept in the float file',
-          tone: 'warning',
-        };
+      if (bitDepth === WAV_FLOAT_BIT_DEPTH && (outcome.clipped > 0 || outcome.nonFinite > 0)) {
+        return { message: floatWarning(outcome), tone: 'warning' };
       }
       if (outcome.clipped > 0) {
         return {
@@ -243,4 +241,16 @@ export function exportNotice(
       }
       return { message: `saved ${outcome.fileName} to ${outcome.where}`, tone: 'success' };
   }
+}
+
+/** A float file's warning: the samples kept over full scale, and the non-finite ones written as 0. */
+function floatWarning(outcome: Extract<AudioExportOutcome, { kind: 'saved' }>): string {
+  const notes: string[] = [];
+  if (outcome.clipped > 0) {
+    notes.push(`${outcome.clipped} samples over full scale, kept in the float file`);
+  }
+  if (outcome.nonFinite > 0) {
+    notes.push(`${outcome.nonFinite} non-finite samples written as silence`);
+  }
+  return `saved ${outcome.fileName} to ${outcome.where} — ${notes.join('; ')}`;
 }

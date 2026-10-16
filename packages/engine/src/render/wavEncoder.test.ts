@@ -170,6 +170,7 @@ describe('encodeWavAsync', () => {
           yieldToLoop: () => Promise.resolve(),
         });
         expect(chunked.clipped).toBe(sync.clipped);
+        expect(chunked.nonFinite).toBe(sync.nonFinite);
         expect(chunked.bytes).toEqual(sync.bytes);
       }
     }
@@ -273,7 +274,7 @@ describe('the 32-bit float file', () => {
   it('writes samples as they are, keeps and counts the ones past full scale', () => {
     const left = Float32Array.from([0, 1.5, -2, 0.123456789, -1, 1]);
     const right = Float32Array.from([1e-30, -0.5, 0.25, 0, 3, 0]);
-    const { bytes, clipped } = encodeWav([left, right], 44100, 32);
+    const { bytes, clipped, nonFinite } = encodeWav([left, right], 44100, 32);
     expect(bytes.length).toBe(58 + 6 * 8);
     const file = parse(bytes);
     expect(file.fact).toBe(6);
@@ -283,15 +284,17 @@ describe('the 32-bit float file', () => {
     expect(file.sample(1 * 2)).toBe(1.5);
     // 1.5, -2 and 3 are over; ±1 exactly is not.
     expect(clipped).toBe(3);
+    expect(nonFinite).toBe(0);
   });
 
-  it('writes a non-finite sample as 0 and counts it', () => {
+  it('writes a non-finite sample as 0 and counts it as non-finite, not as over full scale', () => {
     const left = Float32Array.from([NaN, 0.5, Infinity]);
     const right = Float32Array.from([-Infinity, 0, 0.25]);
-    const { bytes, clipped } = encodeWav([left, right], 48000, 32);
+    const { bytes, clipped, nonFinite } = encodeWav([left, right], 48000, 32);
     const file = parse(bytes);
     expect(Array.from({ length: 6 }, (_, i) => file.sample(i))).toEqual([0, 0, 0.5, 0, 0, 0.25]);
-    expect(clipped).toBe(3);
+    expect(clipped).toBe(0);
+    expect(nonFinite).toBe(3);
   });
 
   it('adds no dither: silence is all zeros, and two seeds give the same file', () => {

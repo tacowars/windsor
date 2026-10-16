@@ -149,6 +149,7 @@ describe('runStemExport', () => {
       fileName: 'night bus-stems.zip',
       where: 'your downloads',
       clipped: 128,
+      nonFinite: 0,
     });
   });
 

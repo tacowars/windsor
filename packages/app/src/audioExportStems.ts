@@ -84,6 +84,7 @@ export function runStemExport(run: StemExportRun): Promise<AudioExportOutcome> {
     const zip = new StoredZipWriter(run.modified);
     const parts: BlobPart[] = [];
     let clipped = 0;
+    let nonFinite = 0;
     await run.render(
       run.document,
       {
@@ -96,6 +97,7 @@ export function runStemExport(run: StemExportRun): Promise<AudioExportOutcome> {
       async ({ stem, channels, sampleRate }) => {
         const wav = await run.encode(channels, sampleRate, settings.bitDepth, { signal });
         clipped += wav.clipped;
+        nonFinite += wav.nonFinite;
         const crc = await crc32Async(wav.bytes, { signal });
         const header = zip.entry(stemFileName(run.exportName, stem), wav.bytes.length, crc);
         parts.push(
@@ -105,6 +107,6 @@ export function runStemExport(run: StemExportRun): Promise<AudioExportOutcome> {
       },
     );
     parts.push(zip.finish() as Uint8Array<ArrayBuffer>);
-    return { file: new Blob(parts, { type: ZIP_MIME }), clipped };
+    return { file: new Blob(parts, { type: ZIP_MIME }), clipped, nonFinite };
   });
 }
