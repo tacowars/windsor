@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Song tab's right-click menu on the part lanes (long press on touch),
+     desktop, for tacowars to approve before an issue is written. The frame
+     redraws today's Song tab at real size from a screenshot of the dev build
+     (song-tab-today.png, 1440 px wide, 16 bars fitted at 75.6875 px a bar):
+     the parts, colors, region positions and summaries are the ones it
+     shows. Sizes and colors are copied from packages/app/src/console.css
+     (the tokens, .lanes, .lane, .reg, .ruler, .loop-strip, .hdl, .seam and
+     the .knob-cc-menu / .song-menu panels) and songViewTables.ts (SONG_VIEW,
+     REGION_SUMMARY, blockBox's 2 px gap). The detail pane under the lanes is
+     a labelled stand-in. Static and self-contained: open it in a browser.
+     The controls above the frame are the mockup's own switches, not part of
+     the console. Hovering a menu item previews what it would do, dashed. -->
+<title>Song Region Menu</title>
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from console.css; the app is dark only, so the page is too. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  /* songViewTables.ts SONG_VIEW, collapsed mixer; the bar is the fitted zoom of the screenshot */
+  --tab: 20px;
+  --tab-gap: 4px;
+  --row-pad: 2px;
+  --fold: 50px;
+  --fold-gap: 4px;
+  --frozen: 166px;
+  --gap: 8px;
+  --row-gap: 4px;
+  --lane-h: 40px;
+  --bar: 75.6875px;
+  --bars: 16;
+  --pad-x: 14px;
+  --pad-top: 12px;
+  /* The menu's row height: the mockup's switch sets it. */
+  --mi-h: 32px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 14px; line-height: 1.5; }
+.page { max-width: 1480px; margin: 0 auto; padding: 28px 16px 64px; display: flex; flex-direction: column; gap: 24px; }
+h1, h2 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.12em; }
+p { margin: 0; max-width: 78ch; color: var(--ink-dim); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+code { font-family: var(--f-num); font-size: 12px; color: var(--ink); }
+section { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+.notes { margin: 0; padding-left: 18px; color: var(--ink-dim); max-width: 86ch; display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- the mockup's own switches ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; padding: 12px 14px; border: 1px dashed var(--line-bright); border-radius: var(--r); }
+.controls .tag { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); width: 100%; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span, .check { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; min-height: 32px; }
+.check input { accent-color: var(--carrier); width: 16px; height: 16px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg button { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; min-height: 32px; padding: 6px 12px; background: var(--panel); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed='true'] { background: var(--carrier); color: var(--ground); }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.caption { font-size: 13px; color: var(--ink-dim); max-width: 100ch; }
+.caption b { color: var(--ink); font-weight: 600; }
+
+/* ---------- the frame: today's Song tab, redrawn ---------- */
+.scroller { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); }
+.frame { position: relative; width: calc(var(--pad-x) * 2 + var(--frozen) + var(--gap) + var(--bars) * var(--bar)); height: 760px; background: var(--ground); overflow: hidden; user-select: none; }
+.lanes { position: absolute; left: var(--pad-x); top: var(--pad-top); display: flex; flex-direction: column; gap: var(--row-gap); }
+.lane-group { display: flex; gap: var(--gap); align-items: stretch; }
+.lane-frozen { flex: none; width: var(--frozen); }
+.lane-timeline { flex: none; display: flex; flex-direction: column; gap: var(--row-gap); width: calc(var(--bars) * var(--bar)); }
+
+/* The head: "Mixer" over "loop"; the ruler over the loop strip. */
+.lane-head { display: flex; flex-direction: column; gap: var(--row-gap); }
+.mix-head { display: flex; align-items: center; gap: 6px; height: 22px; padding-left: 6px; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+.mix-head .bb { margin-left: auto; padding-right: 6px; font-size: 9px; letter-spacing: 0.1em; color: var(--ink-faint); }
+.ruler-name { height: 12px; text-align: right; padding: 0 6px; font-family: var(--f-num); font-size: 9px; line-height: 12px; color: var(--ink-faint); }
+.ruler { display: flex; border-bottom: 1px solid var(--line-bright); height: 22px; }
+.ruler-bar { position: relative; flex: none; width: var(--bar); border-left: 1px solid var(--line-bright); font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 2px; }
+.ruler-bar i { position: absolute; bottom: 0; width: 1px; height: 6px; background: var(--line-bright); }
+.loop-strip { position: relative; height: 12px; }
+.loop-brace { position: absolute; top: 2px; bottom: 2px; background: var(--ink-dim); border-radius: 1px; }
+.loop-handle { position: absolute; top: 0; width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.loop-handle.start { left: 0; border-left: 6px solid var(--ink); }
+.loop-handle.end { right: 0; border-right: 6px solid var(--ink); }
+
+/* The harmony lane. */
+.lane-name { display: flex; flex-direction: column; justify-content: center; height: var(--lane-h); padding: 0 6px; font-family: var(--f-panel); line-height: 1.15; }
+.lane-name b { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.lane-name small { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); letter-spacing: 0.04em; }
+.hblk { position: absolute; top: 3px; bottom: 3px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-top: 3px solid var(--modulator); border-radius: var(--r); padding: 2px 6px; font-family: var(--f-panel); display: flex; flex-direction: column; line-height: 1.15; overflow: hidden; }
+.hblk b { font-size: 11px; font-weight: 600; }
+.hblk small { font-family: var(--f-num); font-size: 8.5px; color: var(--ink-faint); }
+
+/* A part's block in the frozen column: number tab, fold, compact strip. */
+.lane-col { display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: var(--tab-gap); height: var(--lane-h); }
+.lane-col.selected { outline: 1px solid var(--pc); outline-offset: 2px; border-radius: 2px; }
+.lane-tab { display: flex; justify-content: center; border-radius: 2px; background: var(--pc); }
+.lane-tab b { font-family: var(--f-num); font-size: 11px; font-weight: 600; letter-spacing: -0.02em; line-height: var(--lane-h); color: #14181a; }
+.lane-part { display: grid; grid-template-columns: var(--fold) minmax(0, 1fr); align-items: center; column-gap: var(--fold-gap); height: var(--lane-h); padding: 0 var(--row-pad); border-radius: var(--r); }
+.lane-col.selected .lane-part { background: var(--panel-hi); }
+.fold { display: grid; place-items: center; color: var(--ink-faint); }
+.mix-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.dial-face { fill: var(--inset); stroke: var(--line); }
+.dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-arc { stroke: var(--modulator); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.ms { display: flex; gap: 3px; }
+.ms span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); font-family: var(--f-panel); font-size: 10px; font-weight: 600; color: var(--ink-dim); }
+
+/* A part's lane and its regions. */
+.lane { position: relative; height: var(--lane-h); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; }
+.lane.selected { border-color: var(--pc); }
+.reg { position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--pc); background-color: color-mix(in srgb, var(--pc) 19%, transparent); color: var(--ink); font-family: var(--f-panel); font-size: 10px; font-variant: small-caps; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; }
+.reg.cyc { background-image: repeating-linear-gradient(90deg, rgba(220, 227, 227, 0.22) 0 1px, transparent 1px var(--cyc)); }
+.reg.selected { box-shadow: 0 0 0 1px var(--ink); border-color: var(--ink); }
+.reg .gl { flex: none; font-family: var(--f-ui); font-size: 11px; line-height: 1; color: var(--pc); font-variant: normal; }
+.hdl { position: absolute; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--carrier); opacity: 0.45; }
+.hdl.s { left: 2px; }
+.hdl.e { right: 2px; }
+.seam { position: absolute; top: -3px; bottom: -3px; width: 12px; margin-left: -7px; display: flex; justify-content: center; opacity: 0.45; z-index: 2; }
+.seam i { width: 2px; background: var(--carrier); border-radius: 1px; box-shadow: 0 0 0 1px var(--well); }
+.seam b { position: absolute; top: 50%; left: 2px; width: 8px; height: 14px; margin-top: -7px; border-radius: 2px; background: linear-gradient(90deg, var(--carrier) 0 3px, var(--well) 3px 5px, var(--carrier) 5px); }
+
+/* The playhead and loop lines run down every lane. */
+.overlay { position: absolute; top: var(--pad-top); left: calc(var(--pad-x) + var(--frozen) + var(--gap)); width: calc(var(--bars) * var(--bar)); pointer-events: none; }
+.ph-line { position: absolute; top: 0; width: 2px; background: var(--carrier); box-shadow: 0 0 6px var(--carrier); z-index: 2; }
+.ph-line i { position: absolute; top: -2px; left: 4px; font-style: normal; font-family: var(--f-num); font-size: 9px; color: var(--carrier); white-space: nowrap; }
+.loop-line { position: absolute; top: 0; width: 1px; background: var(--ink-dim); z-index: 1; }
+
+/* What a hovered item would do, dashed: the mockup's preview only. */
+.pv-reg { position: absolute; top: 3px; bottom: 3px; border: 1px dashed var(--carrier); border-radius: var(--r); background: color-mix(in srgb, var(--carrier) 12%, transparent); z-index: 3; }
+.pv-line { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px dashed var(--carrier); z-index: 3; }
+.pv-brace { opacity: 0.85; outline: 1px dashed var(--carrier); outline-offset: 1px; }
+
+/* The detail pane: a stand-in under the lanes. */
+.pane { position: absolute; left: var(--pad-x); right: var(--pad-x); top: 340px; bottom: 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line-bright); padding-top: 10px; }
+.pane-head { display: flex; align-items: center; gap: 10px; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.pane-head small { font-family: var(--f-num); font-size: 9.5px; font-weight: 400; letter-spacing: 0.04em; text-transform: none; color: var(--ink-faint); }
+.pane-head .pbtn { padding: 3px 9px; border: 1px solid var(--line-bright); border-radius: var(--r); font-size: 10px; letter-spacing: 0.1em; color: var(--ink); }
+.pane-head .x { margin-left: auto; color: var(--ink-faint); }
+.pane-body { flex: 1; display: grid; place-items: center; border: 1px dashed var(--line-bright); border-radius: var(--r); background: var(--panel); color: var(--ink-faint); font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+
+/* ---------- the menu, after .knob-cc-menu / .song-menu ---------- */
+.ctx { position: absolute; z-index: 50; min-width: 220px; padding: 4px 0; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.ctx-head { margin-bottom: 3px; padding: 3px 12px 5px; border-bottom: 1px solid var(--line); color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.ctx button { display: flex; align-items: center; gap: 16px; width: 100%; min-height: var(--mi-h); padding: 0 12px; background: none; border: 0; color: var(--ink); font: 12px var(--f-ui); text-align: left; cursor: pointer; white-space: nowrap; }
+.ctx button:hover:not(:disabled), .ctx button:focus-visible, .ctx button.open { background: var(--panel-hi); outline: none; }
+.ctx button:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.ctx button .tag { margin-left: auto; color: var(--ink-faint); font: 9.5px var(--f-num); }
+.ctx button .sub { margin-left: auto; color: var(--ink-dim); font-size: 13px; }
+.ctx hr { margin: 3px 0; border: 0; border-top: 1px solid var(--line); }
+.cursor { position: absolute; z-index: 60; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+
+/* ---------- to decide ---------- */
+.decide { margin: 0; padding-left: 22px; color: var(--ink-dim); max-width: 92ch; display: flex; flex-direction: column; gap: 8px; }
+.decide li::marker { color: var(--carrier); font-family: var(--f-num); }
+</style>
+
+<div class="page">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <span class="eyebrow">Song tab · desktop · mockup for approval</span>
+    <h1>Right-click menu on the part lanes</h1>
+    <p>A right-click on a region (a long press on touch, 450 ms as the part color picker's) selects it, as a click does today, and opens this menu at the pointer. A right-click on a gap selects the part and opens the empty-lane menu. The lanes are today's dev build: five parts made in the browser after the old-format song files were refused (see the notes). Hover an item to see what it would do.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Mockup switches">
+    <span class="tag">Mockup switches, not part of the console</span>
+    <div class="field"><span>Right-clicked on</span>
+      <div class="seg" id="state">
+        <button type="button" data-v="grid" aria-pressed="true">Grid region</button>
+        <button type="button" data-v="arp" aria-pressed="false">Arp region</button>
+        <button type="button" data-v="roll" aria-pressed="false">Roll region</button>
+        <button type="button" data-v="euclid" aria-pressed="false">Euclid region</button>
+        <button type="button" data-v="gap" aria-pressed="false">Empty lane</button>
+        <button type="button" data-v="none" aria-pressed="false">No-sequencer part</button>
+      </div>
+    </div>
+    <div class="field"><span>Clipboard</span>
+      <div class="seg" id="clip">
+        <button type="button" data-v="" aria-pressed="false">Empty</button>
+        <button type="button" data-v="grid" aria-pressed="true">Grid clip, 4 bars</button>
+        <button type="button" data-v="euclidean" aria-pressed="false">Euclid clip, 8 bars</button>
+      </div>
+    </div>
+    <div class="field"><span>Row height</span>
+      <div class="seg" id="rowh">
+        <button type="button" data-v="26px" aria-pressed="false">26 (⋯ menu today)</button>
+        <button type="button" data-v="32px" aria-pressed="true">32</button>
+        <button type="button" data-v="40px" aria-pressed="false">40</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="captured"> Kick region captured</label>
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <div class="scroller">
+    <div class="frame" id="frame">
+      <div class="lanes" id="lanes"></div>
+      <div class="overlay" id="overlay"></div>
+      <div class="pane" id="pane"></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>What the menu holds</h2>
+    <ul class="notes">
+      <li><strong>Region menu:</strong> Cut, Copy, Paste, Duplicate, Delete and Split here; Zoom to region and Loop region; the part's pattern actions, the ones its card offers today; Bounce part to Roll… and Part color…. Paste reads "Paste at bar N" and lands at the right-clicked bar, rounded down; Split here cuts at the nearest bar line (<code>splitRegion</code>'s snap). ⌘V still pastes at the playhead, so the menu's Paste carries no ⌘V hint. Paste is disabled with its reason when nothing is copied or the clip is another kind. Menu text is US English (Color, Quantize).</li>
+      <li><strong>Pattern actions by kind, from the cards:</strong> Grid has Randomize and Reverse and no Reseed (<code>gridControls.ts</code>). Arp, Basslead and Figure add Reseed (<code>arpCard.ts</code>, <code>bassCard.ts</code>, <code>figureControls.ts</code>). Euclid has Capture or Release (<code>euclidPatternPage.ts</code>). Roll has Quantize, named with the card's Snap ("to 1/16"; disabled at Snap Off). Fit region to pattern sets the region to one pass of its pattern: the Roll's loop, or length × step on Grid, Euclid and Basslead, and Figure's schedule; Arp and a Figure canon have no cycle and don't get it. Chord's card has only Delete last, so a Chord region gets no pattern section.</li>
+      <li><strong>Bounce part to Roll…</strong> follows <code>bounceButtonState</code>: it isn't shown on a Roll or a no-sequencer part. A part with no regions has no region menu, so it is never drawn disabled here.</li>
+      <li><strong>The no-sequencer lane is drawn as it is today:</strong> a new part gets one whole-song region (∞, "no sequencer"), and its lane can be split, drawn on, copied and pasted like any other. Its region menu has the edits, Zoom and Loop, and <strong>Set sequencer ▸</strong> where the pattern actions go. The submenu lists <code>KIND_LABELS</code> without None and calls <code>setSequencerKindLive</code>.</li>
+      <li><strong>Placement:</strong> the menu opens at the pointer. If it would cross the window's edge it flips above or to the left, then clamps, as <code>songRowMenuPlacement.ts</code> does for the ⋯ menu. The submenu opens beside its row and flips left near the right edge. The panel, border, shadow, head and dim right-aligned tags are <code>.knob-cc-menu</code>'s. Rows are 32 px on desktop. The only touch device in scope is tacowars's 12.9-inch iPad Pro; its row height is set by the tablet mockup, which follows this one.</li>
+      <li><strong>Data:</strong> <code>songs/escalera.json</code> and <code>songs/clicks.json</code> are song format 3, and this build reads 16, so both were refused. The frame is built from a song made in the dev build at 16 bars, named after escalera's parts: acid (Grid), kick (Euclid), lead (Roll, 4 notes on a 3-bar loop in its first region), arp (Arp) and pad (no sequencer).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Decided</h2>
+    <ol class="decide">
+      <li><strong>Fit region to pattern:</strong> on Roll and on every kind with a cycle (Grid, Euclid, Basslead, Figure), set to one pass. Not on Arp or a Figure canon.</li>
+      <li><strong>Paste with nothing copied or a clip of another kind:</strong> disabled, its reason in the tag.</li>
+      <li><strong>Paste's label:</strong> "Paste at bar N", no ⌘V hint.</li>
+      <li><strong>Header line:</strong> kept.</li>
+      <li><strong>Row height:</strong> 32 px on desktop; the 12.9-inch iPad Pro is mocked next.</li>
+      <li><strong>Set sequencer:</strong> does what the Parts tab's Seq picker does (<code>setSequencerKindLive</code>), Roll's case included.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  const PPB = 75.6875;       // the screenshot's fitted px per bar (16 bars in 1211 px)
+  const BLOCK_GAP = 2;       // songViewTables.ts blockBox
+  const LANE_TOP = 12 + 38 + 4 + 40 + 4; // pad, head (22 + 4 + 12), gap, harmony, gap
+  const ROW = 44;            // lane 40 + row gap 4
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  // Today's parts, from song-tab-today.png. Region: [start bar (1-based), bars, summary, cycle bars | null].
+  const PARTS = [
+    { n: 1, name: 'acid', kind: 'grid', label: 'Grid', c: '#6EA8E2',
+      summary: 'grid · 16 steps · 1/16',
+      regions: [[1, 4, 'grid · 16 steps · 1/16', 1], [5, 4, 'grid · 16 steps · 1/16', 1], [13, 4, 'grid · 16 steps · 1/16', 1]] },
+    { n: 2, name: 'kick', kind: 'euclidean', label: 'Euclid', c: '#EDE36E',
+      summary: 'euclid 5/16 · 1/16',
+      regions: [[1, 8, 'euclid 5/16 · 1/16', 1], [9, 8, 'euclid 5/16 · 1/16', 1]] },
+    { n: 3, name: 'lead', kind: 'roll', label: 'Roll', c: '#BC3D6D',
+      summary: 'roll · 4 notes · 3 bar loop',
+      regions: [[5, 4, 'roll · 4 notes · 3 bar loop', 3], [9, 4, 'roll · 0 notes · 4 bar loop', 4]] },
+    { n: 4, name: 'arp', kind: 'arp', label: 'Arp', c: '#8F7A55',
+      summary: 'arp · Up 1/16',
+      regions: [[1, 8, 'arp · Up 1/16', null], [9, 8, 'arp · Up 1/16', null]] },
+    { n: 5, name: 'pad', kind: 'none', label: 'None', c: '#6DE6FC',
+      summary: 'no sequencer',
+      regions: [[1, 16, 'no sequencer', null]] },
+  ];
+  const KIND_LABELS = ['Euclid', 'Grid', 'Chord', 'Arp', 'Basslead', 'Figure', 'Roll'];
+  const BOUNCE_KINDS = ['euclidean', 'grid', 'chord', 'arp', 'bass', 'figure'];
+  const KIND_NAME = { grid: 'Grid', euclidean: 'Euclid', roll: 'Roll', arp: 'Arp', none: 'no-sequencer' };
+
+  // Each state: the part, the region (null for a gap) and where the pointer is, in bars from the song start.
+  const STATES = {
+    grid: { part: 0, region: 1, at: 5.3 },
+    arp: { part: 3, region: 0, at: 2.4 },
+    roll: { part: 2, region: 0, at: 5.4 },
+    euclid: { part: 1, region: 1, at: 11.3 },
+    gap: { part: 0, region: null, at: 9.4 },
+    none: { part: 4, region: 0, at: 9.4 },
+  };
+  const ui = { state: 'grid', clip: 'grid', captured: false };
+
+  const h = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  const px = (bars) => bars * PPB;
+  const knob = () => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('width', '26'); s.setAttribute('height', '26'); s.setAttribute('viewBox', '0 0 26 26');
+    s.innerHTML = '<circle class="dial-face" cx="13" cy="13" r="8"/>' +
+      '<path class="dial-track" d="M6.1 19.9 A10 10 0 1 1 19.9 19.9"/>' +
+      '<path class="dial-arc" d="M6.1 19.9 A10 10 0 0 1 13 3"/>' +
+      '<line class="dial-pin" x1="13" y1="13" x2="13" y2="7.5"/>';
+    return s;
+  };
+  const arrow = () => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('width', '20'); s.setAttribute('height', '20'); s.setAttribute('viewBox', '0 0 16 16');
+    s.innerHTML = '<path d="M4 2.5 L13.5 8 L4 13.5 Z" fill="currentColor"/>';
+    return s;
+  };
+
+  const lanesEl = document.getElementById('lanes');
+  const overlay = document.getElementById('overlay');
+  const frame = document.getElementById('frame');
+  const pane = document.getElementById('pane');
+  const laneEls = [];
+  const regEls = [];
+  let loopStrip;
+
+  function drawHead() {
+    const g = h('div', 'lane-group');
+    const fz = h('div', 'lane-frozen lane-head');
+    const mh = h('div', 'mix-head');
+    const a = arrow(); a.style.color = 'var(--ink-dim)'; a.setAttribute('width', '16'); a.setAttribute('height', '16');
+    mh.append(a, h('span', '', 'Mixer'), h('span', 'bb', 'bar · beat'));
+    fz.append(mh, h('div', 'ruler-name', 'loop'));
+    const tl = h('div', 'lane-timeline');
+    const ruler = h('div', 'ruler');
+    for (let b = 1; b <= 16; b++) {
+      const bar = h('div', 'ruler-bar');
+      bar.appendChild(h('span', '', String(b)));
+      for (let q = 1; q < 4; q++) { const i = h('i'); i.style.left = `${(q / 4) * PPB}px`; bar.appendChild(i); }
+      ruler.appendChild(bar);
+    }
+    loopStrip = h('div', 'loop-strip');
+    tl.append(ruler, loopStrip);
+    tl.style.gap = '4px';
+    g.append(fz, tl);
+    lanesEl.appendChild(g);
+  }
+
+  function drawHarmony() {
+    const g = h('div', 'lane-group');
+    const nm = h('div', 'lane-frozen lane-name');
+    nm.append(h('b', '', 'Harmony'), h('small', '', 'chords'));
+    const tl = h('div', 'lane-timeline');
+    const lane = h('div', 'lane');
+    const blk = h('div', 'hblk');
+    blk.style.left = '0px'; blk.style.width = `${px(16) - BLOCK_GAP}px`;
+    blk.append(h('b', '', 'C min'), h('small', '', 'i · triad'));
+    lane.appendChild(blk);
+    tl.appendChild(lane);
+    g.append(nm, tl);
+    lanesEl.appendChild(g);
+  }
+
+  function drawParts() {
+    PARTS.forEach((p, i) => {
+      const g = h('div', 'lane-group');
+      const col = h('div', 'lane-frozen lane-col');
+      col.style.setProperty('--pc', p.c);
+      const tab = h('div', 'lane-tab'); tab.appendChild(h('b', '', String(p.n)));
+      const row = h('div', 'lane-part');
+      const fold = h('div', 'fold'); fold.appendChild(arrow());
+      const mix = h('div', 'mix-cell');
+      const ms = h('div', 'ms'); ms.append(h('span', '', 'M'), h('span', '', 'S'));
+      mix.append(knob(), ms);
+      row.append(fold, mix);
+      col.append(tab, row);
+      const tl = h('div', 'lane-timeline');
+      const lane = h('div', 'lane');
+      lane.style.setProperty('--pc', p.c);
+      tl.appendChild(lane);
+      g.append(col, tl);
+      lanesEl.appendChild(g);
+      laneEls[i] = { col, lane };
+    });
+  }
+
+  function paintRegions() {
+    PARTS.forEach((p, i) => {
+      const { lane, col } = laneEls[i];
+      const st = STATES[ui.state];
+      const selectedPart = st.part === i;
+      lane.classList.toggle('selected', selectedPart);
+      col.classList.toggle('selected', selectedPart);
+      lane.replaceChildren();
+      regEls[i] = p.regions.map(([s, d, sum, cyc], k) => {
+        const r = h('div', 'reg' + (cyc ? ' cyc' : ''));
+        r.style.left = `${px(s - 1)}px`;
+        r.style.width = `${px(d) - BLOCK_GAP}px`;
+        if (cyc) r.style.setProperty('--cyc', `${px(cyc)}px`);
+        const whole = d === 16;
+        r.append(h('span', 'gl', whole ? '∞' : '⟲'), h('span', 'lb', sum));
+        const sel = selectedPart && st.region === k;
+        r.classList.toggle('selected', sel);
+        if (sel) r.append(h('i', 'hdl s'), h('i', 'hdl e'));
+        lane.appendChild(r);
+        return r;
+      });
+      // The faint seam beside the selected block, where two regions touch.
+      if (selectedPart && st.region !== null) {
+        p.regions.forEach(([s, d], k) => {
+          const next = p.regions[k + 1];
+          if (!next || next[0] !== s + d) return;
+          if (k !== st.region && k + 1 !== st.region) return;
+          const seam = h('div', 'seam'); seam.style.left = `${px(s + d - 1)}px`;
+          seam.append(h('i'), h('b'));
+          lane.appendChild(seam);
+        });
+      }
+    });
+  }
+
+  function paintOverlay() {
+    overlay.replaceChildren();
+    overlay.style.height = `${LANE_TOP - 12 + PARTS.length * ROW - 4}px`;
+    const ph = h('div', 'ph-line'); ph.style.left = '0px'; ph.style.height = '100%';
+    ph.appendChild(h('i', '', '1.1.1'));
+    overlay.appendChild(ph);
+  }
+
+  function paintPane() {
+    const st = STATES[ui.state];
+    const p = PARTS[st.part];
+    const count = p.regions.length;
+    const headLabel = `${p.name} — ${p.label}`;
+    const head = h('div', 'pane-head');
+    head.append(h('span', '', '▾'), h('span', '', headLabel), h('small', '', `${p.summary} · ${count} region${count === 1 ? '' : 's'}`));
+    if (BOUNCE_KINDS.includes(p.kind)) head.appendChild(h('span', 'pbtn', 'Bounce to Roll'));
+    head.appendChild(h('span', 'x', '×'));
+    pane.replaceChildren(head, h('div', 'pane-body', `Stand-in: the ${p.label === 'None' ? 'no-sequencer' : p.label} device, unchanged by this design`));
+  }
+
+  // ---------- the menu ----------
+  const sep = { sep: true };
+  // The menu's Paste lands at the right-clicked bar, so it names the bar and carries no ⌘V hint (⌘V lands at the playhead).
+  function pasteItem(kind, bar) {
+    const label = `Paste at bar ${bar}`;
+    if (!ui.clip) return { label, tag: 'nothing copied', disabled: true };
+    if (ui.clip !== kind) return { label, tag: `clip is ${KIND_NAME[ui.clip]}`, disabled: true };
+    return { label, preview: 'paste' };
+  }
+  // One pass of the region's pattern: the Roll's loop, or a step kind's length × step. Arp has no cycle.
+  function fitItem(reg) {
+    const cyc = reg[3];
+    if (cyc === reg[1]) return { label: 'Fit region to pattern', tag: 'already fits', disabled: true };
+    return { label: 'Fit region to pattern', tag: `${cyc} bar${cyc === 1 ? '' : 's'}`, preview: 'fit' };
+  }
+  function patternItems(p, regionIndex) {
+    switch (p.kind) {
+      case 'grid': return [{ label: 'Randomize' }, { label: 'Reverse' }, fitItem(p.regions[regionIndex])];
+      case 'arp': return [{ label: 'Randomize' }, { label: 'Reverse' }, { label: 'Reseed' }];
+      case 'bass': case 'figure': return [{ label: 'Randomize' }, { label: 'Reverse' }, { label: 'Reseed' }, fitItem(p.regions[regionIndex])];
+      case 'euclidean': return [{ label: ui.captured ? 'Release' : 'Capture' }, fitItem(p.regions[regionIndex])];
+      case 'roll': return [{ label: 'Quantize to 1/16', tag: 'all notes' }, fitItem(p.regions[regionIndex])];
+      case 'none': return [{ label: 'Set sequencer', sub: KIND_LABELS.map((l) => ({ label: l })), open: true }];
+      default: return [];
+    }
+  }
+  function menuFor(st) {
+    const p = PARTS[st.part];
+    const bar = Math.floor(st.at) + 1;
+    if (st.region === null) {
+      return {
+        head: `${p.name} · bar ${bar}`,
+        items: [pasteItem(p.kind, bar), { label: 'Add region here', preview: 'add' }, { label: 'Loop this bar', preview: 'loopbar' }],
+      };
+    }
+    const [s, d] = p.regions[st.region];
+    const items = [
+      { label: 'Cut', tag: '⌘X' }, { label: 'Copy', tag: '⌘C' }, pasteItem(p.kind, bar),
+      { label: 'Duplicate', tag: '⌘D' }, { label: 'Delete', tag: '⌫' },
+      { label: 'Split here', tag: '⌥-click', preview: 'split' },
+      sep,
+      { label: 'Zoom to region' }, { label: 'Loop region', preview: 'loop' },
+    ];
+    const pattern = patternItems(p, st.region);
+    if (pattern.length) items.push(sep, ...pattern);
+    const tail = [];
+    if (BOUNCE_KINDS.includes(p.kind)) tail.push({ label: 'Bounce part to Roll…' });
+    tail.push({ label: 'Part color…' });
+    items.push(sep, ...tail);
+    return { head: `${p.name} · bars ${s}–${s + d - 1} · at bar ${bar}`, items };
+  }
+
+  function buildMenu(spec) {
+    const m = h('div', 'ctx');
+    m.setAttribute('role', 'menu');
+    if (spec.head) m.appendChild(h('div', 'ctx-head', spec.head));
+    const rows = [];
+    spec.items.forEach((it) => {
+      if (it.sep) { m.appendChild(h('hr')); return; }
+      const b = h('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      b.appendChild(h('span', '', it.label));
+      if (it.sub) { b.appendChild(h('span', 'sub', '▸')); b.setAttribute('aria-haspopup', 'menu'); if (it.open) { b.classList.add('open'); b.setAttribute('aria-expanded', 'true'); } }
+      else if (it.tag) b.appendChild(h('span', 'tag', it.tag));
+      b.disabled = !!it.disabled;
+      if (it.preview) {
+        b.addEventListener('pointerenter', () => preview(it.preview));
+        b.addEventListener('pointerleave', () => preview(null));
+        b.addEventListener('focus', () => preview(it.preview));
+        b.addEventListener('blur', () => preview(null));
+      }
+      m.appendChild(b);
+      rows.push({ b, it });
+    });
+    return { m, rows };
+  }
+
+  let menuNodes = [];
+  function place() {
+    menuNodes.forEach((n) => n.remove());
+    menuNodes = [];
+    const st = STATES[ui.state];
+    const fr = frame.getBoundingClientRect();
+    const lane = laneEls[st.part].lane.getBoundingClientRect();
+    const x = lane.left - fr.left + px(st.at);
+    const y = lane.top - fr.top + 24;
+    const { m, rows } = buildMenu(menuFor(st));
+    frame.appendChild(m);
+    const W = frame.clientWidth, H = frame.clientHeight, EDGE = 8;
+    let left = x + 2, top = y + 2;
+    if (left + m.offsetWidth > W - EDGE) left = x - m.offsetWidth - 2;
+    if (top + m.offsetHeight > H - EDGE) top = y - m.offsetHeight - 2;
+    left = Math.max(EDGE, Math.min(left, W - m.offsetWidth - EDGE));
+    top = Math.max(EDGE, Math.min(top, H - m.offsetHeight - EDGE));
+    m.style.left = `${left}px`; m.style.top = `${top}px`;
+    menuNodes.push(m);
+    const opener = rows.find((r) => r.it.sub && r.it.open);
+    if (opener) {
+      const sub = buildMenu({ items: opener.it.sub }).m;
+      frame.appendChild(sub);
+      const ob = opener.b.getBoundingClientRect();
+      let sl = left + m.offsetWidth - 4;
+      if (sl + sub.offsetWidth > W - EDGE) sl = left - sub.offsetWidth + 4;
+      let stp = ob.top - fr.top - 5;
+      stp = Math.max(EDGE, Math.min(stp, H - sub.offsetHeight - EDGE));
+      sub.style.left = `${sl}px`; sub.style.top = `${stp}px`;
+      menuNodes.push(sub);
+    }
+    const cur = document.createElementNS(SVG, 'svg');
+    cur.setAttribute('class', 'cursor'); cur.setAttribute('width', '14'); cur.setAttribute('height', '20'); cur.setAttribute('viewBox', '0 0 14 20');
+    cur.innerHTML = '<path d="M1 1 L1 16 L5 12 L8 19 L10.5 18 L7.5 11 L13 11 Z" fill="#fff" stroke="#000" stroke-width="1"/>';
+    cur.style.left = `${x - 1}px`; cur.style.top = `${y - 1}px`;
+    frame.appendChild(cur);
+    menuNodes.push(cur);
+  }
+
+  // ---------- hover previews ----------
+  let previewNodes = [];
+  function preview(kind) {
+    previewNodes.forEach((n) => n.remove());
+    previewNodes = [];
+    if (!kind) return;
+    const st = STATES[ui.state];
+    const p = PARTS[st.part];
+    const lane = laneEls[st.part].lane;
+    const bar0 = Math.floor(st.at);            // 0-based bar under the pointer
+    const box = (startBar0, bars) => {
+      const n = h('div', 'pv-reg');
+      n.style.left = `${px(startBar0)}px`; n.style.width = `${px(bars) - BLOCK_GAP}px`;
+      lane.appendChild(n); previewNodes.push(n);
+    };
+    const brace = (startBar0, bars) => {
+      const b = h('div', 'loop-brace pv-brace');
+      b.style.left = `${px(startBar0)}px`; b.style.width = `${px(bars)}px`;
+      b.append(h('i', 'loop-handle start'), h('i', 'loop-handle end'));
+      loopStrip.appendChild(b); previewNodes.push(b);
+      [startBar0, startBar0 + bars].forEach((at) => {
+        const l = h('div', 'loop-line'); l.style.left = `${px(at)}px`; l.style.top = '26px'; l.style.bottom = '0';
+        overlay.appendChild(l); previewNodes.push(l);
+      });
+    };
+    const reg = st.region === null ? null : p.regions[st.region];
+    if (kind === 'split') {
+      const at = Math.round(st.at);
+      const n = h('div', 'pv-line'); n.style.left = `${px(at) - 1}px`;
+      lane.appendChild(n); previewNodes.push(n);
+    } else if (kind === 'paste') {
+      const len = ui.clip === 'grid' ? 4 : 8;
+      box(bar0, Math.min(len, 16 - bar0));
+    } else if (kind === 'add') {
+      box(bar0, 1);
+    } else if (kind === 'loopbar') {
+      brace(bar0, 1);
+    } else if (kind === 'loop' && reg) {
+      brace(reg[0] - 1, reg[1]);
+    } else if (kind === 'fit' && reg) {
+      box(reg[0] - 1, reg[3]);
+    }
+  }
+
+  const CAPTIONS = {
+    grid: '<b>Region menu on a Grid part.</b> acid\'s second region (bars 5–8), right-clicked in bar 6. Grid has no Reseed. Its pattern is 16 steps of 1/16, one bar, so Fit region to pattern would make the region bar 5 alone.',
+    arp: '<b>Region menu on an Arp part.</b> arp\'s first region (bars 1–8), right-clicked in bar 3. Arp, Basslead and Figure add Reseed. Arp has no cycle, so no Fit region to pattern.',
+    roll: '<b>Region menu on a Roll part.</b> lead\'s first region (bars 5–8) holds 4 notes on a 3-bar loop, so Fit region to pattern would make it bars 5–7. Quantize uses the card\'s Snap. No Bounce on a Roll.',
+    euclid: '<b>Region menu on a Euclid part.</b> kick\'s second region (bars 9–16), right-clicked in bar 12. Capture, or Release once captured (the switch above). Its 5/16 pattern is one bar, so Fit would make the region bar 9 alone.',
+    gap: '<b>Empty-lane menu.</b> The gap in acid\'s lane (bars 9–12), right-clicked in bar 10. No region is selected; the part is.',
+    none: '<b>A part with no sequencer.</b> pad\'s whole-song region (∞), right-clicked in bar 10. The pattern actions are replaced by Set sequencer ▸, shown open. No Bounce.',
+  };
+
+  function render() {
+    preview(null);
+    paintRegions();
+    paintOverlay();
+    paintPane();
+    place();
+    document.getElementById('caption').innerHTML = CAPTIONS[ui.state];
+  }
+
+  function wireSeg(id, key, after) {
+    const seg = document.getElementById(id);
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      ui[key] = b.dataset.v;
+      if (after) after(b.dataset.v);
+      render();
+    });
+  }
+  wireSeg('state', 'state');
+  wireSeg('clip', 'clip');
+  wireSeg('rowh', 'rowh', (v) => document.documentElement.style.setProperty('--mi-h', v));
+  document.getElementById('captured').addEventListener('change', (e) => { ui.captured = e.target.checked; render(); });
+
+  drawHead();
+  drawHarmony();
+  drawParts();
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+})();
+</script>

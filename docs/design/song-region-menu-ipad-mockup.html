@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Song tab's region menu on touch, for tacowars's 12.9-inch iPad Pro
+     (M2, Safari), for approval after the desktop mockup
+     (song-region-menu-mockup.html), whose menu contents, rules and "Decided"
+     list this page takes as settled. The frame is the whole iPad screen,
+     1366 × 1024 CSS px landscape or 1024 × 1366 portrait (dpr 2, so 1 CSS px
+     is 1 pt), redrawn from a screenshot of the dev build emulated at that
+     size with touch (song-tab-today-ipad.png): the header, the part chips,
+     the lanes at today's 96 px a bar (scrolled, not fitted), and the pane
+     with acid's Grid device, whose body is a labelled stand-in. Sizes and
+     colors are copied from packages/app/src/console.css (the tokens, .pchip,
+     .lanes, .lane, .reg, .ruler, the .knob-cc-menu panel) and
+     songViewTables.ts (SONG_VIEW, SONG_DRAG_THRESHOLD_PX). The long press is
+     partColourPickerTables.ts's LONG_PRESS (450 ms, 8 px). Static and
+     self-contained: open it in a browser. The controls above the frame are
+     the mockup's own switches, not part of the console. -->
+<title>Song Region Menu iPad</title>
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from console.css; the app is dark only, so the page is too. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  /* songViewTables.ts SONG_VIEW, collapsed mixer, at today's default zoom (96 px a bar on the iPad) */
+  --tab: 20px;
+  --tab-gap: 4px;
+  --row-pad: 2px;
+  --fold: 50px;
+  --fold-gap: 4px;
+  --frozen: 166px;
+  --gap: 8px;
+  --row-gap: 4px;
+  --lane-h: 40px;
+  --bar: 96px;
+  --bars: 16;
+  --pad-x: 14px;
+  /* The menu's rows: desktop 32 px, touch set by the mockup's switch (44 px proposed). */
+  --mi-h: 32px;
+  --mi-touch: 44px;
+  --mi-font: 15px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 14px; line-height: 1.5; }
+.page { max-width: 1480px; margin: 0 auto; padding: 28px 16px 64px; display: flex; flex-direction: column; gap: 24px; }
+h1, h2 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.12em; }
+p { margin: 0; max-width: 78ch; color: var(--ink-dim); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+code { font-family: var(--f-num); font-size: 12px; color: var(--ink); }
+section { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+.notes { margin: 0; padding-left: 18px; color: var(--ink-dim); max-width: 92ch; display: flex; flex-direction: column; gap: 6px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px 32px; }
+.two h3 { margin: 0 0 6px; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+
+/* ---------- the mockup's own switches ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; padding: 12px 14px; border: 1px dashed var(--line-bright); border-radius: var(--r); }
+.controls .tag { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); width: 100%; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span, .check { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; min-height: 32px; }
+.check input { accent-color: var(--carrier); width: 16px; height: 16px; }
+.check:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg button { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; min-height: 32px; padding: 6px 12px; background: var(--panel); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed='true'] { background: var(--carrier); color: var(--ground); }
+.seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.caption { font-size: 13px; color: var(--ink-dim); max-width: 110ch; }
+.caption b { color: var(--ink); font-weight: 600; }
+
+/* ---------- the frame: the whole iPad screen, scaled to fit the page ---------- */
+.fit { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--ground); overflow: hidden; user-select: none; }
+.abs { position: absolute; }
+
+/* The header: tabs, the transport strip, the part chips (redrawn at the screenshot's boxes). */
+.hdr { position: absolute; left: 0; top: 0; right: 0; height: 127px; border-bottom: 1px solid var(--line); }
+.hbox { position: absolute; display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px; border: 1px solid var(--line); border-radius: var(--r); background: var(--inset); font-family: var(--f-num); font-size: 13px; color: var(--ink); white-space: nowrap; }
+.hbox small { font-family: var(--f-panel); font-size: 10px; letter-spacing: 0.1em; color: var(--ink-faint); }
+.hbox.sel { justify-content: space-between; padding: 0 8px; }
+.hbox.sel::after { content: '⌄'; color: var(--ink-dim); font-size: 13px; line-height: 0.6; }
+.hbox.t { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--ink-dim); }
+.tabs { position: absolute; left: 16px; top: 8px; display: flex; height: 30px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.tabs span { display: grid; place-items: center; padding: 0 14px; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--ink-dim); border-right: 1px solid var(--line); background: var(--panel); }
+.tabs span.on { background: var(--carrier); color: var(--ground); }
+.tabs span:last-child { border-right: 0; }
+.pchip { position: absolute; top: 80px; width: 150px; height: 38px; padding: 3px 12px; border-radius: var(--r); background: var(--inset); border-left: 4px solid var(--pc); font-family: var(--f-ui); line-height: 1.25; }
+.pchip b { display: block; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 2px; }
+.pchip small { font-size: 9.5px; color: var(--ink-dim); }
+.pchip.on { background: var(--pc); border-left-color: var(--pc); }
+.pchip.on b, .pchip.on small { color: #14181a; }
+.pchip i { position: absolute; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--line-bright); }
+.pchip.on i { background: #14181a; }
+
+/* The lanes. */
+.lanes { position: absolute; left: var(--pad-x); top: 139px; display: flex; flex-direction: column; gap: var(--row-gap); }
+.lane-group { display: flex; gap: var(--gap); align-items: stretch; }
+.lane-frozen { flex: none; width: var(--frozen); position: relative; z-index: 5; background: var(--ground); }
+.lane-timeline { flex: none; display: flex; flex-direction: column; gap: var(--row-gap); width: calc(var(--bars) * var(--bar)); }
+.lane-mask { position: absolute; left: 0; top: 128px; width: 188px; height: 330px; background: var(--ground); z-index: 4; }
+.lane-head { display: flex; flex-direction: column; gap: var(--row-gap); }
+.mix-head { display: flex; align-items: center; gap: 6px; height: 22px; padding-left: 6px; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+.mix-head .bb { margin-left: auto; padding-right: 6px; font-size: 9px; letter-spacing: 0.1em; color: var(--ink-faint); }
+.ruler-name { height: 12px; text-align: right; padding: 0 6px; font-family: var(--f-num); font-size: 9px; line-height: 12px; color: var(--ink-faint); }
+.ruler { display: flex; border-bottom: 1px solid var(--line-bright); height: 22px; }
+.ruler-bar { position: relative; flex: none; width: var(--bar); border-left: 1px solid var(--line-bright); font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 2px; }
+.ruler-bar i { position: absolute; bottom: 0; width: 1px; height: 6px; background: var(--line-bright); }
+.loop-strip { position: relative; height: 12px; }
+.loop-brace { position: absolute; top: 2px; bottom: 2px; background: var(--ink-dim); border-radius: 1px; }
+.loop-handle { position: absolute; top: 0; width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.loop-handle.start { left: 0; border-left: 6px solid var(--ink); }
+.loop-handle.end { right: 0; border-right: 6px solid var(--ink); }
+.lane-name { display: flex; flex-direction: column; justify-content: center; height: var(--lane-h); padding: 0 6px; font-family: var(--f-panel); line-height: 1.15; }
+.lane-name b { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.lane-name small { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); letter-spacing: 0.04em; }
+.hblk { position: absolute; top: 3px; bottom: 3px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-top: 3px solid var(--modulator); border-radius: var(--r); padding: 2px 6px; font-family: var(--f-panel); display: flex; flex-direction: column; line-height: 1.15; overflow: hidden; }
+.hblk b { font-size: 11px; font-weight: 600; }
+.hblk small { font-family: var(--f-num); font-size: 8.5px; color: var(--ink-faint); }
+.lane-col { display: grid; grid-template-columns: var(--tab) minmax(0, 1fr); column-gap: var(--tab-gap); height: var(--lane-h); }
+.lane-col.selected { outline: 1px solid var(--pc); outline-offset: 2px; border-radius: 2px; }
+.lane-tab { display: flex; justify-content: center; border-radius: 2px; background: var(--pc); }
+.lane-tab b { font-family: var(--f-num); font-size: 11px; font-weight: 600; letter-spacing: -0.02em; line-height: var(--lane-h); color: #14181a; }
+.lane-part { display: grid; grid-template-columns: var(--fold) minmax(0, 1fr); align-items: center; column-gap: var(--fold-gap); height: var(--lane-h); padding: 0 var(--row-pad); border-radius: var(--r); }
+.lane-col.selected .lane-part { background: var(--panel-hi); }
+.fold { display: grid; place-items: center; color: var(--ink-faint); }
+.mix-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.dial-face { fill: var(--inset); stroke: var(--line); }
+.dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-arc { stroke: var(--modulator); stroke-width: 3; fill: none; stroke-linecap: round; }
+.dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.ms { display: flex; gap: 3px; }
+.ms span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--inset); font-family: var(--f-panel); font-size: 10px; font-weight: 600; color: var(--ink-dim); }
+.lane { position: relative; height: var(--lane-h); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; }
+.lane.selected { border-color: var(--pc); }
+.reg { position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--pc); background-color: color-mix(in srgb, var(--pc) 19%, transparent); color: var(--ink); font-family: var(--f-panel); font-size: 10px; font-variant: small-caps; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; }
+.reg.cyc { background-image: repeating-linear-gradient(90deg, rgba(220, 227, 227, 0.22) 0 1px, transparent 1px var(--cyc)); }
+.reg.selected { box-shadow: 0 0 0 1px var(--ink); border-color: var(--ink); }
+.reg .gl { flex: none; font-family: var(--f-ui); font-size: 11px; line-height: 1; color: var(--pc); font-variant: normal; }
+.hdl { position: absolute; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--carrier); opacity: 0.45; }
+.hdl.s { left: 2px; }
+.hdl.e { right: 2px; }
+.seam { position: absolute; top: -3px; bottom: -3px; width: 12px; margin-left: -7px; display: flex; justify-content: center; opacity: 0.45; z-index: 2; }
+.seam i { width: 2px; background: var(--carrier); border-radius: 1px; box-shadow: 0 0 0 1px var(--well); }
+.seam b { position: absolute; top: 50%; left: 2px; width: 8px; height: 14px; margin-top: -7px; border-radius: 2px; background: linear-gradient(90deg, var(--carrier) 0 3px, var(--well) 3px 5px, var(--carrier) 5px); }
+.overlay { position: absolute; top: 139px; left: 188px; width: calc(var(--bars) * var(--bar)); pointer-events: none; }
+.ph-line { position: absolute; top: 0; width: 2px; background: var(--carrier); box-shadow: 0 0 6px var(--carrier); z-index: 2; }
+.ph-line i { position: absolute; top: -2px; left: 4px; font-style: normal; font-family: var(--f-num); font-size: 9px; color: var(--carrier); white-space: nowrap; }
+.loop-line { position: absolute; top: 0; width: 1px; background: var(--ink-dim); z-index: 1; }
+.pv-reg { position: absolute; top: 3px; bottom: 3px; border: 1px dashed var(--carrier); border-radius: var(--r); background: color-mix(in srgb, var(--carrier) 12%, transparent); z-index: 3; }
+.pv-line { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px dashed var(--carrier); z-index: 3; }
+.pv-brace { opacity: 0.85; outline: 1px dashed var(--carrier); outline-offset: 1px; }
+
+/* The pane: its head as today, the device and the insert row as labelled stand-ins. */
+.pane { position: absolute; left: 0; right: 0; top: 457px; bottom: 0; border-top: 1px solid var(--line-bright); }
+.pane-head { position: absolute; left: 14px; right: 14px; top: 9px; display: flex; align-items: center; gap: 10px; font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.pane-head .fb { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); font-size: 9px; color: var(--ink-dim); }
+.pane-head small { font-family: var(--f-num); font-size: 9.5px; font-weight: 400; letter-spacing: 0.04em; text-transform: none; color: var(--ink-faint); }
+.pane-head .pbtn { padding: 3px 9px; border: 1px solid var(--line-bright); border-radius: var(--r); font-size: 10px; letter-spacing: 0.1em; color: var(--ink); }
+.pane-head .x { margin-left: auto; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink-faint); }
+.standin { position: absolute; display: grid; place-items: center; border: 1px dashed var(--line-bright); border-radius: var(--r); background: var(--panel); color: var(--ink-faint); font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 8px; }
+
+/* ---------- the menu: one component, .knob-cc-menu's panel ---------- */
+.ctx { position: absolute; z-index: 50; min-width: 220px; padding: 4px 0; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.ctx-head { margin-bottom: 3px; padding: 3px 12px 5px; border-bottom: 1px solid var(--line); color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.ctx button { display: flex; align-items: center; gap: 16px; width: 100%; min-height: var(--mi-h); padding: 0 12px; background: none; border: 0; color: var(--ink); font: 12px var(--f-ui); text-align: left; cursor: pointer; white-space: nowrap; }
+.ctx:not(.touch) button:hover:not(:disabled), .ctx button:focus-visible, .ctx button.open { background: var(--panel-hi); outline: none; }
+.ctx button:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.ctx button .tag { margin-left: auto; color: var(--ink-faint); font: 9.5px var(--f-num); }
+.ctx button .sub { margin-left: auto; color: var(--ink-dim); font-size: 13px; }
+.ctx hr { margin: 3px 0; border: 0; border-top: 1px solid var(--line); }
+/* Opened by touch (the opening press's pointerType): 44 px rows, larger type, no keyboard tags. */
+.ctx.touch { min-width: 260px; padding: 6px 0; }
+.ctx.touch .ctx-head { margin-bottom: 4px; padding: 6px 16px 8px; font-size: 10.5px; }
+.ctx.touch button { min-height: var(--mi-touch); padding: 0 16px; font-size: var(--mi-font); }
+.ctx.touch button .tag { font-size: 11px; }
+.ctx.touch button .sub { font-size: 17px; }
+.ctx.touch hr { margin: 4px 0; }
+.ctx.touch button.hl { background: var(--panel-hi); box-shadow: inset 3px 0 0 var(--carrier); }
+.ctx.touch button.back { color: var(--ink-dim); gap: 10px; }
+.ctx.touch button.back .chev { font-size: 20px; line-height: 1; color: var(--ink-dim); }
+.cursor { position: absolute; z-index: 60; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+.finger { position: absolute; z-index: 70; pointer-events: none; overflow: visible; }
+
+/* ---------- to decide ---------- */
+.decide { margin: 0; padding-left: 22px; color: var(--ink-dim); max-width: 96ch; display: flex; flex-direction: column; gap: 8px; }
+.decide li::marker { color: var(--carrier); font-family: var(--f-num); }
+</style>
+
+<div class="page">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <span class="eyebrow">Song tab · 12.9-inch iPad Pro · mockup for approval</span>
+    <h1>The part lanes' menu, opened by touch</h1>
+    <p>The desktop mockup's menu, on tacowars's iPad. A long press on a region or a gap (450 ms, within 8 px) selects it as the desktop right-click does and opens the same menu, beside the finger rather than under it, with 44 px rows. The frame is the whole iPad screen with today's Song tab, five parts made in the dev build (the desktop mockup's song). Step through a press with the Moment switch.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Mockup switches">
+    <span class="tag">Mockup switches, not part of the console</span>
+    <div class="field"><span>Long-pressed on</span>
+      <div class="seg" id="state">
+        <button type="button" data-v="grid" aria-pressed="true">Grid region</button>
+        <button type="button" data-v="arp" aria-pressed="false">Arp region</button>
+        <button type="button" data-v="roll" aria-pressed="false">Roll region</button>
+        <button type="button" data-v="euclid" aria-pressed="false">Euclid region</button>
+        <button type="button" data-v="gap" aria-pressed="false">Empty lane</button>
+        <button type="button" data-v="none" aria-pressed="false">No-sequencer part</button>
+      </div>
+    </div>
+    <div class="field"><span>Moment</span>
+      <div class="seg" id="moment">
+        <button type="button" data-v="hold" aria-pressed="false">1 · Holding, 250 ms</button>
+        <button type="button" data-v="open" aria-pressed="true">2 · 450 ms: open</button>
+        <button type="button" data-v="slide" aria-pressed="false">3 · Slid onto a row</button>
+        <button type="button" data-v="lifted" aria-pressed="false">4 · Lifted, waits for a tap</button>
+      </div>
+    </div>
+    <div class="field"><span>Screen</span>
+      <div class="seg" id="orient">
+        <button type="button" data-v="land" aria-pressed="true">Landscape 1366 × 1024</button>
+        <button type="button" data-v="port" aria-pressed="false">Portrait 1024 × 1366</button>
+      </div>
+    </div>
+    <div class="field"><span>Hand</span>
+      <div class="seg" id="hand">
+        <button type="button" data-v="right" aria-pressed="true">Right: menu left of the finger</button>
+        <button type="button" data-v="left" aria-pressed="false">Left: menu right of it</button>
+      </div>
+    </div>
+    <div class="field"><span>Touch row height</span>
+      <div class="seg" id="rowh">
+        <button type="button" data-v="40" aria-pressed="false">40 / 14 px</button>
+        <button type="button" data-v="44" aria-pressed="true">44 / 15 px</button>
+        <button type="button" data-v="48" aria-pressed="false">48 / 16 px</button>
+      </div>
+    </div>
+    <div class="field"><span>Opened by</span>
+      <div class="seg" id="input">
+        <button type="button" data-v="touch" aria-pressed="true">Finger (long press)</button>
+        <button type="button" data-v="mouse" aria-pressed="false">Trackpad (right-click)</button>
+      </div>
+    </div>
+    <div class="field"><span>Clipboard</span>
+      <div class="seg" id="clip">
+        <button type="button" data-v="" aria-pressed="false">Empty</button>
+        <button type="button" data-v="grid" aria-pressed="true">Grid clip, 4 bars</button>
+        <button type="button" data-v="euclidean" aria-pressed="false">Euclid clip, 8 bars</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="drill"> Set sequencer ▸ tapped</label>
+    <label class="check"><input type="checkbox" id="kbd"> Keyboard tags on touch</label>
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <div class="fit" id="fit">
+    <div class="frame" id="frame">
+      <div class="hdr" id="hdr"></div>
+      <div class="lane-mask"></div>
+      <div class="lanes" id="lanes"></div>
+      <div class="overlay" id="overlay"></div>
+      <div class="pane" id="pane"></div>
+    </div>
+  </div>
+  <p class="caption" id="scale"></p>
+
+  <section>
+    <h2>The touch rules</h2>
+    <ul class="notes">
+      <li><strong>Opening:</strong> pointer-timed, because iOS Safari fires no <code>contextmenu</code> on a long press. A touch or pen press on a lane (<code>longPressOpens</code>) starts a 450 ms timer (<code>LONG_PRESS</code>); at 450 ms within 8 px (<code>longPressDue</code>) it selects the region, or for a gap the part, as the desktop right-click does, and opens the menu. Moving past the slop cancels the timer and the press carries on as today's drag. The release that ends an opening press does nothing: no tap select, no bar added on a gap (the <code>opened</code> flag <code>wireChipColour</code> already keeps for the chip). <code>pointercancel</code> cancels.</li>
+      <li><strong>No callout, no magnifier:</strong> <code>.lane</code> already has <code>touch-action: none</code> and <code>user-select: none</code>, and the Song tab's panel <code>-webkit-user-select: none</code> (windsor#814), so iOS starts no text selection or loupe. Nothing in <code>console.css</code> sets <code>-webkit-touch-callout</code>; the build adds <code>-webkit-touch-callout: none</code> to <code>.lane</code> so no system callout can appear, and the lane's <code>contextmenu</code> handler calls <code>preventDefault</code> (it is what a trackpad's two-finger click on the iPad fires, and opens the desktop menu).</li>
+      <li><strong>Size:</strong> 44 px rows (Apple's 44 pt minimum; on this screen 1 CSS px is 1 pt), labels 15 px, the header line 10.5 px, tags 11 px, at least 260 px wide, 16 px side padding. The Grid region menu is then about 640 px tall, which fits either orientation without scrolling. A screen too short for a menu caps it and it scrolls inside itself, as <code>.song-menu</code> does.</li>
+      <li><strong>Placement:</strong> beside the finger, never under the hand. For a right hand the menu's right edge sits 32 px left of the touch point (the fingertip's radius plus a gap) and its top 4 px under the pressed lane, so the menu is below-left of the finger, clear of a right hand, and the pressed lane, the lanes above it and the ruler's loop strip stay in view for the preview. With no room on the left (under 32 + width + 8 px) it flips to the right of the finger. It is then clamped 8 px inside the screen on both axes, over the header and pane if it must; a menu too tall for the room under its lane slides up only as far as the bottom edge needs (the Arp state in landscape overlaps arp's lane by 26 px, left of the finger). The other hand mirrors it (the Hand switch). The menu is fixed over the page, as <code>.knob-cc-menu</code> is.</li>
+      <li><strong>Choosing, and the preview:</strong> with the finger still down, sliding onto a row lights it and shows the desktop's hover preview (dashed box, loop brace, split line); lifting on that row runs it, lifting off every row runs nothing. A lift without sliding leaves the menu open, and a tap on a row runs it without a preview. A disabled row lights but runs nothing.</li>
+      <li><strong>Set sequencer ▸</strong> drills in: a tap swaps the rows for "‹ Set sequencer" (back) and the seven kinds, in the same panel at the same top-left, so it needs no room beside the menu. A trackpad still opens it beside, on hover.</li>
+      <li><strong>Dismissal:</strong> a tap or press outside closes it and does nothing else, so it adds no bar and changes no selection. Scrolling the lanes or the page, a rotation, the tab losing focus, or Escape on a hardware keyboard close it. A second long press elsewhere closes this menu and, at 450 ms, opens one for the new spot: one gesture.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Desktop and iPad: one component</h2>
+    <div class="two">
+      <div>
+        <h3>The same on both</h3>
+        <ul class="notes">
+          <li>The items, their order, labels, disabled reasons and the header line (the desktop mockup's "Decided" list).</li>
+          <li>The panel: <code>.knob-cc-menu</code>'s background, border, shadow and separators.</li>
+          <li>The previews themselves (dashed box, loop brace, split line).</li>
+          <li>Flip-then-clamp at the window's edges.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What differs when a finger opens it</h3>
+        <ul class="notes">
+          <li>Rows 44 px, not 32; labels 15 px, not 12; at least 260 px wide, not 220.</li>
+          <li>The keyboard tags (⌘X, ⌘C, ⌘D, ⌫, ⌥-click) are hidden. Tags that say why or how much ("nothing copied", "already fits", "1 bar", "all notes") stay.</li>
+          <li>It opens beside the finger and under the pressed lane, not down-right of the pointer.</li>
+          <li>The preview shows on the row under a sliding finger, not on hover.</li>
+          <li>Set sequencer ▸ drills in, not out to the side.</li>
+          <li>It opens after a 450 ms hold, not on right-click; a tap outside is consumed.</li>
+        </ul>
+      </div>
+    </div>
+    <p>The size is chosen by what opened the menu, not by the screen's width, so it is zoom-safe and the iPad with a trackpad gets the desktop menu on a right-click (the "Opened by" switch).</p>
+  </section>
+
+  <section>
+    <h2>Decided</h2>
+    <ol class="decide">
+      <li><strong>Row height and type:</strong> 44 px rows with 15 px labels on touch.</li>
+      <li><strong>The preview without hover:</strong> slide-to-choose; the lit row shows its preview, and lifting runs it.</li>
+      <li><strong>Which side the menu opens on:</strong> left of the finger, flipping right near the left edge. No handedness setting.</li>
+      <li><strong>The touch drag threshold:</strong> touch and pen drags on the lanes start at 8 px (<code>LONG_PRESS.slopPx</code>); the mouse keeps 4 px (<code>SONG_DRAG_THRESHOLD_PX</code>).</li>
+      <li><strong>What sizes the menu:</strong> the opening press's <code>pointerType</code> (touch or pen), not <code>@media (pointer: coarse)</code>.</li>
+      <li><strong>Keyboard tags on touch:</strong> hidden; reason and amount tags stay.</li>
+      <li><strong>Set sequencer ▸:</strong> drills in, with a back row.</li>
+      <li><strong>Hold feedback:</strong> a ring around the finger that fills over the 450 ms, drawn only after 150 ms so a tap never flashes it.</li>
+    </ol>
+    <p><strong>Decided by the desktop mockup</strong> (song-region-menu-mockup.html, its "Decided" list): the menu's contents, Fit region to pattern, Paste's label and its disabled state, the header line, desktop's 32 px rows and Set sequencer's behavior. None is reopened here.</p>
+  </section>
+
+  <section>
+    <h2>Data</h2>
+    <ul class="notes">
+      <li>The frame copies <code>song-tab-today-ipad.png</code>: the dev build in Chrome emulating 1366 × 1024 at dpr 2 with touch (it matches <code>pointer: coarse</code> and <code>hover: none</code>), with acid's bars 5–8 selected. At today's zoom a bar is 96 px, so landscape shows bars 1 to 12 and portrait bars 1 to 9, and the lanes scroll. In portrait the lanes are drawn scrolled to the long-pressed bar where it would be off-screen (Empty lane, Euclid and No-sequencer states).</li>
+      <li>The song is the desktop mockup's: acid (Grid), kick (Euclid), lead (Roll, 4 notes on a 3-bar loop in its first region), arp (Arp), pad (no sequencer), 16 bars, with acid's gap at bars 9–12.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(() => {
+  const PPB = 96;             // today's px per bar on the iPad (songViewTables.ts default zoom)
+  const BLOCK_GAP = 2;        // songViewTables.ts blockBox
+  const LANES_X = 188;        // the timeline's left edge in the screen: pad 14 + frozen 166 + gap 8
+  const PART_TOP = 225;       // part 1's lane top in the screen (screenshot)
+  const ROW = 44;             // lane 40 + row gap 4
+  const SCREEN = { land: [1366, 1024], port: [1024, 1366] };
+  const TOUCH = { gapX: 32, belowLane: 4, edge: 8 }; // the proposed placement
+  const DESK = { edge: 8 };
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  const PARTS = [
+    { n: 1, name: 'acid', kind: 'grid', label: 'Grid', c: '#6EA8E2', summary: 'grid · 16 steps · 1/16',
+      regions: [[1, 4, 'grid · 16 steps · 1/16', 1], [5, 4, 'grid · 16 steps · 1/16', 1], [13, 4, 'grid · 16 steps · 1/16', 1]] },
+    { n: 2, name: 'kick', kind: 'euclidean', label: 'Euclid', c: '#EDE36E', summary: 'euclid 5/16 · 1/16',
+      regions: [[1, 8, 'euclid 5/16 · 1/16', 1], [9, 8, 'euclid 5/16 · 1/16', 1]] },
+    { n: 3, name: 'lead', kind: 'roll', label: 'Roll', c: '#BC3D6D', summary: 'roll · 4 notes · 3 bar loop',
+      regions: [[5, 4, 'roll · 4 notes · 3 bar loop', 3], [9, 4, 'roll · 0 notes · 4 bar loop', 4]] },
+    { n: 4, name: 'arp', kind: 'arp', label: 'Arp', c: '#8F7A55', summary: 'arp · Up 1/16',
+      regions: [[1, 8, 'arp · Up 1/16', null], [9, 8, 'arp · Up 1/16', null]] },
+    { n: 5, name: 'pad', kind: 'none', label: 'None', c: '#6DE6FC', summary: 'no sequencer',
+      regions: [[1, 16, 'no sequencer', null]] },
+  ];
+  const KIND_LABELS = ['Euclid', 'Grid', 'Chord', 'Arp', 'Basslead', 'Figure', 'Roll'];
+  const BOUNCE_KINDS = ['euclidean', 'grid', 'chord', 'arp', 'bass', 'figure'];
+  const KIND_NAME = { grid: 'Grid', euclidean: 'Euclid', roll: 'Roll', arp: 'Arp', none: 'no-sequencer' };
+
+  // Each state: the part, the region (null for a gap), where the finger is (bars from the song start), and the row a slide lands on.
+  const STATES = {
+    grid: { part: 0, region: 1, at: 5.3, slide: 'Fit region to pattern' },
+    arp: { part: 3, region: 0, at: 2.4, slide: 'Loop region' },
+    roll: { part: 2, region: 0, at: 5.4, slide: 'Fit region to pattern' },
+    euclid: { part: 1, region: 1, at: 11.3, slide: 'Fit region to pattern' },
+    gap: { part: 0, region: null, at: 9.4, slide: 'Add region here' },
+    none: { part: 4, region: 0, at: 9.4, slide: 'Split here' },
+  };
+  // Before the hold opens anything, the selection is the screenshot's: acid, bars 5–8.
+  const BEFORE = { part: 0, region: 1 };
+  const ui = { state: 'grid', moment: 'open', orient: 'land', hand: 'right', rowh: '44', input: 'touch', clip: 'grid', drill: false, kbd: false };
+
+  const h = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  const px = (bars) => bars * PPB;
+  const W = () => SCREEN[ui.orient][0];
+  const H = () => SCREEN[ui.orient][1];
+  const knob = () => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('width', '26'); s.setAttribute('height', '26'); s.setAttribute('viewBox', '0 0 26 26');
+    s.innerHTML = '<circle class="dial-face" cx="13" cy="13" r="8"/><path class="dial-track" d="M6.1 19.9 A10 10 0 1 1 19.9 19.9"/><path class="dial-arc" d="M6.1 19.9 A10 10 0 0 1 13 3"/><line class="dial-pin" x1="13" y1="13" x2="13" y2="7.5"/>';
+    return s;
+  };
+  const arrow = () => {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('width', '20'); s.setAttribute('height', '20'); s.setAttribute('viewBox', '0 0 16 16');
+    s.innerHTML = '<path d="M4 2.5 L13.5 8 L4 13.5 Z" fill="currentColor"/>';
+    return s;
+  };
+
+  const fit = document.getElementById('fit');
+  const frame = document.getElementById('frame');
+  const hdr = document.getElementById('hdr');
+  const lanesEl = document.getElementById('lanes');
+  const overlay = document.getElementById('overlay');
+  const pane = document.getElementById('pane');
+  const laneEls = [];
+  let loopStrip;
+  const timelines = [];
+
+  // ---------- the header, at the screenshot's boxes ----------
+  function box(x, y, w, cls, html) {
+    const b = h('div', 'hbox' + (cls ? ' ' + cls : ''));
+    b.style.left = `${x}px`; b.style.top = `${y}px`; b.style.width = `${w}px`;
+    b.innerHTML = html;
+    hdr.appendChild(b);
+  }
+  function drawHeader() {
+    hdr.replaceChildren();
+    const tabs = h('div', 'tabs');
+    ['PARTS', 'MIXER', 'SONG', '⚙'].forEach((t, i) => { const s = h('span', i === 2 ? 'on' : '', t); tabs.appendChild(s); });
+    hdr.appendChild(tabs);
+    box(262, 8, 114, '', '<span style="width:48px;height:3px;background:var(--line-bright);border-radius:2px"></span><span style="font-size:11px">0%</span>');
+    box(385, 15, 14, '', ''); hdr.lastChild.style.cssText += 'height:14px;border-radius:50%;background:var(--line-bright);border:0';
+    box(405, 8, 26, 't', '↶'); box(436, 8, 26, 't', '↷');
+    box(473, 8, 47, 't', 'TAP');
+    box(530, 8, 92, '', '120.00 <small>BPM</small>');
+    box(632, 8, 74, '', '16 <small>BARS</small>');
+    box(720, 8, 55, '', '50 <small>%</small>');
+    box(785, 8, 61, 'sel', '1/16');
+    box(856, 8, 61, 'sel', '4/4');
+    const port = ui.orient === 'port';
+    const r2 = 45;
+    if (port) {
+      box(473, r2, 52, 'sel', 'C'); box(534, r2, 149, 'sel', 'minor');
+      box(695, r2, 56, '', '1.1.1'); box(761, r2, 35, 't', '▶'); box(806, r2, 35, 't', '■'); box(849, r2, 34, 't', '‖'); box(892, r2, 39, 't', '⟲');
+    } else {
+      box(930, 8, 52, 'sel', 'C'); box(992, 8, 147, 'sel', 'minor');
+      box(473, r2, 56, '', '1.1.1'); box(539, r2, 33, 't', '▶'); box(583, r2, 35, 't', '■'); box(626, r2, 34, 't', '‖'); box(670, r2, 39, 't', '⟲');
+    }
+    const sel = selection().part;
+    PARTS.forEach((p, i) => {
+      const c = h('div', 'pchip' + (i === sel ? ' on' : ''));
+      c.style.left = `${16 + i * 153}px`; c.style.setProperty('--pc', p.c);
+      c.append(h('b', '', p.name), h('small', '', `${p.n} · ${p.label}`));
+      const d1 = h('i'); d1.style.top = '8px'; const d2 = h('i'); d2.style.top = '22px';
+      c.append(d1, d2);
+      hdr.appendChild(c);
+    });
+    const pmx = W() - 87;
+    box(pmx, 80, 32, 't', '+'); box(pmx + 38, 80, 32, 't', '−');
+    [...hdr.querySelectorAll('.hbox')].slice(-2).forEach((b) => { b.style.height = '38px'; b.style.fontSize = '15px'; });
+  }
+
+  // ---------- the lanes ----------
+  function drawHead() {
+    const g = h('div', 'lane-group');
+    const fz = h('div', 'lane-frozen lane-head');
+    const mh = h('div', 'mix-head');
+    const a = arrow(); a.style.color = 'var(--ink-dim)'; a.setAttribute('width', '16'); a.setAttribute('height', '16');
+    mh.append(a, h('span', '', 'Mixer'), h('span', 'bb', 'bar · beat'));
+    fz.append(mh, h('div', 'ruler-name', 'loop'));
+    const tl = h('div', 'lane-timeline');
+    const ruler = h('div', 'ruler');
+    for (let b = 1; b <= 16; b++) {
+      const bar = h('div', 'ruler-bar');
+      bar.appendChild(h('span', '', String(b)));
+      for (let q = 1; q < 4; q++) { const i = h('i'); i.style.left = `${(q / 4) * PPB}px`; bar.appendChild(i); }
+      ruler.appendChild(bar);
+    }
+    loopStrip = h('div', 'loop-strip');
+    tl.append(ruler, loopStrip);
+    tl.style.gap = '4px';
+    g.append(fz, tl);
+    lanesEl.appendChild(g);
+    timelines.push(tl);
+  }
+  function drawHarmony() {
+    const g = h('div', 'lane-group');
+    const nm = h('div', 'lane-frozen lane-name');
+    nm.append(h('b', '', 'Harmony'), h('small', '', 'chords'));
+    const tl = h('div', 'lane-timeline');
+    const lane = h('div', 'lane');
+    const blk = h('div', 'hblk');
+    blk.style.left = '0px'; blk.style.width = `${px(16) - BLOCK_GAP}px`;
+    blk.append(h('b', '', 'C min'), h('small', '', 'i · triad'));
+    lane.appendChild(blk);
+    tl.appendChild(lane);
+    g.append(nm, tl);
+    lanesEl.appendChild(g);
+    timelines.push(tl);
+  }
+  function drawParts() {
+    PARTS.forEach((p, i) => {
+      const g = h('div', 'lane-group');
+      const col = h('div', 'lane-frozen lane-col');
+      col.style.setProperty('--pc', p.c);
+      const tab = h('div', 'lane-tab'); tab.appendChild(h('b', '', String(p.n)));
+      const row = h('div', 'lane-part');
+      const fold = h('div', 'fold'); fold.appendChild(arrow());
+      const mix = h('div', 'mix-cell');
+      const ms = h('div', 'ms'); ms.append(h('span', '', 'M'), h('span', '', 'S'));
+      mix.append(knob(), ms);
+      row.append(fold, mix);
+      col.append(tab, row);
+      const tl = h('div', 'lane-timeline');
+      const lane = h('div', 'lane');
+      lane.style.setProperty('--pc', p.c);
+      tl.appendChild(lane);
+      g.append(col, tl);
+      lanesEl.appendChild(g);
+      laneEls[i] = { col, lane };
+      timelines.push(tl);
+    });
+  }
+
+  // What is selected at this moment: the screenshot's selection until the hold opens the menu.
+  function selection() {
+    const st = STATES[ui.state];
+    if (ui.input === 'touch' && ui.moment === 'hold') return BEFORE;
+    return { part: st.part, region: st.region };
+  }
+
+  // How far the lanes are scrolled: none in landscape; in portrait, enough to bring the pressed bar on screen.
+  function scrollX() {
+    if (ui.orient === 'land') return 0;
+    const at = STATES[ui.state].at;
+    const room = W() - LANES_X;
+    if (px(at) < room - 300) return 0;
+    return px(Math.floor(at) - 4);
+  }
+
+  function paintRegions() {
+    const sel = selection();
+    PARTS.forEach((p, i) => {
+      const { lane, col } = laneEls[i];
+      const selectedPart = sel.part === i;
+      lane.classList.toggle('selected', selectedPart);
+      col.classList.toggle('selected', selectedPart);
+      lane.replaceChildren();
+      p.regions.forEach(([s, d, sum, cyc], k) => {
+        const r = h('div', 'reg' + (cyc ? ' cyc' : ''));
+        r.style.left = `${px(s - 1)}px`;
+        r.style.width = `${px(d) - BLOCK_GAP}px`;
+        if (cyc) r.style.setProperty('--cyc', `${px(cyc)}px`);
+        r.append(h('span', 'gl', d === 16 ? '∞' : '⟲'), h('span', 'lb', sum));
+        const on = selectedPart && sel.region === k;
+        r.classList.toggle('selected', on);
+        if (on) r.append(h('i', 'hdl s'), h('i', 'hdl e'));
+        lane.appendChild(r);
+      });
+      if (selectedPart && sel.region !== null) {
+        p.regions.forEach(([s, d], k) => {
+          const next = p.regions[k + 1];
+          if (!next || next[0] !== s + d) return;
+          if (k !== sel.region && k + 1 !== sel.region) return;
+          const seam = h('div', 'seam'); seam.style.left = `${px(s + d - 1)}px`;
+          seam.append(h('i'), h('b'));
+          lane.appendChild(seam);
+        });
+      }
+    });
+    const sx = scrollX();
+    timelines.forEach((t) => { t.style.transform = `translateX(${-sx}px)`; });
+    overlay.style.transform = `translateX(${-sx}px)`;
+  }
+
+  function paintOverlay() {
+    overlay.replaceChildren();
+    overlay.style.height = `${PART_TOP - 139 + PARTS.length * ROW - 4}px`;
+    const ph = h('div', 'ph-line'); ph.style.left = '0px'; ph.style.height = '100%';
+    ph.appendChild(h('i', '', '1.1.1'));
+    overlay.appendChild(ph);
+  }
+
+  function paintPane() {
+    const p = PARTS[selection().part];
+    const count = p.regions.length;
+    const head = h('div', 'pane-head');
+    head.append(h('span', 'fb', '▾'), h('span', '', `${p.name} — ${p.label}`), h('small', '', `${p.summary} · ${count} region${count === 1 ? '' : 's'}`));
+    if (BOUNCE_KINDS.includes(p.kind)) head.appendChild(h('span', 'pbtn', 'Bounce to Roll'));
+    head.appendChild(h('span', 'x', '×'));
+    const dev = h('div', 'standin', `Stand-in: the ${p.label === 'None' ? 'no-sequencer' : p.label} device, 244 px high, unchanged by this design`);
+    const devTop = ui.orient === 'port' ? 49 : 39;
+    dev.style.cssText = `left:21px;top:${devTop}px;width:965px;height:244px`;
+    const ins = h('div', 'pane-head');
+    ins.style.top = `${devTop + 280}px`;
+    ins.append(h('span', 'fb', '▾'), h('span', '', 'Insert effects'), h('small', '', 'No inserts'));
+    const insBox = h('div', 'standin', 'Stand-in: the insert row');
+    insBox.style.cssText = `left:14px;right:14px;top:${devTop + 307}px;height:206px`;
+    pane.replaceChildren(head, dev, ins, insBox);
+  }
+
+  // ---------- the menu: the desktop mockup's items ----------
+  const sep = { sep: true };
+  function pasteItem(kind, bar) {
+    const label = `Paste at bar ${bar}`;
+    if (!ui.clip) return { label, tag: 'nothing copied', disabled: true };
+    if (ui.clip !== kind) return { label, tag: `clip is ${KIND_NAME[ui.clip]}`, disabled: true };
+    return { label, preview: 'paste' };
+  }
+  function fitItem(reg) {
+    const cyc = reg[3];
+    if (cyc === reg[1]) return { label: 'Fit region to pattern', tag: 'already fits', disabled: true };
+    return { label: 'Fit region to pattern', tag: `${cyc} bar${cyc === 1 ? '' : 's'}`, preview: 'fit' };
+  }
+  function patternItems(p, ri) {
+    switch (p.kind) {
+      case 'grid': return [{ label: 'Randomize' }, { label: 'Reverse' }, fitItem(p.regions[ri])];
+      case 'arp': return [{ label: 'Randomize' }, { label: 'Reverse' }, { label: 'Reseed' }];
+      case 'euclidean': return [{ label: 'Capture' }, fitItem(p.regions[ri])];
+      case 'roll': return [{ label: 'Quantize to 1/16', tag: 'all notes' }, fitItem(p.regions[ri])];
+      case 'none': return [{ label: 'Set sequencer', sub: KIND_LABELS.map((l) => ({ label: l })) }];
+      default: return [];
+    }
+  }
+  function menuFor(st) {
+    const p = PARTS[st.part];
+    const bar = Math.floor(st.at) + 1;
+    if (st.region === null) {
+      return { head: `${p.name} · bar ${bar}`,
+        items: [pasteItem(p.kind, bar), { label: 'Add region here', preview: 'add' }, { label: 'Loop this bar', preview: 'loopbar' }] };
+    }
+    const [s, d] = p.regions[st.region];
+    const items = [
+      { label: 'Cut', tag: '⌘X', kbd: true }, { label: 'Copy', tag: '⌘C', kbd: true }, pasteItem(p.kind, bar),
+      { label: 'Duplicate', tag: '⌘D', kbd: true }, { label: 'Delete', tag: '⌫', kbd: true },
+      { label: 'Split here', tag: '⌥-click', kbd: true, preview: 'split' },
+      sep,
+      { label: 'Zoom to region' }, { label: 'Loop region', preview: 'loop' },
+    ];
+    const pattern = patternItems(p, st.region);
+    if (pattern.length) items.push(sep, ...pattern);
+    const tail = [];
+    if (BOUNCE_KINDS.includes(p.kind)) tail.push({ label: 'Bounce part to Roll…' });
+    tail.push({ label: 'Part color…' });
+    items.push(sep, ...tail);
+    return { head: `${p.name} · bars ${s}–${s + d - 1} · at bar ${bar}`, items };
+  }
+
+  function buildMenu(spec, touch) {
+    const m = h('div', 'ctx' + (touch ? ' touch' : ''));
+    m.setAttribute('role', 'menu');
+    if (spec.head) m.appendChild(h('div', 'ctx-head', spec.head));
+    const rows = [];
+    spec.items.forEach((it) => {
+      if (it.sep) { m.appendChild(h('hr')); return; }
+      const b = h('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      if (it.back) { b.classList.add('back'); b.append(h('span', 'chev', '‹')); }
+      b.appendChild(h('span', '', it.label));
+      if (it.sub) { b.appendChild(h('span', 'sub', '▸')); b.setAttribute('aria-haspopup', 'menu'); if (it.open) { b.classList.add('open'); b.setAttribute('aria-expanded', 'true'); } }
+      else if (it.tag && !(touch && it.kbd && !ui.kbd)) b.appendChild(h('span', 'tag', it.tag));
+      b.disabled = !!it.disabled;
+      if (it.preview && !touch) {
+        b.addEventListener('pointerenter', () => preview(it.preview));
+        b.addEventListener('pointerleave', () => preview(null));
+      }
+      m.appendChild(b);
+      rows.push({ b, it });
+    });
+    return { m, rows };
+  }
+
+  // The touch placement: beside the finger, flipped, then clamped.
+  function touchPlace(x, laneBottom, w, hgt) {
+    const leftFirst = ui.hand === 'right';
+    const leftSide = x - TOUCH.gapX - w;
+    const rightSide = x + TOUCH.gapX;
+    let left = leftFirst ? leftSide : rightSide;
+    let flipped = false;
+    if (leftFirst && left < TOUCH.edge) { left = rightSide; flipped = true; }
+    if (!leftFirst && left + w > W() - TOUCH.edge) { left = leftSide; flipped = true; }
+    left = Math.max(TOUCH.edge, Math.min(left, W() - w - TOUCH.edge));
+    const top = Math.max(TOUCH.edge, Math.min(laneBottom + TOUCH.belowLane, H() - hgt - TOUCH.edge));
+    return { left, top, flipped };
+  }
+
+  let menuNodes = [];
+  let placeNote = '';
+  function place() {
+    menuNodes.forEach((n) => n.remove());
+    menuNodes = [];
+    placeNote = '';
+    const st = STATES[ui.state];
+    const p = PARTS[st.part];
+    const x = LANES_X + px(st.at) - scrollX();
+    const y = PART_TOP + st.part * ROW + 20;
+    const touch = ui.input === 'touch';
+    if (touch && ui.moment === 'hold') { drawFinger(x, y, 'hold'); return; }
+
+    const spec = menuFor(st);
+    const drilled = ui.drill && ui.state === 'none';
+    let menuSpec = spec;
+    if (touch && drilled) {
+      menuSpec = { head: spec.head, items: [{ label: 'Set sequencer', back: true }, sep, ...KIND_LABELS.map((l) => ({ label: l }))] };
+    } else if (!touch && drilled) {
+      menuSpec = { head: spec.head, items: spec.items.map((it) => (it.sub ? { ...it, open: true } : it)) };
+    }
+    const { m, rows } = buildMenu(menuSpec, touch);
+    frame.appendChild(m);
+    menuNodes.push(m);
+    const w = m.offsetWidth, hgt = m.offsetHeight;
+    let left, top;
+    if (touch) {
+      // A drilled-in panel keeps the main menu's top-left: place by the main menu's size.
+      let pw = w, ph = hgt;
+      if (drilled) { const probe = buildMenu(spec, true).m; frame.appendChild(probe); pw = probe.offsetWidth; ph = probe.offsetHeight; probe.remove(); m.style.minWidth = `${pw}px`; }
+      const pl = touchPlace(x, PART_TOP + st.part * ROW + 40, pw, ph);
+      left = pl.left; top = pl.top;
+      if (pl.flipped) placeNote = ` No room on the ${ui.hand === 'right' ? 'left' : 'right'} of the finger, so it flipped and the hand now covers part of it: the lesser evil near an edge, since the rows stay reachable and the pressed lane stays in view.`;
+    } else {
+      left = x + 2; top = y + 2;
+      if (left + w > W() - DESK.edge) left = x - w - 2;
+      if (top + hgt > H() - DESK.edge) top = y - hgt - 2;
+      left = Math.max(DESK.edge, Math.min(left, W() - w - DESK.edge));
+      top = Math.max(DESK.edge, Math.min(top, H() - hgt - DESK.edge));
+    }
+    m.style.left = `${left}px`; m.style.top = `${top}px`;
+    placeNote = ` Menu ${Math.round(m.offsetWidth)} × ${Math.round(m.offsetHeight)} px at (${Math.round(left)}, ${Math.round(top)}).` + placeNote;
+
+    if (!touch && drilled) {
+      const opener = rows.find((r) => r.it.sub);
+      const sub = buildMenu({ items: opener.it.sub }, false).m;
+      frame.appendChild(sub);
+      const fr = frame.getBoundingClientRect();
+      const ob = opener.b.getBoundingClientRect();
+      const s = scaleNow;
+      let sl = left + m.offsetWidth - 4;
+      if (sl + sub.offsetWidth > W() - DESK.edge) sl = left - sub.offsetWidth + 4;
+      const stp = Math.max(DESK.edge, Math.min((ob.top - fr.top) / s - 5, H() - sub.offsetHeight - DESK.edge));
+      sub.style.left = `${sl}px`; sub.style.top = `${stp}px`;
+      menuNodes.push(sub);
+    }
+
+    if (!touch) {
+      const cur = document.createElementNS(SVG, 'svg');
+      cur.setAttribute('class', 'cursor'); cur.setAttribute('width', '14'); cur.setAttribute('height', '20'); cur.setAttribute('viewBox', '0 0 14 20');
+      cur.innerHTML = '<path d="M1 1 L1 16 L5 12 L8 19 L10.5 18 L7.5 11 L13 11 Z" fill="#fff" stroke="#000" stroke-width="1"/>';
+      cur.style.left = `${x - 1}px`; cur.style.top = `${y - 1}px`;
+      frame.appendChild(cur);
+      menuNodes.push(cur);
+      return;
+    }
+    if (ui.moment === 'open') drawFinger(x, y, 'down');
+    else if (ui.moment === 'lifted') drawFinger(x, y, 'lifted');
+    else if (ui.moment === 'slide') {
+      const target = drilled ? rows.find((r) => r.it.label === 'Grid') : rows.find((r) => r.it.label === st.slide);
+      if (!target) return;
+      target.b.classList.add('hl');
+      if (!drilled && target.it.preview && !target.it.disabled) preview(target.it.preview);
+      const fx = left + Math.round(m.offsetWidth * 0.7);
+      const fy = top + target.b.offsetTop + target.b.offsetHeight / 2;
+      drawFinger(x, y, 'trail', fx, fy);
+      drawFinger(fx, fy, 'down');
+    }
+  }
+
+  // The finger: a 44 px contact disc, the hand behind it, the hold's progress ring.
+  function drawFinger(x, y, mode, toX, toY) {
+    const s = document.createElementNS(SVG, 'svg');
+    s.setAttribute('class', 'finger');
+    s.setAttribute('width', '1'); s.setAttribute('height', '1');
+    s.style.left = `${x}px`; s.style.top = `${y}px`;
+    const ang = ui.hand === 'right' ? -32 : 32;
+    let g = '';
+    if (mode === 'trail') {
+      g = `<line x1="0" y1="0" x2="${toX - x}" y2="${toY - y}" stroke="var(--carrier)" stroke-width="2" stroke-dasharray="5 5" opacity="0.8"/>` +
+        `<circle r="5" fill="none" stroke="var(--carrier)" stroke-width="1.5" opacity="0.8"/>`;
+    } else if (mode === 'lifted') {
+      g = '<circle r="22" fill="none" stroke="var(--ink-dim)" stroke-width="1.5" stroke-dasharray="4 4"/>' +
+        '<text x="28" y="-26" fill="var(--ink-dim)" font-family="IBM Plex Mono, monospace" font-size="10">lifted here</text>';
+    } else {
+      g = `<g transform="rotate(${ang})" opacity="0.9">` +
+        '<rect x="-21" y="-6" width="42" height="230" rx="21" fill="rgba(220,227,227,0.10)" stroke="rgba(220,227,227,0.35)" stroke-dasharray="4 4"/>' +
+        '<ellipse cx="0" cy="300" rx="95" ry="115" fill="rgba(220,227,227,0.07)" stroke="rgba(220,227,227,0.25)" stroke-dasharray="4 4"/>' +
+        `<text x="${ui.hand === 'right' ? -30 : -10}" y="300" fill="rgba(220,227,227,0.55)" font-family="Chakra Petch, sans-serif" font-size="11" letter-spacing="1.5" transform="rotate(${-ang} 0 300)">${ui.hand.toUpperCase()} HAND</text>` +
+        '</g>' +
+        '<circle r="22" fill="rgba(224,164,78,0.22)" stroke="var(--carrier)" stroke-width="2"/>' +
+        '<circle r="3" fill="var(--carrier)"/>';
+      if (mode === 'hold') {
+        const r = 30, c = 2 * Math.PI * r, f = 250 / 450;
+        g += `<circle r="${r}" fill="none" stroke="var(--line-bright)" stroke-width="3"/>` +
+          `<circle r="${r}" fill="none" stroke="var(--carrier)" stroke-width="3" stroke-dasharray="${c * f} ${c}" transform="rotate(-90)"/>` +
+          '<text x="36" y="-34" fill="var(--carrier)" font-family="IBM Plex Mono, monospace" font-size="10">250 / 450 ms · moved 3 px</text>';
+      }
+    }
+    s.innerHTML = g;
+    frame.appendChild(s);
+    menuNodes.push(s);
+  }
+
+  // ---------- previews (the desktop's hover previews) ----------
+  let previewNodes = [];
+  function preview(kind) {
+    previewNodes.forEach((n) => n.remove());
+    previewNodes = [];
+    if (!kind) return;
+    const st = STATES[ui.state];
+    const p = PARTS[st.part];
+    const lane = laneEls[st.part].lane;
+    const bar0 = Math.floor(st.at);
+    const boxp = (startBar0, bars) => {
+      const n = h('div', 'pv-reg');
+      n.style.left = `${px(startBar0)}px`; n.style.width = `${px(bars) - BLOCK_GAP}px`;
+      lane.appendChild(n); previewNodes.push(n);
+    };
+    const brace = (startBar0, bars) => {
+      const b = h('div', 'loop-brace pv-brace');
+      b.style.left = `${px(startBar0)}px`; b.style.width = `${px(bars)}px`;
+      b.append(h('i', 'loop-handle start'), h('i', 'loop-handle end'));
+      loopStrip.appendChild(b); previewNodes.push(b);
+      [startBar0, startBar0 + bars].forEach((at) => {
+        const l = h('div', 'loop-line'); l.style.left = `${px(at)}px`; l.style.top = '26px'; l.style.bottom = '0';
+        overlay.appendChild(l); previewNodes.push(l);
+      });
+    };
+    const reg = st.region === null ? null : p.regions[st.region];
+    if (kind === 'split') {
+      const n = h('div', 'pv-line'); n.style.left = `${px(Math.round(st.at)) - 1}px`;
+      lane.appendChild(n); previewNodes.push(n);
+    } else if (kind === 'paste') boxp(bar0, Math.min(ui.clip === 'grid' ? 4 : 8, 16 - bar0));
+    else if (kind === 'add') boxp(bar0, 1);
+    else if (kind === 'loopbar') brace(bar0, 1);
+    else if (kind === 'loop' && reg) brace(reg[0] - 1, reg[1]);
+    else if (kind === 'fit' && reg) boxp(reg[0] - 1, reg[3]);
+  }
+
+  const WHERE = {
+    grid: 'acid\'s second region (bars 5–8), in bar 6',
+    arp: 'arp\'s first region (bars 1–8), in bar 3',
+    roll: 'lead\'s first region (bars 5–8), in bar 6',
+    euclid: 'kick\'s second region (bars 9–16), in bar 12',
+    gap: 'the gap in acid\'s lane (bars 9–12), in bar 10',
+    none: 'pad\'s whole-song region (∞), in bar 10',
+  };
+  function caption() {
+    const st = STATES[ui.state];
+    const where = WHERE[ui.state];
+    if (ui.input === 'mouse') {
+      return `<b>Right-click with a trackpad on the iPad:</b> ${where}. The opening event is a mouse, so it is the desktop menu: 32 px rows, the keyboard tags, at the pointer, hover previews, a submenu beside.`;
+    }
+    const drilled = ui.drill && ui.state === 'none';
+    const M = {
+      hold: `<b>1 · Holding.</b> A finger on ${where}, 250 ms of 450, 3 px from where it landed (the slop is 8). Nothing has changed yet: the selection is still acid's bars 5–8. Past 8 px this becomes today's drag and the timer stops. The ring is the proposed hold feedback.`,
+      open: `<b>2 · At 450 ms the menu opens</b> beside the finger, selecting what was pressed as the desktop right-click does. The finger is still down; the hand's outline shows what it covers.`,
+      slide: drilled
+        ? '<b>3 · Slid onto a kind.</b> In the drilled-in Set sequencer list the finger rests on Grid; lifting here sets pad to Grid. The kinds have no preview.'
+        : `<b>3 · Slid onto "${st.slide}"</b> without lifting. The row lights and the lanes show what it would do, dashed: the desktop's hover preview. Lifting here runs it; sliding back off every row and lifting runs nothing.`,
+      lifted: `<b>4 · Lifted without sliding.</b> The menu stays open and the lift did nothing else. A tap on a row runs it (no preview); a tap or press anywhere else closes the menu and does nothing more.`,
+    };
+    let c = M[ui.moment];
+    if (drilled && ui.moment !== 'hold' && ui.moment !== 'slide') c += ' <b>Set sequencer ▸ was tapped:</b> the panel now lists the kinds under a back row, at the same top-left.';
+    if (ui.moment !== 'hold') c += placeNote;
+    return c;
+  }
+
+  let scaleNow = 1;
+  function fitFrame() {
+    frame.style.width = `${W()}px`; frame.style.height = `${H()}px`;
+    const pg = fit.parentElement, cs = getComputedStyle(pg);
+    const avail = pg.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+    scaleNow = Math.min(1, avail / W());
+    frame.style.transform = `scale(${scaleNow})`;
+    fit.style.width = `${W() * scaleNow + 2}px`;
+    fit.style.height = `${H() * scaleNow + 2}px`;
+    document.getElementById('scale').innerHTML = `The frame is the ${ui.orient === 'land' ? 'landscape' : 'portrait'} screen, ${W()} × ${H()} CSS px (1 CSS px = 1 pt at dpr 2), shown at <b>${Math.round(scaleNow * 1000) / 10}%</b>${scaleNow < 1 ? ' to fit this window; widen the window for 1:1' : ', 1:1'}.`;
+  }
+
+  function render() {
+    document.documentElement.style.setProperty('--mi-touch', `${ui.rowh}px`);
+    document.documentElement.style.setProperty('--mi-font', `${{ 40: 14, 44: 15, 48: 16 }[ui.rowh]}px`);
+    fitFrame();
+    preview(null);
+    drawHeader();
+    paintRegions();
+    paintOverlay();
+    paintPane();
+    place();
+    document.getElementById('caption').innerHTML = caption();
+    const drill = document.getElementById('drill');
+    drill.disabled = ui.state !== 'none' || (ui.input === 'touch' && ui.moment === 'hold');
+    document.getElementById('kbd').disabled = ui.input !== 'touch';
+    document.querySelectorAll('#moment button, #hand button, #rowh button').forEach((b) => { b.disabled = ui.input !== 'touch'; });
+  }
+
+  function wireSeg(id, key) {
+    const seg = document.getElementById(id);
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled) return;
+      seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      ui[key] = b.dataset.v;
+      render();
+    });
+  }
+  ['state', 'moment', 'orient', 'hand', 'rowh', 'input', 'clip'].forEach((k) => wireSeg(k, k));
+  document.getElementById('drill').addEventListener('change', (e) => { ui.drill = e.target.checked; render(); });
+  document.getElementById('kbd').addEventListener('change', (e) => { ui.kbd = e.target.checked; render(); });
+  window.addEventListener('resize', render);
+
+  drawHead();
+  drawHarmony();
+  drawParts();
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+})();
+</script>
