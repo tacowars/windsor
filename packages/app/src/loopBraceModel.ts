@@ -161,6 +161,24 @@ export function dragBrace(gesture: BraceGesture, tick: number, bounds: BraceBoun
 export const loopLineTicks = (loop: SongLoop | undefined): number[] =>
   loop?.on ? [loop.start, loop.end] : [];
 
+/**
+ * Loop this bar (windsor#826; record `2026-10-16-song-tab-context-menu`,
+ * decision 3): the bar of `bar` ticks holding `tick`, inside the song.
+ */
+export const barLoopRange = (tick: number, bar: number, songTicks: number): LoopRange => {
+  const start = clamp(Math.floor(tick / bar) * bar, 0, Math.max(0, songTicks - bar));
+  return { start, end: Math.min(songTicks, start + bar) };
+};
+
+/** Loop region (windsor#826, decision 2): the region's own span, inside the song. */
+export const regionLoopRange = (
+  region: { readonly start: number; readonly duration: number },
+  songTicks: number,
+): LoopRange => ({
+  start: clamp(region.start, 0, songTicks),
+  end: clamp(region.start + region.duration, 0, songTicks),
+});
+
 /** A range and its on state as the live partial every loop edit writes: the whole loop, so an export carries it. */
 export const loopChange = (range: LoopRange, on: boolean): DocumentPartial => ({
   transport: { loop: { start: range.start, end: range.end, on } },

@@ -52,6 +52,7 @@ import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { bodyGroups, harmonyGroup, headGroup, sizeLaneColumn } from './songLaneColumn';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
 import type { RegionClip } from './regionClipboard';
+import type { BarSpan } from './songZoomModel';
 import { refreshMixerCells } from './songMixerCell';
 import { wireRegionKeys } from './songRegionKeys';
 import { wireStripKeys } from './songStripKeys';
@@ -166,6 +167,8 @@ export interface SongView {
   select(selection: SongSelection): void;
   paintLanes(): void;
   paintPane(): void;
+  /** Fit the zoom and scroll to `span` (the lane menu's Zoom to region, windsor#826): view state, no undo step. */
+  zoomTo(span: BarSpan): void;
 }
 
 /**
@@ -276,6 +279,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
   let paneDrawn: DetailPane = { stale: () => false, refreshHead: () => undefined };
   // Set once the zoom is wired below; the arrow can only be pressed after that.
   let refit = (): void => undefined;
+  let zoomBars = (_span: BarSpan): void => undefined;
   const mixer = {
     get expanded(): boolean {
       return state.mixerExpanded;
@@ -343,6 +347,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
     paintPane() {
       paneDrawn = paintDetailPane(pane, view);
     },
+    zoomTo: (span) => zoomBars(span),
   };
   let stripsDrawn = stripSignature(ctx);
   view.paintLanes();
@@ -356,6 +361,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
     repaint: () => view.paintLanes(),
   });
   refit = zoom.refit;
+  zoomBars = zoom.zoomTo;
   const onTick = (tick: number): void => {
     markPlayingBlock(lanes, ctx.model.doc, view.songTicks(), tick);
     readValues(tick);

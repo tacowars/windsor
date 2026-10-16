@@ -20,7 +20,9 @@ import {
   braceGestureAt,
   braceHitAt,
   dragBrace,
+  regionLoopRange,
   drawRange,
+  barLoopRange,
   loopChange,
   loopGrain,
   loopLineTicks,
@@ -238,5 +240,23 @@ describe('the lines through the lanes and the partial', () => {
     expect(loopChange({ start: BAR, end: 3 * BAR }, false)).toEqual({
       transport: { loop: { start: BAR, end: 3 * BAR, on: false } },
     });
+  });
+});
+
+describe('the lane menu’s loops (windsor#826)', () => {
+  const BAR = TICKS_PER_BAR;
+  const SONG = 16 * BAR;
+
+  it('Loop this bar loops the bar holding the press, inside the song', () => {
+    expect(barLoopRange(9.4 * BAR, BAR, SONG)).toEqual({ start: 9 * BAR, end: 10 * BAR });
+    expect(barLoopRange(0, BAR, SONG)).toEqual({ start: 0, end: BAR });
+    expect(barLoopRange(SONG, BAR, SONG)).toEqual({ start: 15 * BAR, end: SONG });
+  });
+
+  it('Loop region loops the region’s span, and the partial turns the loop on', () => {
+    const range = regionLoopRange({ start: 4 * BAR, duration: 4 * BAR }, SONG);
+    expect(range).toEqual({ start: 4 * BAR, end: 8 * BAR });
+    expect(fitLoopRange(range.start, range.end, SONG)).toEqual(range);
+    expect(loopChange(range, true)).toEqual({ transport: { loop: { ...range, on: true } } });
   });
 });

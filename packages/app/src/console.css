@@ -5627,6 +5627,39 @@ select.field.compact {
 .reg.drawing {
   border-style: dashed;
 }
+/* The lane's context menu (windsor#826; record 2026-10-16-song-tab-context-menu, decisions 7 and 8):
+   iOS shows no callout on a long press, and a hovered or lit row previews its effect, dashed in the
+   carrier, as the approved mockups draw it: the region a paste or an add would land, the line a
+   split would cut at, and the loop brace a loop command would set. */
+.lane {
+  -webkit-touch-callout: none;
+}
+.lane-pv-reg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border: 1px dashed var(--carrier);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--carrier) 12%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+.lane-pv-cut {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  margin-left: -1px;
+  border-left: 2px dashed var(--carrier);
+  pointer-events: none;
+  z-index: 3;
+}
+.loop-brace.lane-pv-brace {
+  opacity: 0.85;
+  outline: 1px dashed var(--carrier);
+  outline-offset: 1px;
+  pointer-events: none;
+}
 .reg .gl {
   flex: none;
   font-family: var(--f-ui);

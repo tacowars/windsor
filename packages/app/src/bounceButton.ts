@@ -5,7 +5,8 @@
  * one partial as one undo step, "Bounce to Roll", with no confirmation: the
  * pane then draws the part as a Roll, and an `info` toast sums up what the
  * bounce approximated. A refusal changes nothing and shows an `error` toast.
- * Its state is `bounceButtonModel.ts`, its words `bounceToastModel.ts`.
+ * Its state is `bounceButtonModel.ts`, its words `bounceToastModel.ts`. The
+ * lane's context menu runs the same `bouncePart` (windsor#826).
  */
 import type { MusicPart } from '@windsor/engine';
 import { bounceToRoll, partAt } from '@windsor/engine';
@@ -17,7 +18,7 @@ import { bounceRefusalText, bounceSuccessText } from './bounceToastModel';
 import type { SongView } from './songTab';
 
 /** Bounce the part on `slot`, read from the document at the press. */
-function bounce(view: SongView, slot: number): void {
+export function bouncePart(view: SongView, slot: number): void {
   const { doc } = view.ctx.model;
   const part = partAt(doc, slot);
   // The pane may be older than the part: bounce only what still offers it.
@@ -41,6 +42,6 @@ export function bounceButton(view: SongView, part: MusicPart): HTMLButtonElement
   button.type = 'button';
   button.disabled = state.disabled;
   button.title = state.title;
-  button.onclick = (): void => bounce(view, part.slot);
+  button.onclick = (): void => bouncePart(view, part.slot);
   return button;
 }
