@@ -15,6 +15,7 @@
  * `knobCc.ts`): its tag, ring and right-click menu. A group's, a send bus's
  * and the master's knobs name no part, so their menu refuses learn.
  */
+import type { InsertSpec } from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
@@ -90,17 +91,28 @@ export function insertFieldLock(
   };
 }
 
+/** The chain with the insert at `index` turned to `v`: by the entry's codec, else its number at `f`. */
+function turned<S>(
+  chain: readonly InsertSpec[],
+  index: number,
+  { f, limit, codec }: InsertKnobEntry<S>,
+  v: number,
+): InsertSpec[] {
+  const spec = chain[index] as S | undefined;
+  if (codec) {
+    return chain.map((s, i) => (i === index && spec ? (codec.write(spec, v) as InsertSpec) : s));
+  }
+  return setInsertField(chain, index, f, limit && spec ? limit(v, spec) : v);
+}
+
 function rackKnob<S>(
   ctx: AppCtx,
   slot: InsertTarget,
   index: number,
-  { f, label, o, limit }: InsertKnobEntry<S>,
+  entry: InsertKnobEntry<S>,
   knob: { readonly onChange: (() => void) | undefined; readonly dial: 'rack' | 'rack-big' },
 ): HTMLElement {
-  const stop = (v: number): number => {
-    const spec = insertsOf(ctx, slot)[index] as S | undefined;
-    return limit && spec ? limit(v, spec) : v;
-  };
+  const { f, label, o, codec } = entry;
   return makeKnob({
     label,
     ...o,
@@ -108,12 +120,13 @@ function rackKnob<S>(
     dial: knob.dial,
     ...insertFieldLock(ctx, slot, index, f),
     get: () => {
-      const spec = insertsOf(ctx, slot)[index] as Record<string, unknown> | undefined;
-      const value = spec?.[f];
+      const spec = insertsOf(ctx, slot)[index] as S | undefined;
+      if (codec) return spec ? codec.read(spec) : o.def;
+      const value = (spec as Record<string, unknown> | undefined)?.[f];
       return typeof value === 'number' ? value : o.def;
     },
     set: (v) => {
-      const inserts = setInsertField(insertsOf(ctx, slot), index, f, stop(v));
+      const inserts = turned(insertsOf(ctx, slot), index, entry, v);
       if (ctx.change(targetChange(ctx, slot, inserts)).ok) knob.onChange?.();
     },
   });

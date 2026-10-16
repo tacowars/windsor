@@ -44,6 +44,7 @@ import { BLOOM_BOUNDS } from '../inserts/bloomConstants';
 import { COMPRESSOR_BOUNDS } from '../inserts/compressorConstants';
 import { DELAY_BOUNDS } from '../inserts/delayConstants';
 import { ECHO_BOUNDS } from '../inserts/echoConstants';
+import type { EchoSpec } from '../inserts/echoInsert';
 import { ENSEMBLE_BOUNDS } from '../inserts/ensembleConstants';
 import { EQ_BAND_COUNT, EQ_BOUNDS, EQ_FIRST_ORDER_SLOPE } from '../inserts/eqConstants';
 import { FILTER_BOUNDS } from '../inserts/filterConstants';
@@ -314,11 +315,16 @@ const REVERB_ROWS = [
   row('mix', 'Mix', UNIT),
 ];
 
-const ECHO_ROWS = [
-  {
-    ...row('delayTime', 'Time', ECHO_BOUNDS.delayTime, 'log', 's'),
-    floor: ECHO_TIME_LOG_FLOOR,
-  },
+/**
+ * The Echo's line and Mix; its Time only while it is not synced (windsor#816,
+ * record `2026-10-16-echo-follows-song-tempo`), as the Pump's Length. The
+ * note value and Sync are not targets.
+ */
+const ECHO_ROWS: InsertFieldRow<EchoSpec>[] = [
+  when(
+    { ...row('delayTime', 'Time', ECHO_BOUNDS.delayTime, 'log', 's'), floor: ECHO_TIME_LOG_FLOOR },
+    (spec: EchoSpec) => !spec.sync,
+  ),
   row('feedback', 'Feedback', ECHO_BOUNDS.feedback),
   row('damp', 'Damp', ECHO_BOUNDS.damp, 'log', 'Hz'),
   row('resonance', 'Resonance', ECHO_BOUNDS.resonance, 'linear', 'dB'),

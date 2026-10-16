@@ -33,6 +33,8 @@ import {
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import type { EchoSpec } from '../inserts/echoInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
+import { ECHO_DEFAULT_BPM } from '../inserts/echoConstants';
+import { echoSeconds } from '../inserts/echoTempo';
 import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import type { ReturnSpec } from './mix';
 import { RETURNS, onSendBus } from './mix';
@@ -42,6 +44,8 @@ import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 
 const ECHO = RETURNS.b.inserts[0] as EchoSpec;
+/** Send B's Echo, free at its saved time: the loop's tests read `delayTime`. */
+const FREE_ECHO: EchoSpec = { ...ECHO, sync: false };
 const RUNAWAY_SECONDS = 10;
 const REPEATS = 20;
 /** Past the Butterworth floor's decay test, the runaway must still be sounding. */
@@ -117,7 +121,11 @@ async function renderOldReturn(
     input.connect(plate);
     plate.connect(output);
   } else {
-    attachDelay(context, input, output, ECHO);
+    // Send B's Echo is synced (windsor#816): the line at its dotted eighth before a tempo reaches it.
+    attachDelay(context, input, output, {
+      ...ECHO,
+      delayTime: echoSeconds(ECHO, ECHO_DEFAULT_BPM),
+    });
   }
   source.connect(fake(input));
   const [out] = renderGraph(c, PARITY_SECONDS, [fake(output)]);
@@ -142,7 +150,7 @@ describe('the default send buses', () => {
     expect(out.right).toEqual(old.right);
   });
 
-  it("renders Send B exactly as the echo return's line rendered", async () => {
+  it("renders Send B exactly as the echo return's line rendered, at a dotted eighth", async () => {
     const { out } = await renderBus(RETURNS.b, feed, PARITY_SECONDS);
     const old = await renderOldReturn('echo', feed);
     expect(rms(out.left)).toBeGreaterThan(0);
@@ -240,7 +248,7 @@ describe('the echo loop', () => {
   it('runs delay → damp → feedback → clip input → clip → delay, oversampled, at the spec resonance', () => {
     const context = new FakeContext().asAudioContext();
     const output = context.createGain();
-    const line = attachDelay(context, context.createGain(), output, ECHO);
+    const line = attachDelay(context, context.createGain(), output, FREE_ECHO);
     const delay = fake(line.effect);
     const damp = delay.outbound[0]?.to as FakeBiquad;
     expect(damp.kind).toBe('biquad');
@@ -254,7 +262,7 @@ describe('the echo loop', () => {
   });
 
   it('keeps a full runaway sounding, and bounded by the clip ceiling', async () => {
-    const spec = { ...ECHO, feedback: DELAY_FEEDBACK_MAX, resonance: DELAY_RESONANCE_MAX_DB };
+    const spec = { ...FREE_ECHO, feedback: DELAY_FEEDBACK_MAX, resonance: DELAY_RESONANCE_MAX_DB };
     const { out, context } = await renderBus(
       echoBus(spec),
       impulse(DELAY_CLIP_CEILING),
@@ -269,7 +277,7 @@ describe('the echo loop', () => {
   });
 
   it('fades every repeat at the Butterworth floor, below feedback 1', async () => {
-    const spec = { ...ECHO, feedback: DECAY_FEEDBACK, resonance: DELAY_RESONANCE_MIN_DB };
+    const spec = { ...FREE_ECHO, feedback: DECAY_FEEDBACK, resonance: DELAY_RESONANCE_MIN_DB };
     const seconds = (REPEATS + 1) * spec.delayTime;
     const { out, context } = await renderBus(echoBus(spec), impulse(DELAY_CLIP_CEILING), seconds);
     const window = Math.round(spec.delayTime * context.sampleRate);
@@ -281,7 +289,11 @@ describe('the echo loop', () => {
   });
 
   it('is transparent at ordinary levels: a −12 dBFS echo scales like a −60 dBFS one', async () => {
-    const spec = { ...ECHO, feedback: MODERATE_FEEDBACK, resonance: DELAY_RESONANCE_DEFAULT_DB };
+    const spec = {
+      ...FREE_ECHO,
+      feedback: MODERATE_FEEDBACK,
+      resonance: DELAY_RESONANCE_DEFAULT_DB,
+    };
     const seconds = REPEATS * spec.delayTime;
     const render = async (dbfs: number): Promise<number> => {
       const feed = burst(tones(TONE_HZ, TONE_HZ, fromDb(dbfs)), BURST_SECONDS);

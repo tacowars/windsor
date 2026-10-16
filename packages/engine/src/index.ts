@@ -799,6 +799,7 @@ export type { ReverbPreset, ReverbPresetGroup } from './inserts/reverbPresets';
 export { DEFAULT_ECHO, ECHO_INSERT } from './inserts/echoInsert';
 export type { EchoSpec } from './inserts/echoInsert';
 export { ECHO_BOUNDS, ECHO_MIX_DEFAULT } from './inserts/echoConstants';
+export { echoSeconds } from './inserts/echoTempo';
 
 // Every insert's identity in its chain (windsor#186).
 export {

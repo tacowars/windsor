@@ -43,7 +43,8 @@ async function renderStage(spec: EchoSpec): Promise<{ input: Capture; output: Ca
 
 describe('the Echo sound', () => {
   it("renders the echo return's line exactly at Mix 1", async () => {
-    const hot = { ...DEFAULT_ECHO, feedback: DELAY_FEEDBACK_MAX, mix: 1 };
+    // Free, at the return's 280 ms.
+    const hot = { ...DEFAULT_ECHO, sync: false, feedback: DELAY_FEEDBACK_MAX, mix: 1 };
     const { output } = await renderStage(hot);
 
     const { context: c, source } = await context();
@@ -72,9 +73,15 @@ describe('the Echo sound', () => {
     expect(output.right).toEqual(input.right);
   });
 
-  it('repeats past the input at its default Mix', async () => {
+  it('repeats past the input at its default Mix, a dotted eighth at 120 bpm', async () => {
     const { input, output } = await renderStage(DEFAULT_ECHO);
-    const afterBurst = Math.round((BURST_SECONDS + DEFAULT_ECHO.delayTime) * 48000);
+    const rate = 48000;
+    const dottedEighth = 0.375;
+    const afterBurst = Math.round((BURST_SECONDS + dottedEighth) * rate);
+    // Nothing between the burst (whole quanta: by 60 ms) and its first repeat, a dotted eighth after it began.
+    const burstEnd = 0.06;
+    expect(rms(output.left, burstEnd * rate, dottedEighth * rate)).toBe(0);
+    expect(rms(output.left, dottedEighth * rate, afterBurst)).toBeGreaterThan(0);
     expect(rms(input.left, afterBurst)).toBe(0);
     expect(rms(output.left, afterBurst)).toBeGreaterThan(0);
   });
@@ -93,7 +100,8 @@ describe('the Echo graph', () => {
     const { context: c } = await context();
     const stage = ECHO_INSERT.create(c.asAudioContext(), DEFAULT_ECHO);
     const before = c.nodes.map((n) => [...n.outbound]);
-    stage.set({ ...DEFAULT_ECHO, delayTime: 0.5, feedback: 0.7, mix: 0.9, enabled: false });
+    const free = { ...DEFAULT_ECHO, sync: false };
+    stage.set({ ...free, delayTime: 0.5, feedback: 0.7, mix: 0.9, enabled: false });
     expect(c.nodes.map((n) => [...n.outbound])).toEqual(before);
     expect(c.delays[0]?.delayTime.value).toBe(0.5);
   });
@@ -110,7 +118,7 @@ describe('the Echo graph', () => {
 });
 
 describe('ECHO_INSERT', () => {
-  it("starts at the echo return's numbers, Mix 0.30, switched on", () => {
+  it("starts at the echo return's numbers, synced at a dotted eighth, Mix 0.30, switched on", () => {
     const { delayTime, feedback, damp, resonance } = ECHO_LINE_DEFAULTS;
     expect(DEFAULT_ECHO).toEqual({
       kind: 'echo',
@@ -118,6 +126,8 @@ describe('ECHO_INSERT', () => {
       feedback,
       damp,
       resonance,
+      sync: true,
+      division: '1/8D',
       mix: 0.3,
       enabled: true,
       slot: null,
@@ -130,6 +140,7 @@ describe('ECHO_INSERT', () => {
     const spec = ECHO_INSERT.normalise({ ...raw, mix: -1 }, 'x', n);
     expect(spec).toEqual({
       ...DEFAULT_ECHO,
+      sync: false,
       delayTime: DELAY_MAX_SECONDS,
       feedback: DELAY_FEEDBACK_MAX,
       damp: ECHO_BOUNDS.damp[1],
@@ -140,10 +151,12 @@ describe('ECHO_INSERT', () => {
     expect(n.corrections).toHaveLength(6);
   });
 
-  it('loads a spec with no `enabled` as on', () => {
+  it('loads a spec with no `enabled` as on, and one with no `sync` as free (windsor#816)', () => {
     const n = new FieldNormaliser();
     expect(ECHO_INSERT.normalise({ kind: 'echo', mix: 0.5 }, 'x', n)).toEqual({
       ...DEFAULT_ECHO,
+      sync: false,
+      division: '1/8D',
       mix: 0.5,
     });
     expect(n.corrections).toEqual([]);

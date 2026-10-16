@@ -1,48 +1,41 @@
 /**
  * The Echo insert's card (windsor#171): the `echo` return's Time, Regen, Damp
- * and Q, then Mix, and the tempo picker, on one page (windsor#173). Picking
- * a note value writes the time in seconds at the song's bpm, as the
- * return's tempo buttons do, so a later bpm change needs it picked again; a
- * time that is no note value reads Free. The on/off switch is the rack's
- * rail.
+ * and Q, then Mix, on one page (windsor#173), with a Sync switch beside Time
+ * (windsor#816, record `2026-10-16-echo-follows-song-tempo`). Synced, Time
+ * steps through the note values, shortest to longest, and the engine plays
+ * the one picked at the song's tempo, whatever it becomes; its title gives
+ * the length at the song's bpm now. Free, Time is the knob in ms. Each keeps
+ * its own setting while the other is in use. The on/off switch is the
+ * rack's rail.
  */
 import type { EchoSpec } from '@windsor/engine';
 import { DEFAULT_ECHO } from '@windsor/engine';
+import type { AppCtx } from './context';
 import type { InsertCard } from './insertCards';
-import { ECHO_KNOBS } from './insertKnobTables';
-import { bigInsertKnobs, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
-import { insertPage, insertSelect, wideColumn } from './insertLayout';
+import { ECHO_DIVISION_KNOB, ECHO_KNOBS, echoDivisionTitle } from './insertKnobTables';
+import { bigInsertKnobs, insertKnob, insertsOf, pickKnobs } from './insertKnobs';
+import { insertPage, insertSwitch, knobColumns, wideColumn } from './insertLayout';
+import type { InsertTarget } from './insertTarget';
 import { targetChange } from './insertTarget';
-import { TEMPO_DIVISIONS } from './mixerTables';
-import { tempoMatches, tempoSeconds } from './returnControls';
+import { knobTitle } from './knob';
 
-/** The note value picker at `bpm`, and a refresh that re-reads the time. */
-function tempoPicker(
-  bpm: number,
-  read: () => number,
-  pick: (seconds: number) => void,
-): { readonly root: HTMLElement; refresh(): void } {
-  const shown = (): string =>
-    TEMPO_DIVISIONS.find((division) => tempoMatches(bpm, read(), division))?.label ?? '';
-  const root = insertSelect({
-    label: `Sync to ${bpm} bpm`,
-    options: [['', 'Free'], ...TEMPO_DIVISIONS.map((d) => [d.label, d.label] as const)],
-    value: shown(),
-    change: (label) => {
-      const division = TEMPO_DIVISIONS.find((d) => d.label === label);
-      if (division) pick(tempoSeconds(bpm, division.beats));
-      else refresh();
-    },
-  });
-  const select = root.querySelector('select')!;
-  const refresh = (): void => {
-    select.value = shown();
+/** The synced Time knob, its title the note value's length at the song's bpm, re-read on each turn and look. */
+function divisionKnob(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+  read: () => EchoSpec,
+): HTMLElement {
+  let node: HTMLElement | null = null;
+  const retitle = (): void => {
+    if (!node) return;
+    const length = echoDivisionTitle(read().division, ctx.model.doc.transport.bpm);
+    node.title = knobTitle(`${ECHO_DIVISION_KNOB.label}, ${length}`);
   };
-  TEMPO_DIVISIONS.forEach((division, at) => {
-    const option = select.options[at + 1];
-    if (option) option.title = `${division.title} at ${bpm} bpm`;
-  });
-  return { root, refresh };
+  node = insertKnob(ctx, slot, index, ECHO_DIVISION_KNOB, retitle);
+  retitle();
+  node.addEventListener('pointerenter', retitle);
+  return node;
 }
 
 export const echoCard: InsertCard = (ctx, slot, index) => {
@@ -57,15 +50,17 @@ export const echoCard: InsertCard = (ctx, slot, index) => {
     if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
   };
   const build = (): HTMLElement => {
-    const tempo = tempoPicker(
-      ctx.model.doc.transport.bpm,
-      () => current().delayTime,
-      (seconds) => commit({ ...current(), delayTime: seconds }),
+    const synced = current().sync;
+    const sync = insertSwitch('Sync', synced, (on) => commit({ ...current(), sync: on }));
+    const time = synced
+      ? divisionKnob(ctx, slot, index, current)
+      : insertKnob(ctx, slot, index, pickKnobs(ECHO_KNOBS, ['delayTime'])[0]!);
+    const line = pickKnobs(ECHO_KNOBS, ['feedback', 'damp', 'resonance']).map((entry) =>
+      insertKnob(ctx, slot, index, entry),
     );
-    const knobs = pickKnobs(ECHO_KNOBS, ['delayTime', 'feedback', 'damp', 'resonance']);
     return insertPage(
-      wideColumn(tempo.root),
-      ...insertKnobs(ctx, slot, index, knobs, tempo.refresh),
+      wideColumn(sync),
+      ...knobColumns([time, ...line]),
       ...bigInsertKnobs(ctx, slot, index, pickKnobs(ECHO_KNOBS, ['mix'])),
     );
   };

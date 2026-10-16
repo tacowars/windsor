@@ -29,11 +29,13 @@ import {
   DEFAULT_ENSEMBLE,
   DEFAULT_FILTER,
   DEFAULT_REVERB,
+  DELAY_DIVISIONS,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
   ENSEMBLE_BOUNDS,
+  echoSeconds,
   FILTER_BOUNDS,
   INSERT_AUTOMATION_FIELDS,
   REVERB_SPACE_RANGES,
@@ -90,6 +92,15 @@ export interface InsertKnobEntry<S> {
   readonly o: SeqKnobOpts & Pick<KnobSpec, 'logFloor' | 'steps'>;
   /** Where a turn to `v` stops, given the insert as it stands: Bloom's Low and High never cross. */
   readonly limit?: (v: number, spec: S) => number;
+  /**
+   * A knob over a field that is not a number (the Echo's note value,
+   * windsor#816): the number the knob shows for the insert, and the insert a
+   * turn to `v` makes. Absent, the knob reads and writes the number at `f`.
+   */
+  readonly codec?: {
+    read(spec: S): number;
+    write(spec: S, v: number): S;
+  };
 }
 
 export const DRIVE_KNOBS: readonly InsertKnobEntry<DriveSpec>[] = [
@@ -179,6 +190,42 @@ export const ECHO_KNOBS: readonly InsertKnobEntry<EchoSpec>[] = [
   ...DELAY_LINE_KNOBS.map(({ f, label, o }) => ({ f, label, o: { ...o, def: DEFAULT_ECHO[f] } })),
   { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_ECHO.mix, fmt: fmt2 } },
 ];
+
+/** Echo's note values, shortest to longest (windsor#816): the synced Time knob's steps. */
+export const ECHO_DIVISIONS: readonly EchoSpec['division'][] = (
+  Object.keys(DELAY_DIVISIONS) as EchoSpec['division'][]
+).sort((a, b) => DELAY_DIVISIONS[a] - DELAY_DIVISIONS[b]);
+
+/** The note value at knob step `v`. */
+const echoDivisionAt = (v: number): EchoSpec['division'] =>
+  ECHO_DIVISIONS[Math.round(v)] ?? DEFAULT_ECHO.division;
+
+/**
+ * The synced Echo's Time (windsor#816): a stepped knob over the note values
+ * in length order, reading the note value (`1/8D`). The free Time is
+ * `ECHO_KNOBS`' ms knob.
+ */
+export const ECHO_DIVISION_KNOB: InsertKnobEntry<EchoSpec> = {
+  f: 'division',
+  label: 'Time',
+  o: {
+    min: 0,
+    max: ECHO_DIVISIONS.length - 1,
+    def: ECHO_DIVISIONS.indexOf(DEFAULT_ECHO.division),
+    steps: ECHO_DIVISIONS.map((_, step) => step),
+    fmt: echoDivisionAt,
+  },
+  codec: {
+    read: (spec) => ECHO_DIVISIONS.indexOf(spec.division),
+    write: (spec, v) => ({ ...spec, division: echoDivisionAt(v) }),
+  },
+};
+
+/** What the synced Time's note value lasts at the song's `bpm`, for its title: `1/8D = 375 ms at 120 bpm`. */
+export function echoDivisionTitle(division: EchoSpec['division'], bpm: number): string {
+  const seconds = echoSeconds({ sync: true, division, delayTime: 0 }, bpm);
+  return `${division} = ${Math.round(seconds * 1000)} ms at ${bpm} bpm`;
+}
 
 /** The Filter's knobs (windsor#622): the voice filter's Cutoff and Reso, on its own ranges and log sweeps (windsor#626), then Mix. */
 export const FILTER_INSERT_KNOBS: readonly InsertKnobEntry<FilterSpec>[] = [

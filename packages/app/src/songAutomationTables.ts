@@ -269,4 +269,5 @@ export const INACTIVE_WHY: InactiveWhy = {
   },
   eq: eqBandWhy,
   pump: () => 'the Pump is synced',
+  echo: () => 'the Echo is synced',
 };

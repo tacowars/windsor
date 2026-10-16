@@ -145,7 +145,9 @@ describe('initMusic with the send buses (windsor#172)', () => {
         a: { level: 0.4, inserts: [{ ...PLATE, size: 2.5 }] },
         b: {
           level: 0.2,
-          inserts: [{ ...ECHO, delayTime: 0.75, feedback: 0.5, damp: 1500, resonance: 6 }],
+          inserts: [
+            { ...ECHO, sync: false, delayTime: 0.75, feedback: 0.5, damp: 1500, resonance: 6 },
+          ],
         },
       },
     });
