@@ -15,15 +15,8 @@
  */
 import { PART_COLORS } from './consoleColors';
 import { el } from './dom';
-import {
-  longPressDue,
-  longPressMoved,
-  longPressOpens,
-  pickerPosition,
-  swatchCaption,
-} from './partColourPickerModel';
-import type { Point } from './partColourPickerModel';
-import { LONG_PRESS } from './partColourPickerTables';
+import { wireLongPress } from './longPress';
+import { pickerPosition, swatchCaption } from './partColourPickerModel';
 
 /** The part the picker colours: its name for the title and its colour, ringed. */
 export interface PickedPart {
@@ -115,61 +108,18 @@ export function openPartColourPicker(
   menu.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
 }
 
-/** A touch or pen press on the chip, waiting to become a long press. */
-interface HeldPress {
-  readonly id: number;
-  readonly startMs: number;
-  readonly from: Point;
-  at: Point;
-  readonly timer: number;
-}
-
 /**
  * Open the picker from `chip` on a right-click, or on a touch or pen long
- * press that stays within the table's distance. The returned call says, once,
- * whether the click now arriving ends a long press that opened the picker,
- * so the chip's own click can leave the selection alone.
+ * press (`wireLongPress`, shared with the context menus). The returned call
+ * says, once, whether the click now arriving ends a long press that opened
+ * the picker, so the chip's own click can leave the selection alone.
  */
 export function wireChipColour(chip: HTMLElement, open: () => void): () => boolean {
-  let press: HeldPress | null = null;
-  let opened = false;
-  const cancel = (): void => {
-    if (press) window.clearTimeout(press.timer);
-    press = null;
-  };
+  const hold = wireLongPress(chip, open);
   chip.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     // A touch long press may bring the platform's own context menu; one opening is enough.
-    if (opened) return;
-    opened = press !== null;
-    cancel();
-    open();
+    if (hold.claimContextMenu()) open();
   });
-  chip.addEventListener('pointerdown', (e) => {
-    cancel();
-    opened = false;
-    if (!longPressOpens(e.pointerType)) return;
-    const from = { x: e.clientX, y: e.clientY };
-    const startMs = performance.now();
-    const timer = window.setTimeout(() => {
-      const held = press;
-      press = null;
-      if (!held || !longPressDue(held, { ms: performance.now(), at: held.at })) return;
-      opened = true;
-      open();
-    }, LONG_PRESS.ms);
-    press = { id: e.pointerId, startMs, from, at: from, timer };
-  });
-  chip.addEventListener('pointermove', (e) => {
-    if (!press || e.pointerId !== press.id) return;
-    press.at = { x: e.clientX, y: e.clientY };
-    if (longPressMoved(press.from, press.at)) cancel();
-  });
-  chip.addEventListener('pointerup', cancel);
-  chip.addEventListener('pointercancel', cancel);
-  return () => {
-    const took = opened;
-    opened = false;
-    return took;
-  };
+  return hold.took;
 }

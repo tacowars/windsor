@@ -7114,6 +7114,144 @@ select.field.auto-snap {
   border-top: 1px solid var(--line);
 }
 
+/* The context menu (windsor#825, contextMenu.ts): .knob-cc-menu's panel,
+   sized by the press that opened it. --ctx-row, --ctx-label and
+   --ctx-min-width come from contextMenuTables.ts's MENU_SIZES. */
+.context-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: var(--ctx-min-width, 220px);
+  padding: 4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.context-menu-head {
+  margin-bottom: 3px;
+  padding: 3px 12px 5px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font: 600 9px var(--f-panel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: var(--ctx-row, 32px);
+  padding: 0 12px;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font: var(--ctx-label, 12px) var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.context-menu:not(.touch) button:hover:not(:disabled),
+.context-menu button:focus-visible,
+.context-menu button.hl,
+.context-menu button.open {
+  background: var(--panel-hi);
+  outline: none;
+}
+.context-menu button:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.context-menu button .tag {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font: 9.5px var(--f-num);
+}
+.context-menu button .sub {
+  margin-left: auto;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+.context-menu hr {
+  margin: 3px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+/* Opened by touch or pen: wider padding, larger type, the lit row marked. */
+.context-menu.touch {
+  padding: 6px 0;
+}
+.context-menu.touch .context-menu-head {
+  margin-bottom: 4px;
+  padding: 6px 16px 8px;
+  font-size: 10.5px;
+}
+.context-menu.touch button {
+  padding: 0 16px;
+}
+.context-menu.touch button .tag {
+  font-size: 11px;
+}
+.context-menu.touch button .sub {
+  font-size: 17px;
+}
+.context-menu.touch hr {
+  margin: 4px 0;
+}
+.context-menu.touch button.hl {
+  box-shadow: inset 3px 0 0 var(--carrier);
+}
+.context-menu button.back {
+  gap: 10px;
+  color: var(--ink-dim);
+}
+.context-menu button.back .chev {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+
+/* The long press's hold ring (longPress.ts): drawn around the finger once the
+   press passes HOLD_RING.showMs, filling until it opens. */
+.hold-ring {
+  position: fixed;
+  z-index: 60;
+  width: var(--hold-ring-size);
+  height: var(--hold-ring-size);
+  pointer-events: none;
+}
+.hold-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.hold-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+.hold-ring-track {
+  stroke: var(--line-bright);
+}
+.hold-ring-fill {
+  stroke: var(--carrier);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: hold-ring-fill var(--hold-fill-ms) linear forwards;
+}
+@keyframes hold-ring-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* ---------- controls ---------- */
 
 .seg {
