@@ -60,9 +60,9 @@ export const ECHO_DIVISION_DEFAULT: keyof typeof DELAY_DIVISIONS = '1/8D';
 export const ECHO_DEFAULT_BPM = 120;
 
 /**
- * The time constant, in seconds, of a synced Echo's glide to a new time
- * (record `2026-10-16-echo-follows-song-tempo` decision 3): a tempo or a
- * note value change bends the repeats' pitch briefly instead of clicking.
- * Dub Delay smooths its times over the same 60 ms (`DELAY_DSP.timeSmoothSeconds`).
+ * Seconds over which the Echo's loop time ramps, linearly, to a new time
+ * (record `2026-10-16-echo-follows-song-tempo` decision 3, set by tacowars in
+ * review): a tempo, note value, free Time or Sync change bends the repeats'
+ * pitch like a tape delay repitching (`echoTimeSlew.ts`). Tuned by ear.
  */
-export const ECHO_SYNC_GLIDE_S = 0.06;
+export const ECHO_TIME_SLEW_S = 0.25;

@@ -38,13 +38,21 @@ there, and following the tempo must cost nothing per block.
    behaviour, so `ARRANGEMENT_VERSION` is not bumped and there is no
    migration. Only `normalise`'s default for an absent `sync` differs from
    `DEFAULT_ECHO`'s, and a comment there says so.
-3. **A time change while synced glides.** A tempo change, a note value
-   change, or turning Sync on moves the delay line's `delayTime` with
-   `setTargetAtTime`, with a time constant of `ECHO_SYNC_GLIDE_S` (60 ms, the
-   same as Dub Delay's time smoothing), rather than jumping. The repeats bend
-   in pitch for a moment instead of clicking. `setTempo` writes nothing when
-   the BPM has not changed, when Sync is off, or when the clamped time has
-   not moved. The free knob, and its lane, write the time at once as before.
+3. **Every time change outside a lane slews.** tacowars decided this in
+   review of the PR, on 2026-10-16, replacing the issue's 60 ms glide on
+   synced changes only. A tempo change, a note value change, a turn of the
+   free Time knob, and Sync turned on or off each move the delay line's
+   `delayTime` with a linear ramp, from where the param is now to the new
+   time, over `ECHO_TIME_SLEW_S` (250 ms, in `echoConstants.ts`, to be tuned
+   by ear). The repeats bend in pitch like a tape delay repitching instead
+   of clicking. A change made mid-ramp turns from where the ramp has
+   reached, with no step. A drawn Time lane writes its own curve and is not
+   slewed. When a lane gives the time back (it is turned off or deleted, or
+   goes inert because Sync was turned on), the line slews from the lane's
+   value there to the knob's time. A new Echo, which has been fed nothing
+   yet, takes the song's tempo at once. `setTempo` writes nothing when the
+   BPM has not changed, when Sync is off, or when the clamped time has not
+   moved.
 4. **The Time lane is offered only while Sync is off.** This follows the
    Pump's Length. In `automationInsertTables.ts`, Echo's Time row is wrapped
    in `when(..., (spec) => !spec.sync)`, and the Song tab's inactive-lane
@@ -60,7 +68,9 @@ there, and following the tempo must cost nothing per block.
   eighth. A song saved before this change keeps its 280 ms (decision 2).
 - The switch's wait for the loop to empty (`echoSwitchSettle.ts`) reads the
   time the loop plays, which while synced is the note value's length at the
-  current BPM, not `delayTime`.
+  current BPM, not `delayTime`. While a slew runs, the wait reads the longer of its
+  start and its target, since the line still holds audio that far back. A
+  longer slew therefore mutes a quick switch on for longer.
 - The card has a Sync switch beside Time. While synced, Time is a stepped
   knob over the sixteen note values in length order, labelled with the note
   value (`1/8D`), and its title gives the length in ms at the song's BPM.

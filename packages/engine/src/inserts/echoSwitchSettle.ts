@@ -15,6 +15,9 @@
  * The delay time is the one the loop plays: while the Echo is synced
  * (windsor#816), the note value's length at the song's current BPM, which
  * Delay Time's reader rests at (`echoInsert.ts`), not the saved free time.
+ * While the line slews to a new time (`echoTimeSlew.ts`), the reader is
+ * raised to the larger of the slew's start and its target until the slew is
+ * over: the line may still read that far back.
  *
  * With Delay Time on a lane, the hold is the largest delay time the line
  * holds from `offEnd` until the hold has passed (grown until the window

@@ -1,8 +1,9 @@
 /**
  * The Echo follows the song's tempo (windsor#816, record
  * `2026-10-16-echo-follows-song-tempo`): synced, its loop plays a note value
- * at the song's BPM and glides to a new one; free, it plays its saved
- * seconds, which a synced Echo keeps. Old songs load free.
+ * at the song's BPM; free, it plays its saved seconds, which a synced Echo
+ * keeps. Old songs load free. How the line moves between times is
+ * `echoTimeSlew.test.ts`'s.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -18,7 +19,6 @@ import { makeArrangement } from '../song/arrangementDocument';
 import { FieldNormaliser } from '../song/arrangementFields';
 import type { EchoSpec } from './echoInsert';
 import { DEFAULT_ECHO, ECHO_INSERT } from './echoInsert';
-import { ECHO_SYNC_GLIDE_S } from './echoConstants';
 import { ringTime } from './echoSwitchSettle';
 import { echoSeconds } from './echoTempo';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
@@ -62,26 +62,26 @@ describe('a new Echo', () => {
     }
   });
 
-  it('takes the song’s tempo through the registry when it is created', () => {
+  it('takes the song’s tempo through the registry when it is created, on the beat at once', () => {
     const tempo = tempoInsertRegistry(100);
     const context = new FakeContext();
     tempo.registry.echo!.create(context.asAudioContext(), DEFAULT_ECHO);
     const time = context.delays[0]!.delayTime as unknown as FakeParam;
-    expect(time.automation.at(-1)).toMatchObject({ call: 'setTargetAtTime', value: 0.45 });
+    // Fed nothing yet, so set, not slewed.
+    expect(time.automation.map((e) => e.call)).not.toContain('linearRampToValueAtTime');
+    expect(time.valueAt(0)).toBe(0.45);
   });
 });
 
 describe('setTempo', () => {
-  it('glides a synced Echo’s time to the new tempo’s, and writes nothing for the same tempo', () => {
+  it('moves a synced Echo’s time to the new tempo’s, and writes nothing for the same tempo', () => {
     const { stage, context, time } = echoStage(DEFAULT_ECHO);
     context.currentTime = 2;
     stage.setTempo!(100);
-    expect(time.automation).toEqual([
-      { call: 'cancelScheduledValues', value: 0.375, time: 2 },
-      { call: 'setTargetAtTime', value: 0.45, time: 2, timeConstant: ECHO_SYNC_GLIDE_S },
-    ]);
+    expect(time.valueAt(10)).toBeCloseTo(0.45, 12);
+    const calls = time.automation.length;
     stage.setTempo!(100);
-    expect(time.automation).toHaveLength(2);
+    expect(time.automation).toHaveLength(calls);
   });
 
   it('writes nothing on a free Echo', () => {
@@ -94,7 +94,7 @@ describe('setTempo', () => {
   it('writes nothing when the clamped time does not move', () => {
     const { stage, time } = echoStage(synced('1/1'));
     stage.setTempo!(40);
-    expect(time.automation.at(-1)).toMatchObject({ call: 'setTargetAtTime', value: 5 });
+    expect(time.valueAt(10)).toBe(5);
     const calls = time.automation.length;
     stage.setTempo!(30);
     expect(time.automation).toHaveLength(calls);
@@ -102,58 +102,16 @@ describe('setTempo', () => {
 });
 
 describe('Sync and the note value', () => {
-  it('glides to a new note value while synced', () => {
-    const { stage, time } = echoStage(DEFAULT_ECHO);
-    stage.set(synced('1/4'));
-    expect(time.automation.at(-1)).toMatchObject({ call: 'setTargetAtTime', value: 0.5 });
-  });
-
   it('restores the saved free time on Sync off, and the saved note value on Sync on', () => {
     const spec = { ...synced('1/16'), delayTime: 0.61 };
-    const { stage, time } = echoStage(spec);
+    const { stage, context, time } = echoStage(spec);
     expect(time.value).toBe(0.125);
+    context.currentTime = 1;
     stage.set({ ...spec, sync: false });
-    expect(time.value).toBe(0.61);
+    expect(time.valueAt(2)).toBe(0.61);
+    context.currentTime = 3;
     stage.set(spec);
-    expect(time.automation.at(-1)).toMatchObject({ call: 'setTargetAtTime', value: 0.125 });
-  });
-
-  it('writes a free Echo’s time at once, as the knob always has', () => {
-    const { stage, time } = echoStage({ ...DEFAULT_ECHO, sync: false });
-    stage.set({ ...DEFAULT_ECHO, sync: false, delayTime: 0.5 });
-    expect(time.automation).toEqual([]);
-    expect(time.value).toBe(0.5);
-  });
-});
-
-describe('a free time after a glide, on the param’s timeline', () => {
-  // A browser keeps a scheduled glide over a later `value` write; `valueAt`
-  // replays the timeline as it would (`paramTimeline.ts`).
-  const spec = { ...DEFAULT_ECHO, delayTime: 0.61 };
-
-  /** A synced Echo glided to 100 bpm at 2 s, then turned free at 3 s. */
-  function freedAfterGlide() {
-    const rig = echoStage(spec);
-    rig.context.currentTime = 2;
-    rig.stage.setTempo!(100);
-    expect(rig.time.valueAt(2.9)).toBeCloseTo(0.45, 6);
-    rig.context.currentTime = 3;
-    rig.stage.set({ ...spec, sync: false });
-    return rig;
-  }
-
-  it('plays the saved free time from Sync off, not the glide’s target', () => {
-    const { time } = freedAfterGlide();
-    expect(time.valueAt(3)).toBe(0.61);
-    expect(time.valueAt(10)).toBe(0.61);
-  });
-
-  it('plays a free knob write that follows', () => {
-    const { stage, context, time } = freedAfterGlide();
-    context.currentTime = 4;
-    stage.set({ ...spec, sync: false, delayTime: 0.5 });
-    expect(time.valueAt(3.5)).toBe(0.61);
-    expect(time.valueAt(10)).toBe(0.5);
+    expect(time.valueAt(4)).toBe(0.125);
   });
 });
 

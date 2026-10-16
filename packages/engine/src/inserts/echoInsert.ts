@@ -26,9 +26,11 @@
  * its damp filter has rung out (fix round 2), while `send` opens at once.
  *
  * The loop's time follows the song's tempo while Sync is on (windsor#816,
- * record `2026-10-16-echo-follows-song-tempo`): `setTempo` and `set` glide
- * it to the note value's length at the song's BPM (`echoTempo.ts`), and the
- * switch's wait reads that length. Free, it is `delayTime`, as before.
+ * record `2026-10-16-echo-follows-song-tempo`): the note value's length at
+ * the song's BPM (`echoTempo.ts`); free, it is `delayTime`, as before. Every
+ * change outside a Time lane, and a lane's give-back, slews the line there
+ * (`echoTimeSlew.ts`), and the switch's wait reads the time the loop plays,
+ * raised over a slew still running to the longest time it passes through.
  */
 import type { DelayLine, DelayLineSettings } from '../mixer/returnEffects';
 import {
@@ -50,7 +52,8 @@ import {
 } from './echoConstants';
 import { loopSettlesIn } from './echoSwitchSettle';
 import type { EchoDivision, EchoTiming } from './echoTempo';
-import { echoSeconds, echoTimeWriter } from './echoTempo';
+import { echoSeconds } from './echoTempo';
+import { echoTimeSlew, slewedTimeHandle } from './echoTimeSlew';
 import type { FieldHandles } from './insertFieldHandles';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import { fadeRamp } from './fadeRamp';
@@ -196,13 +199,15 @@ type EchoGraph = ReturnType<typeof echoGraph>;
  * Echo's lane handles (windsor#345, windsor#628, windsor#629): a loop field on
  * its own param, and every gain the switch moves from its fade and the knob
  * beside it. `spec` and `seconds` read the stage's spec and the time its loop
- * plays now.
+ * plays now; `timeReader` raises Delay Time's reader over a slew still
+ * running, for the switch's wait.
  */
 function echoHandles(
   context: BaseAudioContext,
   { send, wet, dry, line }: EchoGraph,
   spec: () => EchoSpec,
   seconds: () => number,
+  timeReader: (base: FieldReader) => FieldReader,
 ): FieldHandles {
   const feedback = delayLineParam(line, 'feedback');
   const switched = (params: AudioParam[], fields: string[], value: SwitchedGain) => ({
@@ -219,7 +224,7 @@ function echoHandles(
     settle: (offEnd: number, read: readonly FieldReader[]) => {
       const [delayTime, damp, resonance] = read.slice(-SETTLE_FIELDS.length);
       return loopSettlesIn(offEnd, {
-        delayTime: delayTime!,
+        delayTime: timeReader(delayTime!),
         damp: damp!,
         resonance: resonance!,
         sampleRate: context.sampleRate,
@@ -244,19 +249,26 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
   const seconds = (): number => echoSeconds(current, bpm);
   const graph = echoGraph(context, spec, seconds());
   const { input, send, direct, wet, dry, output, line } = graph;
-  const knobs = echoHandles(context, graph, () => current, seconds);
-  const writeTime = echoTimeWriter({
+  const slew = echoTimeSlew({
     param: line.effect.delayTime,
     now: () => context.currentTime,
     held: () => knobs.automated('delayTime'),
     initial: seconds(),
   });
+  const knobs = echoHandles(
+    context,
+    graph,
+    () => current,
+    seconds,
+    (base) => slew.reader(base),
+  );
+  const time = slewedTimeHandle(knobs.param('delayTime')!, line.effect.delayTime, slew, seconds);
   const set = (next: EchoSpec): void => {
     current = next;
     const loop: Partial<Record<keyof DelayLineSettings, number>> = {};
     for (const field of OWN_LINE_FIELDS) if (!knobs.automated(field)) loop[field] = next[field];
     writeDelay(line, loop);
-    writeTime(seconds(), next.sync);
+    slew.to(seconds());
     knobs.writeShared();
   };
   set(spec);
@@ -270,9 +282,9 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     setTempo(next): void {
       if (Object.is(next, bpm)) return;
       bpm = next;
-      if (current.sync) writeTime(seconds(), true);
+      if (current.sync) slew.to(seconds());
     },
-    param: (field) => knobs.param(field),
+    param: (field) => (field === 'delayTime' ? time : knobs.param(field)),
     // The loop's own nodes too, as the return's `dispose` does; never the edge out of `output`.
     dispose(): void {
       for (const node of [input, send, direct, wet, dry]) node.disconnect();

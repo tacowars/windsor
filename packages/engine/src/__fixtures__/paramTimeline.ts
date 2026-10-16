@@ -8,12 +8,8 @@
  * value there only when one of them was still to come; after a finished ramp,
  * or on a param with no events, it adds nothing, so a ramp scheduled next
  * still starts from the last event, as Chrome renders it (windsor#694).
- * `setTargetAtTime` approaches its target from the value the timeline has at
- * its time, with its time constant (none logged reads as a step), until the
- * next event (windsor#816). A `value` write is not an event here: in a
- * browser a scheduled event outlives it. The fake itself still applies each
- * call at once (`fakeAudioNodes.ts`); this is what a test reads the schedule
- * with.
+ * `setTargetAtTime` is not modelled. The fake itself still applies each call at once
+ * (`fakeAudioNodes.ts`); this is what a test reads the schedule with.
  */
 
 /** One logged call, as `FakeParam.automation` holds it. */
@@ -21,22 +17,18 @@ export interface LoggedCall {
   readonly call: string;
   readonly value: number;
   readonly time?: number;
-  readonly timeConstant?: number;
 }
 
 interface TimelineEvent {
   readonly call: string;
   readonly value: number;
   readonly time: number;
-  readonly timeConstant?: number;
 }
-
-const SCHEDULED = new Set(['setValueAtTime', 'linearRampToValueAtTime', 'setTargetAtTime']);
 
 /** The events the log leaves scheduled, in time order. */
 export function timeline(log: readonly LoggedCall[], initial = 0): TimelineEvent[] {
   const events: TimelineEvent[] = [];
-  for (const { call, value, time = 0, timeConstant } of log) {
+  for (const { call, value, time = 0 } of log) {
     if (call === 'cancelScheduledValues') {
       dropFrom(events, (t) => t >= time);
       continue;
@@ -48,8 +40,8 @@ export function timeline(log: readonly LoggedCall[], initial = 0): TimelineEvent
       insert(events, { call: 'setValueAtTime', value: held, time });
       continue;
     }
-    if (!SCHEDULED.has(call)) continue;
-    insert(events, { call, value, time, ...(timeConstant === undefined ? {} : { timeConstant }) });
+    if (call !== 'setValueAtTime' && call !== 'linearRampToValueAtTime') continue;
+    insert(events, { call, value, time });
   }
   return events;
 }
@@ -69,35 +61,11 @@ export function timelineValueAt(log: readonly LoggedCall[], initial: number, tim
   return valueOf(timeline(log, initial), initial, time);
 }
 
-/** Where the timeline stands after an event: a value at a time, approaching `target` if set. */
-interface Anchor {
-  readonly time: number;
-  readonly value: number;
-  readonly target?: number;
-  readonly timeConstant?: number;
-}
-
-/** The anchor's value at `time`: its own, or a `setTargetAtTime` curve's. */
-function curve(anchor: Anchor, time: number): number {
-  const { target, timeConstant } = anchor;
-  if (target === undefined) return anchor.value;
-  if (!(timeConstant! > 0)) return target;
-  return target + (anchor.value - target) * Math.exp(-(time - anchor.time) / timeConstant!);
-}
-
 function valueOf(events: readonly TimelineEvent[], initial: number, time: number): number {
-  let prev: Anchor = { time: 0, value: initial };
+  let prev = { time: 0, value: initial };
   for (const event of events) {
     if (event.time <= time) {
-      prev =
-        event.call === 'setTargetAtTime'
-          ? {
-              time: event.time,
-              value: curve(prev, event.time),
-              target: event.value,
-              timeConstant: event.timeConstant ?? 0,
-            }
-          : event;
+      prev = event;
       continue;
     }
     if (event.call !== 'linearRampToValueAtTime') break;
@@ -105,5 +73,5 @@ function valueOf(events: readonly TimelineEvent[], initial: number, time: number
     if (!(span > 0)) return prev.value;
     return prev.value + ((event.value - prev.value) * (time - prev.time)) / span;
   }
-  return curve(prev, time);
+  return prev.value;
 }
