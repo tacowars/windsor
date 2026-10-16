@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Box, MenuRow, MenuSpec, ShownItem } from './contextMenuModel';
 import {
+  MenuSlot,
   SEPARATOR,
   choose,
   itemUnder,
@@ -244,5 +245,56 @@ describe('slide-to-choose', () => {
     expect(itemUnder(boxes, { x: 200, y: 96 })).toBeNull();
     expect(itemUnder(boxes, { x: 380, y: 70 })).toBeNull();
     expect(itemUnder(boxes, { x: 100, y: 143 })).toBe(2);
+  });
+});
+
+describe('the one open menu', () => {
+  /** A model's listener set, as `DocumentModel.onChange` keeps it. */
+  function listenerSet(): { listeners: Set<() => void>; subscribe(l: () => void): () => void } {
+    const listeners = new Set<() => void>();
+    return {
+      listeners,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => void listeners.delete(listener);
+      },
+    };
+  }
+
+  it('leaves no document listener behind however its menus close', () => {
+    const doc = listenerSet();
+    const slot = new MenuSlot();
+    // The lane menu's wiring: its close is the listener, and its teardown unsubscribes.
+    const open = (): (() => void) => {
+      let off = (): void => undefined;
+      const close = slot.open(() => off());
+      off = doc.subscribe(close);
+      return close;
+    };
+    // Replaced by the next opening, four times over.
+    for (let i = 0; i < 4; i++) open();
+    expect(doc.listeners.size).toBe(1);
+    // Dismissed: Escape, a press outside, a scroll, a key, a blur, a resize and a row run all call its close.
+    open()();
+    expect(doc.listeners.size).toBe(0);
+    // Closed by a change to the document it watches.
+    open();
+    for (const listener of [...doc.listeners]) listener();
+    expect(doc.listeners.size).toBe(0);
+    expect(slot.isOpen).toBe(false);
+  });
+
+  it('tears each menu down once, never twice', () => {
+    const slot = new MenuSlot();
+    const closes: string[] = [];
+    const first = slot.open(() => closes.push('first'));
+    const second = slot.open(() => closes.push('second'));
+    first();
+    expect(closes).toEqual(['first']);
+    second();
+    second();
+    slot.close();
+    expect(closes).toEqual(['first', 'second']);
+    expect(slot.isOpen).toBe(false);
   });
 });

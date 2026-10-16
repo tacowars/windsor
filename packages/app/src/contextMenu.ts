@@ -18,11 +18,13 @@
  * Running a row closes the menu, then calls its `run()`. Escape, a press
  * outside, a scroll, a resize or the window losing focus close it too, and
  * with `closeOnKey` any other key pressed outside it, which still does its work. One
- * menu is open at a time, and the focus goes back where it was. It hangs
+ * menu is open at a time (`MenuSlot`), and the focus goes back where it was.
+ * Every close, whatever its cause, calls the caller's `onClose` once. It hangs
  * from the page body at a fixed position, as the knob's menu does.
  */
 import type { Box, MenuItem, MenuRow, MenuSpec, OpeningPress, ShownItem } from './contextMenuModel';
 import {
+  MenuSlot,
   choose,
   itemUnder,
   menuMode,
@@ -38,16 +40,16 @@ import type { MenuSizeTable } from './contextMenuTables';
 import { el } from './dom';
 import type { MenuPlacement } from './songRowMenuPlacement';
 
-/** The open menu's close, so a second opening replaces the first. */
-let closeOpen: (() => void) | null = null;
+/** The open menu, so a second opening replaces the first. */
+const slot = new MenuSlot();
 
 /** Close the open context menu, if one is, running nothing. */
 export function closeContextMenu(): void {
-  closeOpen?.();
+  slot.close();
 }
 
 /** True while a context menu is open. */
-export const contextMenuOpen = (): boolean => closeOpen !== null;
+export const contextMenuOpen = (): boolean => slot.isOpen;
 
 const viewport = (): { width: number; height: number } => ({
   width: document.documentElement.clientWidth,
@@ -107,6 +109,13 @@ export interface MenuOptions {
    * own work: for a menu built from a snapshot a key command could change.
    */
   readonly closeOnKey?: boolean;
+  /**
+   * Called once when the menu closes, whatever closes it: Escape, a press
+   * outside, a scroll, a key, a blur, a resize, a row run (before its `run()`)
+   * or another menu opening. For a caller's own teardown, such as a listener
+   * it holds while the menu is open.
+   */
+  readonly onClose?: () => void;
 }
 
 /** One open menu: its panels, its preview, the finger it follows and its listeners. */
@@ -154,9 +163,10 @@ class OpenMenu {
     window.addEventListener('pointercancel', this.endSlide, true);
   }
 
-  readonly close = (): void => {
-    if (closeOpen !== this.close) return;
-    closeOpen = null;
+  /** Close this menu; does nothing once it has closed or another has replaced it. */
+  readonly close: () => void = slot.open(() => this.teardown());
+
+  private teardown(): void {
     this.light(null);
     const active = document.activeElement;
     const inside = this.panels.some((panel) => panel.node.contains(active));
@@ -172,7 +182,8 @@ class OpenMenu {
     if ((inside || document.activeElement === document.body) && back instanceof HTMLElement) {
       if (back.isConnected) back.focus({ preventScroll: true });
     }
-  };
+    this.options.onClose?.();
+  }
 
   /** Draw `items` into panel `k`, the head line on the menu itself. */
   private fill(k: number, items: readonly ShownItem[]): void {
@@ -345,9 +356,9 @@ export function openContextMenu(
   press: OpeningPress,
   options: MenuOptions = {},
 ): () => void {
-  closeOpen?.();
+  // The menu before closes first, so this one keeps the focus it hands back.
+  slot.close();
   const menu = new OpenMenu(spec, press, options);
-  closeOpen = menu.close;
   menu.show();
   return menu.close;
 }
