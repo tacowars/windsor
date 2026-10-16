@@ -1,0 +1,490 @@
+{
+  "machine": {
+    "cpu": "Apple M4 Pro",
+    "cores": 14,
+    "memoryGb": 64,
+    "os": "25.5.0"
+  },
+  "results": [
+    {
+      "name": "15min-whole-24",
+      "path": "whole",
+      "bitDepth": 24,
+      "song": {
+        "bars": 225,
+        "bpm": 60,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 43296000,
+      "renderMs": 16132.199999809265,
+      "writeMs": 4685.10000038147,
+      "totalMs": 20817.300000190735,
+      "file": {
+        "bytes": 259776044,
+        "riff": "RIFF",
+        "riffSize": 259776036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 259776000
+      },
+      "memory": {
+        "rendererMb": 831.1875,
+        "browserMb": 761.390625,
+        "totalMb": 2572.796875,
+        "samples": 22
+      }
+    },
+    {
+      "name": "15min-whole-32",
+      "path": "whole",
+      "bitDepth": 32,
+      "song": {
+        "bars": 225,
+        "bpm": 60,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 43296000,
+      "renderMs": 16058.89999961853,
+      "writeMs": 4255.300000190735,
+      "totalMs": 20314.199999809265,
+      "file": {
+        "bytes": 346368058,
+        "riff": "RIFF",
+        "riffSize": 346368050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 43296000,
+        "dataAt": 58,
+        "dataBytes": 346368000
+      },
+      "memory": {
+        "rendererMb": 914.625,
+        "browserMb": 931.28125,
+        "totalMb": 2824.828125,
+        "samples": 22
+      }
+    },
+    {
+      "name": "15min-stream-24",
+      "path": "stream",
+      "bitDepth": 24,
+      "song": {
+        "bars": 225,
+        "bpm": 60,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 43296000,
+      "renderMs": 15736.60000038147,
+      "writeMs": 723.3000001907349,
+      "totalMs": 16459.900000572205,
+      "file": {
+        "bytes": 259776044,
+        "riff": "RIFF",
+        "riffSize": 259776036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 259776000
+      },
+      "memory": {
+        "rendererMb": 583.734375,
+        "browserMb": 254.5625,
+        "totalMb": 1872.8125,
+        "samples": 18
+      }
+    },
+    {
+      "name": "15min-stream-32",
+      "path": "stream",
+      "bitDepth": 32,
+      "song": {
+        "bars": 225,
+        "bpm": 60,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 43296000,
+      "renderMs": 15946.400000572205,
+      "writeMs": 429.69999980926514,
+      "totalMs": 16376.10000038147,
+      "file": {
+        "bytes": 346368058,
+        "riff": "RIFF",
+        "riffSize": 346368050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 43296000,
+        "dataAt": 58,
+        "dataBytes": 346368000
+      },
+      "memory": {
+        "rendererMb": 585.546875,
+        "browserMb": 256.140625,
+        "totalMb": 1867.6875,
+        "samples": 18
+      }
+    },
+    {
+      "name": "30min-whole-24",
+      "path": "whole",
+      "bitDepth": 24,
+      "song": {
+        "bars": 225,
+        "bpm": 30,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 86496000,
+      "renderMs": 31209.099999427795,
+      "writeMs": 9290.300000190735,
+      "totalMs": 40499.39999961853,
+      "file": {
+        "bytes": 518976044,
+        "riff": "RIFF",
+        "riffSize": 518976036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 518976000
+      },
+      "memory": {
+        "rendererMb": 1357.40625,
+        "browserMb": 1268.90625,
+        "totalMb": 3019.390625,
+        "samples": 42
+      }
+    },
+    {
+      "name": "30min-whole-32",
+      "path": "whole",
+      "bitDepth": 32,
+      "song": {
+        "bars": 225,
+        "bpm": 30,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 86496000,
+      "renderMs": 31393.60000038147,
+      "writeMs": 8248.19999885559,
+      "totalMs": 39641.79999923706,
+      "file": {
+        "bytes": 691968058,
+        "riff": "RIFF",
+        "riffSize": 691968050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 86496000,
+        "dataAt": 58,
+        "dataBytes": 691968000
+      },
+      "memory": {
+        "rendererMb": 1563.484375,
+        "browserMb": 1159.28125,
+        "totalMb": 3572.65625,
+        "samples": 41
+      }
+    },
+    {
+      "name": "30min-stream-24",
+      "path": "stream",
+      "bitDepth": 24,
+      "song": {
+        "bars": 225,
+        "bpm": 30,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 86496000,
+      "renderMs": 31601.599999427795,
+      "writeMs": 1434.5000009536743,
+      "totalMs": 33036.10000038147,
+      "file": {
+        "bytes": 518976044,
+        "riff": "RIFF",
+        "riffSize": 518976036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 518976000
+      },
+      "memory": {
+        "rendererMb": 902.359375,
+        "browserMb": 261.46875,
+        "totalMb": 2106.375,
+        "samples": 35
+      }
+    },
+    {
+      "name": "30min-stream-32",
+      "path": "stream",
+      "bitDepth": 32,
+      "song": {
+        "bars": 225,
+        "bpm": 30,
+        "meter": "4/4"
+      },
+      "tailSeconds": 2,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 86496000,
+      "renderMs": 31475.800000190735,
+      "writeMs": 841,
+      "totalMs": 32316.800000190735,
+      "file": {
+        "bytes": 691968058,
+        "riff": "RIFF",
+        "riffSize": 691968050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 86496000,
+        "dataAt": 58,
+        "dataBytes": 691968000
+      },
+      "memory": {
+        "rendererMb": 903.5625,
+        "browserMb": 264.4375,
+        "totalMb": 2113.859375,
+        "samples": 34
+      }
+    },
+    {
+      "name": "cap-whole-24",
+      "path": "whole",
+      "bitDepth": 24,
+      "song": {
+        "bars": 256,
+        "bpm": 20,
+        "meter": "12/8"
+      },
+      "tailSeconds": 10,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 221664000,
+      "renderMs": 79591.60000038147,
+      "writeMs": 25175.199999809265,
+      "totalMs": 104766.80000019073,
+      "file": {
+        "bytes": 1329984044,
+        "riff": "RIFF",
+        "riffSize": 1329984036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 1329984000
+      },
+      "memory": {
+        "rendererMb": 3682,
+        "browserMb": 2085.578125,
+        "totalMb": 6131.40625,
+        "samples": 106
+      }
+    },
+    {
+      "name": "cap-whole-32",
+      "path": "whole",
+      "bitDepth": 32,
+      "song": {
+        "bars": 256,
+        "bpm": 20,
+        "meter": "12/8"
+      },
+      "tailSeconds": 10,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 221664000,
+      "renderMs": 79259,
+      "writeMs": 23200.699999809265,
+      "totalMs": 102459.69999980927,
+      "file": {
+        "bytes": 1773312058,
+        "riff": "RIFF",
+        "riffSize": 1773312050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 221664000,
+        "dataAt": 58,
+        "dataBytes": 1773312000
+      },
+      "memory": {
+        "rendererMb": 5331.96875,
+        "browserMb": 1591.640625,
+        "totalMb": 7760.25,
+        "samples": 104
+      }
+    },
+    {
+      "name": "cap-stream-24",
+      "path": "stream",
+      "bitDepth": 24,
+      "song": {
+        "bars": 256,
+        "bpm": 20,
+        "meter": "12/8"
+      },
+      "tailSeconds": 10,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 221664000,
+      "renderMs": 78724.5999994278,
+      "writeMs": 3574.800000190735,
+      "totalMs": 82299.39999961853,
+      "file": {
+        "bytes": 1329984044,
+        "riff": "RIFF",
+        "riffSize": 1329984036,
+        "format": 1,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 24,
+        "fact": null,
+        "dataAt": 44,
+        "dataBytes": 1329984000
+      },
+      "memory": {
+        "rendererMb": 1957.046875,
+        "browserMb": 304.671875,
+        "totalMb": 3097.859375,
+        "samples": 84
+      }
+    },
+    {
+      "name": "cap-stream-32",
+      "path": "stream",
+      "bitDepth": 32,
+      "song": {
+        "bars": 256,
+        "bpm": 20,
+        "meter": "12/8"
+      },
+      "tailSeconds": 10,
+      "browser": "Chrome/155.0.8059.80",
+      "outcome": {
+        "kind": "saved",
+        "fileName": "windsor-822-export.wav",
+        "where": "opfs",
+        "clipped": 0
+      },
+      "frames": 221664000,
+      "renderMs": 78077.5,
+      "writeMs": 2107.6000003814697,
+      "totalMs": 80185.10000038147,
+      "file": {
+        "bytes": 1773312058,
+        "riff": "RIFF",
+        "riffSize": 1773312050,
+        "format": 3,
+        "channels": 2,
+        "rate": 48000,
+        "bits": 32,
+        "fact": 221664000,
+        "dataAt": 58,
+        "dataBytes": 1773312000
+      },
+      "memory": {
+        "rendererMb": 1956.640625,
+        "browserMb": 313.59375,
+        "totalMb": 3109.140625,
+        "samples": 82
+      }
+    }
+  ]
+}

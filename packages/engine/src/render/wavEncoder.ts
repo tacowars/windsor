@@ -1,16 +1,23 @@
 /**
  * The WAV writer (windsor#40 decision 6): planar float channels to a
- * little-endian RIFF/WAVE PCM file, 16 or 24 bits. Pure, with no dependency.
+ * little-endian RIFF/WAVE file, 16- or 24-bit PCM or 32-bit IEEE float
+ * (windsor#822 decision 4). Pure, with no dependency.
  *
- * A sample outside [-1, 1] is clipped and counted, so the console can say the
- * render clipped instead of writing it silently. 16-bit output carries TPDF
- * dither (the difference of two uniform draws, ±1 LSB, triangular) from a
- * seeded PRNG, so two encodes of the same render are byte-identical; 24-bit
- * output is rounded without dither, its LSB already far below the synth's
- * noise floor.
+ * PCM: a sample outside [-1, 1] is clipped and counted, so the console can
+ * say the render clipped instead of writing it silently. 16-bit output
+ * carries TPDF dither (the difference of two uniform draws, ±1 LSB,
+ * triangular) from a seeded PRNG, so two encodes of the same render are
+ * byte-identical; 24-bit output is rounded without dither, its LSB already
+ * far below the synth's noise floor.
+ *
+ * Float: every sample is written as it is, with no dither and no clip, and
+ * one outside [-1, 1] is counted as kept. A non-finite sample (NaN, ±∞) has
+ * no place in a file a tool reads back, so it is written as 0 and counted.
  *
  * `encodeWavAsync` writes the same bytes in chunks, yielding between them, so
- * a long song's encode can be cancelled (windsor#51).
+ * a long song's encode can be cancelled (windsor#51). `encodeWavStream`
+ * hands the same bytes to a writer chunk by chunk instead of holding the
+ * file (windsor#822 decision 1).
  */
 import { mulberry32 } from '../sequencing/mulberry32';
 import type { WavBitDepth } from './renderConstants';
@@ -20,15 +27,26 @@ import {
   WAV_DITHERED_BIT_DEPTH,
   WAV_DITHER_SEED,
   WAV_ENCODE_CHUNK_FRAMES,
+  WAV_FACT_CHUNK_BYTES,
+  WAV_FLOAT_BIT_DEPTH,
+  WAV_FLOAT_FMT_CHUNK_BYTES,
+  WAV_FLOAT_HEADER_BYTES,
   WAV_FMT_CHUNK_BYTES,
+  WAV_FMT_EXTENSION_BYTES,
+  WAV_FORMAT_IEEE_FLOAT,
   WAV_FORMAT_PCM,
   WAV_HEADER_BYTES,
+  WAV_RIFF_SIZE_MAX,
   WAV_RIFF_SIZE_OFFSET,
 } from './renderConstants';
 
 export interface EncodedWav {
   bytes: Uint8Array;
-  /** Samples, counted over every channel, that were outside [-1, 1] and clipped. */
+  /**
+   * Samples, counted over every channel, outside [-1, 1]: clipped in a PCM
+   * file, kept in a float one. A float file counts its non-finite samples,
+   * written as 0, here too.
+   */
   clipped: number;
 }
 
@@ -37,29 +55,47 @@ export interface WavOptions {
   ditherSeed?: number;
 }
 
-/** The 44-byte header for `frames` frames of `channels` channels (exported for its test). */
+/** The header's length at `bitDepth`: 44 bytes for PCM, 58 for float with its `fact` chunk. */
+export const wavHeaderBytes = (bitDepth: WavBitDepth): number =>
+  bitDepth === WAV_FLOAT_BIT_DEPTH ? WAV_FLOAT_HEADER_BYTES : WAV_HEADER_BYTES;
+
+/**
+ * The header for `frames` frames of `channels` channels (exported for its
+ * test). A file whose size RIFF's 32-bit field cannot hold is refused.
+ */
 export function wavHeader(
   channels: number,
   sampleRate: number,
   bitDepth: WavBitDepth,
   frames: number,
-): Uint8Array {
-  const bytesPerSample = bitDepth / BITS_PER_BYTE;
-  const blockAlign = channels * bytesPerSample;
+): Uint8Array<ArrayBuffer> {
+  const float = bitDepth === WAV_FLOAT_BIT_DEPTH;
+  const blockAlign = channels * (bitDepth / BITS_PER_BYTE);
   const dataBytes = frames * blockAlign;
-  const header = new Uint8Array(WAV_HEADER_BYTES);
+  const headerBytes = wavHeaderBytes(bitDepth);
+  const riffBytes = headerBytes - WAV_RIFF_SIZE_OFFSET + dataBytes;
+  if (riffBytes > WAV_RIFF_SIZE_MAX) {
+    throw new RangeError(`a WAV holds at most 4 GiB; this one would need ${riffBytes} bytes`);
+  }
+  const header = new Uint8Array(headerBytes);
   const writer = new HeaderWriter(header);
   writer.tag('RIFF');
-  writer.u32(WAV_HEADER_BYTES - WAV_RIFF_SIZE_OFFSET + dataBytes);
+  writer.u32(riffBytes);
   writer.tag('WAVE');
   writer.tag('fmt ');
-  writer.u32(WAV_FMT_CHUNK_BYTES);
-  writer.u16(WAV_FORMAT_PCM);
+  writer.u32(float ? WAV_FLOAT_FMT_CHUNK_BYTES : WAV_FMT_CHUNK_BYTES);
+  writer.u16(float ? WAV_FORMAT_IEEE_FLOAT : WAV_FORMAT_PCM);
   writer.u16(channels);
   writer.u32(sampleRate);
   writer.u32(sampleRate * blockAlign);
   writer.u16(blockAlign);
   writer.u16(bitDepth);
+  if (float) {
+    writer.u16(WAV_FMT_EXTENSION_BYTES);
+    writer.tag('fact');
+    writer.u32(WAV_FACT_CHUNK_BYTES);
+    writer.u32(frames);
+  }
   writer.tag('data');
   writer.u32(dataBytes);
   return header;
@@ -67,7 +103,8 @@ export function wavHeader(
 
 /**
  * Interleave and quantise `channels` (equal lengths) into a WAV file. The
- * full-scale value is `2^(bits-1) - 1`, so +1.0 and -1.0 land symmetrically.
+ * PCM full-scale value is `2^(bits-1) - 1`, so +1.0 and -1.0 land
+ * symmetrically.
  */
 export function encodeWav(
   channels: readonly Float32Array[],
@@ -75,9 +112,9 @@ export function encodeWav(
   bitDepth: WavBitDepth,
   options: WavOptions = {},
 ): EncodedWav {
-  const writer = new WavWriter(channels, sampleRate, bitDepth, options);
-  writer.advance(writer.frames);
-  return writer.result();
+  const file = new WholeFile(channels, sampleRate, bitDepth, options);
+  file.advance(file.encoder.frames);
+  return file.result();
 }
 
 export interface AsyncWavOptions extends WavOptions {
@@ -103,45 +140,124 @@ export async function encodeWavAsync(
   options: AsyncWavOptions = {},
 ): Promise<EncodedWav> {
   const { signal, chunkFrames = WAV_ENCODE_CHUNK_FRAMES, yieldToLoop = nextTask } = options;
+  checkChunkFrames(chunkFrames);
+  const file = new WholeFile(channels, sampleRate, bitDepth, options);
+  for (;;) {
+    throwIfAborted(signal);
+    if (file.encoder.done) return file.result();
+    file.advance(chunkFrames);
+    await yieldToLoop();
+  }
+}
+
+export interface WavStreamOptions extends WavOptions {
+  /** Aborting rejects the encode with an `AbortError` before the next chunk is encoded. */
+  signal?: AbortSignal;
+  /**
+   * Takes the file's next bytes: the header, then one chunk at a time. The
+   * encoder awaits each write before it encodes the next chunk, so the
+   * destination sets the pace, and it reuses one chunk buffer, so a write
+   * must be done with the bytes when its promise settles.
+   */
+  write: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>;
+  /** Frames per chunk; the shipped `WAV_ENCODE_CHUNK_FRAMES` when absent. */
+  chunkFrames?: number;
+}
+
+/**
+ * The same file as `encodeWav`, handed to `write` piece by piece instead of
+ * held whole (windsor#822 decision 1): the header, then one chunk of
+ * `chunkFrames` frames at a time, from one encoder and one dither PRNG, so
+ * the concatenated pieces are `encodeWav`'s bytes exactly. It holds one chunk
+ * of the file at a time, and checks `signal` before the header and between
+ * chunks.
+ */
+export async function encodeWavStream(
+  channels: readonly Float32Array[],
+  sampleRate: number,
+  bitDepth: WavBitDepth,
+  options: WavStreamOptions,
+): Promise<{ clipped: number }> {
+  const { signal, write, chunkFrames = WAV_ENCODE_CHUNK_FRAMES } = options;
+  checkChunkFrames(chunkFrames);
+  const encoder = new SampleEncoder(channels, bitDepth, options);
+  const header = wavHeader(channels.length, sampleRate, bitDepth, encoder.frames);
+  throwIfAborted(signal);
+  await write(header);
+  const chunk = new Uint8Array(Math.min(chunkFrames, encoder.frames) * encoder.blockAlign);
+  const view = new DataView(chunk.buffer);
+  for (;;) {
+    throwIfAborted(signal);
+    if (encoder.done) return { clipped: encoder.clipped };
+    const length = encoder.encode(chunk, view, 0, chunkFrames);
+    await write(length === chunk.length ? chunk : chunk.subarray(0, length));
+  }
+}
+
+function checkChunkFrames(chunkFrames: number): void {
   if (!Number.isInteger(chunkFrames) || chunkFrames <= 0) {
     throw new RangeError(`chunkFrames must be a positive integer, got ${chunkFrames}`);
   }
-  const writer = new WavWriter(channels, sampleRate, bitDepth, options);
-  for (;;) {
-    if (signal?.aborted) throw new DOMException('the encode was canceled', 'AbortError');
-    if (writer.done) return writer.result();
-    writer.advance(chunkFrames);
-    await yieldToLoop();
-  }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new DOMException('the encode was canceled', 'AbortError');
 }
 
 function nextTask(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** One encode in progress: the file being filled, the dither PRNG, and the next frame. */
-class WavWriter {
-  readonly frames: number;
+/** The whole file in one buffer, filled by one encoder: `encodeWav`'s and `encodeWavAsync`'s. */
+class WholeFile {
+  readonly encoder: SampleEncoder;
   private readonly bytes: Uint8Array;
-  private readonly bytesPerSample: number;
-  private readonly fullScale: number;
-  private readonly random: (() => number) | null;
-  private clipped = 0;
-  private frame = 0;
-  private at = WAV_HEADER_BYTES;
+  private readonly view: DataView;
+  private at: number;
 
   constructor(
-    private readonly channels: readonly Float32Array[],
+    channels: readonly Float32Array[],
     sampleRate: number,
     bitDepth: WavBitDepth,
     options: WavOptions,
   ) {
+    this.encoder = new SampleEncoder(channels, bitDepth, options);
+    const header = wavHeader(channels.length, sampleRate, bitDepth, this.encoder.frames);
+    this.bytes = new Uint8Array(header.length + this.encoder.frames * this.encoder.blockAlign);
+    this.bytes.set(header);
+    this.view = new DataView(this.bytes.buffer);
+    this.at = header.length;
+  }
+
+  advance(count: number): void {
+    this.at += this.encoder.encode(this.bytes, this.view, this.at, count);
+  }
+
+  result(): EncodedWav {
+    return { bytes: this.bytes, clipped: this.encoder.clipped };
+  }
+}
+
+/** One encode in progress: the dither PRNG, the count of samples past full scale, the next frame. */
+class SampleEncoder {
+  readonly frames: number;
+  readonly blockAlign: number;
+  clipped = 0;
+  private frame = 0;
+  private readonly float: boolean;
+  private readonly bytesPerSample: number;
+  private readonly fullScale: number;
+  private readonly random: (() => number) | null;
+
+  constructor(
+    private readonly channels: readonly Float32Array[],
+    bitDepth: WavBitDepth,
+    options: WavOptions,
+  ) {
     this.frames = channels[0]?.length ?? 0;
+    this.float = bitDepth === WAV_FLOAT_BIT_DEPTH;
     this.bytesPerSample = bitDepth / BITS_PER_BYTE;
-    this.bytes = new Uint8Array(
-      WAV_HEADER_BYTES + this.frames * channels.length * this.bytesPerSample,
-    );
-    this.bytes.set(wavHeader(channels.length, sampleRate, bitDepth, this.frames));
+    this.blockAlign = channels.length * this.bytesPerSample;
     this.fullScale = 2 ** (bitDepth - 1) - 1;
     this.random =
       bitDepth === WAV_DITHERED_BIT_DEPTH
@@ -153,11 +269,20 @@ class WavWriter {
     return this.frame >= this.frames;
   }
 
-  /** Encode up to `count` more frames, in order. */
-  advance(count: number): void {
-    const { bytes, bytesPerSample, fullScale, random, channels } = this;
+  /** Encode up to `count` more frames, in order, into `target` from byte `at`; returns the bytes written. */
+  encode(target: Uint8Array, view: DataView, at: number, count: number): number {
     const end = Math.min(this.frames, this.frame + count);
-    let { at, clipped } = this;
+    if (this.float) this.floats(view, at, end);
+    else this.words(target, at, end);
+    const written = (end - this.frame) * this.blockAlign;
+    this.frame = end;
+    return written;
+  }
+
+  private words(target: Uint8Array, start: number, end: number): void {
+    const { bytesPerSample, fullScale, random, channels } = this;
+    let { clipped } = this;
+    let at = start;
     for (let frame = this.frame; frame < end; frame++) {
       for (const channel of channels) {
         let sample = channel[frame] ?? 0;
@@ -170,17 +295,31 @@ class WavWriter {
           -fullScale - 1,
           Math.min(fullScale, Math.round(sample * fullScale + dither)),
         );
-        writeWord(bytes, at, word, bytesPerSample);
+        writeWord(target, at, word, bytesPerSample);
         at += bytesPerSample;
       }
     }
-    this.frame = end;
-    this.at = at;
     this.clipped = clipped;
   }
 
-  result(): EncodedWav {
-    return { bytes: this.bytes, clipped: this.clipped };
+  private floats(view: DataView, start: number, end: number): void {
+    const { bytesPerSample, channels } = this;
+    let { clipped } = this;
+    let at = start;
+    for (let frame = this.frame; frame < end; frame++) {
+      for (const channel of channels) {
+        let sample = channel[frame] ?? 0;
+        if (!Number.isFinite(sample)) {
+          clipped++;
+          sample = 0;
+        } else if (sample > 1 || sample < -1) {
+          clipped++;
+        }
+        view.setFloat32(at, sample, true);
+        at += bytesPerSample;
+      }
+    }
+    this.clipped = clipped;
   }
 }
 

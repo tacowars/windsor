@@ -118,17 +118,24 @@ export function planFor(
   });
 }
 
+/** What a refusal tells the user to change when no caller names another way out. */
+export const RENDER_REFUSAL_REMEDY =
+  'choose a lower sample rate, a shorter tail, fewer bars or a faster tempo';
+
 /**
- * Why a render of `document` would be refused, or null. A render holds the
- * whole song as float PCM in the offline context and then the encoded file,
- * so past `RENDER_MAX_FRAMES` the tab could run out of memory. The check
- * allocates nothing: the console calls it before opening a save picker, and
- * `renderSong` before it builds a context.
+ * Why a render of `document` would be refused, or null. An export holds the
+ * whole song as float PCM in the offline context, and the in-memory ones the
+ * encoded file too, so past `maxFrames` the tab could run out of memory:
+ * `RENDER_MAX_FRAMES` for those, `RENDER_STREAM_MAX_FRAMES` for the streamed
+ * Save as (windsor#822 decision 3). The check allocates nothing: the console
+ * calls it before opening a save picker, and `renderSong` before it builds a
+ * context. `remedy` ends the text: what the user can change.
  */
 export function renderRefusal(
   document: ArrangementDocument,
   options: Pick<RenderSongOptions, 'sampleRate' | 'tailSeconds'> = {},
   maxFrames: number = RENDER_MAX_FRAMES,
+  remedy: string = RENDER_REFUSAL_REMEDY,
 ): string | null {
   const plan = planFor(document, options);
   if (plan.totalFrames <= maxFrames) return null;
@@ -137,17 +144,22 @@ export function renderRefusal(
     (frames / at / SECONDS_PER_MINUTE).toFixed(1);
   return (
     `the song and its tail run ${minutes(plan.totalFrames, rate)} minutes, longer than the ` +
-    `${minutes(maxFrames, rate)} minutes a render can hold at this sample rate — choose a ` +
-    'lower sample rate, a shorter tail, fewer bars or a faster tempo'
+    `${minutes(maxFrames, rate)} minutes this export can hold at this sample rate — ${remedy}`
   );
 }
 
+/**
+ * Render the whole song, refused past `maxFrames` as `renderRefusal` says:
+ * the in-memory exports' `RENDER_MAX_FRAMES` unless the caller streams the
+ * file and passes `RENDER_STREAM_MAX_FRAMES` (windsor#822 decision 3).
+ */
 export async function renderSong(
   document: ArrangementDocument,
   options: RenderSongOptions = {},
+  maxFrames: number = RENDER_MAX_FRAMES,
 ): Promise<RenderedSong> {
   const sampleRate = options.sampleRate ?? RENDER_SAMPLE_RATE_DEFAULT;
-  const refusal = renderRefusal(document, options);
+  const refusal = renderRefusal(document, options, maxFrames);
   if (refusal) throw new RangeError(refusal);
   const plan = planFor(document, options);
   const buffer = await renderPass(

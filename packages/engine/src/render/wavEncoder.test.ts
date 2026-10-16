@@ -1,8 +1,10 @@
 /**
  * The WAV writer (windsor#40 decision 6): byte-exact headers for every rate
  * and depth the console offers, samples that round-trip, clip counting, and
- * a 16-bit dither that is TPDF (±1 LSB) and reproducible; and the chunked
- * async encoder, byte-identical and cancellable between chunks (windsor#51).
+ * a 16-bit dither that is TPDF (±1 LSB) and reproducible; the chunked async
+ * encoder, byte-identical and cancellable between chunks (windsor#51); and
+ * the 32-bit float file (windsor#822). The streamed encoder is
+ * `wavEncoderStream.test.ts`'s.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -158,9 +160,9 @@ describe('encodeWavAsync', () => {
       Float32Array.from({ length: frames }, (_, i) => 1.2 * Math.sin(i * phase)),
     );
 
-  it("writes the synchronous encoder's bytes exactly, at both depths and any chunk size", async () => {
+  it("writes the synchronous encoder's bytes exactly, at every depth and any chunk size", async () => {
     const channels = noisy(1001);
-    for (const bits of [16, 24] as const) {
+    for (const bits of [16, 24, 32] as const) {
       const sync = encodeWav(channels, 44100, bits);
       for (const chunkFrames of [1, 7, 1000, 1001, 1 << 16]) {
         const chunked = await encodeWavAsync(channels, 44100, bits, {
@@ -211,5 +213,97 @@ describe('encodeWavAsync', () => {
     await expect(
       encodeWavAsync(noisy(10), 48000, 24, { signal: controller.signal }),
     ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+describe('the 32-bit float file', () => {
+  /** The header's fields, read back the way a WAV reader walks its chunks. */
+  function parse(bytes: Uint8Array) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const text = (at: number): string => String.fromCharCode(...bytes.subarray(at, at + 4));
+    const chunks: Record<string, { at: number; size: number }> = {};
+    for (let at = 12; at + 8 <= bytes.length;) {
+      const size = view.getUint32(at + 4, true);
+      chunks[text(at)] = { at: at + 8, size };
+      at += 8 + size;
+    }
+    const fmt = chunks['fmt ']!.at;
+    return {
+      riff: text(0),
+      riffSize: view.getUint32(4, true),
+      wave: text(8),
+      fmtSize: chunks['fmt ']!.size,
+      format: view.getUint16(fmt, true),
+      channels: view.getUint16(fmt + 2, true),
+      rate: view.getUint32(fmt + 4, true),
+      byteRate: view.getUint32(fmt + 8, true),
+      blockAlign: view.getUint16(fmt + 12, true),
+      bits: view.getUint16(fmt + 14, true),
+      cbSize: view.getUint16(fmt + 16, true),
+      fact: view.getUint32(chunks['fact']!.at, true),
+      factSize: chunks['fact']!.size,
+      data: chunks['data']!,
+      sample: (index: number): number => view.getFloat32(chunks['data']!.at + 4 * index, true),
+    };
+  }
+
+  it('parses as IEEE float: format 3, 32 bits, an 18-byte fmt and fact = frames', () => {
+    const frames = 1000;
+    const header = parse(wavHeader(2, 48000, 32, frames));
+    expect(header).toMatchObject({
+      riff: 'RIFF',
+      riffSize: 58 - 8 + frames * 8,
+      wave: 'WAVE',
+      fmtSize: 18,
+      format: 3,
+      channels: 2,
+      rate: 48000,
+      byteRate: 48000 * 8,
+      blockAlign: 8,
+      bits: 32,
+      cbSize: 0,
+      factSize: 4,
+      fact: frames,
+    });
+    expect(header.data).toEqual({ at: 58, size: frames * 8 });
+    // The data chunk's tag sits right before its size, after the fact chunk.
+    expect(String.fromCharCode(...wavHeader(2, 48000, 32, frames).subarray(50, 54))).toBe('data');
+  });
+
+  it('writes samples as they are, keeps and counts the ones past full scale', () => {
+    const left = Float32Array.from([0, 1.5, -2, 0.123456789, -1, 1]);
+    const right = Float32Array.from([1e-30, -0.5, 0.25, 0, 3, 0]);
+    const { bytes, clipped } = encodeWav([left, right], 44100, 32);
+    expect(bytes.length).toBe(58 + 6 * 8);
+    const file = parse(bytes);
+    expect(file.fact).toBe(6);
+    const read = Array.from({ length: 12 }, (_, i) => file.sample(i));
+    const interleaved = [...left].flatMap((l, i) => [l, right[i]!]);
+    expect(read).toEqual(interleaved);
+    expect(file.sample(1 * 2)).toBe(1.5);
+    // 1.5, -2 and 3 are over; ±1 exactly is not.
+    expect(clipped).toBe(3);
+  });
+
+  it('writes a non-finite sample as 0 and counts it', () => {
+    const left = Float32Array.from([NaN, 0.5, Infinity]);
+    const right = Float32Array.from([-Infinity, 0, 0.25]);
+    const { bytes, clipped } = encodeWav([left, right], 48000, 32);
+    const file = parse(bytes);
+    expect(Array.from({ length: 6 }, (_, i) => file.sample(i))).toEqual([0, 0, 0.5, 0, 0, 0.25]);
+    expect(clipped).toBe(3);
+  });
+
+  it('adds no dither: silence is all zeros, and two seeds give the same file', () => {
+    const silence = new Float32Array(100);
+    const a = encodeWav([silence, silence], 48000, 32);
+    expect(a.bytes.subarray(58).every((b) => b === 0)).toBe(true);
+    expect(encodeWav([silence, silence], 48000, 32, { ditherSeed: 7 }).bytes).toEqual(a.bytes);
+  });
+
+  it('refuses a file past the 4 GiB a RIFF size field holds', () => {
+    // 2^29 stereo float frames are 4 GiB of samples.
+    expect(() => wavHeader(2, 48000, 32, 2 ** 29)).toThrow(RangeError);
+    expect(() => wavHeader(2, 48000, 32, 2 ** 29 - 8)).not.toThrow();
   });
 });

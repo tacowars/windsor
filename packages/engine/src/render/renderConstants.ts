@@ -9,21 +9,39 @@ export const RENDER_SAMPLE_RATES = [44100, 48000] as const;
 export type RenderSampleRate = (typeof RENDER_SAMPLE_RATES)[number];
 export const RENDER_SAMPLE_RATE_DEFAULT: RenderSampleRate = 48000;
 
-/** The PCM word lengths the writer produces (issue decision 1). */
-export const WAV_BIT_DEPTHS = [16, 24] as const;
+/**
+ * The word lengths the writer produces (issue decision 1): 16- and 24-bit
+ * PCM, and 32-bit IEEE float (windsor#822 decision 4).
+ */
+export const WAV_BIT_DEPTHS = [16, 24, 32] as const;
 export type WavBitDepth = (typeof WAV_BIT_DEPTHS)[number];
 export const WAV_BIT_DEPTH_DEFAULT: WavBitDepth = 24;
+/** The one depth written as IEEE float: samples as they are, no dither and no clip. */
+export const WAV_FLOAT_BIT_DEPTH: WavBitDepth = 32;
 
 /** Seconds rendered after the song's last bar so releases and returns ring out (decision 3). */
 export const RENDER_TAIL_SECONDS = { min: 0, max: 10, default: 2 } as const;
 
 /**
- * The longest render, in frames: 15 minutes at 48 kHz. A render holds the
- * whole song as 32-bit float stereo in the offline context (about 346 MB at
- * this limit) and then the encoded file (about 259 MB at 24-bit), so a longer
- * one risks the tab. 256 bars at 20 BPM (51 minutes) is refused.
+ * The longest render an in-memory export takes, in frames: 15 minutes at
+ * 48 kHz. Download and stems hold the whole song as 32-bit float stereo in
+ * the offline context (about 346 MB at this limit) and then the encoded file
+ * (about 259 MB at 24-bit, 346 MB at 32-bit float), so a longer one risks
+ * the tab. 256 bars at 20 BPM (51 minutes) is refused.
  */
 export const RENDER_MAX_FRAMES = 48000 * 60 * 15;
+
+/**
+ * The longest render the streamed Save as export takes, in frames: 77
+ * minutes at 48 kHz (windsor#822 decision 3). It holds only the float render
+ * (about 1.77 GB at this limit) and writes the WAV to the file as it encodes.
+ * The longest song the format holds, 256 bars (`BARS_MAX`) of 12/8 at 20 BPM
+ * (`BPM_MIN`), runs 76.8 minutes by `songSeconds`; with the 10 s tail, the
+ * lead-in and the output stage's latency it fits, which `renderSong.test.ts`
+ * pins. The 32-bit float file at this length is about 1.77 GB, under a WAV's
+ * 4 GiB.
+ */
+export const RENDER_STREAM_MAX_FRAMES = 48000 * 60 * 77;
 
 /** A render is stereo, like the live master. */
 export const RENDER_CHANNELS = 2;
@@ -66,6 +84,19 @@ export const RENDER_QUANTUM_FRAMES = 128;
 export const WAV_HEADER_BYTES = 44;
 export const WAV_FMT_CHUNK_BYTES = 16;
 export const WAV_FORMAT_PCM = 1;
+/**
+ * The float header (windsor#822 decision 4): `WAVE_FORMAT_IEEE_FLOAT`, an
+ * 18-byte `fmt ` chunk whose `cbSize` is 0, and a `fact` chunk holding the
+ * frame count before `data`. 12 (RIFF, size, WAVE) + 8 + 18 (fmt) + 8 + 4
+ * (fact) + 8 (data's tag and size) = 58 bytes.
+ */
+export const WAV_FLOAT_HEADER_BYTES = 58;
+export const WAV_FLOAT_FMT_CHUNK_BYTES = 18;
+export const WAV_FORMAT_IEEE_FLOAT = 3;
+export const WAV_FMT_EXTENSION_BYTES = 0;
+export const WAV_FACT_CHUNK_BYTES = 4;
+/** The largest value RIFF's 32-bit size field holds: a WAV past 4 GiB cannot be described. */
+export const WAV_RIFF_SIZE_MAX = 0xff_ff_ff_ff;
 /** RIFF's size field counts everything after itself: the header less "RIFF" and the size. */
 export const WAV_RIFF_SIZE_OFFSET = 8;
 export const BITS_PER_BYTE = 8;
@@ -78,9 +109,11 @@ export const WAV_DITHER_SEED = 0x0d_17_4e_12;
 
 /**
  * Frames the async WAV encoder writes between yields to the event loop
- * (windsor#51): 65 536 frames, about 1.49 s of song at 44.1 kHz and 1.37 s at
- * 48 kHz. The signal is checked once per chunk, so a smaller chunk hears a
- * Cancel after less encoding, at the cost of more yields.
+ * (windsor#51), and the streamed encoder per write (windsor#822): 65 536
+ * frames, about 1.49 s of song at 44.1 kHz and 1.37 s at 48 kHz, a 512 KiB
+ * chunk at 32-bit float stereo. The signal is checked once per chunk, so a
+ * smaller chunk hears a Cancel after less encoding, at the cost of more
+ * yields or writes.
  */
 export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;
 

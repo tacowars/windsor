@@ -401,14 +401,17 @@ export type { BakeOptions } from './render/offlineRender';
 // The song render and the WAV writer (windsor#40).
 export { renderRefusal, renderSong, songSeconds } from './render/renderSong';
 export type { RenderSongOptions, RenderedSong } from './render/renderSong';
-export { encodeWav, encodeWavAsync } from './render/wavEncoder';
-export type { EncodedWav } from './render/wavEncoder';
+export { encodeWav, encodeWavAsync, encodeWavStream } from './render/wavEncoder';
+export type { EncodedWav, WavStreamOptions } from './render/wavEncoder';
 export {
+  RENDER_MAX_FRAMES,
   RENDER_SAMPLE_RATES,
   RENDER_SAMPLE_RATE_DEFAULT,
+  RENDER_STREAM_MAX_FRAMES,
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTHS,
   WAV_BIT_DEPTH_DEFAULT,
+  WAV_FLOAT_BIT_DEPTH,
 } from './render/renderConstants';
 export type { RenderSampleRate, WavBitDepth } from './render/renderConstants';
 // Stems: one WAV per part and per return beside the master, and the zip they download as (windsor#41).

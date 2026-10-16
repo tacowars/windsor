@@ -1,14 +1,17 @@
 /**
  * The Export Audio section of the Settings tab (windsor#40): the song
  * rendered offline through the engine's `renderSong` — the live system on an
- * offline context — and written as a WAV by its `encodeWav`; or, with Stems
+ * offline context — and written as a WAV by its encoder; or, with Stems
  * chosen (windsor#41), the engine's `renderStems`: one WAV per part and per
- * return beside the master, in one zip. Sample rate, bit depth and tail are
- * chosen here, and whether stems take the "Sidechain only" parts too;
- * Download always, Save as… where the browser has the save picker. While a
- * render runs the section shows its progress and a Cancel; a cancelled
- * render writes nothing. The rules are `audioExportModel.ts` and
- * `audioExportStems.ts`, the destinations `audioExportSinks.ts`.
+ * return beside the master, in one zip. Sample rate, bit depth (16- or
+ * 24-bit PCM, or 32-bit float, windsor#822) and tail are chosen here, and
+ * whether stems take the "Sidechain only" parts too; Download always, Save
+ * as… where the browser has the save picker. A Save as of the mix streams
+ * the WAV into the picked file as it encodes, so it takes a longer song
+ * (windsor#822). While a render runs the section shows its progress and a
+ * Cancel; a cancelled render writes nothing. The rules are
+ * `audioExportModel.ts`, `audioExportStream.ts` and `audioExportStems.ts`,
+ * the destinations `audioExportSinks.ts`.
  *
  * The settings and a running render live at module scope, so a tab re-render
  * mid-render redraws the progress rather than losing it.
@@ -18,12 +21,12 @@ import {
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTHS,
   encodeWavAsync,
-  renderRefusal,
+  encodeWavStream,
   renderSong,
   renderStems,
 } from '@windsor/engine';
 import type { RenderSampleRate, WavBitDepth } from '@windsor/engine';
-import { HZ_PER_KHZ, PERCENT, TAIL_KNOB_STEP } from './audioExportConstants';
+import { BIT_DEPTH_LABELS, HZ_PER_KHZ, PERCENT, TAIL_KNOB_STEP } from './audioExportConstants';
 import type {
   AudioExportOutcome,
   AudioExportSettings,
@@ -38,6 +41,7 @@ import {
   wavFileName,
 } from './audioExportModel';
 import { runStemExport, stemsZipName } from './audioExportStems';
+import { exportRefusal, exportStreams, runStreamedExport, streamSink } from './audioExportStream';
 import { downloadSink, pickSaveSink, savePickerAvailable } from './audioExportSinks';
 import type { AppCtx } from './context';
 import { el, section, seg } from './dom';
@@ -114,7 +118,7 @@ function formatControls(): HTMLElement {
   );
   formats.appendChild(
     seg(
-      WAV_BIT_DEPTHS.map((bits) => ({ value: String(bits), label: `${bits}-bit` })),
+      WAV_BIT_DEPTHS.map((bits) => ({ value: String(bits), label: BIT_DEPTH_LABELS[bits] })),
       () => String(settings.bitDepth),
       (value) => (settings.bitDepth = Number(value) as WavBitDepth),
     ),
@@ -170,7 +174,7 @@ async function startExport(
 ): Promise<void> {
   if (job) return;
   // A song too long to hold is refused before a picker opens or a byte is allocated.
-  const refusal = renderRefusal(ctx.model.doc, settings);
+  const refusal = exportRefusal(ctx.model.doc, settings, destination, savePickerAvailable());
   if (refusal) {
     ctx.notify(`audio export refused: ${refusal}`, 'error');
     return;
@@ -192,18 +196,27 @@ async function startExport(
   const current: ExportJob = { controller: new AbortController(), fraction: 0 };
   job = current;
   repaint();
-  const outcome = await runExport(ctx, chosen, { exportName, fileName, sink, job: current });
+  const outcome = await runExport(ctx, chosen, {
+    exportName,
+    fileName,
+    sink,
+    job: current,
+    streams: exportStreams(destination, chosen.stems),
+  });
   job = null;
   repaint();
-  const notice = exportNotice(outcome);
+  const notice = exportNotice(outcome, chosen.bitDepth);
   ctx.notify(notice.message, notice.tone);
 }
 
-/** The mix's run or the stems', over a snapshot of the song: an edit made while it runs is not in the files. */
+/**
+ * The mix's run, streamed or whole, or the stems', over a snapshot of the
+ * song: an edit made while it runs is not in the files.
+ */
 function runExport(
   ctx: AppCtx,
   chosen: AudioExportSettings,
-  target: { exportName: string; fileName: string; sink: WavSink; job: ExportJob },
+  target: { exportName: string; fileName: string; sink: WavSink; job: ExportJob; streams: boolean },
 ): Promise<AudioExportOutcome> {
   const common = {
     document: structuredClone(ctx.model.doc),
@@ -217,6 +230,15 @@ function runExport(
     },
     encode: encodeWavAsync,
   };
+  const streamed = target.streams ? streamSink(target.sink) : null;
+  if (streamed) {
+    return runStreamedExport({
+      ...common,
+      sink: streamed,
+      render: renderSong,
+      encodeStream: encodeWavStream,
+    });
+  }
   if (!chosen.stems) return runAudioExport({ ...common, render: renderSong });
   return runStemExport({
     ...common,

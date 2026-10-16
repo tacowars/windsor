@@ -3,6 +3,22 @@
  * the engine's (`RENDER_SAMPLE_RATES`, `WAV_BIT_DEPTHS`, `RENDER_TAIL_SECONDS`);
  * what is here is the console's own.
  */
+import type { WavBitDepth } from '@windsor/engine';
+
+/** The bit-depth control's labels (windsor#822 decision 5): 32 is IEEE float. */
+export const BIT_DEPTH_LABELS: Readonly<Record<WavBitDepth, string>> = {
+  16: '16-bit',
+  24: '24-bit',
+  32: '32-bit float',
+};
+
+/**
+ * How a Download refused only by the in-memory cap ends (windsor#822
+ * decision 3): it names Save as…, which streams the WAV and takes the song.
+ */
+export const DOWNLOAD_LENGTH_REMEDY =
+  'a download holds the whole file in memory; Save as… writes the WAV to the file as it ' +
+  'encodes and can export it';
 
 /**
  * The save picker's `id`: the browser remembers the last directory per id,
