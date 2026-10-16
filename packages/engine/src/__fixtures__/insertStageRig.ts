@@ -13,13 +13,14 @@ import type { FakeParam } from './fakeAudioNodes';
 import { graphParams } from './insertParamRig';
 
 /**
- * Each kind's defaults, switched on, with both delay sides free: a synced
- * side's time comes from the tempo, so `set` would not show the field.
+ * Each kind's defaults, switched on, with both delay sides, the Pump and the
+ * Echo free: a synced time comes from the tempo, so `set` would not show the
+ * field.
  */
 export function openSpec(kind: InsertKindName): InsertSpec {
   const spec = { ...INSERT_KINDS[kind].defaults, enabled: true } as InsertSpec;
   if (spec.kind === 'delay') return { ...spec, leftSync: false, rightSync: false };
-  return spec.kind === 'pump' ? { ...spec, sync: false } : spec;
+  return spec.kind === 'pump' || spec.kind === 'echo' ? { ...spec, sync: false } : spec;
 }
 
 /** `spec` with the catalog field `field` (`bands.3.freq` included) at `value`. */

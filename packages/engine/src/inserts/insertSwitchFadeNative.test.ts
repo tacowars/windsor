@@ -242,6 +242,7 @@ describe.each([DELAY_DAMP_MIN_HZ, DELAY_DAMP_MAX_HZ])(
   (damp) => {
     const spec = {
       ...DEFAULT_ECHO,
+      sync: false,
       delayTime: 0.02,
       damp,
       resonance: DELAY_RESONANCE_MAX_DB,

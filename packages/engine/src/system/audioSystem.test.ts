@@ -30,6 +30,7 @@ import { FmEngine } from '../synth/fmEngine';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { RETURNS, onSendBus } from '../mixer/mix';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
+import { echoSeconds } from '../inserts/echoTempo';
 import { DEFAULT_REVERB } from '../inserts/reverbInsert';
 import { SPACE_ROWS } from '../__fixtures__/reverbSpaceFixtures';
 import { REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
@@ -253,7 +254,7 @@ describe('returns', () => {
     expect(system.strip('p')?.sends.size).toBe(3);
   });
 
-  it('echoes through Send B after delayTime, quieter each repeat', async () => {
+  it('echoes through Send B a dotted eighth later, quieter each repeat', async () => {
     const { system, context } = await rig({ mix: { h: strip({ b: 0.5 }) } });
     sourceOf(system.createMusicPart('h', PRESETS['lead-bell']!)).feed = burst(MONO, 0.05);
     const [echo] = renderGraph(context, 1, [returnOutput(system, 'b')]);
@@ -261,7 +262,8 @@ describe('returns', () => {
 
     const at = (from: number, to: number): number =>
       rms(echo.left, Math.round(from * SAMPLE_RATE), Math.round(to * SAMPLE_RATE));
-    const { delayTime } = DEFAULT_ECHO;
+    // Send B's Echo is synced (windsor#816), at the scheduler's 96 bpm before a song loads.
+    const delayTime = echoSeconds(DEFAULT_ECHO, 96);
     expect(at(0.1, delayTime - 0.01)).toBe(0);
     const first = at(delayTime, delayTime + 0.05);
     const second = at(2 * delayTime, 2 * delayTime + 0.05);

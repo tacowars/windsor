@@ -196,8 +196,9 @@ describe('REVERB_KNOBS (windsor#171)', () => {
 
 describe('ECHO_KNOBS (windsor#171)', () => {
   it('covers every echo number from DEFAULT_ECHO, inside the engine bounds', () => {
-    // The slot (record 2026-10-11-wet-path-slot) holds a child insert, not a number.
-    const notKnobs = ['kind', 'enabled', 'slot'];
+    // The slot (record 2026-10-11-wet-path-slot) holds a child insert, not a number;
+    // Sync is a switch, and the note value is ECHO_DIVISION_KNOB's (windsor#816).
+    const notKnobs = ['kind', 'enabled', 'slot', 'sync', 'division'];
     const fields = INSERT_KINDS.echo.fields.filter((f) => !notKnobs.includes(f));
     expect(ECHO_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of ECHO_KNOBS) {

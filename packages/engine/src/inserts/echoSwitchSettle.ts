@@ -12,6 +12,13 @@
  * opens at the switch on, and what it writes is read a delay time later, no
  * earlier.
  *
+ * The delay time is the one the loop plays: while the Echo is synced
+ * (windsor#816), the note value's length at the song's current BPM, which
+ * Delay Time's reader rests at (`echoInsert.ts`), not the saved free time.
+ * While the line slews to a new time (`echoTimeSlew.ts`), the reader is
+ * raised to the larger of the slew's start and its target until the slew is
+ * over: the line may still read that far back.
+ *
  * With Delay Time on a lane, the hold is the largest delay time the line
  * holds from `offEnd` until the hold has passed (grown until the window
  * reaches no longer one), not the line's 5 s maximum, which would mute a
@@ -45,7 +52,7 @@
  * longer.
  *
  * At the defaults (3200 Hz, 1 dB, 48 kHz) the ring is about 1.2 ms beside
- * the 280 ms delay; at the extremes (10 Hz or 20 kHz, 12 dB) about 1.3 s and
+ * the dotted eighth's 375 ms at 120 bpm; at the extremes (10 Hz or 20 kHz, 12 dB) about 1.3 s and
  * 3.4 ms. The cost: the wet and the feedback stay shut for the ring too, so
  * what the send takes in within the ring time of the fade out's end loses its
  * first repeat, and so every later one (at the defaults, the first 1.2 ms of

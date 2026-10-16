@@ -1,8 +1,9 @@
 /**
- * The Echo insert's tunables (windsor#171): the echo return's ranges, which
- * and the line a new Echo starts with: the numbers the `echo` return ran
- * before the send buses held chains (windsor#172), which Send B's default
- * Echo keeps.
+ * The Echo insert's tunables (windsor#171): the echo return's ranges, and
+ * the line a new Echo starts with: the numbers the `echo` return ran before
+ * the send buses held chains (windsor#172). Its free time, 280 ms, is the
+ * return's; a new Echo plays synced at `ECHO_DIVISION_DEFAULT` instead
+ * (windsor#816, record `2026-10-16-echo-follows-song-tempo`).
  */
 import {
   DELAY_DAMP_MAX_HZ,
@@ -14,6 +15,7 @@ import {
   DELAY_RESONANCE_MIN_DB,
 } from '../audioConstants';
 import type { DelayLineSettings } from '../mixer/returnEffects';
+import type { DELAY_DIVISIONS } from './delayConstants';
 
 /** `[min, max]` per Echo number: seconds, loop gain, Hz, dB, and the wet share. */
 export const ECHO_BOUNDS = {
@@ -50,3 +52,17 @@ export const ECHO_RING_MAX_STEPS = 64;
 
 /** `4` in the damp filter's pole discriminant, `a1² − 4·a2` (`echoSwitchSettle.ts`). */
 export const ECHO_POLE_DISCRIMINANT_FACTOR = 4;
+
+/** The note value a new Echo plays synced at (windsor#816): a dotted eighth. */
+export const ECHO_DIVISION_DEFAULT: keyof typeof DELAY_DIVISIONS = '1/8D';
+
+/** The tempo a synced Echo reads before the song's reaches it, or when the song's is not a tempo. */
+export const ECHO_DEFAULT_BPM = 120;
+
+/**
+ * Seconds over which the Echo's loop time ramps, linearly, to a new time
+ * (record `2026-10-16-echo-follows-song-tempo` decision 3, set by tacowars in
+ * review): a tempo, note value, free Time or Sync change bends the repeats'
+ * pitch like a tape delay repitching (`echoTimeSlew.ts`). Tuned by ear.
+ */
+export const ECHO_TIME_SLEW_S = 0.25;

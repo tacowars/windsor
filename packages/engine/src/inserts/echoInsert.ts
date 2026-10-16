@@ -24,6 +24,13 @@
  * off's end keeps `wet`, `dry` and the feedback where off left them until
  * the loop has emptied (`echoSwitchSettle.ts`, fix round 1 for PR #635) and
  * its damp filter has rung out (fix round 2), while `send` opens at once.
+ *
+ * The loop's time follows the song's tempo while Sync is on (windsor#816,
+ * record `2026-10-16-echo-follows-song-tempo`): the note value's length at
+ * the song's BPM (`echoTempo.ts`); free, it is `delayTime`, as before. Every
+ * change outside a Time lane, and a lane's give-back, slews the line there
+ * (`echoTimeSlew.ts`), and the switch's wait reads the time the loop plays,
+ * raised over a slew still running to the longest time it passes through.
  */
 import type { DelayLine, DelayLineSettings } from '../mixer/returnEffects';
 import {
@@ -35,15 +42,26 @@ import {
 } from '../mixer/returnEffects';
 import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
-import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
+import { DELAY_DIVISIONS } from './delayConstants';
+import {
+  ECHO_BOUNDS,
+  ECHO_DEFAULT_BPM,
+  ECHO_DIVISION_DEFAULT,
+  ECHO_LINE_DEFAULTS,
+  ECHO_MIX_DEFAULT,
+} from './echoConstants';
 import { loopSettlesIn } from './echoSwitchSettle';
+import type { EchoDivision, EchoTiming } from './echoTempo';
+import { echoSeconds } from './echoTempo';
+import { echoTimeSlew, slewedTimeHandle } from './echoTimeSlew';
+import type { FieldHandles } from './insertFieldHandles';
 import { fieldHandles, SWITCH_FIELD, switchOf } from './insertFieldHandles';
 import { fadeRamp } from './fadeRamp';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
 import type { InsertSpec } from './insertRegistry';
 import type { FieldReader } from './switchTimeline';
 
-export interface EchoSpec extends DelayLineSettings {
+export interface EchoSpec extends DelayLineSettings, EchoTiming {
   readonly kind: 'echo';
   /** 0 dry .. 1 the repeats alone. */
   readonly mix: number;
@@ -59,13 +77,16 @@ export interface EchoSpec extends DelayLineSettings {
 export const DEFAULT_ECHO: EchoSpec = {
   kind: 'echo',
   ...ECHO_LINE_DEFAULTS,
+  sync: true,
+  division: ECHO_DIVISION_DEFAULT,
   mix: ECHO_MIX_DEFAULT,
   enabled: true,
   slot: null,
 };
 
 export const ECHO_NUMBERS = Object.keys(ECHO_BOUNDS) as (keyof typeof ECHO_BOUNDS)[];
-const FIELDS = ['kind', ...ECHO_NUMBERS, 'enabled', 'slot'];
+const FIELDS = ['kind', ...ECHO_NUMBERS, 'sync', 'division', 'enabled', 'slot'];
+const DIVISIONS = Object.keys(DELAY_DIVISIONS) as EchoDivision[];
 
 /** Echo's own fields; `slot` is the registry's (`normaliseInsertEntry`), so this leaves it empty. */
 function normalise(raw: Record<string, unknown>, path: string, n: FieldNormaliser): EchoSpec {
@@ -80,6 +101,9 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
     feedback: num('feedback'),
     damp: num('damp'),
     resonance: num('resonance'),
+    // Not DEFAULT_ECHO's: an Echo saved before Sync (windsor#816) plays its saved seconds, free.
+    sync: n.bool(raw.sync, false, `${path}.sync`),
+    division: n.pick(raw.division, DIVISIONS, DEFAULT_ECHO.division, `${path}.division`),
     mix: num('mix'),
     enabled: n.bool(raw.enabled, DEFAULT_ECHO.enabled, `${path}.enabled`),
     slot: null,
@@ -99,11 +123,22 @@ const dryGain = (mix: number, on: number): number => 1 - on * mix;
 /** The fields whose lanes, or knobs, say how long the loop takes to empty: the line's, then the damp filter's. */
 const SETTLE_FIELDS = ['delayTime', 'damp', 'resonance'] as const;
 
-/** The loop fields `set` writes directly: all but the feedback, which the switch shares. */
-const OWN_LINE_FIELDS = DELAY_LINE_FIELDS.filter((field) => field !== 'feedback');
+/**
+ * The loop fields `set` writes directly: all but the feedback, which the
+ * switch shares, and the time, which follows the tempo while synced.
+ */
+const OWN_LINE_FIELDS = DELAY_LINE_FIELDS.filter((f) => f !== 'feedback' && f !== 'delayTime');
 
-/** What one field's lane writes on its own: a loop field its param; the rest only what they share. */
-function echoTarget(field: string, line: DelayLine, spec: () => EchoSpec): KnobTarget | undefined {
+/**
+ * What one field's lane writes on its own: a loop field its param; the rest
+ * only what they share. The time rests at what the loop plays, `seconds`.
+ */
+function echoTarget(
+  field: string,
+  line: DelayLine,
+  spec: () => EchoSpec,
+  seconds: () => number,
+): KnobTarget | undefined {
   if (field === SWITCH_FIELD) {
     return { params: [], write: () => [], resting: () => switchOf(spec()) };
   }
@@ -113,7 +148,8 @@ function echoTarget(field: string, line: DelayLine, spec: () => EchoSpec): KnobT
   }
   if (!isLineField(field)) return undefined;
   const { param, value } = delayLineParam(line, field);
-  return { params: [param], write: (v) => [value(v)], resting: () => spec()[field] };
+  const resting = field === 'delayTime' ? seconds : () => spec()[field];
+  return { params: [param], write: (v) => [value(v)], resting };
 }
 
 /**
@@ -137,8 +173,8 @@ function echoWetPath(
   };
 }
 
-/** Echo's nodes, wired as the diagram at the top has them. */
-function echoGraph(context: BaseAudioContext, spec: EchoSpec) {
+/** Echo's nodes, wired as the diagram at the top has them, the loop at `seconds`. */
+function echoGraph(context: BaseAudioContext, spec: EchoSpec, seconds: number) {
   const input = context.createGain();
   const send = context.createGain();
   // Unity unless a slot child takes the repeats: built either way, so the stage stays the same object.
@@ -146,7 +182,7 @@ function echoGraph(context: BaseAudioContext, spec: EchoSpec) {
   const wet = context.createGain();
   const dry = context.createGain();
   const output = context.createGain();
-  const line = attachDelay(context, send, direct, spec);
+  const line = attachDelay(context, send, direct, { ...spec, delayTime: seconds });
 
   input.connect(send);
   direct.connect(wet);
@@ -156,12 +192,23 @@ function echoGraph(context: BaseAudioContext, spec: EchoSpec) {
   return { input, send, direct, wet, dry, output, line };
 }
 
-function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
-  const { input, send, direct, wet, dry, output, line } = echoGraph(context, spec);
+/** Echo's graph, as `echoGraph` builds it. */
+type EchoGraph = ReturnType<typeof echoGraph>;
 
-  let current = spec;
-  // Each lane (windsor#345, windsor#628, windsor#629): a loop field on its own
-  // param, and every gain the switch moves from its fade and the knob beside it.
+/**
+ * Echo's lane handles (windsor#345, windsor#628, windsor#629): a loop field on
+ * its own param, and every gain the switch moves from its fade and the knob
+ * beside it. `spec` and `seconds` read the stage's spec and the time its loop
+ * plays now; `timeReader` raises Delay Time's reader over a slew still
+ * running, for the switch's wait.
+ */
+function echoHandles(
+  context: BaseAudioContext,
+  { send, wet, dry, line }: EchoGraph,
+  spec: () => EchoSpec,
+  seconds: () => number,
+  timeReader: (base: FieldReader) => FieldReader,
+): FieldHandles {
   const feedback = delayLineParam(line, 'feedback');
   const switched = (params: AudioParam[], fields: string[], value: SwitchedGain) => ({
     params,
@@ -177,14 +224,14 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     settle: (offEnd: number, read: readonly FieldReader[]) => {
       const [delayTime, damp, resonance] = read.slice(-SETTLE_FIELDS.length);
       return loopSettlesIn(offEnd, {
-        delayTime: delayTime!,
+        delayTime: timeReader(delayTime!),
         damp: damp!,
         resonance: resonance!,
         sampleRate: context.sampleRate,
       });
     },
   });
-  const knobs = fieldHandles((field) => echoTarget(field, line, () => current), {
+  return fieldHandles((field) => echoTarget(field, line, spec, seconds), {
     params: [
       settled([wet.gain], ['mix'], wetGain),
       settled([dry.gain], ['mix'], dryGain),
@@ -193,11 +240,35 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     ],
     now: () => context.currentTime,
   });
+}
+
+function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
+  let current = spec;
+  // The song's tempo arrives through `setTempo` (`tempoInsertRegistry.ts`); until then, the default.
+  let bpm = ECHO_DEFAULT_BPM;
+  const seconds = (): number => echoSeconds(current, bpm);
+  const graph = echoGraph(context, spec, seconds());
+  const { input, send, direct, wet, dry, output, line } = graph;
+  const slew = echoTimeSlew({
+    param: line.effect.delayTime,
+    now: () => context.currentTime,
+    held: () => knobs.automated('delayTime'),
+    initial: seconds(),
+  });
+  const knobs = echoHandles(
+    context,
+    graph,
+    () => current,
+    seconds,
+    (base) => slew.reader(base),
+  );
+  const time = slewedTimeHandle(knobs.param('delayTime')!, line.effect.delayTime, slew, seconds);
   const set = (next: EchoSpec): void => {
     current = next;
     const loop: Partial<Record<keyof DelayLineSettings, number>> = {};
     for (const field of OWN_LINE_FIELDS) if (!knobs.automated(field)) loop[field] = next[field];
     writeDelay(line, loop);
+    slew.to(seconds());
     knobs.writeShared();
   };
   set(spec);
@@ -208,7 +279,12 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     output,
     wetPath: echoWetPath(context, line, direct, wet),
     set,
-    param: (field) => knobs.param(field),
+    setTempo(next): void {
+      if (Object.is(next, bpm)) return;
+      bpm = next;
+      if (current.sync) slew.to(seconds());
+    },
+    param: (field) => (field === 'delayTime' ? time : knobs.param(field)),
     // The loop's own nodes too, as the return's `dispose` does; never the edge out of `output`.
     dispose(): void {
       for (const node of [input, send, direct, wet, dry]) node.disconnect();

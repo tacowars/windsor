@@ -80,14 +80,22 @@ describe('automatableInsertFields', () => {
       'reverb',
       'echo',
     ] as const) {
-      // An empty slot reads none of a host's slot rows.
+      // An empty slot reads none of a host's slot rows; a free Echo reads its Time.
       const own = insertKindFields(kind).filter((r) => !r.childKind);
-      expect(fields(defaults(kind)), kind).toEqual(own.map((r) => r.target));
+      const spec = kind === 'echo' ? { ...defaults<EchoSpec>(kind), sync: false } : defaults(kind);
+      expect(fields(spec), kind).toEqual(own.map((r) => r.target));
     }
   });
 
-  describe("a host's slot (record 2026-10-11-wet-path-slot)", () => {
+  it("offers Echo's Time only while it is not synced (windsor#816)", () => {
     const echo = defaults<EchoSpec>('echo');
+    const rest = ['feedback', 'damp', 'resonance', 'mix', 'enabled'];
+    expect(fields({ ...echo, sync: true })).toEqual(rest);
+    expect(fields({ ...echo, sync: false })).toEqual(['delayTime', ...rest]);
+  });
+
+  describe("a host's slot (record 2026-10-11-wet-path-slot)", () => {
+    const echo = { ...defaults<EchoSpec>('echo'), sync: false };
     const ECHO_OWN = ['delayTime', 'feedback', 'damp', 'resonance', 'mix'];
 
     it("lists Echo's rows and exactly the live child's, slot.enabled and slot.mix among them", () => {
