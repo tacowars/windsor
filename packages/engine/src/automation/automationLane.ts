@@ -45,10 +45,23 @@ export type ParsedTarget =
  * - `db`: a linear gain drawn in decibels, from the row's floor to its max;
  * - `octaves` and `log`: logarithmic in the value;
  * - `linear`: linear;
+ * - `knee` (windsor#842): linear up to the row's `knee`, geometric above it;
  * - `switch` (windsor#628): 0 off, 1 on, held from each point to the next
  *   and never ramped (`automationEvaluate.ts`).
  */
-export type AutomationScale = 'db' | 'octaves' | 'log' | 'linear' | 'switch';
+export type AutomationScale = 'db' | 'octaves' | 'log' | 'linear' | 'knee' | 'switch';
+
+/**
+ * A `knee` row's bend (windsor#842, record
+ * `2026-10-16-operator-feedback-to-ten`): the first `at` of the lane's
+ * height (and of its knob's travel) runs linearly from the row's `min` to
+ * `value`, and the rest geometrically from `value` to its `max`. `value` is
+ * above 0, so the geometric part has a ratio.
+ */
+export interface AutomationKnee {
+  readonly at: number;
+  readonly value: number;
+}
 
 /** One target the catalog offers: its bounds, its scale and how it reads. */
 export interface AutomationTargetRow {
@@ -66,6 +79,8 @@ export interface AutomationTargetRow {
    * sits at 0.
    */
   readonly floor?: number;
+  /** A `knee` row's bend. A `knee` row without one is drawn straight. */
+  readonly knee?: AutomationKnee;
 }
 
 /** One point of a lane. */

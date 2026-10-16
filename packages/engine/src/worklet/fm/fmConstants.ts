@@ -90,11 +90,17 @@ const DORMANT_FILTER_STATE = 1e-9;
  */
 const MOD_INDEX_SCALE = 4.0;
 /*
- * Self-feedback depth at |feedback| = 1, in cycles of phase (#529). Positive
- * feedback runs sin(phase + beta*y): sine towards a sawtooth, clean to ~1.25
- * rad and noise past ~2.5. Negative runs sin(phase + beta*y^2), whose half-wave
- * symmetry keeps only odd harmonics: sine towards a square, clean to ~2.0 rad.
- * Measured on A2 and A5 in #529; beyond these the one-sample loop turns chaotic.
+ * Self-feedback depth at |feedback| = 1, in cycles of phase (#529): the
+ * depth is feedback x 1.25 rad times the operator's own amplitude, on the
+ * two-sample average of its last outputs. Positive feedback runs
+ * sin(phase + beta*y): sine towards a sawtooth, clean to ~1.25 rad. Past
+ * about 2.5 rad the one-sample loop turns to noise, and since windsor#842
+ * (feedback to 10, record `2026-10-16-operator-feedback-to-ten`) that is
+ * reachable on purpose: at the top of the range, or on a loud operator. A
+ * decaying operator then falls through grit and saw to sine. Negative runs
+ * sin(phase + beta*y^2), whose half-wave symmetry keeps only odd harmonics:
+ * sine towards a square, clean to ~2.0 rad, and stays clamped at -1.
+ * Measured on A2 and A5 in #529.
  */
 const FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
 const FEEDBACK_SQUARE_CYCLES = 2.0 / (2 * Math.PI);

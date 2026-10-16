@@ -12,7 +12,8 @@ import { partChange } from './context';
 import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureConsole';
 import { settleGestures } from './gestureHooks';
 import { attachKnobInput } from './knob';
-import type { KnobSpec, Scale } from './knob';
+import type { KnobSpec } from './knob';
+import type { Scale } from './knobScale';
 import { DRAG_RANGE_PX } from './knobConstants';
 import type { FrameSource } from './stepStrip';
 

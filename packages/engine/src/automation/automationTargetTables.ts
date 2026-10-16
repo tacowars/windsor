@@ -28,6 +28,7 @@ import {
   type VoiceTargetRow,
 } from '../worklet/fm/voiceTargetTables';
 import type {
+  AutomationKnee,
   AutomationScale,
   AutomationTargetRow,
   StripTargetId,
@@ -86,7 +87,18 @@ interface VoiceLook {
   readonly unit: string;
   /** The knob ends on exact 0: the lane's `min` is 0 and the table row's floor is its display floor. */
   readonly zeroEnd?: boolean;
+  /** A `knee` look's bend, which the lane and the knob over it both read. */
+  readonly knee?: AutomationKnee;
 }
+
+/**
+ * Operator feedback's knee (windsor#842, record
+ * `2026-10-16-operator-feedback-to-ten` decision 5): the first 60 % of the
+ * knob's travel and of the lane's height runs linearly over −1..1, so 0
+ * sits at 30 %, and the last 40 % geometrically over 1..10. Both numbers
+ * are proposals for tacowars to try on the knob, not measured values.
+ */
+export const FEEDBACK_KNEE: AutomationKnee = { at: 0.6, value: 1 };
 
 /** An operator's target, `ops.<i>.<field>`. */
 type OperatorPath = Extract<VoiceTargetPath, `ops.${string}`>;
@@ -124,13 +136,13 @@ const VOICE_LOOKS: Readonly<Record<VoicePath, VoiceLook>> = {
 /**
  * An operator's six fields' looks, under `ops.<i>`; the label follows
  * `Op <name> `. The ratio (windsor#646) reads on a log scale, as a multiple
- * of the note.
+ * of the note, and the feedback on `FEEDBACK_KNEE` (windsor#842).
  */
 const OPERATOR_LOOKS: Readonly<Record<OperatorField, VoiceLook>> = {
   level: { label: 'Level', scale: 'linear', unit: '' },
   'env.decayTime': { label: 'Decay', scale: 'log', unit: 's', zeroEnd: true },
   'env.decayCurve': { label: 'Dcy Crv', scale: 'linear', unit: '' },
-  feedback: { label: 'Fdbk', scale: 'linear', unit: '' },
+  feedback: { label: 'Fdbk', scale: 'knee', unit: '', knee: FEEDBACK_KNEE },
   width: { label: 'Width', scale: 'linear', unit: '' },
   ratio: { label: 'Ratio', scale: 'log', unit: '' },
 };
@@ -191,9 +203,10 @@ function lookOf(path: VoiceTargetPath, section: VoiceSection): VoiceLook {
  */
 export function voiceRowOf(row: VoiceTargetRow, code: number): Omit<VoiceAutomationRow, 'target'> {
   const section = voiceSectionOf(code);
-  const { label, scale, unit, zeroEnd } = lookOf(row.path, section);
+  const { label, scale, unit, zeroEnd, knee } = lookOf(row.path, section);
   const bounds = zeroEnd
     ? { min: 0, max: row.max, floor: row.floor }
     : { min: row.min, max: row.max };
-  return { label, ...bounds, scale, unit, path: row.path, section };
+  const bend = knee ? { knee } : {};
+  return { label, ...bounds, scale, unit, ...bend, path: row.path, section };
 }

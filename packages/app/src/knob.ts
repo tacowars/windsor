@@ -18,6 +18,13 @@ export interface KnobSpec {
    */
   logFloor?: number;
   /**
+   * A knee knob (windsor#842): its catalog row's `knee`, the first `at` of
+   * the travel linear from `min` to the knee's value and the rest geometric
+   * to `max`, read through the lane's own map (`toDisplay`), so a lane point
+   * and the knob sit at one height.
+   */
+  knee?: AutomationKnee;
+  /**
    * A stepped knob (windsor#712): the only values it takes, in order, spaced
    * evenly round the dial (`knobSteps.ts`). `min` and `max` are its first
    * and last; a range across 0 still draws its arc from 0.
@@ -81,6 +88,7 @@ export interface KnobElement extends HTMLElement {
   refresh: () => void;
 }
 
+import type { AutomationKnee } from '@windsor/engine';
 import { escapeHtml } from './dom';
 import { attachKnobBubble } from './knobBubble';
 import { knobBubbleContent } from './knobBubbleModel';
@@ -95,7 +103,9 @@ import { dragFrames } from './knobDragFrames';
 import type { KnobEnvelope } from './knobEnvelope';
 import { AUTO_TAG_TEXT, followKnob, paintLock } from './knobLock';
 import { angleOf, arcPath, knobRingPainter } from './knobRing';
-import { nearestStep, stepKeyTarget, steppedScale } from './knobSteps';
+import type { Scale } from './knobScale';
+import { keyTarget, scaleFor } from './knobScale';
+import { nearestStep } from './knobSteps';
 import type { FrameSource } from './stepStrip';
 import { notify } from './toast';
 import {
@@ -108,8 +118,6 @@ import {
   DRAG_RANGE_PX,
   ENV_DOT_R,
   FACE_INSET,
-  KEY_STEP,
-  KEY_STEP_FINE,
   KNOB_COMPACT_PAD_PX,
   KNOB_COMPACT_R,
   KNOB_PAD_PX,
@@ -117,9 +125,7 @@ import {
   KNOB_RACK_BIG_R,
   KNOB_RACK_PAD_PX,
   KNOB_RACK_R,
-  LOG_FLOOR,
   PIN_INSET,
-  ZERO_END_SLICE,
 } from './knobConstants';
 
 /** A dial's radius and its SVG's side, in px. */
@@ -217,108 +223,6 @@ function knobDom(spec: KnobSpec): HTMLElement {
   node.innerHTML = knobMarkup(spec);
   relabelKnob(node, spec.label);
   return node;
-}
-
-export interface Scale {
-  toNorm: (v: number) => number;
-  fromNorm: (n: number) => number;
-  /**
-   * A zero-end knob's slice (`ZERO_END_SLICE`): the normalised position its
-   * log sweep starts at, its floor. Below it the dial runs straight from 0 to
-   * the floor. Absent on a knob without a zero end.
-   */
-  readonly zeroTop?: number;
-}
-
-/** The part of a spec that decides where a value or a key press lands. */
-export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor' | 'steps'>;
-
-const clampNorm = (n: number): number => Math.min(1, Math.max(0, n));
-
-/**
- * A log sweep from `floor` to `max`; every value up to the floor sits at its
- * bottom. Its two ends are the floor and `max` exactly, not `exp(log(…))`'s
- * neighbour of them, so a knob at either end reads back what it was set to.
- */
-function logSweep(floor: number, max: number): Scale {
-  const lo = Math.log(floor);
-  const hi = Math.log(max);
-  return {
-    toNorm: (v) => (Math.log(Math.max(floor, v)) - lo) / (hi - lo),
-    fromNorm: (n) => {
-      if (n <= 0) return floor;
-      return n >= 1 ? max : Math.exp(lo + n * (hi - lo));
-    },
-  };
-}
-
-/**
- * A log knob whose `min` is 0 (windsor#324 fix round 2): the bottom
- * `ZERO_END_SLICE` of the dial runs straight from exact 0 to its `logFloor`,
- * and the log sweep from the floor to `max` fills the rest. The floor keeps a
- * position of its own above 0, and a value under it (the refitted kicks ship
- * some) one of its own inside the slice, so `fromNorm(toNorm(v))` is `v`
- * across the whole range and a touch moves nothing.
- */
-function zeroEndLogScale(floor: number, max: number): Scale {
-  const sweep = logSweep(floor, max);
-  const top = ZERO_END_SLICE;
-  return {
-    zeroTop: top,
-    toNorm: (v) => {
-      if (v <= 0) return 0;
-      return v < floor ? (v / floor) * top : top + (1 - top) * sweep.toNorm(v);
-    },
-    fromNorm: (n) => {
-      if (n <= 0) return 0;
-      return n < top ? floor * (n / top) : sweep.fromNorm((n - top) / (1 - top));
-    },
-  };
-}
-
-/**
- * The knob's value ↔ sweep mapping. A log knob whose `min` is 0 ends its
- * dial on exact 0 (`zeroEndLogScale`), so a 0 that means
- * something (an envelope stage that ends on its own sample, windsor#316) can
- * be dialled, shown and committed.
- */
-export function scaleFor(spec: KnobScaleSpec): Scale {
-  if (spec.steps) return steppedScale(spec.steps);
-  if (spec.curve === 'log') {
-    if (spec.min <= 0) return zeroEndLogScale(spec.logFloor ?? LOG_FLOOR, spec.max);
-    return logSweep(Math.max(LOG_FLOOR, spec.min), spec.max);
-  }
-  return {
-    toNorm: (v) => (v - spec.min) / (spec.max - spec.min),
-    fromNorm: (n) => spec.min + clampNorm(n) * (spec.max - spec.min),
-  };
-}
-
-/**
- * Where an arrow key lands, before `commit` rounds and clamps it: the key's
- * share of the sweep, or exactly one `step` when that share is finer than the
- * knob's own grid. Without the fallback a coarsely stepped knob rounds
- * straight back to where it stood and the keyboard cannot move it at all —
- * Coarse (0..24 by 1) falls 2% of its range short, and so does shift on
- * Detune (#587). Inside a zero end's slice a press lands on the fine key
- * grid, so a press up from 0 and one back down return to exact 0, not to a
- * rounding error's neighbour of it.
- */
-export function keyTarget(
-  spec: KnobScaleSpec,
-  current: number,
-  dir: 1 | -1,
-  fine: boolean,
-): number {
-  if (spec.steps) return stepKeyTarget(spec.steps, current, dir);
-  const scale = scaleFor(spec);
-  let n = scale.toNorm(current) + dir * (fine ? KEY_STEP_FINE : KEY_STEP);
-  if (scale.zeroTop !== undefined && n < scale.zeroTop) {
-    n = Math.round(n / KEY_STEP_FINE) * KEY_STEP_FINE;
-  }
-  const raw = scale.fromNorm(n);
-  const step = spec.step ?? 0;
-  return step > 0 && Math.abs(raw - current) < step ? current + dir * step : raw;
 }
 
 /** A knob's slider attributes at a value. */

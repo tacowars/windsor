@@ -323,17 +323,18 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
   });
 
   it('says so in the readout instead of a played value', () => {
+    // A feedback step of 0.35 pushes 1.75: its span is 5 (windsor#842).
     const always = { kind: 'retarget', when: 'always' } as const;
-    expect(laneReadout('ops.0.feedback', 0.35, 0, always)).toBe('+0.35 · held by slide');
+    expect(laneReadout('ops.0.feedback', 0.35, 0, always)).toBe('+1.75 · held by slide');
     expect(laneReadout('filter.cutoff', 0.5, 1000, always)).toBe('+2.3 oct → 4.76 kHz');
     expect(laneReadout('filter.cutoff', 0.5, 1000, { kind: 'same', when: 'always' })).toBe(
       '+2.3 oct · held by slide',
     );
     expect(laneReadout('ops.0.feedback', 0.35, 0, { kind: 'retarget', when: 'wrap' })).toBe(
-      '+0.35 · held by slide once looping',
+      '+1.75 · held by slide once looping',
     );
     expect(laneReadout('ops.0.feedback', 0.35, 0, { kind: 'same', when: 'skip' })).toBe(
-      '+0.35 · held by slide unless skipped',
+      '+1.75 · held by slide unless skipped',
     );
   });
 
@@ -345,7 +346,7 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
     expect(laneReadout('filter.cutoff', 0.5, 1000, either)).toBe(
       '+2.3 oct · plays if the slide moves pitch',
     );
-    expect(laneReadout('ops.0.feedback', 0.35, 0, either)).toBe('+0.35 · held by slide');
+    expect(laneReadout('ops.0.feedback', 0.35, 0, either)).toBe('+1.75 · held by slide');
   });
 });
 

@@ -18,12 +18,12 @@ describe('patch normalisation', () => {
     expect(normalisePatch(undefined).ops[3].env.sustainLevel).toBe(0.7);
   });
 
-  it('clamps the algorithm, the tone and the feedback', () => {
-    const p = normalisePatch({ algorithm: 99, tone: 0, ops: [{ feedback: 2 }, { feedback: -3 }] });
+  it('clamps the algorithm, the tone and the feedback, which runs −1..10 (windsor#842)', () => {
+    const ops = [{ feedback: 12 }, { feedback: -3 }, { feedback: 10 }, { feedback: 2.5 }];
+    const p = normalisePatch({ algorithm: 99, tone: 0, ops });
     expect(p.algorithm).toBe(10);
     expect(p.tone).toBe(0.02);
-    expect(p.ops[0].feedback).toBe(1);
-    expect(p.ops[1].feedback).toBe(-1);
+    expect(p.ops.map((op) => op.feedback)).toEqual([10, -1, 10, 2.5]);
   });
 
   it("ignores a stray retired key, as a song's format-1 snapshot still carries userKey", () => {

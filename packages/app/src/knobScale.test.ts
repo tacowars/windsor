@@ -9,11 +9,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { requireCatalogRow, toDisplay, voiceTargetId } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
-import { keyTarget, scaleFor } from './knob';
-import type { KnobScaleSpec } from './knob';
+import { keyTarget, scaleFor } from './knobScale';
+import type { KnobScaleSpec } from './knobScale';
 import { ZERO_END_SLICE } from './knobConstants';
-import { ENVELOPE_KNOBS, FIXED_HZ_KNOB, allPatchKnobs } from './patchKnobTables';
+import { ENVELOPE_KNOBS, FIXED_HZ_KNOB, OP_KNOBS, allPatchKnobs } from './patchKnobTables';
 import { getPath } from './patchPath';
 
 const attack = ENVELOPE_KNOBS.find((k) => k.f === 'attackTime')!.o;
@@ -133,5 +134,42 @@ describe('a stepped knob (windsor#712)', () => {
     expect(keyTarget(octave, 0, 1, false)).toBe(7);
     expect(keyTarget(octave, 7, -1, true)).toBe(0);
     expect(keyTarget(octave, 24, 1, false)).toBe(24);
+  });
+});
+
+describe('the feedback knob on its knee (windsor#842)', () => {
+  const feedback = OP_KNOBS.find((k) => k.f === 'feedback')!.o;
+  const scale = scaleFor(feedback);
+
+  it('runs −1..10 with its catalog row’s knee', () => {
+    expect(feedback).toMatchObject({ min: -1, max: 10, knee: { at: 0.6, value: 1 } });
+  });
+
+  it('puts 0 at 30 % of its travel, +1 at 60 % and +10 at the end', () => {
+    expect([-1, 0, 1, 10].map(scale.toNorm)).toEqual([0, 0.3, 0.6, 1]);
+    expect([0, 0.3, 0.6, 1].map(scale.fromNorm)).toEqual([-1, 0, 1, 10]);
+  });
+
+  it('reads back the value it writes at −1, 0, 1, 1.0001 and 10', () => {
+    for (const v of [-1, 0, 1, 10]) expect(scale.fromNorm(scale.toNorm(v)), `${v}`).toBe(v);
+    const v = 1.0001;
+    expect(Math.abs(scale.fromNorm(scale.toNorm(v)) - v)).toBeLessThan(1e-12);
+  });
+
+  it('sits where a lane point of the same value sits on the feedback lane', () => {
+    for (const path of ['ops.0.feedback', 'ops.3.feedback'] as const) {
+      const row = requireCatalogRow(voiceTargetId(path));
+      for (const v of [-0.5, 0, 1, 2, 10]) expect(toDisplay(row, v)).toBe(scale.toNorm(v));
+    }
+  });
+
+  it('shows a value above 1 signed', () => {
+    expect([1.0001, 3.5, 10].map((v) => feedback.fmt?.(v))).toEqual(['+1.00', '+3.50', '+10.00']);
+  });
+
+  it('steps a key press across the knee and back', () => {
+    const up = keyTarget(feedback, 1, 1, false);
+    expect(up).toBeGreaterThan(1);
+    expect(keyTarget(feedback, up, -1, false)).toBeCloseTo(1, 12);
   });
 });

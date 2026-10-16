@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { clonePatch, makeArrangement, makeMacro, type DocumentPart } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { DocumentModel } from './documentModel';
-import { keyTarget } from './knob';
+import { keyTarget } from './knobScale';
 import { patchKnobAutomation } from './knobAutomation';
 import type { PatchEditor } from './partsSession';
 import {

@@ -34,9 +34,10 @@ function voicePlays(mapping: MacroMapping, x: number): number {
   return values[voiceTargetCode(mapping.target)]!;
 }
 
-/** Rows the pin sweeps: two add rows, a ratio row, and a ratio row mapped up from below its floor. */
+/** Rows the pin sweeps: three add rows, a ratio row, and a ratio row mapped up from below its floor. */
 const PIN_ROWS: readonly (readonly [VoiceTargetPath, number, number])[] = [
   ['ops.0.level', 0.4, 0.9],
+  ['ops.2.feedback', 0, 10],
   ['lfo2.amount', 0, 0.6],
   ['filter.cutoff', 400, 3200],
   ['ops.1.env.decayTime', 0, 1.2],
@@ -57,6 +58,14 @@ describe('macroMappedValue', () => {
     const decay = makeMacroMapping({ target: 'ops.1.env.decayTime', min: 0, max: 1 });
     const decayRow = row('ops.1.env.decayTime');
     expect(macroMappedValue(decayRow, decay, 0)).toBe(decayRow.floor);
+  });
+
+  it('sweeps feedback mapped 0..10 over its whole range, past the old top of 1 (windsor#842)', () => {
+    const fb = makeMacroMapping({ target: 'ops.0.feedback', min: 0, max: 10 });
+    const at = (x: number): number => macroMappedValue(row('ops.0.feedback'), fb, x);
+    expect([0, 0.25, 0.5, 1].map(at)).toEqual([0, 2.5, 5, 10]);
+    expect(voicePlays(fb, 1)).toBe(10);
+    expect(voicePlays(fb, 0.5)).toBe(5);
   });
 
   it('plays what the voice plays: every curve, both polarities', () => {

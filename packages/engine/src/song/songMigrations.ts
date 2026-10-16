@@ -145,6 +145,10 @@ const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
 
 /**
  * Six upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10 and 15 → 16, and none from
+ * 16 to 17 (windsor#842: operator feedback runs to 10 and a feedback step's
+ * span is 5, so an old song's step offsets on feedback play five times
+ * deeper; tacowars keeps no song to carry, record
+ * `2026-10-16-operator-feedback-to-ten`), none from
  * 10 to 11 (windsor#748: the plate's `decay` became seconds, and converting
  * an old gain would take a measured table per Size and diffusion), from 11
  * to 12 (windsor#761: the plate's `build` changes how every plate renders,
@@ -155,8 +159,8 @@ const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
  * `voicing`, whose plate row's shorter input diffusers change how every
  * plate renders, and no voicing renders the old diffusers) or from 14 to 15
  * (windsor#771: the `plate` insert kind renamed `reverb`, with no upgrade by
- * tacowars's decision), so a song saved at any version from 5 to 14 is
- * refused too: the chain stops at 10. A version-15 song loads through 15 → 16.
+ * tacowars's decision), so a song saved at any version from 5 to 16 is
+ * refused too: the chain stops at 10, and 15 → 16 stops at 16.
  * Version 2 was retired by #705, version 3 by windsor#238 (record
  * `2026-10-01-retire-song-version-3`) and version 4 by windsor#224, each
  * with no upgrade, so a song saved at any of them is refused.

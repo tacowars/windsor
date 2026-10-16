@@ -51,6 +51,7 @@ import {
   voiceTargetCode,
   voiceTargetRow,
 } from './voiceTargetTables';
+import { stepModValue } from './voiceTargetValue';
 
 const row = (path: string) => VOICE_TARGET_TABLE.find((r) => r.path === path);
 const DECAY_TIME = /\.decayTime$/;
@@ -161,9 +162,18 @@ describe('the voice target table (windsor#419)', () => {
     expect(row('lfo.rate')?.span).toBeCloseTo(0.5 * Math.log2(40 / 0.02), 12);
   });
 
+  it('runs feedback −1..10, and a step of 1 on it adds 5 (windsor#842)', () => {
+    expect(FEEDBACK_RANGE).toEqual({ min: -1, max: 10 });
+    const feedback = row('ops.1.feedback')!;
+    expect(stepModValue(feedback, 0.5, 1)).toBe(5.5);
+    expect(stepModValue(feedback, 0.5, -0.1)).toBe(0);
+    expect(stepModValue(feedback, 8, 1)).toBe(10);
+    expect(stepModValue(feedback, 0, -1)).toBe(-1);
+  });
+
   it('bounds feedback, width and the vowel by the clamps the worklet applies to the patch', () => {
     for (let i = 0; i < OPERATOR_COUNT; i++) {
-      expect(row(`ops.${i}.feedback`)).toMatchObject({ curve: 'add', ...FEEDBACK_RANGE });
+      expect(row(`ops.${i}.feedback`)).toMatchObject({ curve: 'add', span: 5, ...FEEDBACK_RANGE });
       expect(row(`ops.${i}.width`)).toMatchObject({ curve: 'add', span: 0.5, ...WIDTH_RANGE });
     }
     expect(row('filter.vowel')).toMatchObject({ curve: 'add', span: 2, ...VOWEL_RANGE });
