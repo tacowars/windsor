@@ -1,19 +1,15 @@
 /**
  * The part colour picker's rules (windsor#642; record
  * `2026-10-07-part-colours`, decision 9), pure so they are tested in Node:
- * which presses may open it with a long press, when moving cancels that
- * press, where the picker sits so it stays on screen, and which colour's
- * name it shows. `partColourPicker.ts` draws it and wires the chip.
+ * where the picker sits so it stays on screen, and which colour's name it
+ * shows. The long press that opens it is the shared one
+ * (`longPressModel.ts`, windsor#825). `partColourPicker.ts` draws it and
+ * wires the chip.
  */
 import { partColor } from './consoleColors';
-import type { LongPressTable, PickerPlaceTable } from './partColourPickerTables';
-import { LONG_PRESS, PICKER_PLACE } from './partColourPickerTables';
-
-/** A point in the window, in CSS px. */
-export interface Point {
-  readonly x: number;
-  readonly y: number;
-}
+import type { Point } from './longPressModel';
+import type { PickerPlaceTable } from './partColourPickerTables';
+import { PICKER_PLACE } from './partColourPickerTables';
 
 /** A box in the window, in CSS px, as `getBoundingClientRect` gives it. */
 export interface Box {
@@ -21,30 +17,6 @@ export interface Box {
   readonly top: number;
   readonly right: number;
   readonly bottom: number;
-}
-
-/** A touch or a pen opens the picker by a long press; a mouse opens it by a right-click. */
-export const longPressOpens = (pointerType: string): boolean =>
-  pointerType === 'touch' || pointerType === 'pen';
-
-/** The press has moved from `from` to `to` by more than the long press allows: it no longer opens the picker. */
-export const longPressMoved = (
-  from: Point,
-  to: Point,
-  table: LongPressTable = LONG_PRESS,
-): boolean => Math.hypot(to.x - from.x, to.y - from.y) > table.slopPx;
-
-/**
- * Where a press held since `startMs` stands at `nowMs`, moved to `at`: it
- * opens the picker once held for the table's time without moving past its
- * distance.
- */
-export function longPressDue(
-  press: { readonly startMs: number; readonly from: Point },
-  now: { readonly ms: number; readonly at: Point },
-  table: LongPressTable = LONG_PRESS,
-): boolean {
-  return now.ms - press.startMs >= table.ms && !longPressMoved(press.from, now.at, table);
 }
 
 /**
