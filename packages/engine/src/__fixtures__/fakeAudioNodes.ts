@@ -21,7 +21,7 @@
  * build (see packages/engine/tsconfig.json).
  */
 
-import { timelineValueAt } from './paramTimeline';
+import { type LoggedCall, timelineValueAt } from './paramTimeline';
 
 export const BLOCK = 128;
 
@@ -45,7 +45,7 @@ export class FakeParam {
    * rather than over time, so a ramp's shape is not modelled; what a test can
    * assert from this is the order of the calls around a graph change (#652).
    */
-  readonly automation: { call: string; value: number; time?: number }[] = [];
+  readonly automation: LoggedCall[] = [];
 
   constructor(
     value: number,
@@ -75,8 +75,8 @@ export class FakeParam {
     return this.record('setValueAtTime', value, time);
   }
 
-  setTargetAtTime(value: number, time?: number): this {
-    return this.record('setTargetAtTime', value, time);
+  setTargetAtTime(value: number, time?: number, timeConstant?: number): this {
+    return this.record('setTargetAtTime', value, time, timeConstant);
   }
 
   linearRampToValueAtTime(value: number, time?: number): this {
@@ -93,9 +93,10 @@ export class FakeParam {
   }
 
   /** Logs the call and leaves `value` at what it names (a cancel names the current value). */
-  private record(call: string, value: number, time?: number): this {
+  private record(call: string, value: number, time?: number, timeConstant?: number): this {
     if (this.automation.length === 0) this.before = this.current;
-    this.automation.push({ call, value, ...(time === undefined ? {} : { time }) });
+    const constant = timeConstant === undefined ? {} : { timeConstant };
+    this.automation.push({ call, value, ...(time === undefined ? {} : { time }), ...constant });
     this.current = value;
     return this;
   }

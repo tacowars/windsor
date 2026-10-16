@@ -18,6 +18,7 @@ import { makeArrangement } from '../song/arrangementDocument';
 import { FieldNormaliser } from '../song/arrangementFields';
 import type { EchoSpec } from './echoInsert';
 import { DEFAULT_ECHO, ECHO_INSERT } from './echoInsert';
+import { ECHO_SYNC_GLIDE_S } from './echoConstants';
 import { ringTime } from './echoSwitchSettle';
 import { echoSeconds } from './echoTempo';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
@@ -77,7 +78,7 @@ describe('setTempo', () => {
     stage.setTempo!(100);
     expect(time.automation).toEqual([
       { call: 'cancelScheduledValues', value: 0.375, time: 2 },
-      { call: 'setTargetAtTime', value: 0.45, time: 2 },
+      { call: 'setTargetAtTime', value: 0.45, time: 2, timeConstant: ECHO_SYNC_GLIDE_S },
     ]);
     stage.setTempo!(100);
     expect(time.automation).toHaveLength(2);
@@ -122,6 +123,37 @@ describe('Sync and the note value', () => {
     stage.set({ ...DEFAULT_ECHO, sync: false, delayTime: 0.5 });
     expect(time.automation).toEqual([]);
     expect(time.value).toBe(0.5);
+  });
+});
+
+describe('a free time after a glide, on the param’s timeline', () => {
+  // A browser keeps a scheduled glide over a later `value` write; `valueAt`
+  // replays the timeline as it would (`paramTimeline.ts`).
+  const spec = { ...DEFAULT_ECHO, delayTime: 0.61 };
+
+  /** A synced Echo glided to 100 bpm at 2 s, then turned free at 3 s. */
+  function freedAfterGlide() {
+    const rig = echoStage(spec);
+    rig.context.currentTime = 2;
+    rig.stage.setTempo!(100);
+    expect(rig.time.valueAt(2.9)).toBeCloseTo(0.45, 6);
+    rig.context.currentTime = 3;
+    rig.stage.set({ ...spec, sync: false });
+    return rig;
+  }
+
+  it('plays the saved free time from Sync off, not the glide’s target', () => {
+    const { time } = freedAfterGlide();
+    expect(time.valueAt(3)).toBe(0.61);
+    expect(time.valueAt(10)).toBe(0.61);
+  });
+
+  it('plays a free knob write that follows', () => {
+    const { stage, context, time } = freedAfterGlide();
+    context.currentTime = 4;
+    stage.set({ ...spec, sync: false, delayTime: 0.5 });
+    expect(time.valueAt(3.5)).toBe(0.61);
+    expect(time.valueAt(10)).toBe(0.5);
   });
 });
 

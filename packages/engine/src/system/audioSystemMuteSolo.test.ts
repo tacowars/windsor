@@ -14,8 +14,11 @@ import { FULL_DOCUMENT } from '../__fixtures__/fullArrangement';
 import { installSidechainWorklet, sidechainRig } from '../__fixtures__/sidechainRig';
 import { fake, sources, targets } from '../__fixtures__/stripRig';
 import { DEFAULT_COMPRESSOR } from '../inserts/compressorSpec';
+import type { EchoSpec } from '../inserts/echoInsert';
+import { echoSeconds } from '../inserts/echoTempo';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { ChannelStrip } from '../mixer/mix';
+import { RETURNS } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
 import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
 import { musicPartName } from '../song/documentParts';
@@ -32,6 +35,8 @@ const THREE: ArrangementDocument = {
     .map((part) => ({ ...part, strip: { ...part.strip, sends: { a: 0.5, b: 0.5 } } })),
 };
 const SLOTS = [0, 1, 2];
+/** How far past the echo's first repeat its output is read, and then rendered on. */
+const REPEAT_MARGIN_S = 0.05;
 const strip = (system: AudioSystem, slot: number): PartStrip => system.strip(musicPartName(slot))!;
 
 /** A steady tone into a part, whether or not a note is playing. */
@@ -117,11 +122,13 @@ describe('solo over the music parts', () => {
     const { system, context } = await rig();
     const echo = system.returnBus('b')!;
     const room = system.returnBus('a')!;
-    // The echo repeats after its delay time, so its output is read late in the render.
-    const late = Math.round(0.35 * context.sampleRate);
+    // The echo repeats after its delay time (Send B's default is synced to
+    // the song's tempo), so its output is read just after the first repeat.
+    const repeat = echoSeconds(RETURNS.b.inserts[0] as EchoSpec, THREE.transport.bpm);
+    const late = Math.round((repeat + REPEAT_MARGIN_S) * context.sampleRate);
     const returned = (): number[] => {
       const taps = [room.input, echo.input, echo.output].map(fake);
-      const [roomIn, echoIn, echoOut] = renderGraph(context, 0.4, taps);
+      const [roomIn, echoIn, echoOut] = renderGraph(context, repeat + 2 * REPEAT_MARGIN_S, taps);
       return [peak(roomIn!.left), peak(echoIn!.left), peak(echoOut!.left.slice(late))];
     };
     system.apply(set(1, { solo: true }));

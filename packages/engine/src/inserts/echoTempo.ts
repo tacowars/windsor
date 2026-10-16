@@ -8,9 +8,13 @@
  * A synced time that changes, by the tempo or the note value, glides to its
  * new value with `setTargetAtTime` over `ECHO_SYNC_GLIDE_S`: the repeats
  * bend in pitch for a moment instead of clicking. A free time is written at
- * once, as the knob and its lane always have been.
+ * once, as the knob and its lane always have been. Once a glide has been
+ * scheduled, a free write replaces the timeline rather than assigning
+ * `value`: a scheduled event outlives a `value` write in a browser, so the
+ * loop would stay at the synced time.
  */
 import { SECONDS_PER_MINUTE } from '../audioConstants';
+import { holdAt } from '../mixer/audibleGate';
 import { DELAY_DIVISIONS } from './delayConstants';
 import { ECHO_BOUNDS, ECHO_DEFAULT_BPM, ECHO_SYNC_GLIDE_S } from './echoConstants';
 
@@ -52,12 +56,14 @@ export interface EchoTimeParam {
 /**
  * The loop's time as `set` and `setTempo` write it: `write(seconds, glide)`
  * glides there while synced, and does nothing when the loop already plays
- * it; free, it writes the param at once. A free write after a glide cancels
- * what the glide left scheduled first.
+ * it; free, it writes the param at once. After any glide, the glide's event
+ * stays on the param's timeline, where a `value` write does not override
+ * it, so a free write then holds the param where it is and sets the new time
+ * at `now` (`holdAt`, windsor#694), which replaces what was scheduled.
  */
 export function echoTimeWriter(time: EchoTimeParam): (seconds: number, glide: boolean) => void {
   let playing = time.initial;
-  let glided = false;
+  let scheduled = false;
   return (seconds, glide) => {
     if (time.held()) return;
     const now = time.now();
@@ -65,11 +71,13 @@ export function echoTimeWriter(time: EchoTimeParam): (seconds: number, glide: bo
       if (seconds === playing) return;
       time.param.cancelScheduledValues(now);
       time.param.setTargetAtTime(seconds, now, ECHO_SYNC_GLIDE_S);
+      scheduled = true;
+    } else if (scheduled) {
+      holdAt(time.param, now);
+      time.param.setValueAtTime(seconds, now);
     } else {
-      if (glided) time.param.cancelScheduledValues(now);
       time.param.value = seconds;
     }
-    glided = glide;
     playing = seconds;
   };
 }
