@@ -3,7 +3,8 @@
  * `2026-10-16-echo-follows-song-tempo` decision 3, fix round 2 for PR #817):
  * a linear ramp over `ECHO_TIME_SLEW_S` from where the line is now, turning
  * mid-ramp with no step, and the switch's wait reads the longest time a ramp
- * still running passes through. The param's timeline is replayed as Web
+ * still running passes through, a ramp turned mid-way counting only as far as
+ * it reached (fix round 3). The param's timeline is replayed as Web
  * Audio would hold it (`__fixtures__/paramTimeline.ts`).
  */
 import { describe, expect, it } from 'vitest';
@@ -136,6 +137,28 @@ describe('the switch’s wait over a slew', () => {
     expect(wet.valueAt(offEnd + 1 / 24 + open)).toBe(0);
     expect(wet.valueAt(offEnd + 2 - 0.01)).toBe(0);
     expect(wet.valueAt(offEnd + 2 + open)).toBe(1);
+  });
+
+  it('waits only for the time a reversed ramp reached, not the target it turned from', () => {
+    // 1/32T heading for 1/1, turned back at a fifth of the way: the line reached
+    // about 0.43 s and never 2 s (Codex P1 on PR #817, fix round 3).
+    const spec = { ...synced('1/32T'), mix: 1 };
+    const { stage, context } = echoStage(spec);
+    const [wet] = (sources(stage.output) as unknown as { gain: FakeParam }[]).map((n) => n.gain);
+    context.currentTime = AT;
+    stage.set({ ...spec, division: '1/1' });
+    const turn = AT + S / 5;
+    const reached = 1 / 24 + (2 - 1 / 24) / 5;
+    context.currentTime = turn;
+    stage.set(spec);
+    context.currentTime = turn + S / 10;
+    stage.set({ ...spec, enabled: false });
+    const offEnd = turn + S / 10 + INSERT_SWITCH_FADE_S;
+    context.currentTime = offEnd + 1 / context.sampleRate;
+    stage.set(spec);
+    const open = ringTime(spec.damp, spec.resonance, context.sampleRate) + INSERT_SWITCH_FADE_S;
+    expect(wet!.valueAt(offEnd + reached - 0.01)).toBe(0);
+    expect(wet!.valueAt(offEnd + reached + open + 0.01)).toBe(1);
   });
 
   it('waits for the 1/32T alone once the ramp is over', () => {

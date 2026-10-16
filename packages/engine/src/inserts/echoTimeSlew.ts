@@ -20,7 +20,9 @@
  * `reader` raises it to the longest time the slew passes through, the larger
  * of its start and its target: a 1/1 shortened to 1/32T still holds
  * pre-switch audio a whole note back until its ramp is over. Once the ramp
- * is over, the reader's own value stands.
+ * is over, the reader's own value stands. A ramp turned mid-way by the next
+ * one is cut there, at the value it reached, so a target the line never
+ * reached is never waited for.
  *
  * Until the audio clock has moved since the stage was built, the line has
  * been fed nothing, so a time written then is set, not slewed: the song's
@@ -46,10 +48,11 @@ export interface EchoTimeParam {
 /** One ramp the slew scheduled: from `from` at `start` to `to` at `end`. */
 interface Ramp {
   readonly start: number;
-  /** Cut short where a lane took the param. */
+  /** Cut short where a lane took the param, or where the next ramp turned it. */
   end: number;
   readonly from: number;
-  readonly to: number;
+  /** Cut short with `end`: where the line had reached when the next ramp turned it. */
+  to: number;
 }
 
 export interface EchoTimeSlew {
@@ -80,6 +83,12 @@ export function echoTimeSlew(time: EchoTimeParam, seconds = ECHO_TIME_SLEW_S): E
     }
     holdAt(param, now, from);
     param.linearRampToValueAtTime(to, now + seconds);
+    // The ramp this one turns ends here, where it had reached (Codex P1 on PR
+    // #817): its target is a time the line never reaches, and the wait must not count it.
+    if (last.end > now) {
+      last.to = valueAt(now);
+      last.end = now;
+    }
     last = { start: now, end: now + seconds, from, to };
     // A ramp over for longer than the line's 5 s left nothing the line can still read.
     ramps = ramps.filter((r) => r.end > now - DELAY_MAX_SECONDS);
