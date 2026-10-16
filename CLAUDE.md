@@ -174,7 +174,7 @@ bash scripts/pr-wait.sh <N>       # wait for a PR's verify and Codex review of i
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.
 - **Spelling:** user-visible text (labels, titles, `aria-label`s, hints,
-  toasts, report lines, error messages) is US English: color, quantize,
+  toasts, report lines, error messages, built-in patch descriptions) is US English: color, quantize,
   normalize, canceled, center, gray. Code identifiers, file names, CSS
   classes, comments and the song format's `colour` field keep their spelling
   (`docs/log/2026-10-16-ui-text-is-us-english.md`).

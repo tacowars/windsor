@@ -16,7 +16,8 @@ around them used.
 ## Decision
 
 1. **User-visible text is US English.** Labels, titles, `aria-label`s,
-   hints, toasts, report lines and error messages: color, quantize,
+   hints, toasts, report lines, error messages and the built-in patches'
+   descriptions, which the patch browser shows: color, quantize,
    normalize, canceled, center, gray. windsor#821 changed the strings that
    did not follow it, and `CLAUDE.md` carries the rule so a new label is
    written in US English from the start.

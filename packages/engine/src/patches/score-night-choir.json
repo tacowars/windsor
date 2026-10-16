@@ -3,7 +3,7 @@
   "name": "Night Choir",
   "category": "Pads",
   "tags": ["vocal", "dark", "slow"],
-  "description": "Hold C3–C4 for 6 seconds; fifths leave the vocal colour uncluttered.",
+  "description": "Hold C3–C4 for 6 seconds; fifths leave the vocal color uncluttered.",
   "patch": {
     "name": "Night Choir",
     "algorithm": 4,
