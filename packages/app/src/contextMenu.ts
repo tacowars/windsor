@@ -16,7 +16,8 @@
  *   runs a row. A submenu drills in, under a back row.
  *
  * Running a row closes the menu, then calls its `run()`. Escape, a press
- * outside, a scroll, a resize or the window losing focus close it too. One
+ * outside, a scroll, a resize or the window losing focus close it too, and
+ * with `closeOnKey` any other key pressed outside it, which still does its work. One
  * menu is open at a time, and the focus goes back where it was. It hangs
  * from the page body at a fixed position, as the knob's menu does.
  */
@@ -99,6 +100,15 @@ interface Panel {
   readonly opener: HTMLElement | null;
 }
 
+/** How a menu closes besides the usual ways. */
+export interface MenuOptions {
+  /**
+   * Any key pressed outside the menu but Escape closes it, and still does its
+   * own work: for a menu built from a snapshot a key command could change.
+   */
+  readonly closeOnKey?: boolean;
+}
+
 /** One open menu: its panels, its preview, the finger it follows and its listeners. */
 class OpenMenu {
   private readonly mode: MenuMode;
@@ -114,6 +124,7 @@ class OpenMenu {
   constructor(
     private readonly spec: MenuSpec,
     private readonly press: OpeningPress,
+    private readonly options: MenuOptions,
   ) {
     this.mode = menuMode(press.pointerType);
     this.size = menuSize(this.mode);
@@ -276,9 +287,12 @@ class OpenMenu {
   };
 
   private readonly escape = (e: KeyboardEvent): void => {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    this.close();
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      this.close();
+    } else if (this.options.closeOnKey === true && !this.inMenu(e.target)) {
+      this.close();
+    }
   };
 
   private readonly scrolled = (e: Event): void => {
@@ -326,9 +340,13 @@ class OpenMenu {
  * until it lifts. Returns this menu's close, which does nothing once the
  * menu has closed or another has replaced it.
  */
-export function openContextMenu(spec: MenuSpec, press: OpeningPress): () => void {
+export function openContextMenu(
+  spec: MenuSpec,
+  press: OpeningPress,
+  options: MenuOptions = {},
+): () => void {
   closeOpen?.();
-  const menu = new OpenMenu(spec, press);
+  const menu = new OpenMenu(spec, press, options);
   closeOpen = menu.close;
   menu.show();
   return menu.close;

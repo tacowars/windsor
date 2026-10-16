@@ -16,7 +16,9 @@
  * previews draw on the lane and the loop strip and never touch the
  * document. The menu is built for the document it opened on: any change to
  * it (a region key, an undo or redo, an edit from elsewhere) closes the menu,
- * and a row of a stale menu refuses to run (`whileFresh`).
+ * and a row of a stale menu refuses to run (`whileFresh`). Any key but
+ * Escape closes it too, so ⌘C, which changes only the clipboard, can't leave
+ * a stale Paste open; Paste also refuses once the clipboard holds another clip.
  */
 import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
@@ -130,6 +132,7 @@ function commands(
   const part = (): MusicPart | undefined => partAt(view.ctx.model.doc, slot);
   const bar = view.ticksPerBar();
   return {
+    clipboard: () => view.state.clipboard,
     cut(index) {
       const now = part();
       const cut = now && cutRegion(now, index);
@@ -217,7 +220,9 @@ function openLaneMenu(view: SongView, lane: HTMLElement, slot: number, press: Me
   const spec = whileFresh(laneMenu(facts, commands(view, slot, press, preview)), fresh);
   afterRepaint(() => {
     if (!fresh()) return;
-    const close = openContextMenu(spec, { ...press, lane: { top: rect.top, bottom: rect.bottom } });
+    // The menu is the pointer's: a key (⌘C, say) closes it and does its own work.
+    const lane = { top: rect.top, bottom: rect.bottom };
+    const close = openContextMenu(spec, { ...press, lane }, { closeOnKey: true });
     const off = view.ctx.model.onChange(() => {
       off();
       close();

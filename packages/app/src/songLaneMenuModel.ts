@@ -86,6 +86,8 @@ export interface TickSpan {
 
 /** What the rows do, and the previews they draw: `songLaneMenu.ts` implements them. */
 export interface LaneMenuCommands {
+  /** The view's clipboard now, which Paste checks at the run against the clip it was built for. */
+  clipboard(): RegionClip | null;
   cut(index: number): void;
   copy(index: number): void;
   /** ⌘D's duplicate, which does nothing on a region that ends the song. */
@@ -151,7 +153,8 @@ function previewed(
 /**
  * Paste at bar N (decision 2): the clip laid down at the pressed bar,
  * rounded down, exactly as ⌘V lays it at that bar; disabled with its reason
- * when nothing is copied or the clip is another kind.
+ * when nothing is copied or the clip is another kind. It pastes only the clip
+ * it was built for: once the clipboard holds another, the row is refused.
  */
 export function pasteRow(press: LaneMenuPress, commands: LaneMenuCommands): MenuRow {
   const { part, clip, tick, bar, songTicks } = press;
@@ -168,7 +171,10 @@ export function pasteRow(press: LaneMenuPress, commands: LaneMenuCommands): Menu
   const show = (): void => {
     if (region) commands.showRegion(region);
   };
-  return previewed(label, () => commands.place(placed), show, commands);
+  const run = (): void => {
+    if (commands.clipboard() === clip) commands.place(placed);
+  };
+  return previewed(label, run, show, commands);
 }
 
 /** Split here (decision 2): Alt-click's cut at the nearest bar line, disabled where Alt-click refuses. */

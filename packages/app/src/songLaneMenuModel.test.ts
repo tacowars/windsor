@@ -70,8 +70,11 @@ const press = (
   added: null,
 });
 
-/** The commands, each recording its call. */
-function spy(): { commands: LaneMenuCommands; calls: [string, unknown][] } {
+/** The commands, each recording its call, over the clipboard `clipboard` reads. */
+function spy(clipboard: () => RegionClip | null = () => null): {
+  commands: LaneMenuCommands;
+  calls: [string, unknown][];
+} {
   const calls: [string, unknown][] = [];
   const record =
     (name: string) =>
@@ -94,9 +97,10 @@ function spy(): { commands: LaneMenuCommands; calls: [string, unknown][] } {
     'showLoop',
     'unpreview',
   ] as const;
-  const commands = Object.fromEntries(
-    names.map((n) => [n, record(n)]),
-  ) as unknown as LaneMenuCommands;
+  const commands = {
+    ...Object.fromEntries(names.map((n) => [n, record(n)])),
+    clipboard,
+  } as unknown as LaneMenuCommands;
   return { commands, calls };
 }
 
@@ -210,9 +214,9 @@ describe('Paste at bar N', () => {
   });
 
   it('lands at the pressed bar, rounded down, and previews the region there', () => {
-    const { commands, calls } = spy();
     const clip = copyRegion(acid, 0);
     if (!clip) throw new Error('no clip');
+    const { commands, calls } = spy(() => clip);
     const paste = rowOf(laneMenu(press(acid, null, 9.4, clip), commands), 'Paste at bar 10');
     paste.preview?.();
     paste.run();
@@ -221,9 +225,9 @@ describe('Paste at bar N', () => {
   });
 
   it('near the song’s end lands and clips exactly as ⌘V does at that bar', () => {
-    const { commands, calls } = spy();
     const clip = copyRegion(kick, 0);
     if (!clip) throw new Error('no clip');
+    const { commands, calls } = spy(() => clip);
     const paste = rowOf(laneMenu(press(kick, 1, 14.5, clip), commands), 'Paste at bar 15');
     paste.run();
     const placed = pasteRegion(kick, clip, 14 * BAR, SONG);
@@ -232,6 +236,25 @@ describe('Paste at bar N', () => {
       ...bars(15, 2),
       pattern: clip.pattern,
     });
+  });
+});
+
+describe('a Paste row built under one clipboard', () => {
+  it('pastes that clip while the clipboard still holds it, and is refused once it holds another', () => {
+    const first = copyRegion(acid, 0);
+    const second = copyRegion(acid, 2);
+    if (!first || !second) throw new Error('no clip');
+    let clipboard: RegionClip | null = first;
+    const { commands, calls } = spy(() => clipboard);
+    const paste = rowOf(laneMenu(press(acid, null, 9.4, first), commands), 'Paste at bar 10');
+    clipboard = second;
+    paste.run();
+    clipboard = null;
+    paste.run();
+    expect(calls).toEqual([]);
+    clipboard = first;
+    paste.run();
+    expect(calls).toEqual([['place', pasteRegion(acid, first, 9 * BAR, SONG)]]);
   });
 });
 
