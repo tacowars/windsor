@@ -28,6 +28,7 @@ import {
   TAPE_MODELS,
 } from '../../inserts/tapeConstants';
 import { driveGain } from '../../inserts/tapeMagneticConstants';
+import { tapeMotionAmount } from '../../inserts/tapeMotionCurve';
 import { TapeTone } from './tapeFilter';
 import { assertMagneticRows } from './tapeMagneticRows';
 import { TapeMagneticStage } from './tapeMagneticStage';
@@ -95,6 +96,14 @@ class TapeDsp {
   lastTrim = NaN;
   lastHiss = NaN;
   hissGain = NaN;
+  /**
+   * The Wow and Flutter dial values (Wear's while unsplit) the motion amounts were last worked
+   * out at, and those amounts on `tapeMotionAmount`'s square law (windsor#818).
+   */
+  lastWow = NaN;
+  lastFlutter = NaN;
+  wowAmount = NaN;
+  flutterAmount = NaN;
   buffers: Float32Array[];
   dcInput = new Float64Array(2);
   dcOutput = new Float64Array(2);
@@ -276,11 +285,11 @@ class TapeDsp {
     const motion = this.motion;
     motion.wowRate = s.wowRate;
     motion.flutterRate = s.flutterRate;
-    if (t.split) {
-      motion.wowAmount = s.wow / C.percent;
-      motion.flutterAmount = s.flutter / C.percent;
-      motion.dropoutAmount = s.dropouts / C.percent;
-    } else motion.wowAmount = motion.flutterAmount = motion.dropoutAmount = s.wear / C.percent;
+    this.updateAmounts();
+    motion.wowAmount = this.wowAmount;
+    motion.flutterAmount = this.flutterAmount;
+    // Dropouts stay linear in their dial (windsor#818 decision 2).
+    motion.dropoutAmount = (t.split ? s.dropouts : s.wear) / C.percent;
     motion.advance();
     this.tickNoise();
     if (this.magnetic.gliding) this.magnetic.glide();
@@ -302,6 +311,25 @@ class TapeDsp {
     if (s.hiss !== this.lastHiss) {
       this.lastHiss = s.hiss;
       this.hissGain = C.dbBase ** (s.hiss / C.dbScale);
+    }
+  }
+  /**
+   * Wow's and Flutter's amounts on the square law, worked out again only when a dial's smoothed
+   * value moves. Unsplit, both read Wear, so they are equal and `TapeMotion` keeps its
+   * equal-amounts arithmetic.
+   */
+  updateAmounts(): void {
+    const s = this.controls,
+      t = this.targets;
+    const wow = t.split ? s.wow : s.wear,
+      flutter = t.split ? s.flutter : s.wear;
+    if (wow !== this.lastWow) {
+      this.lastWow = wow;
+      this.wowAmount = tapeMotionAmount(wow);
+    }
+    if (flutter !== this.lastFlutter) {
+      this.lastFlutter = flutter;
+      this.flutterAmount = tapeMotionAmount(flutter);
     }
   }
   tickNoise(): void {

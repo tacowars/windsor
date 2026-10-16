@@ -94,8 +94,21 @@ it('randomizes valid saved values while preserving Trim, Mix, bypass and the ori
     expect(rolled.wowRate).toBeLessThanOrEqual(R.wowRateMax);
     expect(rolled.flutterRate).toBeGreaterThanOrEqual(R.flutterRateMin);
     expect(rolled.flutterRate).toBeLessThanOrEqual(R.flutterRateMax);
+    // windsor#818: Wow and Flutter draw on 0–70 of their square-law dials, Dropouts on 0–50.
+    for (const dial of [rolled.wow, rolled.flutter]) {
+      expect(dial).toBeGreaterThanOrEqual(0);
+      expect(dial).toBeLessThanOrEqual(R.motionMax);
+    }
+    expect(rolled.dropouts).toBeGreaterThanOrEqual(0);
+    expect(rolled.dropouts).toBeLessThanOrEqual(R.wearMax);
     expect(spec).toEqual(original);
   }
+  expect([R.motionMax, R.wearMax]).toEqual([70, 50]);
+});
+it('draws Wow and Flutter at a median of about dial 25 and a top of dial 70', () => {
+  expect(randomiseTape(DEFAULT_TAPE, () => 0.5).wow).toBeCloseTo(24.75, 2);
+  const top = randomiseTape(DEFAULT_TAPE, () => 1);
+  expect([top.wow, top.flutter, top.dropouts]).toEqual([70, 70, 50]);
 });
 it.each([
   [0, 0.2, 4],

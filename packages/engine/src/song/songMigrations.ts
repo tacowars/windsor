@@ -131,7 +131,20 @@ function bloomScalesRenamed(doc: RawDocument): RawDocument {
 }
 
 /**
- * Five upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9 and 9 → 10, and none from
+ * Version 15 → 16 (windsor#818, record `2026-10-16-tape-motion-on-a-square-law`):
+ * a Tape's `wow` and `flutter`, and `wear`'s wow and flutter while unsplit,
+ * drive the motion on a square law (`inserts/tapeMotionCurve.ts`) where the
+ * dial's percentage was the motion amount itself. The stored numbers, and the
+ * points of a Wow, Flutter or Wear lane, are not rewritten: playing them on
+ * the new, gentler curve is the point of the change, and today's 30 % is the
+ * new dial's top. `dropouts` keeps its linear scale. A version-15 snapshot
+ * already holds the current patch format, and no patch carries a Tape, so
+ * `patches` is not touched.
+ */
+const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
+
+/**
+ * Six upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10 and 15 → 16, and none from
  * 10 to 11 (windsor#748: the plate's `decay` became seconds, and converting
  * an old gain would take a measured table per Size and diffusion), from 11
  * to 12 (windsor#761: the plate's `build` changes how every plate renders,
@@ -143,7 +156,7 @@ function bloomScalesRenamed(doc: RawDocument): RawDocument {
  * plate renders, and no voicing renders the old diffusers) or from 14 to 15
  * (windsor#771: the `plate` insert kind renamed `reverb`, with no upgrade by
  * tacowars's decision), so a song saved at any version from 5 to 14 is
- * refused too: the chain stops at 10.
+ * refused too: the chain stops at 10. A version-15 song loads through 15 → 16.
  * Version 2 was retired by #705, version 3 by windsor#238 (record
  * `2026-10-01-retire-song-version-3`) and version 4 by windsor#224, each
  * with no upgrade, so a song saved at any of them is refused.
@@ -154,6 +167,7 @@ export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   7: filterResoOnLogScale,
   8: retroSizeOnLogScale,
   9: bloomScalesRenamed,
+  15: tapeMotionOnSquareLaw,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

@@ -81,6 +81,13 @@ var TAPE_DSP = {
   percent: 100,
   maxFrequencyRatio: 0.45,
   maxDelaySeconds: 0.025,
+  /**
+   * The Wow and Flutter dials' square law (windsor#818, `tapeMotionCurve.ts`): dial `d` drives the
+   * motion amount `motionMax · (d / 100) ^ motionPower`, so dial 100 swings the delay as the old
+   * linear dial's 30 % did, and a real deck's few cents sit in the dial's lower half.
+   */
+  motionMax: 0.3,
+  motionPower: 2,
   wowHz: 1,
   flutterHz: 7,
   flutterMinHz: 2,
@@ -175,8 +182,15 @@ var TAPE_MODELS = [
 var TAPE_RANDOM = {
   driveMax: 32,
   drivePower: 1.8,
+  /** Dropouts' draw: `wearMax · u ^ wearPower`, linear in their dial. */
   wearMax: 50,
   wearPower: 2.5,
+  /**
+   * Wow's and Flutter's draws (windsor#818): `motionMax · u ^ motionPower`, a median about dial
+   * 25 (about 6 cents on the square law) and a top of dial 70.
+   */
+  motionMax: 70,
+  motionPower: 1.5,
   wowRateMin: 0.2,
   wowRateMax: 1.2,
   flutterRateMin: 4,
@@ -443,6 +457,11 @@ function driveGain(drive, table = TAPE_DRIVE_GAIN) {
   const clamped = Math.min(high, Math.max(low, drive));
   const position = clamped >= 0 ? clamped / high : -clamped / low;
   return exp2(table.boundOctaves * position);
+}
+
+// packages/engine/src/inserts/tapeMotionCurve.ts
+function tapeMotionAmount(dial, curve = TAPE_DSP) {
+  return curve.motionMax * (dial / curve.percent) ** curve.motionPower;
 }
 
 // packages/engine/src/worklet/tape/tapeFilter.ts
@@ -1129,6 +1148,14 @@ var TapeDsp = class {
     this.lastTrim = NaN;
     this.lastHiss = NaN;
     this.hissGain = NaN;
+    /**
+     * The Wow and Flutter dial values (Wear's while unsplit) the motion amounts were last worked
+     * out at, and those amounts on `tapeMotionAmount`'s square law (windsor#818).
+     */
+    this.lastWow = NaN;
+    this.lastFlutter = NaN;
+    this.wowAmount = NaN;
+    this.flutterAmount = NaN;
     this.dcInput = new Float64Array(2);
     this.dcOutput = new Float64Array(2);
     /** Test-only: skip the Bias and model EQ (`bypassEq`); not a parameter, never set from a song. */
@@ -1286,11 +1313,10 @@ var TapeDsp = class {
     const motion = this.motion;
     motion.wowRate = s.wowRate;
     motion.flutterRate = s.flutterRate;
-    if (t.split) {
-      motion.wowAmount = s.wow / TAPE_DSP.percent;
-      motion.flutterAmount = s.flutter / TAPE_DSP.percent;
-      motion.dropoutAmount = s.dropouts / TAPE_DSP.percent;
-    } else motion.wowAmount = motion.flutterAmount = motion.dropoutAmount = s.wear / TAPE_DSP.percent;
+    this.updateAmounts();
+    motion.wowAmount = this.wowAmount;
+    motion.flutterAmount = this.flutterAmount;
+    motion.dropoutAmount = (t.split ? s.dropouts : s.wear) / TAPE_DSP.percent;
     motion.advance();
     this.tickNoise();
     if (this.magnetic.gliding) this.magnetic.glide();
@@ -1312,6 +1338,23 @@ var TapeDsp = class {
     if (s.hiss !== this.lastHiss) {
       this.lastHiss = s.hiss;
       this.hissGain = TAPE_DSP.dbBase ** (s.hiss / TAPE_DSP.dbScale);
+    }
+  }
+  /**
+   * Wow's and Flutter's amounts on the square law, worked out again only when a dial's smoothed
+   * value moves. Unsplit, both read Wear, so they are equal and `TapeMotion` keeps its
+   * equal-amounts arithmetic.
+   */
+  updateAmounts() {
+    const s = this.controls, t = this.targets;
+    const wow = t.split ? s.wow : s.wear, flutter = t.split ? s.flutter : s.wear;
+    if (wow !== this.lastWow) {
+      this.lastWow = wow;
+      this.wowAmount = tapeMotionAmount(wow);
+    }
+    if (flutter !== this.lastFlutter) {
+      this.lastFlutter = flutter;
+      this.flutterAmount = tapeMotionAmount(flutter);
     }
   }
   tickNoise() {

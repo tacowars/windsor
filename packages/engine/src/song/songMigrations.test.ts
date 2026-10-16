@@ -2,15 +2,17 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. Five upgrades ship, 5 → 6
+ * patch of an unreadable format is refused whole. Six upgrades ship, 5 → 6
  * (windsor#300: the snapshot's patches to patch format 3, pinned by
  * `songDriveUpgrade.test.ts`), 6 → 7 (windsor#590: to patch format 4,
  * the operators' `noiseLp` and `noiseHp` renamed), 7 → 8 (windsor#626:
  * the Filter's Reso lane on a log scale, an identity step pinned by
  * `songFilterResoUpgrade.test.ts`), 8 → 9 (RV-4: Retro Reverb's Size
  * lane on a log scale, an identity step pinned by
- * `songRetroSizeUpgrade.test.ts`) and 9 → 10 (windsor#728: bloom's Scale
- * values renamed to Windsor's, pinned here); versions 2 (#705), 3 (record
+ * `songRetroSizeUpgrade.test.ts`), 9 → 10 (windsor#728: bloom's Scale
+ * values renamed to Windsor's, pinned here) and 15 → 16 (windsor#818: the
+ * Tape's Wow, Flutter and Wear on a square law, an identity step pinned
+ * here); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused. None ships from 10 to 11 (windsor#748, the
  * plate's Decay in seconds), from 11 to 12 (windsor#761, the plate's
@@ -74,8 +76,8 @@ const PAST_TEN = {
 };
 
 describe('upgradeSong', () => {
-  it('ships five upgrades, 5 → 6 to 9 → 10, and none to 11, 12, 13, 14 or 15: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9']);
+  it('ships six upgrades, 5 → 6 to 9 → 10 and 15 → 16, and none to 11, 12, 13, 14 or 15: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
@@ -108,7 +110,7 @@ describe('upgradeSong', () => {
     );
   });
 
-  it.each([3, 4, 5, 6, 7, 8, 9, 10, 11])(
+  it.each([3, 4, 5, 6, 7, 8, 9, 10, 11, 14])(
     'refuses version %i, which no upgrade brings to this build, with the standard message',
     (version) => {
       const raw = { ...song([KICK]), version };
@@ -315,5 +317,52 @@ describe("a version-9 song's blooms (windsor#728)", () => {
     const twice = makeArrangement(JSON.parse(JSON.stringify(once))).document;
     expect(twice.master!.inserts[0]).toMatchObject({ key: 'A#', scale: 'wholeTone' });
     expect(twice).toEqual(once);
+  });
+});
+
+describe("a version-15 song's Tape (windsor#818)", () => {
+  const tape = {
+    kind: 'tape',
+    id: 'tp',
+    wear: 30,
+    split: true,
+    wow: 5,
+    flutter: 10,
+    dropouts: 30,
+  };
+  const lane = {
+    target: 'insert.tp.wow',
+    on: true,
+    points: [
+      { tick: 0, value: 5, bend: 0 },
+      { tick: 96, value: 40, bend: 0 },
+    ],
+  };
+  const withTape = (): Doc => ({
+    ...song([{ ...KICK, strip: { inserts: [tape] }, automation: [lane] }]),
+    version: 15,
+    master: { inserts: [{ ...tape, id: 'mt', split: false }] },
+  });
+
+  it('passes the document through unchanged, its Tape fields and lanes as saved', () => {
+    const raw = withTape();
+    const before = structuredClone(raw);
+    const { document, refused } = upgradeSong(raw);
+    expect(refused).toBeUndefined();
+    expect(raw).toEqual(before);
+    expect(document).toEqual({ ...before, version: ARRANGEMENT_VERSION });
+  });
+
+  it("loads at this build's version with its Tape's numbers and lane kept, and a song with no Tape unchanged", () => {
+    const result = makeArrangement(withTape());
+    expect(result.refused).toBeUndefined();
+    expect(result.document.version).toBe(ARRANGEMENT_VERSION);
+    expect(result.document.parts[0]!.strip!.inserts[0]).toMatchObject(tape);
+    expect(result.document.parts[0]!.automation).toEqual([lane]);
+    expect(result.document.master!.inserts[0]).toMatchObject({ wear: 30, split: false });
+    const upgraded = makeArrangement({ ...song([KICK]), version: 15 });
+    const current = makeArrangement({ ...song([KICK]), version: ARRANGEMENT_VERSION });
+    expect(upgraded.corrections).toEqual(current.corrections);
+    expect(upgraded.document).toEqual(current.document);
   });
 });
