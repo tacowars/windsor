@@ -36,6 +36,7 @@ import { leaderOf } from './figureProcessModel';
 import { withStep } from './gridModel';
 import { groupColumns } from './meterGrid';
 import { changePattern } from './partEdits';
+import { cellsBorrowed } from './patternActionModel';
 import { regionReadAt, type RegionRead } from './regionPlayhead';
 import {
   type LaneHost,
@@ -99,7 +100,7 @@ export function figureView(
   const chord = regionChord(ctx, slot, region, tick);
   return {
     line,
-    borrowed: own?.source !== undefined,
+    borrowed: cellsBorrowed(own),
     leader: lead?.name ?? null,
     stack: chord?.stack ?? FIGURE_SUMMARY_STACK,
     chord,

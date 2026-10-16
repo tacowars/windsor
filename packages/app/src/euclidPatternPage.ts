@@ -18,6 +18,8 @@ import { el } from './dom';
 import type { EuclidCard } from './euclidCardState';
 import { EUCLID_KNOB_COLUMNS } from './euclidConstants';
 import { type LaneChoice, addLaneRow, laneChoices } from './euclidLaneModel';
+import { captured } from './patternActionModel';
+import { runPatternAction } from './patternActionRun';
 import { partPatch } from './stepModLane';
 import { stepperBox } from './euclidStepper';
 import { EUCLID_STEPPERS } from './euclidStepperModel';
@@ -70,10 +72,12 @@ function steppers(card: EuclidCard): Record<keyof typeof EUCLID_STEPPERS, HTMLEl
 }
 
 function captureButton(card: EuclidCard): HTMLButtonElement {
-  const button = el('button', 'btn seq-btn', card.spec()?.pattern ? 'Release' : 'Capture');
+  const spec = card.spec();
+  const button = el('button', 'btn seq-btn', spec && captured(spec) ? 'Release' : 'Capture');
   const node = button as HTMLButtonElement;
   node.type = 'button';
-  node.onclick = (): void => card.capture(card.spec()?.pattern != null ? null : card.figure());
+  // The pattern action the Song tab's region menu runs too (`patternActionRun.ts`, windsor#827).
+  node.onclick = (): void => void runPatternAction(card.ctx, card.slot, card.region, 'capture');
   return node;
 }
 

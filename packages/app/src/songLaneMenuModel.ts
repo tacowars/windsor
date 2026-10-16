@@ -10,11 +10,12 @@
  *
  * - **A region:** Cut, Copy, Paste at bar N, Duplicate, Delete and Split
  *   here; Zoom to region and Loop region; Set sequencer ▸ on a part with no
- *   sequencer; then Bounce part to Roll… where the pane offers it, and Part
- *   color…. The pattern actions come in the next ticket.
+ *   sequencer, else the pattern group (`songLanePatternGroup.ts`, windsor#827:
+ *   the card's pattern actions and Fit region to pattern); then Bounce part
+ *   to Roll… where the pane offers it, and Part color….
  * - **A gap:** Paste at bar N, Add region here and Loop this bar.
  */
-import type { MusicPart, PartRegion, SequencerKind } from '@windsor/engine';
+import type { Meter, MusicPart, PartRegion, SequencerKind } from '@windsor/engine';
 import { SEQUENCER_KINDS } from '@windsor/engine';
 import { bounceButtonState } from './bounceButtonModel';
 import { laneHitAt } from './laneEditModel';
@@ -29,7 +30,10 @@ import type { RegionClip } from './regionClipboard';
 import { pasteRegion, pasteTick } from './regionClipboard';
 import { snapTick } from './regionModel';
 import type { Placement } from './regionPlacement';
+import type { RollSnap } from './rollTables';
 import { KIND_LABELS } from './sequencerConstants';
+import type { PatternGroupCommands } from './songLanePatternGroup';
+import { patternGroup } from './songLanePatternGroup';
 import { boxTick, pxToTick } from './songViewTables';
 
 /** The menu's words, in US English (decision 11). */
@@ -71,7 +75,10 @@ export interface LaneMenuPress {
   readonly tick: number;
   /** One bar of the song's meter, in ticks. */
   readonly bar: number;
+  readonly meter: Meter | undefined;
   readonly songTicks: number;
+  /** The Roll card's Snap for the part: what Quantize names and snaps to. */
+  readonly snap: RollSnap;
   /** The view's clipboard: what Copy or Cut last took. */
   readonly clip: RegionClip | null;
   /** On a gap, what a click there would draw (`drawRegionChange`); null when it draws nothing. */
@@ -85,7 +92,7 @@ export interface TickSpan {
 }
 
 /** What the rows do, and the previews they draw: `songLaneMenu.ts` implements them. */
-export interface LaneMenuCommands {
+export interface LaneMenuCommands extends PatternGroupCommands {
   /** The view's clipboard now, which Paste checks at the run against the clip it was built for. */
   clipboard(): RegionClip | null;
   cut(index: number): void;
@@ -248,8 +255,11 @@ function regionMenu(
       commands,
     ),
   ];
-  const pattern =
-    part.sequencer.kind === 'none' ? [SEPARATOR, setSequencerMenu(commands, kinds)] : [];
+  const group =
+    part.sequencer.kind === 'none'
+      ? [setSequencerMenu(commands, kinds)]
+      : patternGroup(press, index, commands);
+  const pattern = group.length > 0 ? [SEPARATOR, ...group] : [];
   return {
     head: regionHead(part, region, press),
     items: [
@@ -301,15 +311,16 @@ export function laneMenu(
   return onRegion ?? gapMenu(press, commands);
 }
 
-/** `item`, its rows (and a submenu's) running and previewing only while `fresh()` holds. */
-function freshItem(item: MenuItem, fresh: () => boolean): MenuItem {
+/** `item`, its rows (and a submenu's) running and previewing only while `fresh()` holds, `ran` told first. */
+function freshItem(item: MenuItem, fresh: () => boolean, ran: () => void): MenuItem {
   if (item.kind === 'separator') return item;
   if (item.kind === 'submenu')
-    return { ...item, items: item.items.map((i) => freshItem(i, fresh)) };
+    return { ...item, items: item.items.map((i) => freshItem(i, fresh, ran)) };
   const { preview } = item;
   return {
     ...item,
     run: () => {
+      ran();
       if (fresh()) item.run();
     },
     ...(preview && {
@@ -327,9 +338,14 @@ function freshItem(item: MenuItem, fresh: () => boolean): MenuItem {
  * placements would act on the wrong region or overwrite that edit. The lane
  * also closes the menu on that change (`songLaneMenu.ts`); this keeps a row
  * that still runs from acting stale. An unpreview always runs, so nothing
- * shown is left behind.
+ * shown is left behind. `ran` hears of every row run, fresh or not, before
+ * it runs: the menu has closed by then (`songLaneMenu.ts` ends its watch).
  */
-export const whileFresh = (spec: MenuSpec, fresh: () => boolean): MenuSpec => ({
+export const whileFresh = (
+  spec: MenuSpec,
+  fresh: () => boolean,
+  ran: () => void = () => undefined,
+): MenuSpec => ({
   ...spec,
-  items: spec.items.map((item) => freshItem(item, fresh)),
+  items: spec.items.map((item) => freshItem(item, fresh, ran)),
 });

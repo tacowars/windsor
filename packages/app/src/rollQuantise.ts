@@ -16,6 +16,10 @@
  */
 import { ROLL_LOOP_TICKS_MAX, type RollNote, type RollSequencerConfig } from '@windsor/engine';
 import { type RollEdit, type RollFrame, settle } from './rollEdits';
+import { ROLL_SNAP_OFF_TICKS } from './rollTables';
+
+/** Snap Off has no step to snap to, so Quantize is off: the card's button and the region menu's row. */
+export const quantiseOff = (snapTicks: number): boolean => snapTicks === ROLL_SNAP_OFF_TICKS;
 
 /** `tick` (never negative) to the nearest whole `snap`, a tie rounding up, as `Math.round` does. */
 export const nearestSnap = (tick: number, snap: number): number => Math.round(tick / snap) * snap;

@@ -36,7 +36,6 @@ import { EUCLID_LANES_MAX, EUCLID_PLOT_SECONDS_DIGITS } from './euclidConstants'
 import { BarLineWatch, plotSeconds } from './euclidBarLines';
 import { densityNote, plotBar } from './euclidDensityModel';
 import { type DensityPage, densityPage } from './euclidDensityPage';
-import { regionFigure } from './euclidFigure';
 import { laneChoices, laneLength, lanesOf } from './euclidLaneModel';
 import { cycleText, fullCycle } from './euclidLaneView';
 import { type Figure, countOnsets, figureKey } from './euclidModel';
@@ -48,6 +47,8 @@ import { euclidRailTools } from './euclidRail';
 import type { RowHead } from './euclidRowParts';
 import { paintRows } from './euclidRows';
 import { euclidTabs } from './euclidTabs';
+import { captureNotice } from './patternActionModel';
+import { figureOf } from './patternActionRun';
 import { lightPlayhead } from './regionPlayhead';
 import type { DeviceBody } from './sequencerDevice';
 import { partPatch } from './stepModLane';
@@ -82,16 +83,6 @@ function stepAtPosition(ctx: AppCtx, slot: number, region: number | undefined): 
 /** The region's step at the audible tick: null while halted. */
 function readAt(ctx: AppCtx, slot: number, region: number | undefined): RegionStep | null {
   return ctx.transport.running ? stepAtPosition(ctx, slot, region) : null;
-}
-
-function figureOf(ctx: AppCtx, slot: number, region: number | undefined): Figure {
-  const source = {
-    doc: ctx.model.doc,
-    capturePattern: (s: number, r?: number) => ctx.host.capturePattern(s, r),
-    regionStepAt: (s: number, r: number, tick: number) => ctx.host.regionStepAt(s, r, tick),
-    position: () => ctx.transport.position(),
-  };
-  return regionFigure(source, slot, region);
 }
 
 /** Everything the rows show, as one string: the rows rebuild when it changes. */
@@ -217,12 +208,7 @@ function watch(live: Live, root: HTMLElement): void {
 }
 
 function capture(card: EuclidCard, pattern: Figure | null): void {
-  if (!card.write({ pattern })) return;
-  card.ctx.notify(
-    pattern
-      ? `part ${card.slot}: captured — the figure is a literal array in the document`
-      : `part ${card.slot}: released back to the modulator`,
-  );
+  if (card.write({ pattern })) card.ctx.notify(captureNotice(card.slot, pattern));
 }
 
 /** The card's handle; `ref.live` is filled in once its pages exist. */

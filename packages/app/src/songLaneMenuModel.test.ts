@@ -2,8 +2,9 @@
  * The Song tab lane's context menu (windsor#826; record
  * `2026-10-16-song-tab-context-menu`): the rows of the approved mockups'
  * Grid, Arp, Roll, Euclid, gap and no-sequencer states, in order with their
- * tags (the pattern group is the next ticket), and what each row runs and
- * previews. The parts are the mockups' 16-bar test song.
+ * tags (the pattern group's own cases are `songLanePatternGroup.test.ts`'s),
+ * and what each row runs and previews. The parts are the mockups' 16-bar
+ * test song.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -20,6 +21,7 @@ import { partLaneGeometry } from './partLaneModel';
 import type { RegionClip } from './regionClipboard';
 import { copyRegion, pasteRegion } from './regionClipboard';
 import { splitPartRegion } from './partEdits';
+import { ROLL_SNAPS, ROLL_SNAP_DEFAULT } from './rollTables';
 import type { LaneMenuCommands, LaneMenuPress } from './songLaneMenuModel';
 import { laneMenu, lanePressAt, whileFresh } from './songLaneMenuModel';
 
@@ -50,7 +52,10 @@ const kick = part(
   { ...DEFAULT_EUCLIDEAN_CONFIG, kind: 'euclidean', note: 36, hold: 1 },
   [bars(1, 8), bars(9, 8)],
 );
-const lead = part(2, 'lead', { ...DEFAULT_ROLL_CONFIG, kind: 'roll' }, [bars(5, 4), bars(9, 4)]);
+/** lead's roll: notes on a 3-bar loop, as the mockups draw it (one note stands in for their four). */
+const notes = [{ tick: 0, pitch: 60, ticks: 6, velocity: 100 }];
+const roll = { ...DEFAULT_ROLL_CONFIG, kind: 'roll' as const, loopTicks: 3 * BAR, notes };
+const lead = part(2, 'lead', roll, [bars(5, 4), bars(9, 4)]);
 const arp = part(3, 'arp', { ...DEFAULT_ARP_CONFIG, kind: 'arp' }, [bars(1, 8), bars(9, 8)]);
 const pad = part(4, 'pad', { kind: 'none' }, [bars(1, 16)]);
 
@@ -65,7 +70,9 @@ const press = (
   region,
   tick: at * BAR,
   bar: BAR,
+  meter: '4/4',
   songTicks: SONG,
+  snap: ROLL_SNAPS[ROLL_SNAP_DEFAULT] ?? { label: '1/16', ticks: 6 },
   clip,
   added: null,
 });
@@ -81,22 +88,10 @@ function spy(clipboard: () => RegionClip | null = () => null): {
     (arg?: unknown): void => {
       calls.push([name, arg]);
     };
-  const names = [
-    'cut',
-    'copy',
-    'duplicate',
-    'delete',
-    'place',
-    'zoom',
-    'loop',
-    'bounce',
-    'colour',
-    'setKind',
-    'showRegion',
-    'showCut',
-    'showLoop',
-    'unpreview',
-  ] as const;
+  const names =
+    'cut copy duplicate delete place zoom loop bounce colour setKind pattern showRegion showCut showLoop unpreview'.split(
+      ' ',
+    );
   const commands = {
     ...Object.fromEntries(names.map((n) => [n, record(n)])),
     clipboard,
@@ -141,22 +136,32 @@ describe("the mockups' states", () => {
     expect(spec.head).toBe('acid · bars 5–8 · at bar 6');
     expect(shown(spec.items)).toEqual([
       ...EDITS('Paste at bar 6'),
+      'Randomize',
+      'Reverse',
+      'Fit region to pattern [1 bar]',
+      '—',
       'Bounce part to Roll…',
       'Part color…',
     ]);
   });
 
-  it('Arp and Euclid offer Bounce; Roll does not', () => {
+  it('Arp, Euclid and Roll: their groups (`songLanePatternGroup.test.ts`), then Bounce on Arp and Euclid only', () => {
     const arpSpec = laneMenu(press(arp, 0, 2.4), commands);
     expect(arpSpec.head).toBe('arp · bars 1–8 · at bar 3');
-    expect(shown(arpSpec.items).slice(-2)).toEqual(['Bounce part to Roll…', 'Part color…']);
+    expect(shown(arpSpec.items).slice(-4)).toEqual([
+      'Reseed',
+      '—',
+      'Bounce part to Roll…',
+      'Part color…',
+    ]);
     const euclidSpec = laneMenu(press(kick, 1, 11.3), commands);
     expect(euclidSpec.head).toBe('kick · bars 9–16 · at bar 12');
     expect(shown(euclidSpec.items).slice(-2)).toEqual(['Bounce part to Roll…', 'Part color…']);
     const rollSpec = laneMenu(press(lead, 0, 5.4), commands);
     expect(rollSpec.head).toBe('lead · bars 5–8 · at bar 6');
-    expect(shown(rollSpec.items)).toEqual([
-      ...EDITS('Paste at bar 6 [nothing copied] (off)'),
+    expect(shown(rollSpec.items).slice(-3)).toEqual([
+      'Fit region to pattern [3 bars]',
+      '—',
       'Part color…',
     ]);
   });
