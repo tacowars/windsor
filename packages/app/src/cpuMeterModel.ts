@@ -15,6 +15,7 @@ import {
   CPU_METER_FULL_PCT,
   CPU_METER_INTERVAL_MS,
   CPU_METER_MAX_LABEL_PCT,
+  CPU_METER_SETTLE_MS,
   CPU_METER_TOAST_GAP_MS,
 } from './cpuMeterConstants';
 
@@ -160,18 +161,21 @@ function rise(previous: number | null, count: number | null): number {
  * on the same context, while the device's keeps counting. A rise in either
  * flashes the meter for `flashMs` and toasts unless one went up within
  * `toastGapMs`, once per reading; a steady or falling count does neither.
+ * Before `settleUntilMs` (a cold start's window, `stepSettle`) a rise only
+ * moves the baseline: it neither flashes nor toasts, and is not carried over.
  */
 export function stepOverrun(
   state: OverrunState,
   counts: OverrunCounts,
   nowMs: number,
+  settleUntilMs = -Infinity,
   rules: OverrunRules = OVERRUN_RULES,
 ): OverrunStep {
   const added =
     rise(state.underruns, counts.underruns) + rise(state.deviceUnderruns, counts.deviceUnderruns);
   let { lastToastMs, flashUntilMs } = state;
   let toast = false;
-  if (added > 0) {
+  if (added > 0 && nowMs >= settleUntilMs) {
     flashUntilMs = nowMs + rules.flashMs;
     toast = lastToastMs === null || nowMs - lastToastMs >= rules.toastGapMs;
     if (toast) lastToastMs = nowMs;
@@ -187,4 +191,50 @@ export function stepOverrun(
     toast,
     added,
   };
+}
+
+/** What a reading sees of a cold start: which system, and whether ▶ is running. */
+export interface SettleFacts {
+  /** The system's identity; a different value is a new system. */
+  system: unknown;
+  /** The transport is running. */
+  playing: boolean;
+}
+
+/** The cold-start window's memory between readings. */
+export interface SettleState {
+  /** The system the last reading saw; null before the first. */
+  system: unknown;
+  /** The transport has started on that system. */
+  started: boolean;
+  /** Overruns neither flash nor toast before this time. */
+  settleUntilMs: number;
+}
+
+export const INITIAL_SETTLE_STATE: SettleState = {
+  system: null,
+  started: false,
+  settleUntilMs: -Infinity,
+};
+
+/**
+ * Open the cold-start window (windsor#835) for `settleMs` when a reading sees
+ * a new system (power-on, an import, an undo or redo rebuild, a rebuild while
+ * playing) or the transport's first start on that system. A later ▶ on the
+ * same system opens nothing. A system that arrives already playing counts as
+ * started: its own window covers that first play.
+ */
+export function stepSettle(
+  state: SettleState,
+  facts: SettleFacts,
+  nowMs: number,
+  settleMs = CPU_METER_SETTLE_MS,
+): SettleState {
+  if (facts.system !== state.system) {
+    return { system: facts.system, started: facts.playing, settleUntilMs: nowMs + settleMs };
+  }
+  if (facts.playing && !state.started) {
+    return { system: state.system, started: true, settleUntilMs: nowMs + settleMs };
+  }
+  return state;
 }

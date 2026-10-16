@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { CPU_METER_FLASH_MS, CPU_METER_TOAST_GAP_MS } from './cpuMeterConstants';
+import {
+  CPU_METER_FLASH_MS,
+  CPU_METER_SETTLE_MS,
+  CPU_METER_TOAST_GAP_MS,
+} from './cpuMeterConstants';
 import {
   INITIAL_OVERRUN_STATE,
+  INITIAL_SETTLE_STATE,
   type OverrunState,
+  type SettleState,
   type CpuLoad,
   cpuMeterView,
   formatLoad,
   meterSampleAt,
   stepOverrun,
+  stepSettle,
 } from './cpuMeterModel';
 
 /** A reading with no clock or device figure, overridden per case. */
@@ -162,5 +169,112 @@ describe('stepOverrun with the device count', () => {
     );
     const rebuild = stepOverrun(first.state, reading({ underruns: 0, deviceUnderruns: 105 }), 250);
     expect(rebuild).toMatchObject({ toast: true, flashing: true, added: 5 });
+  });
+});
+
+/** One meter reading as `cpuMeter.ts` takes it: the system, ▶, the count, the time. */
+interface ColdReading {
+  system: object;
+  playing: boolean;
+  count: number;
+  ms: number;
+}
+
+/** Feed readings through the settling window and the overrun rule, as the meter does. */
+function runCold(readings: ColdReading[]): Array<ReturnType<typeof stepOverrun>> {
+  let overrun: OverrunState = INITIAL_OVERRUN_STATE;
+  let settle: SettleState = INITIAL_SETTLE_STATE;
+  return readings.map(({ system, playing, count, ms }) => {
+    settle = stepSettle(settle, { system, playing }, ms);
+    const counts = { underruns: 0, deviceUnderruns: count };
+    const step = stepOverrun(overrun, counts, ms, settle.settleUntilMs);
+    overrun = step.state;
+    return step;
+  });
+}
+
+const SETTLE = CPU_METER_SETTLE_MS;
+
+describe('the cold-start settling window', () => {
+  it('holds a rise after a new system silent, while the baseline moves', () => {
+    const sys = {};
+    const steps = runCold([
+      { system: sys, playing: false, count: 10, ms: 0 },
+      { system: sys, playing: false, count: 15, ms: 1200 },
+      { system: sys, playing: false, count: 15, ms: SETTLE + 100 },
+    ]);
+    expect(steps[0]).toMatchObject({ toast: false, flashing: false, added: 0 });
+    expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 5 });
+    expect(steps[1]?.state.deviceUnderruns).toBe(15);
+    expect(steps[2]).toMatchObject({ toast: false, flashing: false, added: 0 });
+  });
+
+  it('holds a rise after the first start on a system, but not after a second', () => {
+    const sys = {};
+    const start = SETTLE + 10_000;
+    const second = start + 20_000;
+    const steps = runCold([
+      { system: sys, playing: false, count: 0, ms: 0 },
+      { system: sys, playing: true, count: 0, ms: start },
+      { system: sys, playing: true, count: 4, ms: start + 500 },
+      { system: sys, playing: false, count: 4, ms: second - 1000 },
+      { system: sys, playing: true, count: 4, ms: second },
+      { system: sys, playing: true, count: 6, ms: second + 500 },
+    ]);
+    expect(steps[2]).toMatchObject({ toast: false, flashing: false, added: 4 });
+    expect(steps[5]).toMatchObject({ toast: true, flashing: true, added: 2 });
+  });
+
+  it('opens a fresh window on a new system mid-session, and another on its first start', () => {
+    const [a, b, c] = [{}, {}, {}];
+    const t = 60_000;
+    const steps = runCold([
+      { system: a, playing: true, count: 0, ms: 0 },
+      { system: b, playing: false, count: 0, ms: t },
+      { system: b, playing: false, count: 3, ms: t + 500 },
+      { system: b, playing: true, count: 3, ms: t + 10_000 },
+      { system: b, playing: true, count: 5, ms: t + 10_500 },
+      // A rebuild while playing: a new system that arrives already running.
+      { system: c, playing: true, count: 5, ms: t + 30_000 },
+      { system: c, playing: true, count: 8, ms: t + 30_500 },
+      { system: c, playing: true, count: 9, ms: t + 30_000 + SETTLE + 1 },
+    ]);
+    expect(steps.slice(0, 7).some((s) => s.toast || s.flashing)).toBe(false);
+    expect(steps[7]).toMatchObject({ toast: true, flashing: true, added: 1 });
+  });
+
+  it('toasts a rise at settle + 1 ms and holds one at settle - 1 ms', () => {
+    const riseAt = (ms: number): ReturnType<typeof stepOverrun> | undefined => {
+      const sys = {};
+      return runCold([
+        { system: sys, playing: false, count: 0, ms: 0 },
+        { system: sys, playing: false, count: 1, ms },
+      ])[1];
+    };
+    expect(riseAt(SETTLE - 1)).toMatchObject({ toast: false, flashing: false });
+    expect(riseAt(SETTLE + 1)).toMatchObject({ toast: true, flashing: true });
+  });
+
+  it('toasts a sustained overload on its first reading after the window', () => {
+    const sys = {};
+    const readings: ColdReading[] = [];
+    for (let i = 0; i <= 16; i++) {
+      readings.push({ system: sys, playing: false, count: i, ms: i * 250 });
+    }
+    const steps = runCold(readings);
+    const firstToast = steps.findIndex((s) => s.toast);
+    expect(readings[firstToast]?.ms).toBe(SETTLE);
+    expect(steps.slice(0, firstToast).some((s) => s.flashing)).toBe(false);
+    expect(steps[firstToast]?.added).toBe(1);
+  });
+
+  it('keeps the first-reading baseline and adds nothing for a falling count', () => {
+    const sys = {};
+    const steps = runCold([
+      { system: sys, playing: false, count: 40, ms: 0 },
+      { system: sys, playing: false, count: 2, ms: SETTLE + 500 },
+    ]);
+    expect(steps[0]).toMatchObject({ toast: false, added: 0 });
+    expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 0 });
   });
 });

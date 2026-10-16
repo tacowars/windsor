@@ -3,7 +3,8 @@
  * engine's DSP load (`AudioSystem.readout().load`) as a bar and `NN%`, the
  * interval's peak as a tick, and flashes red with a warning toast when the
  * underrun count rises; the bar also goes full-scale while the audio clock
- * runs behind real time (windsor#794). The rules are `cpuMeterModel.ts`; this file draws.
+ * runs behind real time (windsor#794). A cold start (a new system, or its
+ * first ▶) settles before a rise may flash or toast (windsor#835). The rules are `cpuMeterModel.ts`; this file draws.
  *
  * It rides the console's one frame loop (`watchPlayhead`): the "playhead" is
  * the meter's sample number, which moves about 4 Hz, so the meter repaints
@@ -11,7 +12,14 @@
  * off the loop idles.
  */
 import type { AppCtx } from './context';
-import { cpuMeterView, INITIAL_OVERRUN_STATE, meterSampleAt, stepOverrun } from './cpuMeterModel';
+import {
+  cpuMeterView,
+  INITIAL_OVERRUN_STATE,
+  INITIAL_SETTLE_STATE,
+  meterSampleAt,
+  stepOverrun,
+  stepSettle,
+} from './cpuMeterModel';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';
 
@@ -30,6 +38,7 @@ export function mountCpuMeter(button: HTMLElement, ctx: AppCtx): void {
   button.replaceChildren(bar, label);
   button.classList.add('cpu-meter');
   let overrun = INITIAL_OVERRUN_STATE;
+  let settle = INITIAL_SETTLE_STATE;
 
   const paint = (): void => {
     const system = ctx.host.system;
@@ -37,7 +46,8 @@ export function mountCpuMeter(button: HTMLElement, ctx: AppCtx): void {
     const { load } = system.readout();
     const now = performance.now();
     const view = cpuMeterView(load);
-    const step = stepOverrun(overrun, load, now);
+    settle = stepSettle(settle, { system, playing: ctx.transport.running }, now);
+    const step = stepOverrun(overrun, load, now, settle.settleUntilMs);
     overrun = step.state;
     button.style.setProperty('--cpu-fill', String(view.fill));
     button.style.setProperty('--cpu-peak', String(view.peak));
