@@ -13,6 +13,7 @@ import {
   cpuMeterView,
   formatLoad,
   meterSampleAt,
+  overrunMessage,
   stepOverrun,
   stepSettle,
 } from './cpuMeterModel';
@@ -108,7 +109,7 @@ function run(readings: Array<[number, number]>): Array<ReturnType<typeof stepOve
 describe('stepOverrun', () => {
   it('takes the first reading as the baseline, even a non-zero one', () => {
     const [first] = run([[7, 0]]);
-    expect(first).toMatchObject({ toast: false, flashing: false, added: 0 });
+    expect(first).toMatchObject({ toast: false, flashing: false, dspAdded: 0 });
   });
 
   it('neither flashes nor toasts while the count holds steady', () => {
@@ -127,7 +128,7 @@ describe('stepOverrun', () => {
       [3, 250 + CPU_METER_FLASH_MS - 1],
       [3, 250 + CPU_METER_FLASH_MS],
     ]);
-    expect(steps[1]).toMatchObject({ toast: true, flashing: true, added: 3 });
+    expect(steps[1]).toMatchObject({ toast: true, flashing: true, dspAdded: 3 });
     expect(steps[2]).toMatchObject({ toast: false, flashing: true });
     expect(steps[3]).toMatchObject({ toast: false, flashing: false });
   });
@@ -147,8 +148,8 @@ describe('stepOverrun', () => {
       [0, 250],
       [1, 500],
     ]);
-    expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 0 });
-    expect(steps[2]).toMatchObject({ toast: true, added: 1 });
+    expect(steps[1]).toMatchObject({ toast: false, flashing: false, dspAdded: 0 });
+    expect(steps[2]).toMatchObject({ toast: true, dspAdded: 1 });
   });
 });
 
@@ -158,7 +159,7 @@ describe('stepOverrun with the device count', () => {
     const rise = stepOverrun(first.state, reading({ deviceUnderruns: 3 }), 100);
     const steady = stepOverrun(rise.state, reading({ deviceUnderruns: 3 }), 200);
     expect([first.toast, rise.toast, steady.toast]).toEqual([false, true, false]);
-    expect(rise.added).toBe(1);
+    expect(rise.deviceAdded).toBe(1);
   });
 
   it('still toasts a device rise when a rebuilt system restarts the sampler', () => {
@@ -168,7 +169,7 @@ describe('stepOverrun with the device count', () => {
       0,
     );
     const rebuild = stepOverrun(first.state, reading({ underruns: 0, deviceUnderruns: 105 }), 250);
-    expect(rebuild).toMatchObject({ toast: true, flashing: true, added: 5 });
+    expect(rebuild).toMatchObject({ toast: true, flashing: true, deviceAdded: 5 });
   });
 });
 
@@ -203,10 +204,10 @@ describe('the cold-start settling window', () => {
       { system: sys, playing: false, count: 15, ms: 1200 },
       { system: sys, playing: false, count: 15, ms: SETTLE + 100 },
     ]);
-    expect(steps[0]).toMatchObject({ toast: false, flashing: false, added: 0 });
-    expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 5 });
+    expect(steps[0]).toMatchObject({ toast: false, flashing: false, deviceAdded: 0 });
+    expect(steps[1]).toMatchObject({ toast: false, flashing: false, deviceAdded: 5 });
     expect(steps[1]?.state.deviceUnderruns).toBe(15);
-    expect(steps[2]).toMatchObject({ toast: false, flashing: false, added: 0 });
+    expect(steps[2]).toMatchObject({ toast: false, flashing: false, deviceAdded: 0 });
   });
 
   it('holds a rise after the first start on a system, but not after a second', () => {
@@ -221,8 +222,8 @@ describe('the cold-start settling window', () => {
       { system: sys, playing: true, count: 4, ms: second },
       { system: sys, playing: true, count: 6, ms: second + 500 },
     ]);
-    expect(steps[2]).toMatchObject({ toast: false, flashing: false, added: 4 });
-    expect(steps[5]).toMatchObject({ toast: true, flashing: true, added: 2 });
+    expect(steps[2]).toMatchObject({ toast: false, flashing: false, deviceAdded: 4 });
+    expect(steps[5]).toMatchObject({ toast: true, flashing: true, deviceAdded: 2 });
   });
 
   it('opens a fresh window on a new system mid-session, and another on its first start', () => {
@@ -240,7 +241,7 @@ describe('the cold-start settling window', () => {
       { system: c, playing: true, count: 9, ms: t + 30_000 + SETTLE + 1 },
     ]);
     expect(steps.slice(0, 7).some((s) => s.toast || s.flashing)).toBe(false);
-    expect(steps[7]).toMatchObject({ toast: true, flashing: true, added: 1 });
+    expect(steps[7]).toMatchObject({ toast: true, flashing: true, deviceAdded: 1 });
   });
 
   it('toasts a rise at settle + 1 ms and holds one at settle - 1 ms', () => {
@@ -265,7 +266,7 @@ describe('the cold-start settling window', () => {
     const firstToast = steps.findIndex((s) => s.toast);
     expect(readings[firstToast]?.ms).toBe(SETTLE);
     expect(steps.slice(0, firstToast).some((s) => s.flashing)).toBe(false);
-    expect(steps[firstToast]?.added).toBe(1);
+    expect(steps[firstToast]?.deviceAdded).toBe(1);
   });
 
   it('keeps the first-reading baseline and adds nothing for a falling count', () => {
@@ -274,7 +275,34 @@ describe('the cold-start settling window', () => {
       { system: sys, playing: false, count: 40, ms: 0 },
       { system: sys, playing: false, count: 2, ms: SETTLE + 500 },
     ]);
-    expect(steps[0]).toMatchObject({ toast: false, added: 0 });
-    expect(steps[1]).toMatchObject({ toast: false, flashing: false, added: 0 });
+    expect(steps[0]).toMatchObject({ toast: false, deviceAdded: 0 });
+    expect(steps[1]).toMatchObject({ toast: false, flashing: false, deviceAdded: 0 });
+  });
+});
+
+describe('overrunMessage', () => {
+  const dsp = (n: string): string =>
+    `audio overrun: the DSP missed ${n} — this song is at the CPU's limit`;
+  const dropout = (n: string): string =>
+    `audio dropout: the output ran dry ${n} — the audio thread fell behind`;
+
+  it('names the DSP whenever its count rose, counting its rise alone', () => {
+    expect(overrunMessage({ dspAdded: 1, deviceAdded: 0 })).toBe(dsp('a deadline'));
+    expect(overrunMessage({ dspAdded: 3, deviceAdded: 5 })).toBe(dsp('3 deadlines'));
+  });
+
+  it('names an output dropout when only the device count rose', () => {
+    expect(overrunMessage({ dspAdded: 0, deviceAdded: 1 })).toBe(dropout('once'));
+    expect(overrunMessage({ dspAdded: 0, deviceAdded: 4 })).toBe(dropout('4 times'));
+  });
+
+  it('only ever gives the DSP sentence where the device count is unknown', () => {
+    const steps = run([
+      [0, 0],
+      [1, 250],
+      [4, 250 + CPU_METER_TOAST_GAP_MS],
+    ]);
+    const messages = steps.filter((s) => s.toast).map(overrunMessage);
+    expect(messages).toEqual([dsp('a deadline'), dsp('3 deadlines')]);
   });
 });
