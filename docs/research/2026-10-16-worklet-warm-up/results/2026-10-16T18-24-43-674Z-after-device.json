@@ -1,0 +1,1320 @@
+{
+  "environment": {
+    "cpu": "Apple M4 Pro",
+    "cores": 14,
+    "kernel": "25.5.0",
+    "arch": "arm64",
+    "node": "v24.16.0",
+    "chromeVersion": "Google Chrome 155.0.8059.80",
+    "commit": "5a31f336dd6d117e502c8a14f0df33cafdb4c402",
+    "runs": 6,
+    "cases": [
+      "bench",
+      "drums"
+    ],
+    "rate": null,
+    "label": "after-device",
+    "bundles": "worktree",
+    "started": "2026-10-16T18:24:43.674Z",
+    "finished": "2026-10-16T18:27:48.316Z"
+  },
+  "results": [
+    {
+      "name": "bench",
+      "run": 0,
+      "load1": 8.75537109375,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58,
+        "dsp": 0,
+        "ms": 51.19999980926514
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 3,
+          "worstUs": 3788,
+          "renderMs": 758.257,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.164,
+            "V8.DeserializeContext": 0.109,
+            "V8.CompileScript": 6.472999999999999,
+            "V8.CompileCode": 16.299999999999955,
+            "V8.ParseProgram": 5.7280000000000015,
+            "V8.PreParse": 4.120999999999956,
+            "V8.Compile": 0.6750000000000002,
+            "V8.CompileIgnition": 3.561999999999962,
+            "V8.CompileIgnitionFinalization": 0.5290000000000004,
+            "V8.ParseFunction": 4.917999999999968,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09000000000000007,
+            "FlushInstructionCache": 1.912999999999918,
+            "V8.GCScavenger": 3.999,
+            "V8.MarkCandidatesForOptimization": 0.17900000000000013,
+            "V8.MaglevConcurrentPrepare": 0.12000000000000009,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.2159999999999958,
+            "V8.MaglevConcurrentFinalize": 2.0379999999999967,
+            "V8.Maglev.CodeGeneration": 0.08900000000000007,
+            "V8.Maglev.CommittingDependencies": 1.1229999999999996,
+            "V8.DeoptimizeCode": 0.16200000000000006,
+            "V8.OptimizeCode": 0.8420000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.46200000000000035,
+            "V8.InstallOptimizedFunctions": 1.9340000000000004,
+            "V8.OptimizeConcurrentFinalize": 1.4379999999999997
+          }
+        },
+        "first": {
+          "quanta": 1378,
+          "overBudget": 0,
+          "worstUs": 2522,
+          "renderMs": 1849.409,
+          "compileMs": {
+            "V8.CompileCode": 0.11800000000000001,
+            "V8.ParseFunction": 0.055,
+            "V8.CompileIgnition": 0.032,
+            "V8.CompileIgnitionFinalization": 0.005,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.005,
+            "FlushInstructionCache": 0.17300000000000013,
+            "V8.DeoptimizeCode": 0.10500000000000004,
+            "V8.MaglevConcurrentPrepare": 0.03300000000000002,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.5950000000000004,
+            "V8.MaglevConcurrentFinalize": 0.5390000000000004,
+            "V8.Maglev.CommittingDependencies": 0.2930000000000002,
+            "V8.MarkCandidatesForOptimization": 0.04600000000000003,
+            "V8.Maglev.CodeGeneration": 0.02000000000000001,
+            "V8.OptimizeCode": 0.6620000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.39600000000000024,
+            "V8.InstallOptimizedFunctions": 1.7789999999999997,
+            "V8.OptimizeConcurrentFinalize": 1.3820000000000001,
+            "V8.GCScavenger": 0.379
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 2,
+          "worstUs": 4303,
+          "renderMs": 1860.729,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.014000000000000002,
+            "V8.MaglevConcurrentPrepare": 0.009000000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.12200000000000001,
+            "V8.MaglevConcurrentFinalize": 0.111,
+            "V8.Maglev.CodeGeneration": 0.005,
+            "V8.Maglev.CommittingDependencies": 0.06700000000000002,
+            "V8.DeoptimizeCode": 0.024000000000000004,
+            "FlushInstructionCache": 0.023000000000000007,
+            "V8.OptimizeCode": 0.091,
+            "V8.OptimizeConcurrentPrepare": 0.054000000000000006,
+            "V8.InstallOptimizedFunctions": 0.252,
+            "V8.OptimizeConcurrentFinalize": 0.21400000000000002,
+            "V8.GCScavenger": 0.33299999999999996,
+            "V8.CompileCode": 0.083,
+            "V8.ParseFunction": 0.036,
+            "V8.CompileIgnition": 0.026000000000000002,
+            "V8.CompileIgnitionFinalization": 0.004
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 0,
+      "load1": 7.3388671875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58.1,
+        "dsp": 0,
+        "ms": 51.69999980926514
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1044,
+          "overBudget": 4,
+          "worstUs": 3870,
+          "renderMs": 770.165,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.171,
+            "V8.DeserializeContext": 0.108,
+            "V8.CompileScript": 6.265000000000001,
+            "V8.CompileCode": 16.48499999999996,
+            "V8.ParseProgram": 5.5169999999999995,
+            "V8.PreParse": 3.9889999999999577,
+            "V8.Compile": 0.6769999999999999,
+            "V8.CompileIgnition": 3.7149999999999634,
+            "V8.CompileIgnitionFinalization": 0.5080000000000002,
+            "V8.ParseFunction": 5.1369999999999685,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09300000000000007,
+            "FlushInstructionCache": 1.9929999999999082,
+            "V8.GCScavenger": 4.739000000000001,
+            "V8.MaglevConcurrentPrepare": 0.10900000000000008,
+            "V8.MarkCandidatesForOptimization": 0.19000000000000014,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.3829999999999947,
+            "V8.MaglevConcurrentFinalize": 2.173999999999995,
+            "V8.Maglev.CommittingDependencies": 1.1619999999999995,
+            "V8.DeoptimizeCode": 0.18300000000000008,
+            "V8.Maglev.CodeGeneration": 0.09500000000000007,
+            "V8.OptimizeCode": 0.7810000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.43000000000000027,
+            "V8.InstallOptimizedFunctions": 1.903,
+            "V8.OptimizeConcurrentFinalize": 1.4150000000000005
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 0,
+          "worstUs": 1753,
+          "renderMs": 1544.496,
+          "compileMs": {
+            "V8.CompileCode": 0.221,
+            "V8.ParseFunction": 0.10500000000000001,
+            "V8.CompileIgnition": 0.06999999999999999,
+            "V8.CompileIgnitionFinalization": 0.008,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.004,
+            "FlushInstructionCache": 0.1390000000000001,
+            "V8.DeoptimizeCode": 0.08400000000000003,
+            "V8.MarkCandidatesForOptimization": 0.055000000000000035,
+            "V8.MaglevConcurrentPrepare": 0.03400000000000002,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.4860000000000002,
+            "V8.MaglevConcurrentFinalize": 0.4390000000000002,
+            "V8.Maglev.CodeGeneration": 0.016000000000000007,
+            "V8.Maglev.CommittingDependencies": 0.2350000000000001,
+            "V8.OptimizeCode": 0.6060000000000004,
+            "V8.OptimizeConcurrentPrepare": 0.3540000000000002,
+            "V8.InstallOptimizedFunctions": 1.7519999999999996,
+            "V8.OptimizeConcurrentFinalize": 1.1820000000000004,
+            "V8.GCScavenger": 0.316
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 1,
+          "worstUs": 3086,
+          "renderMs": 1499.963,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.022000000000000006,
+            "V8.MaglevConcurrentPrepare": 0.016,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.14800000000000002,
+            "V8.MaglevConcurrentFinalize": 0.128,
+            "V8.Maglev.CommittingDependencies": 0.06,
+            "V8.OptimizeCode": 0.16599999999999998,
+            "V8.OptimizeConcurrentPrepare": 0.105,
+            "V8.InstallOptimizedFunctions": 0.30900000000000005,
+            "V8.OptimizeConcurrentFinalize": 0.25199999999999995,
+            "FlushInstructionCache": 0.020000000000000004,
+            "V8.Maglev.CodeGeneration": 0.006
+          }
+        }
+      }
+    },
+    {
+      "name": "bench",
+      "run": 1,
+      "load1": 6.44482421875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 9,
+        "deviceMs": 52.2,
+        "dsp": 0,
+        "ms": 50.60000038146973
+      },
+      "first": {
+        "device": 2,
+        "deviceMs": 11.699999999999996,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1042,
+          "overBudget": 1,
+          "worstUs": 4756,
+          "renderMs": 849.713,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.171,
+            "V8.DeserializeContext": 0.094,
+            "V8.CompileScript": 6.649,
+            "V8.CompileCode": 16.718999999999962,
+            "V8.ParseProgram": 5.828000000000001,
+            "V8.PreParse": 4.19399999999996,
+            "V8.Compile": 0.7460000000000001,
+            "V8.CompileIgnition": 3.675999999999963,
+            "V8.CompileIgnitionFinalization": 0.5140000000000002,
+            "V8.ParseFunction": 5.066999999999973,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.10000000000000007,
+            "FlushInstructionCache": 1.885999999999919,
+            "V8.GCScavenger": 4.170000000000001,
+            "V8.MarkCandidatesForOptimization": 0.17100000000000012,
+            "V8.MaglevConcurrentPrepare": 0.11100000000000008,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.236999999999997,
+            "V8.MaglevConcurrentFinalize": 2.038999999999998,
+            "V8.Maglev.CodeGeneration": 0.07800000000000006,
+            "V8.Maglev.CommittingDependencies": 1.1240000000000006,
+            "V8.DeoptimizeCode": 0.18000000000000005,
+            "V8.OptimizeCode": 0.8170000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.4410000000000003,
+            "V8.InstallOptimizedFunctions": 2.223,
+            "V8.OptimizeConcurrentFinalize": 1.4980000000000004
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 2,
+          "worstUs": 6957,
+          "renderMs": 1925.136,
+          "compileMs": {
+            "V8.CompileCode": 0.254,
+            "V8.ParseFunction": 0.104,
+            "V8.CompileIgnition": 0.07100000000000001,
+            "V8.CompileIgnitionFinalization": 0.016,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.008,
+            "FlushInstructionCache": 0.19700000000000015,
+            "V8.DeoptimizeCode": 0.1940000000000001,
+            "V8.MaglevConcurrentPrepare": 0.04500000000000003,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.8670000000000005,
+            "V8.MaglevConcurrentFinalize": 0.8000000000000005,
+            "V8.Maglev.CommittingDependencies": 0.41700000000000026,
+            "V8.MarkCandidatesForOptimization": 0.06900000000000005,
+            "V8.Maglev.CodeGeneration": 0.037000000000000026,
+            "V8.OptimizeCode": 0.6920000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.4220000000000003,
+            "V8.InstallOptimizedFunctions": 1.8739999999999994,
+            "V8.OptimizeConcurrentFinalize": 1.353,
+            "V8.GCScavenger": 0.53
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 1,
+          "worstUs": 3000,
+          "renderMs": 1881.059,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.019000000000000003,
+            "V8.MaglevConcurrentPrepare": 0.006,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.11,
+            "V8.MaglevConcurrentFinalize": 0.09999999999999999,
+            "V8.Maglev.CommittingDependencies": 0.06100000000000001,
+            "V8.DeoptimizeCode": 0.024000000000000004,
+            "FlushInstructionCache": 0.028000000000000004,
+            "V8.OptimizeCode": 0.098,
+            "V8.OptimizeConcurrentPrepare": 0.057999999999999996,
+            "V8.InstallOptimizedFunctions": 0.31100000000000005,
+            "V8.OptimizeConcurrentFinalize": 0.255,
+            "V8.GCScavenger": 0.28400000000000003,
+            "V8.CompileCode": 0.07100000000000001,
+            "V8.ParseFunction": 0.032,
+            "V8.CompileIgnition": 0.024,
+            "V8.CompileIgnitionFinalization": 0.002,
+            "V8.Maglev.CodeGeneration": 0.001
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 1,
+      "load1": 5.0966796875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 11,
+        "deviceMs": 63.9,
+        "dsp": 0,
+        "ms": 51.40000057220459
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 3,
+          "worstUs": 3703,
+          "renderMs": 850.943,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.175,
+            "V8.DeserializeContext": 0.114,
+            "V8.CompileScript": 6.471,
+            "V8.CompileCode": 16.534999999999954,
+            "V8.ParseProgram": 5.74,
+            "V8.PreParse": 4.163999999999955,
+            "V8.Compile": 0.6620000000000001,
+            "V8.CompileIgnition": 3.668999999999961,
+            "V8.CompileIgnitionFinalization": 0.49800000000000033,
+            "V8.ParseFunction": 5.088999999999967,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09100000000000007,
+            "FlushInstructionCache": 2.064999999999903,
+            "V8.GCScavenger": 5.092,
+            "V8.MarkCandidatesForOptimization": 0.17900000000000013,
+            "V8.MaglevConcurrentPrepare": 0.1300000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.3749999999999942,
+            "V8.MaglevConcurrentFinalize": 2.1499999999999955,
+            "V8.Maglev.CommittingDependencies": 1.1589999999999994,
+            "V8.DeoptimizeCode": 0.19400000000000006,
+            "V8.Maglev.CodeGeneration": 0.07700000000000005,
+            "V8.OptimizeCode": 0.8320000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.48000000000000026,
+            "V8.InstallOptimizedFunctions": 2.274,
+            "V8.OptimizeConcurrentFinalize": 1.5040000000000002
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 1,
+          "worstUs": 3032,
+          "renderMs": 1667.422,
+          "compileMs": {
+            "V8.CompileCode": 0.28300000000000003,
+            "V8.ParseFunction": 0.127,
+            "V8.CompileIgnition": 0.08100000000000002,
+            "V8.CompileIgnitionFinalization": 0.009000000000000001,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.004,
+            "V8.DeoptimizeCode": 0.16300000000000003,
+            "FlushInstructionCache": 0.16000000000000011,
+            "V8.MarkCandidatesForOptimization": 0.052000000000000025,
+            "V8.MaglevConcurrentPrepare": 0.03400000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.5250000000000002,
+            "V8.MaglevConcurrentFinalize": 0.48300000000000026,
+            "V8.Maglev.CodeGeneration": 0.013000000000000005,
+            "V8.Maglev.CommittingDependencies": 0.2700000000000001,
+            "V8.OptimizeCode": 0.5650000000000004,
+            "V8.OptimizeConcurrentPrepare": 0.3390000000000002,
+            "V8.InstallOptimizedFunctions": 1.665,
+            "V8.OptimizeConcurrentFinalize": 1.2660000000000002,
+            "V8.GCScavenger": 0.349
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 0,
+          "worstUs": 1847,
+          "renderMs": 1595.728,
+          "compileMs": {
+            "V8.OptimizeCode": 0.16899999999999998,
+            "V8.OptimizeConcurrentPrepare": 0.104,
+            "V8.InstallOptimizedFunctions": 0.302,
+            "V8.OptimizeConcurrentFinalize": 0.251,
+            "FlushInstructionCache": 0.025,
+            "V8.MarkCandidatesForOptimization": 0.021000000000000005,
+            "V8.MaglevConcurrentPrepare": 0.019000000000000003,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.18600000000000003,
+            "V8.MaglevConcurrentFinalize": 0.171,
+            "V8.Maglev.CodeGeneration": 0.009000000000000001,
+            "V8.Maglev.CommittingDependencies": 0.08
+          }
+        }
+      }
+    },
+    {
+      "name": "bench",
+      "run": 2,
+      "load1": 4.7119140625,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58,
+        "dsp": 0,
+        "ms": 50.5
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 5,
+          "worstUs": 4216,
+          "renderMs": 753.814,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.172,
+            "V8.DeserializeContext": 0.109,
+            "V8.CompileScript": 6.305000000000001,
+            "V8.CompileCode": 16.290999999999958,
+            "V8.ParseProgram": 5.535,
+            "V8.PreParse": 3.9809999999999555,
+            "V8.Compile": 0.7000000000000001,
+            "V8.CompileIgnition": 3.649999999999961,
+            "V8.CompileIgnitionFinalization": 0.5310000000000004,
+            "V8.ParseFunction": 5.021999999999967,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09400000000000007,
+            "FlushInstructionCache": 1.85199999999992,
+            "V8.GCScavenger": 4.172000000000001,
+            "V8.MarkCandidatesForOptimization": 0.16200000000000012,
+            "V8.MaglevConcurrentPrepare": 0.11000000000000008,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.2649999999999957,
+            "V8.MaglevConcurrentFinalize": 2.035999999999997,
+            "V8.Maglev.CommittingDependencies": 1.1030000000000004,
+            "V8.DeoptimizeCode": 0.17800000000000005,
+            "V8.Maglev.CodeGeneration": 0.08000000000000006,
+            "V8.OptimizeCode": 0.7180000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.3870000000000003,
+            "V8.InstallOptimizedFunctions": 1.8810000000000004,
+            "V8.OptimizeConcurrentFinalize": 1.3990000000000005
+          }
+        },
+        "first": {
+          "quanta": 1378,
+          "overBudget": 2,
+          "worstUs": 4536,
+          "renderMs": 1898.82,
+          "compileMs": {
+            "V8.CompileCode": 0.209,
+            "V8.ParseFunction": 0.088,
+            "V8.CompileIgnition": 0.069,
+            "V8.CompileIgnitionFinalization": 0.01,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.008,
+            "FlushInstructionCache": 0.19600000000000015,
+            "V8.DeoptimizeCode": 0.16400000000000006,
+            "V8.MaglevConcurrentPrepare": 0.03800000000000003,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.7230000000000004,
+            "V8.MaglevConcurrentFinalize": 0.6550000000000004,
+            "V8.Maglev.CodeGeneration": 0.02400000000000001,
+            "V8.Maglev.CommittingDependencies": 0.3570000000000002,
+            "V8.MarkCandidatesForOptimization": 0.06700000000000005,
+            "V8.OptimizeCode": 0.6740000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.4160000000000003,
+            "V8.InstallOptimizedFunctions": 1.8769999999999993,
+            "V8.OptimizeConcurrentFinalize": 1.3619999999999999,
+            "V8.GCScavenger": 0.423
+          }
+        },
+        "second": {
+          "quanta": 1379,
+          "overBudget": 2,
+          "worstUs": 3138,
+          "renderMs": 1873.196,
+          "compileMs": {
+            "FlushInstructionCache": 0.06100000000000002,
+            "V8.MarkCandidatesForOptimization": 0.018000000000000002,
+            "V8.MaglevConcurrentPrepare": 0.007,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.094,
+            "V8.MaglevConcurrentFinalize": 0.08499999999999999,
+            "V8.Maglev.CodeGeneration": 0.004,
+            "V8.Maglev.CommittingDependencies": 0.051000000000000004,
+            "V8.DeoptimizeCode": 0.030000000000000002,
+            "V8.OptimizeCode": 0.099,
+            "V8.OptimizeConcurrentPrepare": 0.059,
+            "V8.InstallOptimizedFunctions": 0.315,
+            "V8.OptimizeConcurrentFinalize": 0.262,
+            "V8.GCScavenger": 0.381,
+            "V8.CompileCode": 0.065,
+            "V8.ParseFunction": 0.031,
+            "V8.CompileIgnition": 0.022,
+            "V8.CompileIgnitionFinalization": 0.002
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 2,
+      "load1": 4.11669921875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58,
+        "dsp": 0,
+        "ms": 51
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1041,
+          "overBudget": 1,
+          "worstUs": 3121,
+          "renderMs": 678.44,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.171,
+            "V8.DeserializeContext": 0.116,
+            "V8.CompileScript": 6.165000000000001,
+            "V8.CompileCode": 16.400999999999964,
+            "V8.ParseProgram": 5.4270000000000005,
+            "V8.PreParse": 3.8979999999999584,
+            "V8.Compile": 0.6710000000000002,
+            "V8.CompileIgnition": 3.6899999999999626,
+            "V8.CompileIgnitionFinalization": 0.4930000000000003,
+            "V8.ParseFunction": 5.09999999999997,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.10300000000000008,
+            "FlushInstructionCache": 2.0119999999999068,
+            "V8.GCScavenger": 4.539,
+            "V8.MarkCandidatesForOptimization": 0.18700000000000014,
+            "V8.MaglevConcurrentPrepare": 0.10600000000000008,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.3329999999999944,
+            "V8.MaglevConcurrentFinalize": 2.1079999999999957,
+            "V8.Maglev.CommittingDependencies": 1.1520000000000001,
+            "V8.DeoptimizeCode": 0.17800000000000005,
+            "V8.OptimizeCode": 0.7860000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.43600000000000033,
+            "V8.InstallOptimizedFunctions": 2.4400000000000004,
+            "V8.OptimizeConcurrentFinalize": 1.4849999999999999,
+            "V8.Maglev.CodeGeneration": 0.08100000000000006
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 0,
+          "worstUs": 1685,
+          "renderMs": 1538.976,
+          "compileMs": {
+            "V8.CompileCode": 0.18000000000000002,
+            "V8.ParseFunction": 0.08700000000000001,
+            "V8.CompileIgnition": 0.056,
+            "V8.CompileIgnitionFinalization": 0.004,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.004,
+            "FlushInstructionCache": 0.12700000000000009,
+            "V8.DeoptimizeCode": 0.06600000000000002,
+            "V8.MaglevConcurrentPrepare": 0.02700000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.4080000000000002,
+            "V8.MaglevConcurrentFinalize": 0.3770000000000001,
+            "V8.Maglev.CommittingDependencies": 0.19600000000000006,
+            "V8.Maglev.CodeGeneration": 0.017000000000000008,
+            "V8.MarkCandidatesForOptimization": 0.04300000000000003,
+            "V8.OptimizeCode": 0.5430000000000004,
+            "V8.OptimizeConcurrentPrepare": 0.33900000000000025,
+            "V8.InstallOptimizedFunctions": 1.5499999999999998,
+            "V8.OptimizeConcurrentFinalize": 1.2160000000000002,
+            "V8.GCScavenger": 0.647
+          }
+        },
+        "second": {
+          "quanta": 1380,
+          "overBudget": 0,
+          "worstUs": 1845,
+          "renderMs": 1538.546,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.021000000000000005,
+            "V8.OptimizeCode": 0.16399999999999998,
+            "V8.OptimizeConcurrentPrepare": 0.102,
+            "V8.InstallOptimizedFunctions": 0.29900000000000004,
+            "V8.OptimizeConcurrentFinalize": 0.245,
+            "FlushInstructionCache": 0.019000000000000003,
+            "V8.MaglevConcurrentPrepare": 0.016,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.14700000000000002,
+            "V8.MaglevConcurrentFinalize": 0.128,
+            "V8.Maglev.CodeGeneration": 0.010000000000000002,
+            "V8.Maglev.CommittingDependencies": 0.064
+          }
+        }
+      }
+    },
+    {
+      "name": "bench",
+      "run": 3,
+      "load1": 3.94873046875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 9,
+        "deviceMs": 52.3,
+        "dsp": 0,
+        "ms": 51
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1041,
+          "overBudget": 2,
+          "worstUs": 4005,
+          "renderMs": 905.123,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.127,
+            "V8.DeserializeContext": 0.09,
+            "V8.CompileScript": 6.521,
+            "V8.CompileCode": 16.39999999999994,
+            "V8.ParseProgram": 5.757,
+            "V8.PreParse": 4.174999999999955,
+            "V8.Compile": 0.6910000000000001,
+            "V8.CompileIgnition": 3.6009999999999667,
+            "V8.CompileIgnitionFinalization": 0.5290000000000004,
+            "V8.ParseFunction": 4.956999999999972,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09300000000000007,
+            "FlushInstructionCache": 1.9499999999999098,
+            "V8.GCScavenger": 4.265,
+            "V8.MarkCandidatesForOptimization": 0.19100000000000014,
+            "V8.MaglevConcurrentPrepare": 0.11800000000000009,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.3739999999999957,
+            "V8.MaglevConcurrentFinalize": 2.1509999999999967,
+            "V8.Maglev.CommittingDependencies": 1.2099999999999993,
+            "V8.DeoptimizeCode": 0.1660000000000001,
+            "V8.OptimizeCode": 0.7880000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.42900000000000027,
+            "V8.InstallOptimizedFunctions": 1.9790000000000003,
+            "V8.OptimizeConcurrentFinalize": 1.4080000000000004,
+            "V8.Maglev.CodeGeneration": 0.07600000000000005
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 1,
+          "worstUs": 3654,
+          "renderMs": 1928.945,
+          "compileMs": {
+            "V8.InstallOptimizedFunctions": 1.8479999999999996,
+            "V8.OptimizeConcurrentFinalize": 1.4259999999999997,
+            "FlushInstructionCache": 0.18800000000000014,
+            "V8.CompileCode": 0.212,
+            "V8.ParseFunction": 0.093,
+            "V8.CompileIgnition": 0.061,
+            "V8.CompileIgnitionFinalization": 0.009000000000000001,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.009000000000000001,
+            "V8.DeoptimizeCode": 0.15900000000000009,
+            "V8.MarkCandidatesForOptimization": 0.058000000000000045,
+            "V8.MaglevConcurrentPrepare": 0.048000000000000036,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.7530000000000004,
+            "V8.MaglevConcurrentFinalize": 0.6860000000000004,
+            "V8.Maglev.CodeGeneration": 0.026000000000000016,
+            "V8.Maglev.CommittingDependencies": 0.3710000000000002,
+            "V8.OptimizeCode": 0.6370000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.3870000000000003,
+            "V8.GCScavenger": 0.617
+          }
+        },
+        "second": {
+          "quanta": 1379,
+          "overBudget": 2,
+          "worstUs": 4060,
+          "renderMs": 1906.87,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.016,
+            "V8.MaglevConcurrentPrepare": 0.009000000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.129,
+            "V8.MaglevConcurrentFinalize": 0.11600000000000002,
+            "V8.Maglev.CodeGeneration": 0.005,
+            "V8.Maglev.CommittingDependencies": 0.07100000000000001,
+            "V8.DeoptimizeCode": 0.029,
+            "FlushInstructionCache": 0.023000000000000013,
+            "V8.OptimizeCode": 0.08399999999999999,
+            "V8.OptimizeConcurrentPrepare": 0.048,
+            "V8.InstallOptimizedFunctions": 0.25,
+            "V8.OptimizeConcurrentFinalize": 0.201,
+            "V8.GCScavenger": 0.247,
+            "V8.CompileCode": 0.09,
+            "V8.ParseFunction": 0.043,
+            "V8.CompileIgnition": 0.027000000000000003,
+            "V8.CompileIgnitionFinalization": 0.004
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 3,
+      "load1": 3.51611328125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 11,
+        "deviceMs": 63.9,
+        "dsp": 0,
+        "ms": 51.80000019073486
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1041,
+          "overBudget": 5,
+          "worstUs": 3418,
+          "renderMs": 801.245,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.165,
+            "V8.DeserializeContext": 0.116,
+            "V8.CompileScript": 6.2509999999999994,
+            "V8.CompileCode": 16.35999999999995,
+            "V8.ParseProgram": 5.468,
+            "V8.PreParse": 3.9889999999999586,
+            "V8.Compile": 0.7140000000000001,
+            "V8.CompileIgnition": 3.635999999999965,
+            "V8.CompileIgnitionFinalization": 0.5660000000000004,
+            "V8.ParseFunction": 5.071999999999975,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.08100000000000006,
+            "FlushInstructionCache": 2.0519999999999015,
+            "V8.GCScavenger": 4.472,
+            "V8.MaglevConcurrentPrepare": 0.12500000000000008,
+            "V8.MarkCandidatesForOptimization": 0.21500000000000016,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.3429999999999946,
+            "V8.MaglevConcurrentFinalize": 2.1299999999999946,
+            "V8.Maglev.CodeGeneration": 0.08100000000000006,
+            "V8.Maglev.CommittingDependencies": 1.1779999999999993,
+            "V8.DeoptimizeCode": 0.16300000000000003,
+            "V8.OptimizeCode": 0.7690000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.42400000000000027,
+            "V8.InstallOptimizedFunctions": 1.8940000000000001,
+            "V8.OptimizeConcurrentFinalize": 1.3660000000000003
+          }
+        },
+        "first": {
+          "quanta": 1380,
+          "overBudget": 0,
+          "worstUs": 2184,
+          "renderMs": 1639.219,
+          "compileMs": {
+            "V8.CompileCode": 0.289,
+            "V8.ParseFunction": 0.13799999999999998,
+            "V8.CompileIgnition": 0.08600000000000001,
+            "V8.CompileIgnitionFinalization": 0.010000000000000002,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.006,
+            "FlushInstructionCache": 0.1480000000000001,
+            "V8.DeoptimizeCode": 0.10200000000000004,
+            "V8.MarkCandidatesForOptimization": 0.04200000000000002,
+            "V8.MaglevConcurrentPrepare": 0.033000000000000015,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.5340000000000003,
+            "V8.MaglevConcurrentFinalize": 0.48400000000000026,
+            "V8.Maglev.CommittingDependencies": 0.25700000000000006,
+            "V8.Maglev.CodeGeneration": 0.01800000000000001,
+            "V8.OptimizeCode": 0.5790000000000004,
+            "V8.OptimizeConcurrentPrepare": 0.3630000000000002,
+            "V8.InstallOptimizedFunctions": 1.626,
+            "V8.OptimizeConcurrentFinalize": 1.2480000000000002,
+            "V8.GCScavenger": 0.296
+          }
+        },
+        "second": {
+          "quanta": 1379,
+          "overBudget": 0,
+          "worstUs": 1895,
+          "renderMs": 1558.51,
+          "compileMs": {
+            "V8.OptimizeCode": 0.179,
+            "V8.OptimizeConcurrentPrepare": 0.11699999999999999,
+            "V8.InstallOptimizedFunctions": 0.277,
+            "V8.OptimizeConcurrentFinalize": 0.22399999999999998,
+            "FlushInstructionCache": 0.018000000000000002,
+            "V8.MaglevConcurrentPrepare": 0.017,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.16,
+            "V8.MaglevConcurrentFinalize": 0.143,
+            "V8.Maglev.CodeGeneration": 0.005,
+            "V8.Maglev.CommittingDependencies": 0.068,
+            "V8.MarkCandidatesForOptimization": 0.014
+          }
+        }
+      }
+    },
+    {
+      "name": "bench",
+      "run": 4,
+      "load1": 7.86474609375,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58.1,
+        "dsp": 0,
+        "ms": 50.5
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 2,
+          "worstUs": 4400,
+          "renderMs": 854.352,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.168,
+            "V8.DeserializeContext": 0.114,
+            "V8.CompileScript": 6.523,
+            "V8.CompileCode": 16.36199999999996,
+            "V8.ParseProgram": 5.773000000000001,
+            "V8.PreParse": 4.182999999999957,
+            "V8.Compile": 0.678,
+            "V8.CompileIgnition": 3.566999999999963,
+            "V8.CompileIgnitionFinalization": 0.4930000000000003,
+            "V8.ParseFunction": 4.9579999999999735,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.09600000000000007,
+            "FlushInstructionCache": 1.8959999999999189,
+            "V8.GCScavenger": 4.264,
+            "V8.MarkCandidatesForOptimization": 0.17400000000000013,
+            "V8.MaglevConcurrentPrepare": 0.11400000000000007,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.277999999999997,
+            "V8.MaglevConcurrentFinalize": 2.071999999999997,
+            "V8.Maglev.CommittingDependencies": 1.1410000000000005,
+            "V8.DeoptimizeCode": 0.18000000000000005,
+            "V8.OptimizeCode": 0.7380000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.40200000000000025,
+            "V8.InstallOptimizedFunctions": 2.1870000000000007,
+            "V8.OptimizeConcurrentFinalize": 1.4260000000000002,
+            "V8.Maglev.CodeGeneration": 0.08100000000000006
+          }
+        },
+        "first": {
+          "quanta": 1380,
+          "overBudget": 2,
+          "worstUs": 3291,
+          "renderMs": 1908.662,
+          "compileMs": {
+            "V8.CompileCode": 0.22500000000000003,
+            "V8.ParseFunction": 0.095,
+            "V8.CompileIgnition": 0.06499999999999999,
+            "V8.CompileIgnitionFinalization": 0.008,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.007,
+            "FlushInstructionCache": 0.20300000000000015,
+            "V8.DeoptimizeCode": 0.15500000000000005,
+            "V8.MarkCandidatesForOptimization": 0.046000000000000034,
+            "V8.MaglevConcurrentPrepare": 0.03800000000000002,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.7390000000000004,
+            "V8.MaglevConcurrentFinalize": 0.6630000000000005,
+            "V8.Maglev.CodeGeneration": 0.023000000000000013,
+            "V8.Maglev.CommittingDependencies": 0.3750000000000002,
+            "V8.OptimizeCode": 0.6440000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.3890000000000003,
+            "V8.InstallOptimizedFunctions": 1.7400000000000002,
+            "V8.OptimizeConcurrentFinalize": 1.3319999999999999,
+            "V8.GCScavenger": 0.512
+          }
+        },
+        "second": {
+          "quanta": 1379,
+          "overBudget": 2,
+          "worstUs": 4024,
+          "renderMs": 1873.88,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.016,
+            "V8.MaglevConcurrentPrepare": 0.005,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.13300000000000003,
+            "V8.MaglevConcurrentFinalize": 0.11900000000000002,
+            "V8.Maglev.CommittingDependencies": 0.065,
+            "V8.DeoptimizeCode": 0.028,
+            "FlushInstructionCache": 0.031000000000000007,
+            "V8.Maglev.CodeGeneration": 0.002,
+            "V8.OptimizeCode": 0.08399999999999999,
+            "V8.OptimizeConcurrentPrepare": 0.05,
+            "V8.InstallOptimizedFunctions": 0.244,
+            "V8.OptimizeConcurrentFinalize": 0.202,
+            "V8.GCScavenger": 0.317,
+            "V8.CompileCode": 0.074,
+            "V8.ParseFunction": 0.033,
+            "V8.CompileIgnition": 0.020999999999999998,
+            "V8.CompileIgnitionFinalization": 0.001
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 4,
+      "load1": 6.95166015625,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.6,
+        "dsp": 0,
+        "ms": 52.60000038146973
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 5,
+          "worstUs": 4435,
+          "renderMs": 937.681,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.173,
+            "V8.DeserializeContext": 0.119,
+            "V8.CompileScript": 6.271999999999999,
+            "V8.CompileCode": 16.489999999999956,
+            "V8.ParseProgram": 5.510000000000001,
+            "V8.PreParse": 3.981999999999958,
+            "V8.Compile": 0.6920000000000002,
+            "V8.CompileIgnition": 3.7099999999999635,
+            "V8.CompileIgnitionFinalization": 0.5410000000000004,
+            "V8.ParseFunction": 5.131999999999959,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.10600000000000007,
+            "FlushInstructionCache": 1.9749999999999117,
+            "V8.GCScavenger": 4.380000000000001,
+            "V8.MaglevConcurrentPrepare": 0.11100000000000008,
+            "V8.MarkCandidatesForOptimization": 0.20500000000000015,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.512999999999993,
+            "V8.MaglevConcurrentFinalize": 2.254999999999997,
+            "V8.Maglev.CodeGeneration": 0.08500000000000006,
+            "V8.Maglev.CommittingDependencies": 1.2559999999999998,
+            "V8.DeoptimizeCode": 0.19600000000000006,
+            "V8.OptimizeCode": 0.8030000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.42900000000000027,
+            "V8.InstallOptimizedFunctions": 2.0140000000000002,
+            "V8.OptimizeConcurrentFinalize": 1.4990000000000003
+          }
+        },
+        "first": {
+          "quanta": 1379,
+          "overBudget": 0,
+          "worstUs": 2217,
+          "renderMs": 1669.173,
+          "compileMs": {
+            "V8.CompileCode": 0.296,
+            "V8.ParseFunction": 0.132,
+            "V8.CompileIgnition": 0.08900000000000001,
+            "V8.CompileIgnitionFinalization": 0.009000000000000001,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.004,
+            "FlushInstructionCache": 0.1450000000000001,
+            "V8.DeoptimizeCode": 0.10500000000000004,
+            "V8.MarkCandidatesForOptimization": 0.05300000000000003,
+            "V8.MaglevConcurrentPrepare": 0.03700000000000002,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.5410000000000003,
+            "V8.MaglevConcurrentFinalize": 0.49400000000000027,
+            "V8.Maglev.CodeGeneration": 0.01900000000000001,
+            "V8.Maglev.CommittingDependencies": 0.26500000000000007,
+            "V8.OptimizeCode": 0.5650000000000004,
+            "V8.OptimizeConcurrentPrepare": 0.3480000000000002,
+            "V8.GCScavenger": 0.64,
+            "V8.InstallOptimizedFunctions": 1.6810000000000003,
+            "V8.OptimizeConcurrentFinalize": 1.2670000000000003
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 1,
+          "worstUs": 3085,
+          "renderMs": 1592.357,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.020000000000000004,
+            "V8.MaglevConcurrentPrepare": 0.019000000000000003,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.14700000000000002,
+            "V8.MaglevConcurrentFinalize": 0.13299999999999998,
+            "V8.Maglev.CodeGeneration": 0.007,
+            "V8.Maglev.CommittingDependencies": 0.053000000000000005,
+            "V8.OptimizeCode": 0.15700000000000003,
+            "V8.OptimizeConcurrentPrepare": 0.09599999999999999,
+            "V8.InstallOptimizedFunctions": 0.30800000000000005,
+            "V8.OptimizeConcurrentFinalize": 0.249,
+            "FlushInstructionCache": 0.019000000000000003,
+            "V8.GCScavenger": 0.312
+          }
+        }
+      }
+    },
+    {
+      "name": "bench",
+      "run": 5,
+      "load1": 6.22314453125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 10,
+        "deviceMs": 58,
+        "dsp": 0,
+        "ms": 51
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1043,
+          "overBudget": 3,
+          "worstUs": 4054,
+          "renderMs": 794.751,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.137,
+            "V8.DeserializeContext": 0.1,
+            "V8.CompileScript": 6.431000000000001,
+            "V8.CompileCode": 16.365999999999946,
+            "V8.ParseProgram": 5.619999999999999,
+            "V8.PreParse": 4.019999999999955,
+            "V8.Compile": 0.7360000000000001,
+            "V8.CompileIgnition": 3.622999999999962,
+            "V8.CompileIgnitionFinalization": 0.5930000000000003,
+            "V8.ParseFunction": 4.965999999999974,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.08600000000000006,
+            "FlushInstructionCache": 1.9359999999999118,
+            "V8.GCScavenger": 4.2299999999999995,
+            "V8.MaglevConcurrentPrepare": 0.1230000000000001,
+            "V8.MarkCandidatesForOptimization": 0.20800000000000013,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.187999999999997,
+            "V8.MaglevConcurrentFinalize": 1.983999999999997,
+            "V8.Maglev.CommittingDependencies": 1.1030000000000004,
+            "V8.DeoptimizeCode": 0.15700000000000003,
+            "V8.OptimizeCode": 0.8010000000000006,
+            "V8.OptimizeConcurrentPrepare": 0.4540000000000003,
+            "V8.InstallOptimizedFunctions": 2.0450000000000004,
+            "V8.OptimizeConcurrentFinalize": 1.5200000000000005,
+            "V8.Maglev.CodeGeneration": 0.08200000000000006
+          }
+        },
+        "first": {
+          "quanta": 1378,
+          "overBudget": 3,
+          "worstUs": 4903,
+          "renderMs": 1902.74,
+          "compileMs": {
+            "V8.CompileCode": 0.16799999999999998,
+            "V8.ParseFunction": 0.07500000000000001,
+            "V8.CompileIgnition": 0.048,
+            "V8.CompileIgnitionFinalization": 0.008,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.008,
+            "FlushInstructionCache": 0.18000000000000013,
+            "V8.DeoptimizeCode": 0.18300000000000008,
+            "V8.MaglevConcurrentPrepare": 0.06400000000000003,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.7610000000000005,
+            "V8.MaglevConcurrentFinalize": 0.6970000000000004,
+            "V8.Maglev.CommittingDependencies": 0.40100000000000025,
+            "V8.MarkCandidatesForOptimization": 0.05300000000000004,
+            "V8.Maglev.CodeGeneration": 0.023000000000000013,
+            "V8.OptimizeCode": 0.6520000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.40000000000000024,
+            "V8.InstallOptimizedFunctions": 1.9049999999999998,
+            "V8.OptimizeConcurrentFinalize": 1.403,
+            "V8.GCScavenger": 0.489
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 2,
+          "worstUs": 4415,
+          "renderMs": 1896.908,
+          "compileMs": {
+            "FlushInstructionCache": 0.04300000000000002,
+            "V8.MarkCandidatesForOptimization": 0.016,
+            "V8.MaglevConcurrentPrepare": 0.007,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.133,
+            "V8.MaglevConcurrentFinalize": 0.12000000000000002,
+            "V8.Maglev.CodeGeneration": 0.007,
+            "V8.Maglev.CommittingDependencies": 0.065,
+            "V8.DeoptimizeCode": 0.027,
+            "V8.OptimizeCode": 0.1,
+            "V8.OptimizeConcurrentPrepare": 0.06,
+            "V8.InstallOptimizedFunctions": 0.308,
+            "V8.OptimizeConcurrentFinalize": 0.252,
+            "V8.GCScavenger": 0.306,
+            "V8.CompileCode": 0.093,
+            "V8.ParseFunction": 0.040999999999999995,
+            "V8.CompileIgnition": 0.028999999999999998,
+            "V8.CompileIgnitionFinalization": 0.005
+          }
+        }
+      }
+    },
+    {
+      "name": "drums",
+      "run": 5,
+      "load1": 5.2001953125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 11,
+        "deviceMs": 63.8,
+        "dsp": 0,
+        "ms": 52.39999961853027
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "trace": {
+        "build": {
+          "quanta": 1044,
+          "overBudget": 3,
+          "worstUs": 3449,
+          "renderMs": 843.19,
+          "compileMs": {
+            "V8.DeserializeIsolate": 0.139,
+            "V8.DeserializeContext": 0.131,
+            "V8.CompileScript": 6.5280000000000005,
+            "V8.CompileCode": 16.700999999999954,
+            "V8.ParseProgram": 5.78,
+            "V8.PreParse": 4.178999999999958,
+            "V8.Compile": 0.676,
+            "V8.CompileIgnition": 3.678999999999964,
+            "V8.CompileIgnitionFinalization": 0.5100000000000003,
+            "V8.ParseFunction": 5.06899999999997,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.08300000000000006,
+            "FlushInstructionCache": 1.946999999999914,
+            "V8.GCScavenger": 4.817999999999999,
+            "V8.MarkCandidatesForOptimization": 0.19100000000000014,
+            "V8.MaglevConcurrentPrepare": 0.1310000000000001,
+            "V8.FinalizeMaglevConcurrentCompilation": 2.507999999999993,
+            "V8.MaglevConcurrentFinalize": 2.2779999999999947,
+            "V8.Maglev.CommittingDependencies": 1.2599999999999993,
+            "V8.DeoptimizeCode": 0.17900000000000005,
+            "V8.Maglev.CodeGeneration": 0.08800000000000006,
+            "V8.OptimizeCode": 0.7330000000000005,
+            "V8.OptimizeConcurrentPrepare": 0.3830000000000003,
+            "V8.InstallOptimizedFunctions": 2.009,
+            "V8.OptimizeConcurrentFinalize": 1.4620000000000002
+          }
+        },
+        "first": {
+          "quanta": 1378,
+          "overBudget": 0,
+          "worstUs": 1668,
+          "renderMs": 1626.685,
+          "compileMs": {
+            "V8.CompileCode": 0.18100000000000002,
+            "V8.ParseFunction": 0.082,
+            "V8.CompileIgnition": 0.057,
+            "V8.CompileIgnitionFinalization": 0.005,
+            "V8.FinalizeBaselineConcurrentCompilation": 0.003,
+            "FlushInstructionCache": 0.12600000000000008,
+            "V8.DeoptimizeCode": 0.06200000000000002,
+            "V8.MaglevConcurrentPrepare": 0.03300000000000002,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.3910000000000002,
+            "V8.MaglevConcurrentFinalize": 0.35700000000000015,
+            "V8.Maglev.CommittingDependencies": 0.19100000000000006,
+            "V8.MarkCandidatesForOptimization": 0.04100000000000002,
+            "V8.Maglev.CodeGeneration": 0.013000000000000005,
+            "V8.OptimizeCode": 0.5430000000000003,
+            "V8.OptimizeConcurrentPrepare": 0.3400000000000002,
+            "V8.InstallOptimizedFunctions": 1.784,
+            "V8.OptimizeConcurrentFinalize": 1.2060000000000004,
+            "V8.GCScavenger": 0.362
+          }
+        },
+        "second": {
+          "quanta": 1378,
+          "overBudget": 0,
+          "worstUs": 1777,
+          "renderMs": 1549.664,
+          "compileMs": {
+            "V8.MarkCandidatesForOptimization": 0.02,
+            "V8.MaglevConcurrentPrepare": 0.017,
+            "V8.FinalizeMaglevConcurrentCompilation": 0.141,
+            "V8.MaglevConcurrentFinalize": 0.124,
+            "V8.Maglev.CodeGeneration": 0.004,
+            "V8.Maglev.CommittingDependencies": 0.059,
+            "V8.OptimizeCode": 0.17700000000000002,
+            "V8.OptimizeConcurrentPrepare": 0.109,
+            "V8.InstallOptimizedFunctions": 0.28700000000000003,
+            "V8.OptimizeConcurrentFinalize": 0.23299999999999998,
+            "FlushInstructionCache": 0.019000000000000003
+          }
+        }
+      }
+    }
+  ]
+}

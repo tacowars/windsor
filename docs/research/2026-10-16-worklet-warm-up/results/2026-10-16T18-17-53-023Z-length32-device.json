@@ -1,0 +1,282 @@
+{
+  "environment": {
+    "cpu": "Apple M4 Pro",
+    "cores": 14,
+    "kernel": "25.5.0",
+    "arch": "arm64",
+    "node": "v24.16.0",
+    "chromeVersion": "Google Chrome 155.0.8059.80",
+    "commit": "0582ec72d67a521a8809f1854416592c2312706e",
+    "runs": 10,
+    "cases": [
+      "bench"
+    ],
+    "rate": null,
+    "label": "length32-device",
+    "bundles": "other",
+    "started": "2026-10-16T18:17:53.023Z",
+    "finished": "2026-10-16T18:20:19.400Z"
+  },
+  "results": [
+    {
+      "name": "bench",
+      "run": 0,
+      "load1": 3.4326171875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 11,
+        "deviceMs": 63.9,
+        "dsp": 0,
+        "ms": 50.30000019073486
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 1,
+      "load1": 3.1025390625,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 50.39999961853027
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 2,
+      "load1": 3.080078125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 49.89999961853027
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 3,
+      "load1": 2.6923828125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 49.09999942779541
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 4,
+      "load1": 3.203125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 49.39999961853027
+      },
+      "first": {
+        "device": 1,
+        "deviceMs": 5.700000000000003,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 5,
+      "load1": 4.28515625,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 50.69999980926514
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 6,
+      "load1": 7.40576171875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.7,
+        "dsp": 0,
+        "ms": 48.89999961853027
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 7,
+      "load1": 6.501953125,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 13,
+        "deviceMs": 75.5,
+        "dsp": 0,
+        "ms": 50.60000038146973
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 8,
+      "load1": 5.99072265625,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 12,
+        "deviceMs": 69.6,
+        "dsp": 0,
+        "ms": 49.60000038146973
+      },
+      "first": {
+        "device": 1,
+        "deviceMs": 5.900000000000006,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    },
+    {
+      "name": "bench",
+      "run": 9,
+      "load1": 5.9873046875,
+      "started": {
+        "sampleRate": 44100,
+        "baseLatency": 0.005804988662131519,
+        "state": "running"
+      },
+      "build": {
+        "device": 13,
+        "deviceMs": 75.4,
+        "dsp": 0,
+        "ms": 50.10000038146973
+      },
+      "first": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      },
+      "second": {
+        "device": 0,
+        "deviceMs": 0,
+        "dsp": 0
+      }
+    }
+  ]
+}
