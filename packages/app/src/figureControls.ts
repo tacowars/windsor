@@ -10,26 +10,30 @@
  * the turned cells, their velocities, ratchets and lane values with them,
  * and no offset; Randomize rerolls the line's cells over the chord's tones;
  * Reverse mirrors them, lanes with them (windsor#548). Length, Randomize and
- * Reverse replace what Rotate turned, so they rebase it. With a source those
- * four act on cells the part does not play, so the device greys them
- * (`.figure-own`) and `holdOwnControls` takes them out of reach: the buttons
- * disabled, the knobs inert, so neither Tab nor a key edits the hidden cells.
+ * Reverse replace what Rotate turned, so they rebase it. With a source
+ * (`cellsBorrowed`) those four act on cells the part does not play, so the
+ * device greys them (`.figure-own`) and `holdOwnControls` takes them out of
+ * reach: the buttons disabled, the knobs inert, so neither Tab nor a key
+ * edits the hidden cells. Randomize, Reverse and Reseed run the pattern
+ * actions the Song tab's region menu runs too (`patternActionRun.ts`,
+ * windsor#827), which turns the same two off on a canon.
  */
 import type { FigureSpec } from '@windsor/engine';
 import { DEFAULT_FIGURE_CONFIG } from '@windsor/engine';
 import { ICON_RESEED } from './arpCard';
-import { arpSeedChange, freshSeed, parseSeed } from './arpModel';
-import { regionChord } from './chordRegionChord';
+import { arpSeedChange, parseSeed } from './arpModel';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { divisorOptions } from './divisorLabels';
 import { el, select } from './dom';
-import { FIGURE_KNOB_COLUMNS, FIGURE_SUMMARY_STACK } from './figureConstants';
-import { cellsForLength, randomFigureCells, reverseFigure, rotateFigure } from './figureModel';
+import { FIGURE_KNOB_COLUMNS } from './figureConstants';
+import { cellsForLength, rotateFigure } from './figureModel';
 import { GRID_TURN_REBASED } from './gridModel';
 import { octaveKnob } from './harmonyTables';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import type { PatternAction } from './patternActionModel';
+import { runPatternAction } from './patternActionRun';
 import { tableKnob } from './seqFields';
 import { FIGURE_KNOBS, FIGURE_LENGTH_KNOB, FIGURE_ROTATE_KNOB } from './sequencerKnobTables';
 import { railIcon, railSvg } from './sequencerRail';
@@ -52,6 +56,11 @@ function write(target: FigureTarget, fields: Record<string, unknown>): boolean {
   const ok = changePattern(target.ctx, target.slot, target.region, fields);
   if (ok) target.repaint();
   return ok;
+}
+
+/** Run a pattern action (`patternActionRun.ts`, which the Song tab's region menu runs too) and repaint when it took. */
+function act(target: FigureTarget, action: PatternAction): void {
+  if (runPatternAction(target.ctx, target.slot, target.region, action)) target.repaint();
 }
 
 function column(className: string, nodes: readonly HTMLElement[]): HTMLElement {
@@ -106,8 +115,8 @@ function seedField(target: FigureTarget): HTMLElement {
   reseed.setAttribute('aria-label', 'Reseed');
   reseed.appendChild(railSvg(ICON_RESEED, 'seq-icon-svg seq-line-icon'));
   reseed.onclick = (): void => {
-    const seed = freshSeed(spec(target).seed, Math.random);
-    if (ctx.change(arpSeedChange(slot, seed)).ok) field.value = String(seed);
+    if (runPatternAction(ctx, slot, target.region, 'reseed'))
+      field.value = String(spec(target).seed);
   };
   const row = el('div', 'figure-seed');
   row.append(field, reseed);
@@ -122,12 +131,8 @@ function randomizeButton(target: FigureTarget, rotor: Rotor): HTMLElement {
   button.title =
     'Reroll the line: tones over the chord, a velocity, accent, slide, an octave now and then, a tie or rest';
   button.onclick = (): void => {
-    const now = spec(target);
-    const size =
-      regionChord(target.ctx, target.slot, target.region)?.stack.length ??
-      FIGURE_SUMMARY_STACK.length;
     rebase(rotor);
-    write(target, { cells: randomFigureCells(now.cells, now.length, size, Math.random) });
+    act(target, 'randomize');
   };
   return button;
 }
@@ -139,7 +144,7 @@ function reverseButton(target: FigureTarget, rotor: Rotor): HTMLElement {
   button.title = 'Mirror the line: every cell and lane value, last to first';
   button.onclick = (): void => {
     rebase(rotor);
-    write(target, reverseFigure(spec(target)));
+    act(target, 'reverse');
   };
   return button;
 }

@@ -27,15 +27,7 @@
  */
 import type { ArpSpec, ArpStep } from '@windsor/engine';
 import { ARP_STEPS_MAX, STEP_MOD_LANES_MAX } from '@windsor/engine';
-import {
-  arpCycleLabel,
-  arpListCount,
-  arpShownList,
-  arpSlideAt,
-  randomArpCells,
-  reverseArp,
-  rotateArp,
-} from './arpGridModel';
+import { arpCycleLabel, arpListCount, arpShownList, arpSlideAt, rotateArp } from './arpGridModel';
 import { arpStepCells } from './arpStepCells';
 import { regionChord } from './chordRegionChord';
 import { PITCH_COLOR } from './consoleColors';
@@ -44,6 +36,7 @@ import { el } from './dom';
 import { GRID_TURN_REBASED, withStep } from './gridModel';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import { runPatternAction } from './patternActionRun';
 import { regionPlayheadAt } from './regionPlayhead';
 import { ARP_ROTATE_KNOB } from './sequencerKnobTables';
 import {
@@ -200,8 +193,9 @@ function randomizeButton(strip: ArpStrip): HTMLElement {
   const button = el('button', 'btn seq-btn', 'Randomize') as HTMLButtonElement;
   button.type = 'button';
   button.title = 'The shown cells: accent, slide, an octave now and then, a tie or rest, a ratchet';
-  button.onclick = (): void =>
-    commitSteps(strip, (spec) => randomArpCells(spec.steps, countOf(strip), Math.random));
+  button.onclick = (): void => {
+    if (runPatternAction(strip.ctx, strip.slot, strip.region, 'randomize')) strip.repaint();
+  };
   return button;
 }
 
@@ -211,11 +205,9 @@ function reverseButton(strip: ArpStrip, rotor: ArpRotor): HTMLElement {
   button.type = 'button';
   button.title = 'Mirror the shown cells: every cell and lane value, last to first';
   button.onclick = (): void => {
-    const spec = strip.spec();
-    if (!spec) return;
+    if (!strip.spec()) return;
     rebase(rotor);
-    const reversed = reverseArp(spec, countOf(strip));
-    if (changePattern(strip.ctx, strip.slot, strip.region, reversed)) strip.repaint();
+    if (runPatternAction(strip.ctx, strip.slot, strip.region, 'reverse')) strip.repaint();
   };
   return button;
 }

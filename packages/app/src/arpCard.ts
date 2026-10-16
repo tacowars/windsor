@@ -21,13 +21,14 @@ import type { ArpSpec } from '@windsor/engine';
 import { DEFAULT_ARP_CONFIG } from '@windsor/engine';
 import { arpGrid } from './arpGrid';
 import { ARP_KNOB_COLUMNS } from './arpGridConstants';
-import { arpSeedChange, freshSeed, parseSeed } from './arpModel';
+import { arpSeedChange, parseSeed } from './arpModel';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, seg, select } from './dom';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import { runPatternAction } from './patternActionRun';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
 import { divisorOptions } from './divisorLabels';
@@ -116,8 +117,8 @@ function seedField(target: ArpTarget): HTMLElement {
   reseed.setAttribute('aria-label', 'Reseed');
   reseed.appendChild(railSvg(ICON_RESEED, 'seq-icon-svg seq-line-icon'));
   reseed.onclick = (): void => {
-    const seed = freshSeed(spec(target).seed, Math.random);
-    if (ctx.change(arpSeedChange(slot, seed)).ok) field.value = String(seed);
+    if (runPatternAction(ctx, slot, target.region, 'reseed'))
+      field.value = String(spec(target).seed);
   };
   const row = el('div', 'arp-seed');
   row.append(field, reseed);

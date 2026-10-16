@@ -12,11 +12,15 @@
  * one `view.commit` and so one undo step; Zoom to region (`view.zoomTo`,
  * view state, no undo step); the loop through `loopChange`; the pane's
  * Bounce (`bouncePart`); the part color picker at the menu's opening
- * point; and the Parts tab's Seq picker's `setSequencerKindLive`. Their
+ * point; the Parts tab's Seq picker's `setSequencerKindLive`; and the
+ * card's pattern actions (`runPatternAction`, windsor#827) and Fit region to
+ * pattern (`regionFit.ts`, a commit). Their
  * previews draw on the lane and the loop strip and never touch the
  * document. The menu is built for the document it opened on: any change to
  * it (a region key, an undo or redo, an edit from elsewhere) closes the menu,
- * and a row of a stale menu refuses to run (`whileFresh`). Any key but
+ * and a row of a stale menu refuses to run (`whileFresh`). That watch is one
+ * listener at a time (`LaneMenuWatch`), ended by the next opening, a row's
+ * run or the change itself. Any key but
  * Escape closes it too, so ⌘C, which changes only the clipboard, can't leave
  * a stale Paste open; Paste also refuses once the clipboard holds another clip.
  */
@@ -30,11 +34,14 @@ import { wireLongPress } from './longPress';
 import type { LoopRange } from './loopBraceModel';
 import { braceBox, loopChange } from './loopBraceModel';
 import { openPartColourPicker } from './partColourPicker';
+import { runPatternAction } from './patternActionRun';
 import { drawRegionChange, setPartColourLive, setSequencerKindLive } from './partEdits';
+import { LaneMenuWatch } from './laneMenuWatch';
 import { laneScaleOf } from './partLaneBlocks';
 import { copyRegion, cutRegion, duplicateRegion } from './regionClipboard';
 import { deleteRegion } from './regionModel';
 import type { Placement } from './regionPlacement';
+import { rollViewOf, snapOf } from './rollView';
 import type { LaneMenuCommands } from './songLaneMenuModel';
 import { laneMenu, lanePressAt, whileFresh } from './songLaneMenuModel';
 import type { SongView } from './songTab';
@@ -166,6 +173,13 @@ function commands(
       openPartColourPicker(at, now, (colour) => setPartColourLive(view.ctx, slot, colour));
     },
     setKind: (kind) => void setSequencerKindLive(view.ctx, slot, kind),
+    pattern(index, action) {
+      // The card's own write; the pane then shows the edited pattern, its Rotate rebased.
+      if (!runPatternAction(view.ctx, slot, index, action)) return;
+      view.ctx.invalidate();
+      view.paintLanes();
+      view.paintPane();
+    },
     showRegion: (span) => preview.region(span),
     showCut: (tick) => preview.cut(tick),
     showLoop: (range) => preview.loop(range),
@@ -175,6 +189,9 @@ function commands(
 
 /** The latest opening waiting for its frames: a newer one replaces it. */
 let waiting = 0;
+
+/** The open menu's watch on the document: one at a time, so no dismissed menu's listener piles up. */
+const watch = new LaneMenuWatch();
 
 /**
  * Run `open` once the selection's repaint has settled. The shared menu
@@ -210,23 +227,24 @@ function openLaneMenu(view: SongView, lane: HTMLElement, slot: number, press: Me
     region: at.region,
     tick: at.tick,
     bar: scale.bar,
+    meter: doc.transport.meter,
     songTicks: view.songTicks(),
+    snap: snapOf(rollViewOf(slot).snap),
     clip: view.state.clipboard,
     added,
   };
   // The menu is for this document: a key edit, an undo or redo, or a change from elsewhere ends it.
   const fresh = (): boolean => view.ctx.model.doc === doc;
   const preview = new LanePreview(view, grid, slot);
-  const spec = whileFresh(laneMenu(facts, commands(view, slot, press, preview)), fresh);
+  // A row run has closed the menu, so its watch ends before the row's own edit.
+  const menu = laneMenu(facts, commands(view, slot, press, preview));
+  const spec = whileFresh(menu, fresh, () => watch.stop());
   afterRepaint(() => {
     if (!fresh()) return;
     // The menu is the pointer's: a key (⌘C, say) closes it and does its own work.
     const lane = { top: rect.top, bottom: rect.bottom };
     const close = openContextMenu(spec, { ...press, lane }, { closeOnKey: true });
-    const off = view.ctx.model.onChange(() => {
-      off();
-      close();
-    });
+    watch.start((listener) => view.ctx.model.onChange(listener), close);
   });
 }
 

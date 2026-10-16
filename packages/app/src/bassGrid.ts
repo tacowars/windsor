@@ -26,8 +26,6 @@ import {
   bassLengthChange,
   bassSlideAt,
   bassStepsLabel,
-  randomBassSteps,
-  reverseBass,
   turnBass,
 } from './bassGridModel';
 import { PITCH_COLOR } from './consoleColors';
@@ -36,6 +34,8 @@ import { el } from './dom';
 import { withStep } from './gridModel';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import type { PatternAction } from './patternActionModel';
+import { runPatternAction } from './patternActionRun';
 import { regionPlayheadAt } from './regionPlayhead';
 import { BASS_LENGTH_KNOB, BASS_ROTATE_KNOB } from './sequencerKnobTables';
 import {
@@ -140,6 +140,11 @@ const write = (strip: Strip<BassSpec>, fields: Record<string, unknown>): void =>
   if (changePattern(strip.ctx, strip.slot, strip.region, fields)) strip.repaint();
 };
 
+/** Run a pattern action (`patternActionRun.ts`, which the Song tab's region menu runs too) and repaint when it took. */
+const act = (strip: Strip<BassSpec>, action: PatternAction): void => {
+  if (runPatternAction(strip.ctx, strip.slot, strip.region, action)) strip.repaint();
+};
+
 /**
  * Rotate's offset from the pattern it last turned, and its knob. Length,
  * Randomize and Reverse replace that pattern, so they rebase the offset
@@ -194,8 +199,9 @@ function randomizeButton(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement 
   button.title =
     'Reroll the rhythm: notes, ties, rests, octaves, accents, slides and ratchets. The pitch mode keeps the pitch';
   button.onclick = (): void => {
+    if (!strip.spec()) return;
     rebase(rotor);
-    commitSteps(strip, (spec) => randomBassSteps(spec.steps, Math.random));
+    act(strip, 'randomize');
   };
   return button;
 }
@@ -206,10 +212,9 @@ function reverseButton(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement {
   button.type = 'button';
   button.title = 'Mirror the steps: every cell and lane value, last to first';
   button.onclick = (): void => {
-    const spec = strip.spec();
-    if (!spec) return;
+    if (!strip.spec()) return;
     rebase(rotor);
-    write(strip, { ...reverseBass(spec) });
+    act(strip, 'reverse');
   };
   return button;
 }

@@ -17,7 +17,8 @@ import { auditionOn, setAudition } from './rollAudition';
 import { tableKnob } from './seqFields';
 import { ROLL_ACCENT_KNOBS, ROLL_KNOBS } from './sequencerKnobTables';
 import { barsOf, loopText } from './rollSummary';
-import { ROLL_QUANTISE, ROLL_SNAP_OFF_TICKS, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
+import { quantiseOff } from './rollQuantise';
+import { ROLL_QUANTISE, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
 import type { RollKeys } from './rollRows';
 import { type RollViewState, type RollZoom, rowZoomText, snapOf, timeZoomText } from './rollView';
 
@@ -124,7 +125,7 @@ function quantiseItem(target: RollControlsTarget): { node: HTMLElement; refresh:
   const wrap = item(label, button);
   const refresh = (): void => {
     const snap = snapOf(target.view.snap);
-    const off = snap.ticks === ROLL_SNAP_OFF_TICKS;
+    const off = quantiseOff(snap.ticks);
     const count = target.selectedCount();
     to.textContent = off ? Q.off : `${Q.to} ${snap.label}`;
     button.textContent = count > 0 ? `${count} ${Q.selected}` : Q.all;

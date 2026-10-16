@@ -28,7 +28,6 @@ import {
   bassControlsEnabled,
   fixedDegreeOptions,
   isBassPitchMode,
-  reseedChange,
   seedFromText,
 } from './bassModel';
 import { PITCH_COLOR } from './consoleColors';
@@ -37,6 +36,7 @@ import { el, seg, select } from './dom';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
 import { changePattern, patternOf } from './partEdits';
+import { runPatternAction } from './patternActionRun';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
 import { divisorOptions } from './divisorLabels';
@@ -124,7 +124,7 @@ function seedField(target: BassTarget): HTMLElement {
   reseed.setAttribute('aria-label', 'Reseed');
   reseed.appendChild(railSvg(ICON_RESEED, 'seq-icon-svg seq-line-icon'));
   reseed.onclick = (): void => {
-    send(target, reseedChange());
+    runPatternAction(target.ctx, target.slot, target.region, 'reseed');
     show();
   };
   show();

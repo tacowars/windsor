@@ -3,21 +3,22 @@
  * 5, as the insert rack lays its pages out): Step, Randomize and Reverse; Octave,
  * Length and Rotate; Vel, Acc vel and Acc mod; Skip. Every knob writes the
  * selected region's pattern through `changePattern` (windsor#76), Vel
- * aside, which is the part's.
+ * aside, which is the part's. Randomize and Reverse run the pattern actions
+ * the Song tab's region menu runs too (`patternActionRun.ts`, windsor#827).
  */
 import type { GridSpec } from '@windsor/engine';
-import { scaleOffsets } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { GRID_KNOB_COLUMNS } from './gridDeviceTables';
-import { GRID_TURN_REBASED, randomSteps, reverseGrid, stepsForLength, turnGrid } from './gridModel';
+import { GRID_TURN_REBASED, stepsForLength, turnGrid } from './gridModel';
 import { octaveKnob } from './harmonyTables';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import { runPatternAction } from './patternActionRun';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import { lanesForSteps } from './stepModLaneModel';
-import { type Strip, commitSteps } from './stepStrip';
+import type { Strip } from './stepStrip';
 
 type GridStrip = Strip<GridSpec>;
 
@@ -96,14 +97,9 @@ function randomizeButton(strip: GridStrip, rotor: GridRotor): HTMLElement {
   button.type = 'button';
   button.title = 'Every step: a random degree from the key, octave, accent and slide';
   button.onclick = (): void => {
+    if (!strip.spec()) return;
     rebase(rotor);
-    commitSteps(strip, (spec) =>
-      randomSteps(
-        spec.steps.length,
-        scaleOffsets(strip.ctx.model.doc.harmony.scale).length,
-        Math.random,
-      ),
-    );
+    if (runPatternAction(strip.ctx, strip.slot, strip.region, 'randomize')) strip.repaint();
   };
   return button;
 }
@@ -114,10 +110,9 @@ function reverseButton(strip: GridStrip, rotor: GridRotor): HTMLElement {
   button.type = 'button';
   button.title = 'Mirror the steps: every cell and lane value, last to first';
   button.onclick = (): void => {
-    const spec = strip.spec();
-    if (!spec) return;
+    if (!strip.spec()) return;
     rebase(rotor);
-    if (changePattern(strip.ctx, strip.slot, strip.region, reverseGrid(spec))) strip.repaint();
+    if (runPatternAction(strip.ctx, strip.slot, strip.region, 'reverse')) strip.repaint();
   };
   return button;
 }
