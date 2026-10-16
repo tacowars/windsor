@@ -141,8 +141,10 @@ export interface OverrunStep {
   flashing: boolean;
   /** Put up a toast now. */
   toast: boolean;
-  /** How many underruns arrived since the last reading, both counts together. */
-  added: number;
+  /** How far the sampler's count (the DSP missed a deadline in `process()`) rose since the last reading. */
+  dspAdded: number;
+  /** How far the output device's count (the output ran dry) rose since the last reading. */
+  deviceAdded: number;
 }
 
 /**
@@ -171,11 +173,11 @@ export function stepOverrun(
   settleUntilMs = -Infinity,
   rules: OverrunRules = OVERRUN_RULES,
 ): OverrunStep {
-  const added =
-    rise(state.underruns, counts.underruns) + rise(state.deviceUnderruns, counts.deviceUnderruns);
+  const dspAdded = rise(state.underruns, counts.underruns);
+  const deviceAdded = rise(state.deviceUnderruns, counts.deviceUnderruns);
   let { lastToastMs, flashUntilMs } = state;
   let toast = false;
-  if (added > 0 && nowMs >= settleUntilMs) {
+  if (dspAdded + deviceAdded > 0 && nowMs >= settleUntilMs) {
     flashUntilMs = nowMs + rules.flashMs;
     toast = lastToastMs === null || nowMs - lastToastMs >= rules.toastGapMs;
     if (toast) lastToastMs = nowMs;
@@ -189,8 +191,24 @@ export function stepOverrun(
     },
     flashing: nowMs < flashUntilMs,
     toast,
-    added,
+    dspAdded,
+    deviceAdded,
   };
+}
+
+/**
+ * The toast's sentence for a step that toasts (windsor#836). A DSP rise means
+ * the render itself missed a deadline, so it wins whatever the device did and
+ * counts the DSP's rise alone; a device rise on its own means the output ran
+ * dry while the DSP kept up.
+ */
+export function overrunMessage(step: Pick<OverrunStep, 'dspAdded' | 'deviceAdded'>): string {
+  if (step.dspAdded > 0) {
+    const deadlines = step.dspAdded === 1 ? 'a deadline' : `${step.dspAdded} deadlines`;
+    return `audio overrun: the DSP missed ${deadlines} — this song is at the CPU's limit`;
+  }
+  const times = step.deviceAdded === 1 ? 'once' : `${step.deviceAdded} times`;
+  return `audio dropout: the output ran dry ${times} — the audio thread fell behind`;
 }
 
 /** What a reading sees of a cold start: which system, and whether ▶ is running. */

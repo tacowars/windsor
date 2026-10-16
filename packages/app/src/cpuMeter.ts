@@ -17,16 +17,12 @@ import {
   INITIAL_OVERRUN_STATE,
   INITIAL_SETTLE_STATE,
   meterSampleAt,
+  overrunMessage,
   stepOverrun,
   stepSettle,
 } from './cpuMeterModel';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';
-
-function overrunMessage(added: number): string {
-  const deadlines = added === 1 ? 'a deadline' : `${added} deadlines`;
-  return `audio overrun: the DSP missed ${deadlines} — this song is at the CPU's limit`;
-}
 
 /** Turn `button` into the meter and start it; the click stays the caller's. */
 export function mountCpuMeter(button: HTMLElement, ctx: AppCtx): void {
@@ -56,7 +52,7 @@ export function mountCpuMeter(button: HTMLElement, ctx: AppCtx): void {
     button.classList.toggle('overrun', step.flashing);
     button.title = view.summary;
     button.setAttribute('aria-label', `Audio on — ${view.summary}`);
-    if (step.toast) ctx.notify(overrunMessage(step.added), 'warning');
+    if (step.toast) ctx.notify(overrunMessage(step), 'warning');
   };
 
   watchPlayhead({
