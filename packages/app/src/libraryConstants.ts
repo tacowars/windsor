@@ -39,15 +39,29 @@ export const isInitPreset = (id: string): boolean => id.startsWith(INIT_PRESET_P
 export const INIT_PATCH_NAME = 'Init';
 
 /**
+ * Init's operator decay and release curves (windsor#844): negative, so a
+ * stage falls fast and then eases, where the engine's +0.5 default holds and
+ * then drops. A mirror of that default, set on all four operators.
+ */
+const INIT_OP_CURVES = { decayCurve: -0.5, releaseCurve: -0.5 };
+
+/**
  * What Init sets over `makePatch()` defaults: tacowars's Init, taken from a
  * song on 2026-10-05. Operator 1 restarts at phase 0 on each note with a
- * slightly slower attack, the filter envelope opens at once, and the volume
- * sits well under the clip line.
+ * slightly slower attack, every operator's decay and release curves fall
+ * fast and then ease, the filter envelope opens at once, and the volume sits
+ * well under the clip line. `makePatch` merges `ops` by index, so all four
+ * operators are listed.
  */
 export const INIT_PATCH_OVERRIDES = {
   name: INIT_PATCH_NAME,
   volume: 0.2296977796052631,
-  ops: [{ phaseFree: false, env: { attackTime: 0.004466565172673648 } }],
+  ops: [
+    { phaseFree: false, env: { attackTime: 0.004466565172673648, ...INIT_OP_CURVES } },
+    { env: { ...INIT_OP_CURVES } },
+    { env: { ...INIT_OP_CURVES } },
+    { env: { ...INIT_OP_CURVES } },
+  ],
   filter: { env: { attackTime: 0 } },
 };
 
