@@ -92,7 +92,9 @@ const VOICE_TARGET_FILTER_ROWS = [
  * both. The ratio (windsor#646) is last, so the five before it keep their
  * offsets: an octave curve over the console's `RATIO_RANGE`, its floor that
  * range's bottom, read where the frequency is worked out; a fixed-frequency
- * operator ignores it, as it ignores its ratio.
+ * operator ignores it, as it ignores its ratio. The feedback's span is 5,
+ * about half its −1..10 travel, so a full step sweeps a sine into noise
+ * (windsor#842, record `2026-10-16-operator-feedback-to-ten`).
  */
 const VOICE_TARGET_OPERATOR_ROWS = [
   { field: 'level', curve: 'add', min: 0, max: 1, floor: 0, span: 0.5, slideKeeps: false },
@@ -112,7 +114,7 @@ const VOICE_TARGET_OPERATOR_ROWS = [
     min: FEEDBACK_RANGE.min,
     max: FEEDBACK_RANGE.max,
     floor: 0,
-    span: 1,
+    span: 5,
     slideKeeps: true,
   },
   {

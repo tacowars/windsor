@@ -205,10 +205,14 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 16 since windsor#818 (the Tape's
+ * A document's document-format version: 17 since windsor#842 (operator
+ * feedback runs to 10, and a step of 1 on a feedback target adds 5 where it
+ * added 1, so an old song's step offsets play differently; record
+ * `2026-10-16-operator-feedback-to-ten`, with no upgrade), after 16
+ * (windsor#818: the Tape's
  * `wow`, `flutter` and `wear` drive its wow and flutter on a square law,
  * record `2026-10-16-tape-motion-on-a-square-law`; `SONG_MIGRATIONS[15]`
- * passes a version-15 song through unchanged), after 15 (windsor#771: the `plate`
+ * passes a version-15 song through unchanged), 15 (windsor#771: the `plate`
  * insert kind renamed `reverb`, record `2026-10-12-plate-insert-renamed-reverb`),
  * 14 (windsor#746: the plate's `voicing`, whose plate row's shorter
  * input diffusers change how every plate renders), 13 (windsor#764: the
@@ -216,12 +220,13 @@ export const ROLL_NOTES_MAX = 2048;
  * `modDepth` is each point's peak excursion), 12 (windsor#761: the plate's `build`, which changes how
  * every plate renders) and 11 (windsor#748: the plate's `decay` is an RT60
  * in seconds, with `lowDecay` and `lowCross`, and the Plate insert's Mix is
- * equal-power). There is no upgrade to 11, 12, 13, 14 or 15, so every version
- * before 15 is refused (record `2026-09-28-format-versions-refuse-never-destroy`);
- * `SONG_MIGRATIONS` still carries the steps 5 → 6 to 9 → 10, which no
- * longer reach this one.
+ * equal-power). There is no upgrade to 11, 12, 13, 14, 15 or 17, so every
+ * version before 17 is refused (record
+ * `2026-09-28-format-versions-refuse-never-destroy`); `SONG_MIGRATIONS` still
+ * carries the steps 5 → 6 to 9 → 10 and 15 → 16, which no longer reach this
+ * one.
  */
-export const ARRANGEMENT_VERSION = 16;
+export const ARRANGEMENT_VERSION = 17;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

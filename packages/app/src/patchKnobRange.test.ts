@@ -68,10 +68,11 @@ describe('the Parts tab knobs over voice targets', () => {
     for (const [path, o] of knobs) {
       const row = catalogRow(voiceTargetId(path));
       if (!row) continue;
-      const { min, max, curve, logFloor } = o;
-      expect({ min, max, curve, logFloor }, path).toEqual({
+      const { min, max, curve, logFloor, knee } = o;
+      expect({ min, max, curve, logFloor, knee }, path).toEqual({
         curve: undefined,
         logFloor: undefined,
+        knee: undefined,
         ...knobRangeOf(row),
       });
     }
@@ -81,7 +82,10 @@ describe('the Parts tab knobs over voice targets', () => {
 /** A pinned range: the path, min and max, then the curve and the log floor where it has them. */
 type PinnedRange = readonly [string, number, number, 'log'?, number?];
 
-/** Every knob's range before windsor#436, in `allPatchKnobs()` order. */
+/**
+ * Every knob's range before windsor#436, in `allPatchKnobs()` order, but for
+ * the feedback's top, 10 since windsor#842 (on its knee, `knobScale.test.ts`).
+ */
 const PINNED: readonly PinnedRange[] = [
   ['volume', 0, 1.5],
   ['tone', 0.02, 1],
@@ -138,7 +142,7 @@ const PINNED: readonly PinnedRange[] = [
   ['ops.0.fixedHz', 1, 8000, 'log'],
   ['ops.0.detune', -100, 100],
   ['ops.0.level', 0, 1],
-  ['ops.0.feedback', -1, 1],
+  ['ops.0.feedback', -1, 10],
   ['ops.0.width', 0.05, 1],
   ['ops.0.velSens', 0, 1],
   ['ops.0.opLp', 0, 20000, 'log', 20],
@@ -148,7 +152,7 @@ const PINNED: readonly PinnedRange[] = [
   ['ops.1.fixedHz', 1, 8000, 'log'],
   ['ops.1.detune', -100, 100],
   ['ops.1.level', 0, 1],
-  ['ops.1.feedback', -1, 1],
+  ['ops.1.feedback', -1, 10],
   ['ops.1.width', 0.05, 1],
   ['ops.1.velSens', 0, 1],
   ['ops.1.opLp', 0, 20000, 'log', 20],
@@ -158,7 +162,7 @@ const PINNED: readonly PinnedRange[] = [
   ['ops.2.fixedHz', 1, 8000, 'log'],
   ['ops.2.detune', -100, 100],
   ['ops.2.level', 0, 1],
-  ['ops.2.feedback', -1, 1],
+  ['ops.2.feedback', -1, 10],
   ['ops.2.width', 0.05, 1],
   ['ops.2.velSens', 0, 1],
   ['ops.2.opLp', 0, 20000, 'log', 20],
@@ -168,7 +172,7 @@ const PINNED: readonly PinnedRange[] = [
   ['ops.3.fixedHz', 1, 8000, 'log'],
   ['ops.3.detune', -100, 100],
   ['ops.3.level', 0, 1],
-  ['ops.3.feedback', -1, 1],
+  ['ops.3.feedback', -1, 10],
   ['ops.3.width', 0.05, 1],
   ['ops.3.velSens', 0, 1],
   ['ops.3.opLp', 0, 20000, 'log', 20],

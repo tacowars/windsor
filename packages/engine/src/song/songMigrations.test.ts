@@ -12,14 +12,16 @@
  * `songRetroSizeUpgrade.test.ts`), 9 → 10 (windsor#728: bloom's Scale
  * values renamed to Windsor's, pinned here) and 15 → 16 (windsor#818: the
  * Tape's Wow, Flutter and Wear on a square law, an identity step pinned
- * here); versions 2 (#705), 3 (record
+ * here, read through a stand-in 16 → 17); versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused. None ships from 10 to 11 (windsor#748, the
  * plate's Decay in seconds), from 11 to 12 (windsor#761, the plate's
  * Build), from 12 to 13 (windsor#764, the plate's modulation), from 13 to
  * 14 (windsor#746, the plate's voicing) or from 14 to 15 (windsor#771, the
- * `plate` insert kind renamed `reverb`), so 5 to 14 are refused too, and the
- * steps' own tests read through stand-ins 10 → 11 to 14 → 15 (`PAST_TEN`).
+ * `plate` insert kind renamed `reverb`) or from 16 to 17 (windsor#842, a
+ * feedback step's span from 1 to 5), so 5 to 16 are refused too, and the
+ * steps' own tests read through stand-ins 10 → 11 to 14 → 15 and 16 → 17
+ * (`PAST_TEN`).
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
  */
 import { describe, expect, it } from 'vitest';
@@ -58,9 +60,9 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 /**
- * The shipped steps and stand-ins 10 → 11 to 14 → 15: windsor#748, windsor#761,
- * windsor#764, windsor#746 and windsor#771 ship none, so a version-10 to 14 song is
- * refused, and
+ * The shipped steps and stand-ins 10 → 11 to 14 → 15 and 16 → 17: windsor#748,
+ * windsor#761, windsor#764, windsor#746, windsor#771 and windsor#842 ship none, so
+ * a version-10 to 14 or 16 song is refused, and
  * this reads a step's own work through to a version this build loads.
  */
 const PAST_TEN = {
@@ -71,12 +73,13 @@ const PAST_TEN = {
     12: (doc: Record<string, unknown>) => doc,
     13: (doc: Record<string, unknown>) => doc,
     14: (doc: Record<string, unknown>) => doc,
+    16: (doc: Record<string, unknown>) => doc,
   },
   patches: PATCH_MIGRATIONS,
 };
 
 describe('upgradeSong', () => {
-  it('ships six upgrades, 5 → 6 to 9 → 10 and 15 → 16, and none to 11, 12, 13, 14 or 15: versions 2, 3 and 4 were retired without one', () => {
+  it('ships six upgrades, 5 → 6 to 9 → 10 and 15 → 16, and none to 11, 12, 13, 14, 15 or 17: versions 2, 3 and 4 were retired without one', () => {
     expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15']);
   });
 
@@ -110,7 +113,7 @@ describe('upgradeSong', () => {
     );
   });
 
-  it.each([3, 4, 5, 6, 7, 8, 9, 10, 11, 14])(
+  it.each([3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16])(
     'refuses version %i, which no upgrade brings to this build, with the standard message',
     (version) => {
       const raw = { ...song([KICK]), version };
@@ -347,20 +350,21 @@ describe("a version-15 song's Tape (windsor#818)", () => {
   it('passes the document through unchanged, its Tape fields and lanes as saved', () => {
     const raw = withTape();
     const before = structuredClone(raw);
-    const { document, refused } = upgradeSong(raw);
+    const { document, refused } = upgradeSong(raw, PAST_TEN);
     expect(refused).toBeUndefined();
     expect(raw).toEqual(before);
     expect(document).toEqual({ ...before, version: ARRANGEMENT_VERSION });
   });
 
   it("loads at this build's version with its Tape's numbers and lane kept, and a song with no Tape unchanged", () => {
-    const result = makeArrangement(withTape());
+    const open = (raw: Doc) => makeArrangement(upgradeSong(raw, PAST_TEN).document);
+    const result = open(withTape());
     expect(result.refused).toBeUndefined();
     expect(result.document.version).toBe(ARRANGEMENT_VERSION);
     expect(result.document.parts[0]!.strip!.inserts[0]).toMatchObject(tape);
     expect(result.document.parts[0]!.automation).toEqual([lane]);
     expect(result.document.master!.inserts[0]).toMatchObject({ wear: 30, split: false });
-    const upgraded = makeArrangement({ ...song([KICK]), version: 15 });
+    const upgraded = open({ ...song([KICK]), version: 15 });
     const current = makeArrangement({ ...song([KICK]), version: ARRANGEMENT_VERSION });
     expect(upgraded.corrections).toEqual(current.corrections);
     expect(upgraded.document).toEqual(current.document);

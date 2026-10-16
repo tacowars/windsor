@@ -455,7 +455,7 @@ function driveOnByDefault(gain, bias) {
 var DRIVE_BIAS_RANGE = { min: -1, max: 1 };
 var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
-var FEEDBACK_RANGE = { min: -1, max: 1 };
+var FEEDBACK_RANGE = { min: -1, max: 10 };
 var RATIO_RANGE = { min: 0.0625, max: 24 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
 var OP_FILTER_RANGE = { min: 0, max: 2e4 };
@@ -510,7 +510,7 @@ var VOICE_TARGET_OPERATOR_ROWS = [
     min: FEEDBACK_RANGE.min,
     max: FEEDBACK_RANGE.max,
     floor: 0,
-    span: 1,
+    span: 5,
     slideKeeps: true
   },
   {

@@ -119,6 +119,7 @@ export type { EffectiveMacroMapping } from './worklet/fm/macroMappings';
 export { macroMappedValue } from './worklet/fm/macroShape';
 // Song automation lanes (windsor#341, record `2026-10-01-song-automation-lanes`): the pure core.
 export type {
+  AutomationKnee,
   AutomationLane,
   AutomationPoint,
   AutomationScale,

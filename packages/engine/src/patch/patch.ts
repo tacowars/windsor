@@ -126,7 +126,10 @@ export interface Operator {
    * (#543). The Level knob means both because an operator can be either.
    */
   level: number;
-  /** Self-feedback, -1..1 (#529): positive towards a sawtooth, negative towards a square, 0 off. */
+  /**
+   * Self-feedback, -1..10 (#529, windsor#842): positive towards a sawtooth
+   * and past it to noise, negative towards a square, 0 off.
+   */
   feedback: number;
   /**
    * The fraction of the period the wave is squeezed into, `WIDTH_RANGE`; the

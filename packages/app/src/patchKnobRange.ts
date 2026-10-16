@@ -10,16 +10,18 @@ import { requireCatalogRow, voiceTargetId } from '@windsor/engine';
 import type { KnobSpec } from './knob';
 
 /** The part of a knob's spec a catalog row decides. */
-export type CatalogKnobRange = Pick<KnobSpec, 'min' | 'max' | 'curve' | 'logFloor'>;
+export type CatalogKnobRange = Pick<KnobSpec, 'min' | 'max' | 'curve' | 'logFloor' | 'knee'>;
 
 /**
- * A knob range from a catalog row: its bounds, a log knob for any row not
+ * A knob range from a catalog row: its bounds, the row's knee on a `knee`
+ * row (operator feedback, windsor#842), a log knob for any other row not
  * drawn linear (cutoff's octaves, resonance's log), and the row's display
  * floor as the log knob's floor where the row has one (a decay time from 0).
  */
 export function knobRangeOf(row: AutomationTargetRow): CatalogKnobRange {
   const bounds = { min: row.min, max: row.max };
   if (row.scale === 'linear') return bounds;
+  if (row.scale === 'knee') return row.knee ? { ...bounds, knee: row.knee } : bounds;
   return row.floor === undefined
     ? { ...bounds, curve: 'log' }
     : { ...bounds, curve: 'log', logFloor: row.floor };

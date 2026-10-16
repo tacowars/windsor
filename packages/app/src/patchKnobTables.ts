@@ -28,7 +28,10 @@ import { voiceKnobRange } from './patchKnobRange';
 import { getPath } from './patchPath';
 
 /** A table entry's options: the range and readout. The default is not the table's to state. */
-export type PatchKnobRange = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor' | 'fmt'>;
+export type PatchKnobRange = Pick<
+  KnobSpec,
+  'min' | 'max' | 'step' | 'curve' | 'logFloor' | 'knee' | 'fmt'
+>;
 export interface PatchKnobEntry {
   /** A full patch path, or a sub-field of the group the table serves. */
   readonly f: string;

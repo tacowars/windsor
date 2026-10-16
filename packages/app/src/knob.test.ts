@@ -12,15 +12,10 @@ import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureCon
 import { partChange } from './context';
 import { settleGestures } from './gestureHooks';
 import { KNOB_PAD_PX, KNOB_R } from './knobConstants';
-import {
-  attachKnobInput,
-  continuesKeySteps,
-  knobGeometry,
-  knobMarkup,
-  relabelKnob,
-  scaleFor,
-} from './knob';
-import type { KnobSpec, Scale } from './knob';
+import { attachKnobInput, continuesKeySteps, knobGeometry, knobMarkup, relabelKnob } from './knob';
+import type { KnobSpec } from './knob';
+import { scaleFor } from './knobScale';
+import type { Scale } from './knobScale';
 import type { KnobAutomation } from './knobAutomation';
 import type { KnobEnvelope } from './knobEnvelope';
 import { ENVELOPE_KNOBS } from './patchKnobTables';

@@ -164,7 +164,8 @@ describe('the voice rows', () => {
   it('give every logarithmic row a positive bottom', () => {
     for (const row of VOICE_AUTOMATION_ROWS) {
       expect(row.min, row.target).toBeLessThan(row.max);
-      if (row.scale !== 'linear') expect(row.floor ?? row.min, row.target).toBeGreaterThan(0);
+      const logarithmic = row.scale !== 'linear' && row.scale !== 'knee';
+      if (logarithmic) expect(row.floor ?? row.min, row.target).toBeGreaterThan(0);
     }
   });
 

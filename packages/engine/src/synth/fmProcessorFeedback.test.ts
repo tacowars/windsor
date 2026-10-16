@@ -1,7 +1,9 @@
 /**
  * Bipolar self-feedback (#529): positive feedback moves a sine towards a
- * sawtooth, negative towards a square, and neither end of the knob reaches
- * noise. Measured on a lone sine operator at a low and a high note, where the
+ * sawtooth, negative towards a square, and neither +1 nor −1 reaches noise.
+ * Since windsor#842 the positive side runs to 10, past the saw into noise on
+ * purpose, and stays finite and within the operator's own ±1 there.
+ * Measured on a lone sine operator at a low and a high note, where the
  * one-sample feedback loop behaves differently. Split out of
  * fmProcessor.test.ts for its length; the file name keeps the
  * `vitest run fmProcessor` filter.
@@ -92,9 +94,36 @@ describe.each(NOTES)('self-feedback at note %i', (note) => {
     expect(square.result.peak).toBeLessThanOrEqual(sine.result.peak * PEAK_TOLERANCE);
   });
 
-  it('clamps beyond the knob instead of reaching the noise the old scale did', () => {
-    const past = spectrum(note, 8);
-    expect(past.harmonicShare).toBeGreaterThan(MIN_HARMONIC_SHARE);
-    expect(past.h(2)).toBeCloseTo(spectrum(note, 1).h(2), 6);
+  it('clamps past the top of the range to 10 (windsor#842)', () => {
+    const past = spectrum(note, 12);
+    expect(past.result.samples).toEqual(spectrum(note, 10).result.samples);
+  });
+});
+
+/** The top of the range (windsor#842): a full-level operator at A2 and A6, held for 2 s. */
+const TOP_NOTES = [45, 93] as const;
+const TOP_SECONDS = 2;
+/** The sine's amplitude, as read off its fundamental, is the voice gain; the loop's peak stays under it. */
+const GAIN_TOLERANCE = 1e-6;
+
+describe.each(TOP_NOTES)('feedback 10 at note %i', (note) => {
+  const held = (feedback: number): RenderResult =>
+    render(
+      loaded,
+      loaded.create(makePatch({ ops: [{ wave: WAVE.SINE, level: 1, feedback, env }] }), 4),
+      blocksFor(TOP_SECONDS),
+      [{ type: 'noteOn', id: 1, note, velocity: 1, frame: 0 }],
+    );
+
+  it('renders finite output whose peak stays within the operator’s ±1 before the voice gain', () => {
+    const f0 = 440 * Math.pow(2, (note - 69) / 12);
+    const top = held(10);
+    expect(top.nonFinite).toBe(0);
+    expect(top.samples.every((x) => Number.isFinite(x))).toBe(true);
+    // goertzel returns half a partial's amplitude: the plain sine's amplitude is the voice gain.
+    const sine = spectrum(note, 0).result;
+    const gain = 2 * goertzel(sine.samples, f0, SR);
+    expect(top.peak).toBeGreaterThan(0);
+    expect(top.peak).toBeLessThanOrEqual(gain * (1 + GAIN_TOLERANCE));
   });
 });

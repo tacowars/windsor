@@ -246,8 +246,15 @@ const DRIVE_TONE_RANGE = { min: 0, max: 1 };
 /** `tone` is clamped here by the worklet: its floor keeps the anti-alias trim above silence. */
 const TONE_RANGE = { min: 0.02, max: 1 };
 
-/** Operator self-feedback is bipolar (#529) and clamped here by the worklet. */
-const FEEDBACK_RANGE = { min: -1, max: 1 };
+/**
+ * Operator self-feedback, clamped here by the worklet: bipolar (#529), the
+ * negative (square) side to −1 and the positive (saw) side to 10 (windsor#842,
+ * record `2026-10-16-operator-feedback-to-ten`). The value that matches
+ * classic FM feedback `n` is `20.1 × 2^(n − 8)`, so the top, feedback 7, is
+ * 10.05, rounded to 10. The same bounds are the voice target row's, the
+ * catalog row's and the knob's.
+ */
+const FEEDBACK_RANGE = { min: -1, max: 10 };
 
 /**
  * An operator's ratio as the console sets it and a ratio target moves it
