@@ -15,6 +15,11 @@
  * picker must open inside the click's user activation, long before the render
  * ends) is told to discard instead. Discarding releases what the sink holds
  * and never deletes a file: a picked file may be one the user already had.
+ *
+ * That is the in-memory run: Download, and stems on either destination. A
+ * Save as of the mix streams instead (`audioExportStream.ts`, windsor#822),
+ * and its rule is that nothing reaches the picked file until the writable
+ * closes.
  */
 import type {
   ArrangementDocument,
@@ -28,6 +33,7 @@ import {
   RENDER_SAMPLE_RATE_DEFAULT,
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTH_DEFAULT,
+  WAV_FLOAT_BIT_DEPTH,
 } from '@windsor/engine';
 import {
   FILE_NAME_FORBIDDEN,
@@ -89,6 +95,22 @@ export interface WavSink {
   write(file: Blob, signal: AbortSignal): Promise<void>;
   /** The run will not write; release anything held. Never deletes a file the user picked. */
   discard(): Promise<void>;
+  /**
+   * Open the destination for a streamed write (windsor#822), where it can
+   * take one: the picked file's writable. Absent on a download.
+   */
+  stream?: () => Promise<StreamWritable>;
+}
+
+/**
+ * What a streamed export needs of a `FileSystemWritableFileStream`; a test
+ * fakes it. The picked file keeps its old contents until `close()`, and
+ * `abort()` leaves them as they were.
+ */
+export interface StreamWritable {
+  write(bytes: Uint8Array<ArrayBuffer>): Promise<void>;
+  close(): Promise<void>;
+  abort(): Promise<void>;
 }
 
 export interface AudioExportRun {
@@ -98,7 +120,12 @@ export interface AudioExportRun {
   sink: WavSink;
   signal: AbortSignal;
   onProgress: (fraction: number) => void;
-  render: (document: ArrangementDocument, options: RenderSongOptions) => Promise<RenderedSong>;
+  /** The engine's `renderSong`; `maxFrames` is its cap, `RENDER_MAX_FRAMES` when absent. */
+  render: (
+    document: ArrangementDocument,
+    options: RenderSongOptions,
+    maxFrames?: number,
+  ) => Promise<RenderedSong>;
   /**
    * The engine's chunked encoder (`encodeWavAsync`): it yields between chunks
    * and rejects with an `AbortError` once `signal` fires, so a Cancel during
@@ -113,7 +140,7 @@ export interface AudioExportRun {
 }
 
 export type AudioExportOutcome =
-  | { kind: 'saved'; fileName: string; where: string; clipped: number }
+  | { kind: 'saved'; fileName: string; where: string; clipped: number; nonFinite: number }
   | { kind: 'cancelled' }
   | { kind: 'failed'; error: string };
 
@@ -127,20 +154,22 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       onProgress: run.onProgress,
     });
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
-    const { bytes, clipped } = await run.encode(
+    const { bytes, clipped, nonFinite } = await run.encode(
       rendered.channels,
       rendered.sampleRate,
       settings.bitDepth,
       { signal },
     );
-    return { file: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME }), clipped };
+    const file = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME });
+    return { file, clipped, nonFinite };
   });
 }
 
-/** What a run makes before it writes: the whole file, and the samples clipped making it. */
+/** What a run makes before it writes: the whole file, and the samples clipped or non-finite making it. */
 export interface MadeFile {
   file: Blob;
   clipped: number;
+  nonFinite: number;
 }
 
 /**
@@ -155,31 +184,53 @@ export async function runToSink(
   const { sink, signal } = run;
   let writing = false;
   try {
-    const { file, clipped } = await make();
+    const { file, clipped, nonFinite } = await make();
     if (signal.aborted) throw new DOMException('canceled', 'AbortError');
     // From here the sink decides: past its commit point a Cancel changes
     // nothing, and the write resolves (saved) or fails with its own error.
     writing = true;
     await sink.write(file, signal);
-    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
+    return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped, nonFinite };
   } catch (error) {
     await sink.discard().catch(() => undefined);
-    const abortError = error instanceof DOMException && error.name === 'AbortError';
-    if (abortError || (signal.aborted && !writing)) {
-      return { kind: 'cancelled' };
-    }
-    return { kind: 'failed', error: error instanceof Error ? error.message : String(error) };
+    return failureOutcome(error, signal, writing);
   }
 }
 
-/** The toast for an outcome: where the file went, and a warning when the render clipped. */
-export function exportNotice(outcome: AudioExportOutcome): { message: string; tone: ToastTone } {
+/**
+ * A run that threw: `cancelled` on an `AbortError`, or on any error while
+ * the signal has fired before the commit point (`committed` false);
+ * otherwise `failed`, with the error's message.
+ */
+export function failureOutcome(
+  error: unknown,
+  signal: AbortSignal,
+  committed: boolean,
+): AudioExportOutcome {
+  const abortError = error instanceof DOMException && error.name === 'AbortError';
+  if (abortError || (signal.aborted && !committed)) return { kind: 'cancelled' };
+  return { kind: 'failed', error: error instanceof Error ? error.message : String(error) };
+}
+
+/**
+ * The toast for an outcome: where the file went, and a warning when samples
+ * passed full scale, clipped in a PCM file and kept in a float one
+ * (windsor#822 decision 4), or when a float file wrote non-finite samples as
+ * silence.
+ */
+export function exportNotice(
+  outcome: AudioExportOutcome,
+  bitDepth: WavBitDepth,
+): { message: string; tone: ToastTone } {
   switch (outcome.kind) {
     case 'cancelled':
       return { message: 'audio export canceled — nothing was written', tone: 'info' };
     case 'failed':
       return { message: `audio export failed: ${outcome.error}`, tone: 'error' };
     case 'saved':
+      if (bitDepth === WAV_FLOAT_BIT_DEPTH && (outcome.clipped > 0 || outcome.nonFinite > 0)) {
+        return { message: floatWarning(outcome), tone: 'warning' };
+      }
       if (outcome.clipped > 0) {
         return {
           message:
@@ -190,4 +241,16 @@ export function exportNotice(outcome: AudioExportOutcome): { message: string; to
       }
       return { message: `saved ${outcome.fileName} to ${outcome.where}`, tone: 'success' };
   }
+}
+
+/** A float file's warning: the samples kept over full scale, and the non-finite ones written as 0. */
+function floatWarning(outcome: Extract<AudioExportOutcome, { kind: 'saved' }>): string {
+  const notes: string[] = [];
+  if (outcome.clipped > 0) {
+    notes.push(`${outcome.clipped} samples over full scale, kept in the float file`);
+  }
+  if (outcome.nonFinite > 0) {
+    notes.push(`${outcome.nonFinite} non-finite samples written as silence`);
+  }
+  return `saved ${outcome.fileName} to ${outcome.where} — ${notes.join('; ')}`;
 }

@@ -151,6 +151,7 @@ describe('runAudioExport', () => {
       fileName: 'song.wav',
       where: 'your downloads',
       clipped: 0,
+      nonFinite: 0,
     });
   });
 
@@ -204,7 +205,7 @@ describe('runAudioExport', () => {
 
   it("a cancel past the sink's commit point reports what the write did", async () => {
     for (const [result, expected] of [
-      [undefined, { kind: 'saved', fileName: 'song.wav', where: 'x', clipped: 0 }],
+      [undefined, { kind: 'saved', fileName: 'song.wav', where: 'x', clipped: 0, nonFinite: 0 }],
       [new Error('quota exceeded'), { kind: 'failed', error: 'quota exceeded' }],
     ] as const) {
       const controller = new AbortController();
@@ -271,18 +272,52 @@ describe('runAudioExport', () => {
 describe('exportNotice', () => {
   it('names where the file went', () => {
     expect(
-      exportNotice({ kind: 'saved', fileName: 'a.wav', where: 'your downloads', clipped: 0 }),
+      exportNotice(
+        { kind: 'saved', fileName: 'a.wav', where: 'your downloads', clipped: 0, nonFinite: 0 },
+        24,
+      ),
     ).toEqual({ message: 'saved a.wav to your downloads', tone: 'success' });
   });
 
   it('warns when the render clipped, errors on a failure, informs on a cancel', () => {
-    expect(exportNotice({ kind: 'saved', fileName: 'a.wav', where: 'x', clipped: 3 }).tone).toBe(
-      'warning',
-    );
-    expect(exportNotice({ kind: 'failed', error: 'boom' })).toEqual({
+    expect(
+      exportNotice({ kind: 'saved', fileName: 'a.wav', where: 'x', clipped: 3, nonFinite: 0 }, 24),
+    ).toEqual({
+      message:
+        'saved a.wav to x — 3 samples clipped at full scale; lower the master level and export again',
+      tone: 'warning',
+    });
+    expect(exportNotice({ kind: 'failed', error: 'boom' }, 24)).toEqual({
       message: 'audio export failed: boom',
       tone: 'error',
     });
-    expect(exportNotice({ kind: 'cancelled' }).tone).toBe('info');
+    expect(exportNotice({ kind: 'cancelled' }, 24).tone).toBe('info');
+  });
+
+  it('says a float file kept the samples over full scale (windsor#822 decision 4)', () => {
+    expect(
+      exportNotice({ kind: 'saved', fileName: 'a.wav', where: 'x', clipped: 3, nonFinite: 0 }, 32),
+    ).toEqual({
+      message: 'saved a.wav to x — 3 samples over full scale, kept in the float file',
+      tone: 'warning',
+    });
+    expect(
+      exportNotice({ kind: 'saved', fileName: 'a.wav', where: 'x', clipped: 0, nonFinite: 0 }, 32)
+        .tone,
+    ).toBe('success');
+  });
+
+  it('says a float file wrote its non-finite samples as silence, apart from those over full scale', () => {
+    const saved = { kind: 'saved', fileName: 'a.wav', where: 'x' } as const;
+    expect(exportNotice({ ...saved, clipped: 0, nonFinite: 2 }, 32)).toEqual({
+      message: 'saved a.wav to x — 2 non-finite samples written as silence',
+      tone: 'warning',
+    });
+    expect(exportNotice({ ...saved, clipped: 3, nonFinite: 2 }, 32)).toEqual({
+      message:
+        'saved a.wav to x — 3 samples over full scale, kept in the float file; ' +
+        '2 non-finite samples written as silence',
+      tone: 'warning',
+    });
   });
 });

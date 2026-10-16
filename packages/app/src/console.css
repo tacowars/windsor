@@ -5977,6 +5977,8 @@ select.field.compact {
   flex: none;
 }
 .export-formats .seg button {
+  /* Each as wide as its label, so "32-bit float" (windsor#822) is not cut short. */
+  flex: none;
   white-space: nowrap;
   padding: 6px 10px;
 }

@@ -61,12 +61,15 @@ export function downloadSink(fileName: string): WavSink {
  * and a render can outlast it). Null when the user closes the picker.
  *
  * The picked file is never removed: it may be one the user already had, and
- * nothing proves it new. The file is opened for writing only once the whole
- * WAV or zip is made, and a writable stream keeps the old contents until it
- * closes, so a failed or cancelled write (`writeInChunks`) is aborted and
- * the file is left as it was. A cancel before that point never touches the
- * file (a browser that creates an empty file on picking a new name leaves
- * that empty file).
+ * nothing proves it new. The rule is that nothing reaches the picked file
+ * until the writable closes (windsor#822 decision 2): a writable stream keeps
+ * the old contents until `close()`, and a failed or cancelled write is
+ * aborted, so the file is left as it was. The file is opened for writing only
+ * once the render is done: by `stream` for the mix, which the WAV encoder
+ * then writes chunk by chunk (`audioExportStream.ts`), or by `write` once the
+ * stems' whole zip is made (`writeInChunks`). A cancel before that point
+ * never touches the file (a browser that creates an empty file on picking a
+ * new name leaves that empty file).
  */
 export async function pickSaveSink(fileName: string, format: SaveFormat): Promise<WavSink | null> {
   let handle: FileSystemFileHandle;
@@ -96,5 +99,13 @@ export async function pickSaveSink(fileName: string, format: SaveFormat): Promis
       );
     },
     discard: () => Promise.resolve(),
+    stream: async () => {
+      const writable = await handle.createWritable();
+      return {
+        write: (bytes) => writable.write(bytes),
+        close: () => writable.close(),
+        abort: () => writable.abort(),
+      };
+    },
   };
 }
