@@ -6,7 +6,8 @@
  * tested in Node: the spec a caller hands the menu, the size the opening
  * press picks, where the menu and a submenu sit, the drilled-in rows of a
  * touch submenu, the row under a sliding finger, and what a press on a row
- * does. `contextMenu.ts` draws it.
+ * does, and the one open menu, whose close ends it exactly once.
+ * `contextMenu.ts` draws it.
  */
 import type { MenuSizeTable, MousePlaceTable, TouchPlaceTable } from './contextMenuTables';
 import { MENU_SIZES, MOUSE_PLACE, TOUCH_PLACE } from './contextMenuTables';
@@ -255,4 +256,36 @@ export function movePreview(current: MenuRow | null, next: ShownItem | undefined
   const row = next?.kind === 'row' && next.disabled !== true ? next : null;
   if (row === current) return { previewed: current, unpreview: null, preview: null };
   return { previewed: row, unpreview: current, preview: row };
+}
+
+/**
+ * The one open menu (windsor#834): opening a menu closes the one before, and
+ * each menu's close runs its `teardown` exactly once, whatever closes it (a
+ * row, Escape, a press outside, a scroll, a key, a blur, a resize, or the
+ * next opening). A close of a menu already closed or replaced does nothing.
+ */
+export class MenuSlot {
+  private current: (() => void) | null = null;
+
+  /** Make `teardown`'s menu the open one, closing the one before; returns its close. */
+  open(teardown: () => void): () => void {
+    this.close();
+    const close = (): void => {
+      if (this.current !== close) return;
+      this.current = null;
+      teardown();
+    };
+    this.current = close;
+    return close;
+  }
+
+  /** Close the open menu, if one is. */
+  close(): void {
+    this.current?.();
+  }
+
+  /** True while a menu is open. */
+  get isOpen(): boolean {
+    return this.current !== null;
+  }
 }
