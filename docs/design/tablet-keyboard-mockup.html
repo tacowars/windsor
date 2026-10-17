@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The audition keyboard as a playable instrument on a tablet (windsor#861,
+     record docs/log/2026-10-17-the-keyboard-on-a-tablet.md). Reproduced from
+     screenshots of today's Parts tab taken on 2026-10-17 in a headless browser
+     at CSS 1024 x 1366 and 1366 x 1024 with touch, 1440 x 900 without, and
+     390 x 844 with touch, with a three-part song (Keys on Submerged Keys, Pad
+     on Drift Pad, Kick on 909 Kick with a Euclid), Keys selected and two keys
+     (C4 and G4) held by synthetic pointerdowns. Static and self-contained:
+     open it in a browser. The strip at the very top is the mockup's own
+     switcher, not part of the console. -->
+  <!-- Sizes from the app (the headless browser, 2026-10-17): the header 127 px on
+     the tablet in both orientations, 93 px at 1440 x 900, 165 px at 390 x 844;
+     the keys row's padding 12 / 14 / 15 px and its gap 14 px; the keys 46 px
+     high; .btn 28 px high (Oct - 60.4, Oct + 60.4, Hold 58.3, Panic 61.2,
+     Enable MIDI 101.8 px wide); the white key today 26.1 px (portrait), 43 px
+     (landscape), 46.7 px (1440), 15.3 px (390). The expanded view's frame is
+     #855 / #856's: 16 px under the header, 24 px at the sides and bottom. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Tablet Keyboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --carrier: #e0a44e;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own switcher (not the console) ---------- */
+    .mock-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--return);
+    }
+    .mock-bar label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select {
+      max-width: 100%;
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 6px;
+      font: 11px var(--f-ui);
+    }
+    /* A mockup-only marker inside a frame (not part of the console). */
+    .mock-tag {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      color: var(--return);
+      background: #2a2140;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      padding: 2px 6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    /* New controls carry a dashed outline; the switcher's toggle turns it off. */
+    body.marks .new {
+      outline: 1px dashed var(--return);
+      outline-offset: 2px;
+    }
+    body.marks .overlay.new {
+      outline-offset: -3px;
+    }
+
+    /* ---------- the frame: the console at a device's CSS size, 1:1 ---------- */
+    .console {
+      width: var(--frame-w);
+      height: var(--frame-h);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      outline: 1px dashed var(--return);
+    }
+
+    /* ---------- the header, as #855 / #856's mockup draws it ---------- */
+    header.head {
+      flex: none;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .head-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .head-row:first-child {
+      gap: 8px 12px;
+      align-items: flex-start;
+    }
+    .tstrip {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+    }
+    .tgroup {
+      display: flex;
+      gap: 8px;
+      flex: none;
+    }
+    .undo-pair {
+      display: flex;
+      gap: 4px;
+      margin-left: -6px;
+    }
+    .tabs {
+      flex: none;
+      display: inline-flex;
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .tab {
+      height: 28px;
+      padding: 0 14px;
+      background: var(--inset);
+      color: var(--ink-dim);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 0;
+    }
+    .tab.icon {
+      width: 36px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+    }
+    .tab[aria-selected='true'] {
+      background: var(--carrier);
+      color: #111416;
+    }
+    .box {
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 9px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      font: 13px var(--f-num);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .box small {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.1em;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+    .box.btn {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+    .box.sq {
+      width: 28px;
+      justify-content: center;
+      padding: 0;
+    }
+    .box.sq[disabled] {
+      color: var(--line-bright);
+      cursor: default;
+    }
+    .box.sel::after {
+      content: '⌄';
+      margin-left: 8px;
+      color: var(--ink-dim);
+      transform: translateY(-3px);
+    }
+    .cpu {
+      width: 116px;
+      justify-content: space-between;
+    }
+    .cpu i {
+      width: 49px;
+      height: 6px;
+      border: 1px solid var(--line-bright);
+      border-radius: 1px;
+    }
+    .rec-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--line-bright);
+      margin: 9px 0 0 -4px;
+    }
+    .spacer {
+      flex: 1;
+    }
+    .pchip {
+      width: 150px;
+      height: 38px;
+      padding: 4px 12px 3px 7px;
+      text-align: left;
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--tone);
+      border-radius: var(--r);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      position: relative;
+    }
+    .pchip[aria-pressed='true'] {
+      background: var(--tone);
+      border-color: var(--tone);
+      color: #14181a;
+    }
+    .pchip small {
+      display: block;
+      font: 500 9.5px var(--f-ui);
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink-faint);
+    }
+    .pchip[aria-pressed='true'] small {
+      color: #14181a;
+    }
+    .pchip + .pchip {
+      margin-left: -4px;
+    }
+    .pchip::after {
+      content: '';
+      position: absolute;
+      right: 6px;
+      top: 7px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #222;
+      box-shadow: 0 9px 0 #222;
+    }
+    .pm {
+      width: 34px;
+      height: 38px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      color: var(--ink);
+    }
+    /* The phone header (record 2026-10-04-phone-header): three rows, then the chips. */
+    .phone .tabs {
+      flex: 1;
+      display: flex;
+    }
+    .phone .tab {
+      flex: 1;
+      padding: 0;
+    }
+    .phone .tab.icon {
+      flex: none;
+      width: 38px;
+    }
+    .phone .undo-pair {
+      margin-left: 5px;
+    }
+    .phone .cpu {
+      width: 91.8px;
+    }
+    .phone .cpu i {
+      width: 32.8px;
+    }
+    .phone .settings-row {
+      flex-wrap: nowrap;
+      overflow: hidden;
+      position: relative;
+      gap: 8px;
+      margin: 0 -16px;
+      padding: 0 16px;
+    }
+    .phone .settings-row::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 28px;
+      background: linear-gradient(90deg, transparent, var(--panel) 60%);
+    }
+    .phone .settings-row .tgroup + .tgroup {
+      padding-left: 12px;
+      border-left: 1px solid var(--line);
+    }
+    .phone .pchip {
+      width: 92.3px;
+    }
+    .phone .pchip + .pchip {
+      margin-left: -5px;
+    }
+    .phone .pm {
+      margin-left: -4px;
+    }
+    .phone .pm + .pm {
+      margin-left: -5px;
+    }
+
+    /* ---------- the Parts tab under the header ---------- */
+    .stage {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .parts-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+    .rail {
+      width: 231px;
+      flex: none;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+    }
+    .deck {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 12px 12px;
+    }
+    .stand-in {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-content: center;
+      gap: 8px;
+      justify-items: center;
+      padding: 16px;
+      text-align: center;
+      border: 1px dashed var(--line-bright);
+      border-top: 0;
+      border-radius: 0 0 var(--r) var(--r);
+      color: var(--ink-faint);
+      font-size: 12px;
+    }
+    .card {
+      flex: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 10px 12px;
+    }
+    .section-title {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+      order: 1;
+    }
+    .section-title .end {
+      order: 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font: 10px var(--f-num);
+      letter-spacing: 0.1em;
+    }
+    .btn {
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 6px 12px;
+      color: var(--ink-dim);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .btn.small {
+      padding: 3px 14px;
+      margin-right: 8px;
+      font-size: 10px;
+    }
+    .btn[aria-pressed='true'] {
+      background: var(--modulator);
+      border-color: var(--modulator);
+      color: #111416;
+    }
+    .btn.midi {
+      background: var(--panel-hi);
+      border-color: var(--line-bright);
+      color: var(--ink);
+    }
+    .btn svg {
+      width: 12px;
+      height: 12px;
+      margin: -2px 6px -2px 0;
+      vertical-align: middle;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.2;
+    }
+    .add-macro {
+      width: 130px;
+      margin: 11px 0 10px;
+      padding: 5px 0;
+      background: var(--inset);
+      border: 1px dashed var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-dim);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- the keys row (console.css .keys-row, .keys, .key) ---------- */
+    .keys-row {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 12px 14px 15px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+    .keys {
+      display: flex;
+      gap: 2px;
+      flex: 1;
+      min-width: 260px;
+      height: 46px;
+    }
+    .key {
+      flex: 1;
+      background: linear-gradient(180deg, #262d32, #1a2023);
+      border: 1px solid var(--line);
+      border-radius: 0 0 var(--r) var(--r);
+      position: relative;
+    }
+    .key.black {
+      background: linear-gradient(180deg, #14181a, #0d1012);
+      flex: 0.62;
+    }
+    .key.down {
+      background: var(--carrier);
+      border-color: var(--carrier);
+    }
+    .key-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .status {
+      font: 11px var(--f-num);
+      color: var(--ink-faint);
+    }
+
+    /* Proposed, under (any-pointer: coarse): white keys of equal width, never under
+       44 px, the black keys over them at 60 % x 62 %, the row 110 px high. */
+    .keys.touch {
+      --white-min: 44px;
+      position: relative;
+      gap: 0;
+      height: 110px;
+      min-width: calc(var(--whites) * var(--white-min));
+    }
+    .keys.touch .key,
+    .krow .key {
+      flex: 1;
+    }
+    .keys.touch .key.black,
+    .krow .key.black {
+      position: absolute;
+      top: 0;
+      z-index: 1;
+      height: 62%;
+      width: calc(100% / var(--whites) * 0.6);
+      left: calc(100% / var(--whites) * (var(--after) + 0.7));
+    }
+
+    /* ---------- the expanded keyboard view (the #855 / #856 frame) ---------- */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 24px 24px;
+      background: var(--ground);
+    }
+    .overlay-head {
+      flex: none;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 10px;
+    }
+    .overlay-title {
+      font: 600 12px var(--f-panel);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+    .overlay-head .status {
+      align-self: stretch;
+    }
+    .pick {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+    .pick-label {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    /* console.css .seg, the Drive switch's control, at the bar's 28 px. */
+    .seg {
+      display: flex;
+      gap: 1px;
+      background: var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .seg button {
+      min-width: 44px;
+      height: 28px;
+      padding: 0 4px;
+      background: var(--inset);
+      border: 0;
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.07em;
+      color: var(--ink-dim);
+    }
+    .seg button[aria-pressed='true'] {
+      background: var(--modulator);
+      color: #111416;
+    }
+    .seg button[aria-disabled='true'] {
+      color: var(--line-bright);
+      background: #0e1113;
+      cursor: not-allowed;
+    }
+    .keyboard {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .krow {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      position: relative;
+    }
+    .cname {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 8px;
+      text-align: center;
+      font: 11px var(--f-num);
+      color: var(--ink-faint);
+    }
+    .key.down .cname {
+      color: #111416;
+    }
+    /* A tap on a disabled option writes its reason here; console.css .roll-overlay-note. */
+    .pick-hint {
+      color: var(--ink-faint);
+      font-family: var(--f-num);
+      font-size: 10px;
+    }
+    .pick-hint:empty {
+      display: none;
+    }
+    /* Mockup only: the strike velocity zones on one key, with their values. */
+    .zones {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(180deg, rgba(156, 123, 208, 0.08), rgba(156, 123, 208, 0.5));
+      border: 1px dashed var(--return);
+    }
+    .zones i {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 0;
+      border-top: 1px solid var(--return);
+    }
+    .zones b {
+      position: absolute;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 1px 5px;
+      background: #2a2140;
+      border: 1px solid var(--return);
+      border-radius: var(--r);
+      font: 600 11px var(--f-num);
+      color: #e6dcf8;
+    }
+    .frame-tag {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      z-index: 20;
+    }
+
+    /* ---------- notes on the design ---------- */
+    .notes {
+      margin: 14px 16px 30px;
+      padding: 12px 14px;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      background: rgba(156, 123, 208, 0.06);
+      max-width: 980px;
+    }
+    .notes[hidden] {
+      display: none;
+    }
+    .notes h2 {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--return);
+      margin: 0 0 8px;
+    }
+    .notes ol,
+    .notes p {
+      margin: 0 0 12px;
+      color: var(--ink-dim);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .notes ol {
+      padding-left: 20px;
+    }
+    .notes b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin: 0 0 12px;
+    }
+    .notes table {
+      border-collapse: collapse;
+      font: 11.5px var(--f-num);
+      color: var(--ink-dim);
+    }
+    .notes th,
+    .notes td {
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .notes th {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .notes td.off {
+      color: var(--hot, #d2643c);
+    }
+  </style>
+
+  <div class="mock-bar" aria-label="Mockup controls">
+    <b>Mockup</b>
+    <label
+      >Frame
+      <select id="mFrame"></select>
+    </label>
+    <label><input type="checkbox" id="mMarks" checked /> Mark new controls</label>
+    <label><input type="checkbox" id="mNotes" /> Notes below</label>
+    <span
+      >In a frame, Expand, Close, Esc, Oct − / +, Octaves, Rows and the part chips are live.</span
+    >
+  </div>
+
+  <div class="console" id="console"></div>
+
+  <div class="notes" id="notes" hidden>
+    <h2>What changes</h2>
+    <ol>
+      <li>
+        <b>The keys row on a touch screen</b> (<code>@media (any-pointer: coarse)</code>): white keys
+        of equal width, never under 44 px, the black keys over them at 60 % of a white key's
+        width and 62 % of the row's height, centred on the line between their two white keys. The
+        row is 110 px high (46 px today). Two octaves, as today, 14 white keys, when they fit at
+        44 px (616 px), else one. Where the row leaves less beside the buttons, the buttons wrap
+        under the keys (portrait, the phone). The colours are today's.
+      </li>
+      <li>
+        <b>Expand</b>, the one new button on the keys row, on every device, at the end of the
+        button group: a <code>.btn</code> with the roll's rail icon (<code>rollExpand.ts</code>'s
+        expand path) and the word. At 1440 × 900 with a mouse nothing else changes; the keys give
+        Expand's width to it.
+      </li>
+      <li>
+        <b>The expanded keyboard</b> opens below the live header, 16 px under it and 24 px from
+        the sides and bottom, on the ground colour, like the roll and the workbench (#855,
+        #856). Its bar: the title (the family's, "Keys — Keyboard"), Oct −, the octave label, Oct
+        +, Octaves 1 · 2 · 3 · 4, Rows 1 · 2, Hold, Panic and Close. The keys fill what is left;
+        two rows sit 12 px apart, the lower octaves on the lower row. The C of each octave shows
+        its name. The part chips stay live: pick Pad and the keyboard plays Pad.
+      </li>
+      <li>
+        <b>An Octaves tap takes effect whenever some row count allows it</b>, and the rows
+        follow: they stay if they allow it, else they switch. On the portrait tablet, 4 octaves
+        in one row would make a white key 34.9 px, so from 3 octaves, 1 row a tap on 4 gives 4
+        octaves, 2 rows; on the phone, from 1 octave, 1 row a tap on 2 gives 2 octaves, 2 rows.
+        Only an octave count no row count allows is dimmed ("3 octaves needs more width", on the
+        phone). A Rows option the octaves do not allow is dimmed: Rows 2 for 1 and 3 octaves
+        ("2 rows takes 2 or 4 octaves"), Rows 1 for 4 octaves in portrait ("4 octaves needs 2
+        rows at this width"). A dimmed option keeps its place and stays tappable: a tap leaves
+        the pick as it is and writes the reason beside Octaves and Rows until the next pick, and
+        the mouse also has it in the title. The view opens on the nearest allowed pick when the stored one
+        does not fit the room, the same rows with fewer octaves first, then one row: the phone's
+        default 2 octaves, 1 row opens at 1 octave, 1 row (342 ÷ 7 = 48.9 px).
+      </li>
+      <li>
+        <b>The strike velocity</b> (touch and pen): 0.6 at a key's top edge, 0.8 at its middle,
+        1.0 at its bottom edge, linear, a black key over its own height. A mouse keeps 0.9. The
+        "Strike velocity" frame draws the zones on E and F♯; the app draws nothing.
+      </li>
+      <li>
+        <b>A narrow keys box</b> (the phone): the touch row's octave count comes from the keys
+        box's own width, not a breakpoint: two octaves when 14 whites fit at 44 px (616 px), else
+        one, the keys always sharing the box's width. At 390 × 844 that is one octave, 7 white
+        keys at 51.7 px, the buttons under it; at 320 × 568 a white key is 41.7 px rather than
+        the row overflowing. The expanded view is the way to play more.
+      </li>
+    </ol>
+
+    <h2>The numbers</h2>
+    <p>
+      The room for the keys is the window less the view's padding: 24 px each side, so 1318 px in
+      landscape and 976 px in portrait. Its height is the window less the 127 px header, the 16 px
+      above the bar, the 28 px bar, the 8 px under it and the 24 px at the bottom: 821 px in
+      landscape, 1163 px in portrait. Two rows split it with a 12 px gap. A white key's width is
+      the room's width over the white keys in a row; red is under 44 px, disabled. One octave in
+      one row is always offered: below a 308 px room its white keys share the room under 44 px (at
+      320 px wide the room is 272 px and a white key 38.9 px) rather than the view overflowing.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <tr>
+          <th>Octaves</th>
+          <th>Rows</th>
+          <th>Whites a row</th>
+          <th>Landscape white</th>
+          <th>Landscape row</th>
+          <th>Portrait white</th>
+          <th>Portrait row</th>
+          <th>Oct + stops at</th>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td>1</td>
+          <td>7</td>
+          <td>188.3 px</td>
+          <td>821 px</td>
+          <td>139.4 px</td>
+          <td>1163 px</td>
+          <td>C8</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>1</td>
+          <td>14</td>
+          <td>94.1 px</td>
+          <td>821 px</td>
+          <td>69.7 px</td>
+          <td>1163 px</td>
+          <td>C8</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>2</td>
+          <td>7</td>
+          <td>188.3 px</td>
+          <td>404.5 px</td>
+          <td>139.4 px</td>
+          <td>575.5 px</td>
+          <td>C8</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>1</td>
+          <td>21</td>
+          <td>62.8 px</td>
+          <td>821 px</td>
+          <td>46.5 px</td>
+          <td>1163 px</td>
+          <td>C7</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>1</td>
+          <td>28</td>
+          <td>47.1 px</td>
+          <td>821 px</td>
+          <td class="off">34.9 px</td>
+          <td class="off">disabled</td>
+          <td>C6</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>2</td>
+          <td>14</td>
+          <td>94.1 px</td>
+          <td>404.5 px</td>
+          <td>69.7 px</td>
+          <td>575.5 px</td>
+          <td>C6</td>
+        </tr>
+      </table>
+    </div>
+    <p>
+      The octave label names the lowest C as the keyboard does today (<code>C${octave}</code>, MIDI
+      note = 12 × octave, so C4 is 48). Oct + stops where the highest key is still in the engine's
+      range 0–127: at C8 the 2-octave keyboard tops out at B9 (119), at C7 three octaves do, at
+      C6 four. On the 110 px touch row a white key reads 0.6 at its top, 0.8 at 55 px and 1.0 at
+      110 px; a black key (68.2 px) 0.6, 0.8 at 34.1 px and 1.0 at 68.2 px.
+    </p>
+
+    <h2>To decide</h2>
+    <ol>
+      <li>
+        <b>The touch row's height on the Parts tab.</b> Recommended: 110 px. Room for the strike
+        velocity to spread (0.4 over 110 px) and for a finger to land on a black key's lower half,
+        and still short enough that the Parts tab's cards keep most of the screen.
+      </li>
+      <li>
+        <b>The black keys' height on the touch row.</b> Recommended: 62 % (68.2 px of 110). It
+        leaves 41.8 px of white below every black key, just under the 44 px touch row size,
+        because a finger landing between black keys has the whole white key's width as well.
+      </li>
+      <li>
+        <b>The expanded view's default.</b> Recommended: 2 octaves, 1 row: 94.1 px white keys in
+        landscape and 69.7 px in portrait, the same two octaves as the Parts row.
+      </li>
+      <li>
+        <b>Expand on the desktop.</b> Recommended: yes. The view is as useful with a mouse, the
+        button (91.1 px and an 8 px gap) costs the keys 99.2 px of today's 996.7 px at 1440 ×
+        900, a white key going from 46.7 to 41.8 px, and one keys row for every device is less
+        to build and test.
+      </li>
+      <li>
+        <b>Note names on the expanded keys.</b> Recommended: yes, the C of each octave only, in
+        the octave label's naming, so the bar and the keys agree. That naming calls MIDI 48 C4,
+        where the rest of the console (<code>noteName</code>, the roll's keys) calls 60 C4; the
+        record lists one naming for both as Later. The touch row on the Parts tab stays
+        unlabelled, as today.
+      </li>
+    </ol>
+  </div>
+
+  <script>
+    /* ---------- the app's own numbers (record 2026-10-17-the-keyboard-on-a-tablet) ---------- */
+    const DEVICES = {
+      portrait: [1024, 1366],
+      landscape: [1366, 1024],
+      desktop: [1440, 900],
+      phone: [390, 844],
+    };
+    const VIEW_PAD_X = 24; // the expanded views' side padding (#855)
+    const WHITE_MIN = 44; // contextMenuTables.ts's touch row
+    const HEADER_TABLET = 127;
+    const BAR = 28;
+    const BLACK = new Set([1, 3, 6, 8, 10]);
+    const OCTAVE_MAX = { 1: 8, 2: 8, 3: 7, 4: 6 };
+    const PARTS = [
+      ['keys', 'Keys', '#6ea8e2'],
+      ['pad', 'Pad', '#ede36e'],
+      ['kick', 'Kick', '#bc3d6d'],
+    ];
+    const FRAMES = [
+      ['today-portrait', 'Today · tablet portrait, 1024 × 1366', 'portrait', 'today'],
+      ['today-landscape', 'Today · tablet landscape, 1366 × 1024', 'landscape', 'today'],
+      ['today-desktop', 'Today · desktop, 1440 × 900', 'desktop', 'today'],
+      ['today-phone', 'Today · phone, 390 × 844', 'phone', 'today'],
+      ['touch-portrait', 'Proposed · touch keys row, portrait', 'portrait', 'touch'],
+      ['touch-landscape', 'Proposed · touch keys row, landscape', 'landscape', 'touch'],
+      ['desktop', 'Proposed · desktop keys row with Expand', 'desktop', 'desktop'],
+      ['phone', 'Proposed · phone, one octave', 'phone', 'touch'],
+      ['exp-land-2-1', 'Proposed · expanded, landscape, 2 octaves, 1 row (default)', 'landscape', 'expanded', 2, 1],
+      ['exp-land-4-2', 'Proposed · expanded, landscape, 4 octaves, 2 rows', 'landscape', 'expanded', 4, 2],
+      ['exp-port-3-1', 'Proposed · expanded, portrait, 3 octaves, 1 row', 'portrait', 'expanded', 3, 1],
+      ['exp-port-4-2', 'Proposed · expanded, portrait, 4 octaves, 2 rows', 'portrait', 'expanded', 4, 2],
+      ['exp-port-title', 'Proposed · the bar: Rows 2 dimmed, its reason after a tap', 'portrait', 'expanded', 3, 1, 'title'],
+      ['velocity', 'Proposed · strike velocity zones (0.6, 0.8, 1.0)', 'landscape', 'expanded', 2, 1, 'zones'],
+    ];
+    // `octaves` and `rows` are the stored preference, what the user picked; the view draws allowedPick of it.
+    const state = { frame: FRAMES[0], part: 'keys', octave: 4, octaves: 2, rows: 1, hold: false, open: false, hint: '' };
+    const $ = (id) => document.getElementById(id);
+    const ICON_EXPAND = '<path d="M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7"/>';
+    const ICON_GEAR =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.73l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.27 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.18l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
+    /* ---------- the view model: which picks a room allows, and why not ---------- */
+    function whiteWidth(roomW, octaves, rows) {
+      return roomW / ((7 * octaves) / rows);
+    }
+    // `rowsButton`: the reason is for a Rows option, not an Octaves one.
+    // One octave in one row is always offered: below a 308 px room its keys share the room under 44 px.
+    function whyNot(roomW, octaves, rows, rowsButton = false) {
+      if (octaves === 1 && rows === 1) return '';
+      if (rows === 2 && octaves % 2)
+        return rowsButton ? '2 rows takes 2 or 4 octaves' : `${octaves} octave${octaves > 1 ? 's' : ''} can't split into 2 rows`;
+      if (whiteWidth(roomW, octaves, rows) < WHITE_MIN) return `${octaves} octaves needs 2 rows at this width`;
+      return '';
+    }
+    // The rows an Octaves tap takes: the current rows if they allow it, else the other count, else 0 (none).
+    function rowsFor(roomW, octaves, rows) {
+      if (!whyNot(roomW, octaves, rows)) return rows;
+      return whyNot(roomW, octaves, 3 - rows) ? 0 : 3 - rows;
+    }
+    // An Octaves option is dimmed only when no row count allows it.
+    function whyNotOctaves(roomW, octaves, rows) {
+      return rowsFor(roomW, octaves, rows) ? '' : `${octaves} octave${octaves > 1 ? 's' : ''} needs more width`;
+    }
+    // The pick a room allows: the pick itself, else the same rows with fewer octaves, else one row with fewer,
+    // else one octave in one row, which every room offers, so the view never draws nothing or overflows.
+    function allowedPick(roomW, octaves, rows) {
+      if (!whyNot(roomW, octaves, rows)) return { octaves, rows };
+      for (let n = octaves - 1; n >= 1; n--) if (!whyNot(roomW, n, rows)) return { octaves: n, rows };
+      for (let n = octaves - 1; n >= 1; n--) if (!whyNot(roomW, n, 1)) return { octaves: n, rows: 1 };
+      return { octaves: 1, rows: 1 };
+    }
+    const roomOf = (device) => DEVICES[device][0] - 2 * VIEW_PAD_X;
+    // Applied whenever the view opens or its room changes: every render reads the room again.
+    const viewPick = () => allowedPick(roomOf(state.frame[2]), state.octaves, state.rows);
+
+    /* ---------- the header ---------- */
+    const chips = (phone) =>
+      PARTS.map(
+        ([id, name, tone], i) =>
+          `<button class="pchip" data-part="${id}" style="--tone:${tone}" aria-pressed="${state.part === id}">${name}<small>${i + 1} · None</small></button>`,
+      ).join('');
+    const tabsHtml = () =>
+      `<nav class="tabs"><button class="tab" aria-selected="true" style="width:66px">Parts</button><button class="tab" style="width:65px">Mixer</button><button class="tab" style="width:61px">Song</button><button class="tab icon" aria-label="Settings">${ICON_GEAR}</button></nav>`;
+    const undo = `<span class="undo-pair"><button class="box sq" aria-label="Undo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></g></svg></button><button class="box sq" aria-label="Redo" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="matrix(-1 0 0 1 24 0)"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></g></svg></button></span>`;
+    const G_TEMPO = `<span class="tgroup"><button class="box btn" style="width:48px">Tap</button><span class="box" style="width:94px">120.00 <small>BPM</small></span><span class="box" style="width:77px;justify-content:flex-end">4 <small>Bars</small></span></span>`;
+    const G_GRID = `<span class="tgroup"><span class="box" style="width:57px;justify-content:flex-end">50 <small>%</small></span><span class="box sel" style="width:63px">1/16</span><span class="box sel" style="width:63px">4/4</span></span>`;
+    const G_KEY = `<span class="tgroup"><span class="box sel" style="width:53px">C</span><span class="box sel" style="width:149px;justify-content:space-between">minor</span></span>`;
+    const G_PLAY = `<span class="tgroup"><span class="box" style="width:57px;justify-content:center">1.1.1</span><button class="box sq" style="width:37px">▶</button><button class="box sq" style="width:37px">■</button><button class="box sq" style="width:34px">‖</button><button class="box sq" style="width:41px"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9V7.5A2.5 2.5 0 0 1 5 5h8M11 3l2 2-2 2"/><path d="M13.5 7v1.5A2.5 2.5 0 0 1 11 11H3M5 9l-2 2 2 2"/></svg></button></span>`;
+    function headerHtml(phone) {
+      if (phone)
+        return `<header class="head phone">
+          <div class="head-row">${tabsHtml()}${undo}</div>
+          <div class="head-row"><span class="box cpu"><i></i>2%</span><span class="rec-dot" style="margin: 0 2px 0 0"></span>${G_PLAY}</div>
+          <div class="head-row settings-row">${G_TEMPO}${G_GRID}${G_KEY}</div>
+          <div class="head-row">${chips(true)}<button class="pm">+</button><button class="pm">−</button></div>
+        </header>`;
+      return `<header class="head">
+        <div class="head-row">${tabsHtml()}<span class="box cpu"><i></i>2%</span><span class="rec-dot"></span>${undo}
+          <div class="tstrip">${G_TEMPO}${G_GRID}${G_KEY}${G_PLAY}</div></div>
+        <div class="head-row">${chips(false)}<span class="spacer"></span><button class="pm">+</button><button class="pm">−</button></div>
+      </header>`;
+    }
+
+    /* ---------- the keys ---------- */
+    // One row of keys from `first` (an offset from the octave's C), `count` keys.
+    function keyRow({ first, count, cls, lit, names, zones }) {
+      let whites = 0;
+      let html = '';
+      for (let o = first; o < first + count; o++) {
+        const pc = o % 12;
+        const down = lit.has(o) ? ' down' : '';
+        if (BLACK.has(pc)) {
+          html += `<div class="key black${down}" style="--after:${whites - 1}">${zones?.has(o) ? zoneHtml() : ''}</div>`;
+        } else {
+          const name = names && pc === 0 ? `<span class="cname">C${state.octave + Math.floor(o / 12)}</span>` : '';
+          html += `<div class="key${down}">${name}${zones?.has(o) ? zoneHtml() : ''}</div>`;
+          whites++;
+        }
+      }
+      return `<div class="${cls}" style="--whites:${whites}">${html}</div>`;
+    }
+    const zoneHtml = () =>
+      '<span class="zones"><i style="top:0"></i><b style="top:14px">0.6</b><i style="top:50%"></i><b style="top:50%">0.8</b><i style="top:100%"></i><b style="top:calc(100% - 14px)">1.0</b></span>';
+    // Today's row: every key inline, the black ones at 0.62 of the flex.
+    function todayKeys(count, lit) {
+      let html = '';
+      for (let o = 0; o < count; o++)
+        html += `<div class="key${BLACK.has(o % 12) ? ' black' : ''}${lit.has(o) ? ' down' : ''}"></div>`;
+      return `<div class="keys">${html}</div>`;
+    }
+
+    /* ---------- the Parts tab's foot: the cards (abridged), Macros, the keys row ---------- */
+    function partsHtml(mode, device) {
+      const name = PARTS.find((p) => p[0] === state.part)[1];
+      const phone = device === 'phone';
+      const touch = mode === 'touch';
+      const lit = touch ? new Set([0, 3, 7]) : new Set([0, 7]);
+      const count = touch && phone ? 12 : 24;
+      const keys = touch ? keyRow({ first: 0, count, cls: 'keys touch new', lit }) : todayKeys(24, lit);
+      const expand =
+        mode === 'today'
+          ? ''
+          : `<button class="btn new" data-open title="Expand: open the keyboard wide"><svg viewBox="0 0 12 12">${ICON_EXPAND}</svg>Expand</button>`;
+      const rail = device === 'landscape' || device === 'desktop' ? '<div class="rail"></div>' : '';
+      return `<div class="parts-body">${rail}<div class="deck">
+          <div class="stand-in"><span class="mock-tag">Today, abridged</span>The Parts tab above the keys, exactly as today: ${name}'s patch, its operators, filter, LFOs, pitch envelope and Drive.</div>
+          <div class="card"><div class="section-title">Macros<span class="end">0 / 8 <button class="btn small">+ Macro</button></span></div><button class="add-macro">+ Macro</button></div>
+        </div></div>
+        <div class="keys-row">${keys}
+          <div class="key-buttons"><button class="btn" data-oct="-1">Oct &minus;</button><span class="status">C${state.octave}</span><button class="btn" data-oct="1">Oct +</button><button class="btn" data-hold aria-pressed="${state.hold}">Hold</button><button class="btn">Panic</button>${expand}</div>
+          <div><button class="btn midi">Enable MIDI</button></div>
+        </div>`;
+    }
+
+    /* ---------- the expanded keyboard ---------- */
+    function expandedHtml(device, extra) {
+      const [, h] = DEVICES[device];
+      const roomW = roomOf(device);
+      const view = viewPick();
+      const name = PARTS.find((p) => p[0] === state.part)[1];
+      // A dimmed option stays tappable: aria-disabled, its reason in data-why for a tap and in title for the mouse.
+      const off = (why) => (why ? ` aria-disabled="true" data-why="${why}" title="${why}"` : '');
+      const octSeg = [1, 2, 3, 4]
+        .map((n) => `<button aria-pressed="${n === view.octaves}" data-octaves="${n}"${off(whyNotOctaves(roomW, n, view.rows))}>${n}</button>`)
+        .join('');
+      const rowSeg = [1, 2]
+        .map((n) => `<button aria-pressed="${n === view.rows}" data-rows="${n}"${off(whyNot(roomW, view.octaves, n, true))}>${n}</button>`)
+        .join('');
+      const perRow = (12 * view.octaves) / view.rows;
+      const rows = [];
+      for (let r = view.rows - 1; r >= 0; r--)
+        rows.push(
+          keyRow({
+            first: r * perRow,
+            count: perRow,
+            cls: 'krow',
+            lit: new Set([12, 15, 19]),
+            names: true,
+            // The zones frame draws them on a white key (E) and a black key (F sharp).
+            zones: extra === 'zones' ? new Set([4, 6]) : null,
+          }),
+        );
+      const keyboard = rows.join('');
+      const ww = whiteWidth(roomW, view.octaves, view.rows);
+      const roomH = h - HEADER_TABLET - 16 - BAR - 8 - 24;
+      const rowH = view.rows === 1 ? roomH : (roomH - 12) / 2;
+      return `<div class="overlay new">
+        <div class="overlay-head">
+          <span class="overlay-title">${name} — Keyboard</span>
+          <button class="btn" data-oct="-1">Oct &minus;</button><span class="status">C${state.octave}</span><button class="btn" data-oct="1">Oct +</button>
+          <span class="pick"><span class="pick-label">Octaves</span><span class="seg">${octSeg}</span></span>
+          <span class="pick"><span class="pick-label">Rows</span><span class="seg">${rowSeg}</span></span>
+          <span class="pick-hint" aria-live="polite">${state.hint}</span>
+          <button class="btn" data-hold aria-pressed="${state.hold}">Hold</button><button class="btn">Panic</button>
+          <span class="spacer"></span><button class="btn" data-close title="Close the keyboard (Esc)">Close</button>
+        </div>
+        <div class="keyboard">${keyboard}</div>
+        <span class="mock-tag frame-tag">Mockup · white key ${ww.toFixed(1)} px · row ${rowH.toFixed(1)} px</span>
+      </div>`;
+    }
+
+    /* ---------- render ---------- */
+    function render() {
+      const [, , device, mode, , , extra] = state.frame;
+      const [w, h] = DEVICES[device];
+      const c = $('console');
+      c.style.setProperty('--frame-w', `${w}px`);
+      c.style.setProperty('--frame-h', `${h}px`);
+      const showView = state.open && mode !== 'today';
+      c.innerHTML = `${headerHtml(device === 'phone')}<div class="stage">${partsHtml(mode, device)}${showView ? expandedHtml(device, extra) : ''}</div>`;
+      for (const b of c.querySelectorAll('.pchip'))
+        b.onclick = () => {
+          state.part = b.dataset.part;
+          render();
+        };
+      for (const b of c.querySelectorAll('[data-oct]'))
+        b.onclick = () => {
+          const max = state.open ? OCTAVE_MAX[viewPick().octaves] : OCTAVE_MAX[2];
+          state.octave = Math.min(max, Math.max(0, state.octave + Number(b.dataset.oct)));
+          render();
+        };
+      for (const b of c.querySelectorAll('[data-hold]'))
+        b.onclick = () => {
+          state.hold = !state.hold;
+          render();
+        };
+      for (const b of c.querySelectorAll('[data-open]'))
+        b.onclick = () => {
+          state.open = true;
+          render();
+        };
+      for (const b of c.querySelectorAll('[data-close]')) b.onclick = close;
+      for (const b of c.querySelectorAll('[data-octaves], [data-rows]'))
+        b.onclick = () => {
+          // A dimmed option leaves the pick as it is and shows why, until the next pick.
+          if (b.dataset.why) state.hint = b.dataset.why;
+          else {
+            const view = viewPick();
+            state.octaves = Number(b.dataset.octaves ?? view.octaves);
+            // An Octaves tap brings the rows it needs; a Rows tap keeps the octaves.
+            state.rows = b.dataset.octaves ? rowsFor(roomOf(state.frame[2]), state.octaves, view.rows) : Number(b.dataset.rows);
+            state.octave = Math.min(state.octave, OCTAVE_MAX[state.octaves]);
+            state.hint = '';
+          }
+          render();
+        };
+    }
+    function close() {
+      state.open = false;
+      state.hint = '';
+      state.octave = Math.min(state.octave, OCTAVE_MAX[2]);
+      render();
+    }
+    function pick(frame) {
+      state.frame = frame;
+      const [, , , mode, octaves, rows, extra] = frame;
+      state.open = mode === 'expanded';
+      if (octaves) Object.assign(state, { octaves, rows });
+      // The bar frame shows the reason a tap on the dimmed Rows 2 writes.
+      state.hint = extra === 'title' ? whyNot(roomOf(frame[2]), octaves, 2, true) : '';
+      render();
+    }
+
+    $('mFrame').innerHTML = FRAMES.map((f, i) => `<option value="${i}">${f[1]}</option>`).join('');
+    $('mFrame').onchange = (e) => pick(FRAMES[Number(e.target.value)]);
+    $('mMarks').onchange = (e) => document.body.classList.toggle('marks', e.target.checked);
+    $('mNotes').onchange = (e) => ($('notes').hidden = !e.target.checked);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.open) close();
+    });
+    document.body.classList.add('marks');
+    // `#frame-id` opens that frame, for the rendered pictures.
+    const start = FRAMES.findIndex((f) => `#${f[0]}` === location.hash);
+    if (start >= 0) $('mFrame').value = String(start);
+    pick(FRAMES[Math.max(0, start)]);
+  </script>
+</html>
