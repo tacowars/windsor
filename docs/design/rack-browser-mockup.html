@@ -320,8 +320,8 @@ body[data-kind='racks'] .patches-only { display: none !important; }
         </div>
         <div class="section">
           <div class="section-title"><span>Source</span></div>
-          <button class="pb-facet"><span>This song</span><span class="pb-count">0</span></button>
-          <button class="pb-facet"><span>Built-in</span><span class="pb-count patches-only">11</span><span class="pb-count racks-only">0</span></button>
+          <button class="pb-facet"><span>This song</span><span class="pb-count patches-only norack-only">1</span><span class="pb-count patches-only rack-only">0</span><span class="pb-count racks-only">0</span></button>
+          <button class="pb-facet"><span>Built-in</span><span class="pb-count patches-only norack-only">10</span><span class="pb-count patches-only rack-only">11</span><span class="pb-count racks-only">0</span></button>
           <button class="pb-facet"><span>Library</span><span class="pb-count patches-only">0</span><span class="pb-count racks-only">2</span></button>
         </div>
         <div class="section">
@@ -358,7 +358,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
             <tr><td>EFM Closed Hat</td><td>Drums</td><td>efm, hat, digital, metal, short, mono</td><td>Built-in</td></tr>
             <tr><td>EFM Cowbell</td><td>Drums</td><td>efm, perc, digital, metal, mono</td><td>Built-in</td></tr>
             <tr><td>EFM Crash</td><td>Drums</td><td>efm, cymbal, digital, metal, long, mono</td><td>Built-in</td></tr>
-            <tr><td>EFM Kick</td><td>Drums</td><td>efm, kick, digital, sub, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Kick</td><td>Drums</td><td>efm, kick, digital, sub, mono</td><td><span class="norack-only">This song</span><span class="rack-only">Built-in</span></td></tr>
             <tr><td>EFM Open Hat</td><td>Drums</td><td>efm, hat, digital, metal, mono</td><td>Built-in</td></tr>
             <tr><td>EFM Rim</td><td>Drums</td><td>efm, perc, digital, short, mono</td><td>Built-in</td></tr>
             <tr><td>EFM Snare</td><td>Drums</td><td>efm, snare, digital, noise, mono</td><td>Built-in</td></tr>
@@ -424,7 +424,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   <h3>What the rack state changes, row by row</h3>
   <table class="rows">
     <tr><th>Where</th><th>Today (Patches)</th><th>On Racks</th><th>Source</th></tr>
-    <tr><td>Facets</td><td>Source, Category, Tags</td><td><b>Kind</b> first, Patches 11 | Racks 2 under the <code>efm</code> search, counted as every facet is: the rows the table would show on picking it, the search and the other facets kept. Source, Category and Tags count over racks.</td><td>decision 18; <code>facets()</code></td></tr>
+    <tr><td>Facets</td><td>Source, Category, Tags</td><td><b>Kind</b> first, Patches 11 | Racks 2 under the <code>efm</code> search, counted as every facet is: the rows the table would show on picking it, the search and the other facets kept. Source, Category and Tags count over racks. Source counts the selected part's song copy as This song, since a copy shadows its library row (<code>stepListing</code>): with no rack the part plays an unedited copy of the EFM Kick under its own id, so the facet reads This song 1 and Built-in 10 and the EFM Kick row reads This song; right after the rack load the part's copy is Kick Drive, outside the <code>efm</code> search (a song-own copy carries no library tags), and the unedited EFM Kick copy went with the part (invariant 3), so This song reads 0 and Built-in 11.</td><td>decision 18; <code>facets()</code></td></tr>
     <tr><td>Head</td><td>PATCHES · search · Loading into Part 1</td><td>The title follows the kind: RACKS. The search field and the part are the same.</td><td>decision 18</td></tr>
     <tr><td>Table</td><td>Name, Category, Tags, Source</td><td>Name, Category, <b>Chain</b>, Tags, Source. The chain is the kinds' labels in order with →; a rack with a sequencer adds <b>▦ Euclid</b>, the kind's label, in the modulator color after the chain.</td><td><code>INSERT_LABELS</code>, <code>KIND_LABELS</code></td></tr>
     <tr><td>Pane: head</td><td>name, <code>category · source</code>, tags, description</td><td>The same, the source line reading <code>Drums · Library · Rack</code>.</td><td>decision 20</td></tr>
