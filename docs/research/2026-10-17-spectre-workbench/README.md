@@ -25,6 +25,13 @@ Checked by hand on the same run:
 - The readout names the band, its note and each lane's value.
 - The console stayed free of errors and warnings.
 
+`landing/` holds the same views retaken on the landing branch (windsor#846),
+rebased on `main`, with a marimba arp playing over a four-chord harmony
+track: `card-playing.png` (the card on a master insert, Bleep Test),
+`workbench-shape-playing.png` (a selection with Listen on, Harmonics as a
+ghost before Apply) and `workbench-follow-playing.png` (after Apply, Follow
+on Chord).
+
 ## Voicing the presets
 
 `presetRig.ts` renders each preset at Mix 1, 48 kHz, through the worklet's own
