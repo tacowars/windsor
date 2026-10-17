@@ -79,16 +79,18 @@ instrument that plays one finger per note.
    `pointerType` (`2026-10-16-song-tab-context-menu` decision 5, windsor#825
    decision 3), because a keyboard is laid out before any press. On a fine
    pointer nothing changes. The touch row:
-   - White keys of equal width, never narrower than 44 px: the keys box's
-     `min-width` is the white key count × 44 px, 616 px for 14 whites, so
-     where the row leaves less beside the buttons the buttons wrap under
-     the keys rather than a key going under 44 px.
+   - White keys of equal width, never narrower than 44 px while the row
+     has 308 px: the keys box's `min-width` is the white key count × 44 px
+     capped at the row's width, 616 px for 14 whites, so where the row
+     leaves less beside the buttons the buttons wrap under the keys rather
+     than a key going under 44 px.
    - Black keys over the whites at their real places, centred on the line
      between their two white keys, 60 % of a white key's width and 62 % of
      its height, in place of today's inline black keys at 0.62 of the flex.
    - 110 px high, where today's row is 46 px (proposed; To decide in the
      mockup).
-   - Two octaves, as today: 14 white keys.
+   - Two octaves, as today, 14 white keys, when they fit at 44 px
+     (616 px); else one (decision 10).
 
    In the mockup, with Expand added: at 1024 × 1366 the keys take the whole
    row, 996 px, a white key 71.1 px, with the buttons on the line below; at
@@ -147,14 +149,17 @@ instrument that plays one finger per note.
    each the Drive switch's segmented control at the bar's height. The keys
    fit the view's width, with no sideways scrolling (`touch-action: none`
    leaves no swipe, and a scroll under a chord is wrong anyway), and the
-   view's height. A white key is never narrower than 44 px: an option that
-   would go under it is disabled ("4 octaves needs 2 rows at this width").
-   A disabled option stays tappable, dimmed and `aria-disabled`, and a tap
-   on it leaves the pick as it is and writes the reason in a hint beside
-   Octaves and Rows until the next pick, since a touch never shows a
-   title; the title stays for the mouse. Rows 2 is offered for 2 and 4
-   octaves, an even split, the lower octaves on the lower row; for 1 and 3
-   it is disabled ("2 rows takes 2 or 4 octaves"). Default: 2 octaves,
+   view's height. A white key is never narrower than 44 px. Rows 2 is an
+   even split of 2 or 4 octaves, the lower octaves on the lower row. An
+   Octaves tap takes effect whenever some row count allows that many
+   octaves, and the rows follow: they stay if they allow it, else they
+   switch to the other count; only an octave count no row count allows is
+   dimmed ("3 octaves needs more width"). A Rows option the octaves do not
+   allow is dimmed ("2 rows takes 2 or 4 octaves", "4 octaves needs 2 rows
+   at this width"). A dimmed option stays tappable and `aria-disabled`,
+   and a tap on it leaves the pick as it is and writes the reason in a
+   hint beside Octaves and Rows until the next pick, since a touch never
+   shows a title; the title stays for the mouse. Default: 2 octaves,
    1 row. The pick is a console preference in `localStorage`, wrapped in
    try/catch, never song data (the pattern of windsor#778 decision 7).
    A pick is normalized before it renders, the default and a restored
@@ -180,6 +185,7 @@ instrument that plays one finger per note.
    | 4 | 2 | 14 | 94.1 px | 404.5 px | 69.7 px | 575.5 px |
 
    So in landscape every pick is allowed, and in portrait 4 octaves takes
+   2 rows: from 3 octaves, 1 row, a tap on Octaves 4 gives 4 octaves,
    2 rows. **Oct − / Oct +** shift the whole range, and the label names its
    lowest C as today: `C${octave}`, the note being 12 × octave + the key's
    offset (`Keyboard.press`). The engine's note range is 0 … 127
@@ -208,18 +214,25 @@ instrument that plays one finger per note.
    give Expand its room: at 1440 × 900 the button is 91.1 px with an 8 px
    gap, the keys box goes from 996.7 to 897.5 px and a white key from 46.7
    to 41.8 px.
-10. **The phone.** Below 720 px (the phone block of `2026-10-04-phone-header`)
-    the keys row shows one octave: 7 white keys at 44 px is 308 px, so it
-    fits 360 px. At 390 × 844 the keys take the row's 362 px, a white key
-    51.7 px, with the buttons under them. The expanded view is the way to
-    play more. Its room at 390 × 844 is 390 − 2 × 24 = 342 px, so it allows
-    1 octave at 1 row and 2 octaves at 2 rows, each 342 ÷ 7 = 48.9 px, and
-    disables everything else (the next widest, 14 whites a row, is
-    24.4 px); the default opens at 1 octave, 1 row. The key count becomes a
-    layout value (24 wide, 12 on the phone, `KEY_COUNT` and a phone count in
-    `keyboardConstants.ts`); a QWERTY offset past the shown keys plays with
-    no key lit, as a MIDI note outside the row does today (`midiSink`'s
-    `offset < KEY_COUNT`).
+10. **A narrow keys box: the phone.** On a touch layout the keys row's
+    octave count comes from the keys box's own width, read by a
+    `ResizeObserver`, never from a breakpoint, so it holds under zoom
+    (`2026-10-03-parts-tab-layout` decision 9): two octaves when 14 whites
+    fit at 44 px (616 px), else one. The keys always share the box's
+    width, so below 308 px a white key goes under 44 px rather than the
+    row overflowing: at 320 × 568 the box is 292 px and a white key
+    41.7 px. The 720 px block of `2026-10-04-phone-header` stays for the
+    header only. At 390 × 844 the keys take the row's 362 px, one octave,
+    a white key 51.7 px, with the buttons under them. The expanded view is
+    the way to play more. Its room at 390 × 844 is 390 − 2 × 24 = 342 px,
+    so it allows 1 octave at 1 row and 2 octaves at 2 rows, each
+    342 ÷ 7 = 48.9 px, and dims 3 and 4 octaves (the next widest, 14 whites
+    a row, is 24.4 px). The default opens at 1 octave, 1 row, and a tap on
+    Octaves 2 gives 2 octaves, 2 rows. The key count becomes a layout
+    value (24 or 12 from the box's width on touch, 24 with a fine pointer;
+    `KEY_COUNT` and a one-octave count in `keyboardConstants.ts`); a QWERTY
+    offset past the shown keys plays with no key lit, as a MIDI note
+    outside the row does today (`midiSink`'s `offset < KEY_COUNT`).
 11. **Later**, not in this build:
     - pressure and aftertouch from `PointerEvent.pressure`;
     - a pitch ribbon, or a finger's slide becoming a bend;

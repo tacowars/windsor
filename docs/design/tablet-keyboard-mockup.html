@@ -764,9 +764,9 @@
         <b>The keys row on a touch screen</b> (<code>@media (pointer: coarse)</code>): white keys
         of equal width, never under 44 px, the black keys over them at 60 % of a white key's
         width and 62 % of the row's height, centred on the line between their two white keys. The
-        row is 110 px high (46 px today). Two octaves, as today: 14 white keys, so the keys need
-        616 px. Where the row leaves less beside the buttons, the buttons wrap under the keys
-        (portrait, the phone). The colours are today's.
+        row is 110 px high (46 px today). Two octaves, as today, 14 white keys, when they fit at
+        44 px (616 px), else one. Where the row leaves less beside the buttons, the buttons wrap
+        under the keys (portrait, the phone). The colours are today's.
       </li>
       <li>
         <b>Expand</b>, the one new button on the keys row, on every device, at the end of the
@@ -783,14 +783,16 @@
         its name. The part chips stay live: pick Pad and the keyboard plays Pad.
       </li>
       <li>
-        <b>A disabled option keeps its place</b>, dimmed and tappable: a tap leaves the pick as
-        it is and writes the reason beside Octaves and Rows until the next pick, and the mouse
-        also has it in the title. On the portrait
-        tablet, 4 octaves in one row would make a white key 34.9 px, so it is disabled at 1 row
-        ("4 octaves needs 2 rows at this width"); Rows 2 is disabled for 1 and 3 octaves
-        ("2 rows takes 2 or 4 octaves"), and with 2 rows chosen, 1 and 3 octaves are disabled
-        ("3 octaves can't split into 2 rows"). With 4 octaves chosen in portrait, Rows 1 is
-        disabled by the width. The view opens on the nearest allowed pick when the stored one
+        <b>An Octaves tap takes effect whenever some row count allows it</b>, and the rows
+        follow: they stay if they allow it, else they switch. On the portrait tablet, 4 octaves
+        in one row would make a white key 34.9 px, so from 3 octaves, 1 row a tap on 4 gives 4
+        octaves, 2 rows; on the phone, from 1 octave, 1 row a tap on 2 gives 2 octaves, 2 rows.
+        Only an octave count no row count allows is dimmed ("3 octaves needs more width", on the
+        phone). A Rows option the octaves do not allow is dimmed: Rows 2 for 1 and 3 octaves
+        ("2 rows takes 2 or 4 octaves"), Rows 1 for 4 octaves in portrait ("4 octaves needs 2
+        rows at this width"). A dimmed option keeps its place and stays tappable: a tap leaves
+        the pick as it is and writes the reason beside Octaves and Rows until the next pick, and
+        the mouse also has it in the title. The view opens on the nearest allowed pick when the stored one
         does not fit the room, the same rows with fewer octaves first, then one row: the phone's
         default 2 octaves, 1 row opens at 1 octave, 1 row (342 ÷ 7 = 48.9 px).
       </li>
@@ -800,8 +802,11 @@
         "Strike velocity" frame draws the zones on E and F♯; the app draws nothing.
       </li>
       <li>
-        <b>The phone</b> (below 720 px): one octave on the keys row, 7 white keys at 51.7 px, the
-        buttons under it. The expanded view is the way to play more.
+        <b>A narrow keys box</b> (the phone): the touch row's octave count comes from the keys
+        box's own width, not a breakpoint: two octaves when 14 whites fit at 44 px (616 px), else
+        one, the keys always sharing the box's width. At 390 × 844 that is one octave, 7 white
+        keys at 51.7 px, the buttons under it; at 320 × 568 a white key is 41.7 px rather than
+        the row overflowing. The expanded view is the way to play more.
       </li>
     </ol>
 
@@ -959,7 +964,7 @@
       ['exp-land-4-2', 'Proposed · expanded, landscape, 4 octaves, 2 rows', 'landscape', 'expanded', 4, 2],
       ['exp-port-3-1', 'Proposed · expanded, portrait, 3 octaves, 1 row', 'portrait', 'expanded', 3, 1],
       ['exp-port-4-2', 'Proposed · expanded, portrait, 4 octaves, 2 rows', 'portrait', 'expanded', 4, 2],
-      ['exp-port-title', 'Proposed · the bar: 4 octaves disabled, its reason after a tap', 'portrait', 'expanded', 3, 1, 'title'],
+      ['exp-port-title', 'Proposed · the bar: Rows 2 dimmed, its reason after a tap', 'portrait', 'expanded', 3, 1, 'title'],
       ['velocity', 'Proposed · strike velocity zones (0.6, 0.8, 1.0)', 'landscape', 'expanded', 2, 1, 'zones'],
     ];
     // `octaves` and `rows` are the stored preference, what the user picked; the view draws allowedPick of it.
@@ -979,6 +984,15 @@
         return rowsButton ? '2 rows takes 2 or 4 octaves' : `${octaves} octave${octaves > 1 ? 's' : ''} can't split into 2 rows`;
       if (whiteWidth(roomW, octaves, rows) < WHITE_MIN) return `${octaves} octaves needs 2 rows at this width`;
       return '';
+    }
+    // The rows an Octaves tap takes: the current rows if they allow it, else the other count, else 0 (none).
+    function rowsFor(roomW, octaves, rows) {
+      if (!whyNot(roomW, octaves, rows)) return rows;
+      return whyNot(roomW, octaves, 3 - rows) ? 0 : 3 - rows;
+    }
+    // An Octaves option is dimmed only when no row count allows it.
+    function whyNotOctaves(roomW, octaves, rows) {
+      return rowsFor(roomW, octaves, rows) ? '' : `${octaves} octave${octaves > 1 ? 's' : ''} needs more width`;
     }
     // The pick a room allows: the pick itself, else the same rows with fewer octaves, else one row with fewer.
     function allowedPick(roomW, octaves, rows) {
@@ -1076,10 +1090,10 @@
       const roomW = roomOf(device);
       const view = viewPick();
       const name = PARTS.find((p) => p[0] === state.part)[1];
-      // A disabled option stays tappable: aria-disabled, its reason in data-why for a tap and in title for the mouse.
+      // A dimmed option stays tappable: aria-disabled, its reason in data-why for a tap and in title for the mouse.
       const off = (why) => (why ? ` aria-disabled="true" data-why="${why}" title="${why}"` : '');
       const octSeg = [1, 2, 3, 4]
-        .map((n) => `<button aria-pressed="${n === view.octaves}" data-octaves="${n}"${off(whyNot(roomW, n, view.rows))}>${n}</button>`)
+        .map((n) => `<button aria-pressed="${n === view.octaves}" data-octaves="${n}"${off(whyNotOctaves(roomW, n, view.rows))}>${n}</button>`)
         .join('');
       const rowSeg = [1, 2]
         .map((n) => `<button aria-pressed="${n === view.rows}" data-rows="${n}"${off(whyNot(roomW, view.octaves, n, true))}>${n}</button>`)
@@ -1150,12 +1164,13 @@
       for (const b of c.querySelectorAll('[data-close]')) b.onclick = close;
       for (const b of c.querySelectorAll('[data-octaves], [data-rows]'))
         b.onclick = () => {
-          // A disabled option leaves the pick as it is and shows why, until the next pick.
+          // A dimmed option leaves the pick as it is and shows why, until the next pick.
           if (b.dataset.why) state.hint = b.dataset.why;
           else {
             const view = viewPick();
             state.octaves = Number(b.dataset.octaves ?? view.octaves);
-            state.rows = Number(b.dataset.rows ?? view.rows);
+            // An Octaves tap brings the rows it needs; a Rows tap keeps the octaves.
+            state.rows = b.dataset.octaves ? rowsFor(roomOf(state.frame[2]), state.octaves, view.rows) : Number(b.dataset.rows);
             state.octave = Math.min(state.octave, OCTAVE_MAX[state.octaves]);
             state.hint = '';
           }
@@ -1173,8 +1188,8 @@
       const [, , , mode, octaves, rows, extra] = frame;
       state.open = mode === 'expanded';
       if (octaves) Object.assign(state, { octaves, rows });
-      // The bar frame shows the reason a tap on the disabled 4 writes.
-      state.hint = extra === 'title' ? whyNot(roomOf(frame[2]), 4, rows) : '';
+      // The bar frame shows the reason a tap on the dimmed Rows 2 writes.
+      state.hint = extra === 'title' ? whyNot(roomOf(frame[2]), octaves, 2, true) : '';
       render();
     }
 
