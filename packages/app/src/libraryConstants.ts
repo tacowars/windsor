@@ -66,7 +66,13 @@ export const INIT_PATCH_OVERRIDES = {
 };
 
 /** The repo folder the grant is asked on, shown in the picker's hint and the mode line. */
-export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
+/**
+ * The developer's folder grant (windsor#877, record `2026-10-17-racks` decision
+ * 16): the engine's source folder, under which the two banks sit.
+ */
+export const LIBRARY_FOLDER_PATH = 'packages/engine/src';
+/** The bank folders under the grant: the patches and the racks. */
+export const LIBRARY_SUBFOLDERS = { patches: 'patches', racks: 'racks' } as const;
 
 /**
  * The user's own state (`2026-09-27-user-library-in-indexeddb`): one

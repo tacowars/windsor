@@ -12,16 +12,18 @@ import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { LIBRARY_FOLDER_PATH } from './libraryConstants';
+import { loadBuiltInRacks } from './builtInRacks';
 import type { ChromeDirectoryHandle, PatchFolder } from './libraryFolder';
 import {
   folderApiAvailable,
   forgetHandle,
+  isPatchesOnlyGrant,
+  openLibraryFolders,
   pickDirectory,
   queryGrant,
   recallHandle,
   rememberHandle,
   requestGrant,
-  wrapDirectoryHandle,
 } from './libraryFolder';
 import {
   awaitUserLibrary,
@@ -32,7 +34,12 @@ import {
   library,
   refreshLibrary,
 } from './libraryModel';
-import { connectUserRacks } from './rackLibrary';
+import {
+  connectRackFolder,
+  connectUserRacks,
+  disconnectRackFolder,
+  refreshRacks,
+} from './rackLibrary';
 import type { LibraryModel, SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
@@ -73,35 +80,55 @@ export function reportLibraryProblems(ctx: AppCtx, force = false): void {
   reportProblems(library, (message, tone) => ctx.notify(message, tone), force);
 }
 
+/** What a stale grant on `patches/` alone (before windsor#877) is told. */
+const PATCHES_ONLY_GRANT = `The library folder grant was on patches/ alone; grant ${LIBRARY_FOLDER_PATH} (the folder above it) from ⋯ → Library folder… so racks are written too.`;
+
 /**
  * At boot: attach the user's library (null where the browser has no
  * IndexedDB), load the built-ins beside it, then reconnect a remembered
  * folder whose grant still stands. A song opening meanwhile waits for all
- * of it (`libraryLoaded`).
+ * of it (`libraryLoaded`). `notify` carries the one notice boot can give,
+ * a grant on the old folder forgotten.
  */
 export function bootLibrary(
   user: PatchFolder | null,
   settle: SettleUserLibrary = awaitUserLibrary,
   racks: PatchFolder | null = null,
+  notify: (message: string) => void = () => undefined,
 ): Promise<void> {
-  const load = loadBootLibrary(user, racks);
+  const load = loadBootLibrary(user, racks, notify);
   settle(load);
   return load;
 }
 
-async function loadBootLibrary(user: PatchFolder | null, racks: PatchFolder | null): Promise<void> {
+async function loadBootLibrary(
+  user: PatchFolder | null,
+  racks: PatchFolder | null,
+  notify: (message: string) => void,
+): Promise<void> {
   library.user = user;
   await loadPageLibrary(library);
   // The racks (windsor#868) read in after the patches, which their provenance names.
+  await loadBuiltInRacks();
   await connectUserRacks(library, racks);
   if (!folderApiAvailable()) return;
   const handle = await recallHandle();
   if (!handle) return;
-  if ((await queryGrant(handle)) === 'granted') {
-    await connectLibrary(library, wrapDirectoryHandle(handle));
+  if (isPatchesOnlyGrant(handle)) {
+    await forgetHandle();
+    notify(PATCHES_ONLY_GRANT);
+  } else if ((await queryGrant(handle)) === 'granted') {
+    await connectFolders(handle);
   } else {
     remembered = handle;
   }
+}
+
+/** The grant's two bank folders onto the model: the patches, then the racks. */
+async function connectFolders(handle: ChromeDirectoryHandle): Promise<void> {
+  const folders = await openLibraryFolders(handle);
+  await connectLibrary(library, folders.patches);
+  await connectRackFolder(library, folders.racks);
 }
 
 /** The unsaved-changes guard: resolves true when loading over the working patch may go ahead. */
@@ -136,10 +163,11 @@ async function connectFolder(ctx: AppCtx): Promise<void> {
   if (!handle) {
     handle = await pickDirectory();
     if (!handle) return;
+    if (isPatchesOnlyGrant(handle)) return ctx.notify(PATCHES_ONLY_GRANT, 'warning');
     await rememberHandle(handle);
   }
   remembered = null;
-  await connectLibrary(library, wrapDirectoryHandle(handle));
+  await connectFolders(handle);
   ctx.notify(`library folder "${handle.name}" connected — Save writes to it`, 'success');
   ctx.render();
 }
@@ -154,6 +182,7 @@ function forgetFolder(ctx: AppCtx): Promise<void> {
 async function forgetAndDisconnect(ctx: AppCtx): Promise<void> {
   await forgetHandle();
   await disconnectLibrary(library);
+  await disconnectRackFolder(library);
   remembered = null;
   ctx.notify('library folder forgotten — Save writes to your library in this browser again');
   ctx.render();
@@ -356,6 +385,7 @@ export function libraryFolderEntries(ctx: AppCtx): MenuItem[] {
     ...items,
     menuAction(ctx, 'Re-read folder', 'Read the folder again', async () => {
       await refreshLibrary(library);
+      await refreshRacks(library);
       // An explicit re-read says a refusal again, even one dismissed and unchanged.
       reportLibraryProblems(ctx, true);
       ctx.render();

@@ -12,7 +12,7 @@ import { CARRIER_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { drawEnv } from './envCanvas';
-import { LIBRARY_FOLDER_PATH } from './libraryConstants';
+import { LIBRARY_FOLDER_PATH, LIBRARY_SUBFOLDERS } from './libraryConstants';
 import { isWritable, library, libraryPatch } from './libraryModel';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
@@ -260,7 +260,9 @@ export function browserInfo(ctx: AppCtx, row: PresetListing | null, hooks: InfoH
     'btn ghost',
   );
   show.onclick = (): void =>
-    ctx.notify(`${row.id}.json — in the library folder (${LIBRARY_FOLDER_PATH})`);
+    ctx.notify(
+      `${row.id}.json — in the library folder (${LIBRARY_FOLDER_PATH}/${LIBRARY_SUBFOLDERS.patches})`,
+    );
   const primary = el('div', 'pb-actions');
   primary.append(load, copy);
   const manage = el('div', 'pb-actions');

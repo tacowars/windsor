@@ -1,18 +1,19 @@
 /**
  * The library folder (#563, epic #564 decision 5): a File System Access grant
- * on `packages/engine/src/patches/`, remembered in IndexedDB and
- * re-requested when the browser has dropped it. The folder is read through
- * the library's one loader, the same the built-ins and the user's IndexedDB
- * library load through, so the preset browser reflects a save without a
- * rebuild.
+ * on the engine's source folder, `packages/engine/src`, with the patches in
+ * `patches/` and the racks in `racks/` under it (windsor#877; before it the
+ * grant was on `patches/` itself), remembered in IndexedDB and re-requested
+ * when the browser has dropped it. Each bank folder is read through its one
+ * loader, the same the built-ins and the user's IndexedDB stores load
+ * through, so the preset browser reflects a save without a rebuild.
  *
- * `PatchFolder` is the whole of what the workflow needs from the handle; the
- * tests drive it with an in-memory fake and only `wrapDirectoryHandle` touches
- * the Chrome API.
+ * `PatchFolder` is the whole of what the workflow needs from a handle; the
+ * tests drive it with an in-memory fake and only `wrapDirectoryHandle` and
+ * `openLibraryFolders` touch the Chrome API.
  */
 import type { FormatRefusal, LibraryEntry } from '@windsor/engine';
 import { PatchFormatError, RackFormatError, loadPatchFile } from '@windsor/engine';
-import { HANDLE_DB } from './libraryConstants';
+import { HANDLE_DB, LIBRARY_SUBFOLDERS } from './libraryConstants';
 
 export interface PatchFolder {
   name: string;
@@ -109,6 +110,7 @@ export interface ChromeDirectoryHandle {
     createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
   }>;
   removeEntry(name: string): Promise<void>;
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<ChromeDirectoryHandle>;
   queryPermission(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   requestPermission(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 }
@@ -143,6 +145,30 @@ export function wrapDirectoryHandle(handle: ChromeDirectoryHandle): PatchFolder 
       await writable.close();
     },
     remove: (name) => handle.removeEntry(name),
+  };
+}
+
+/** The two bank folders under the grant, as the model reads and writes them. */
+export interface LibraryFolders {
+  readonly patches: PatchFolder;
+  readonly racks: PatchFolder;
+}
+
+/**
+ * True for a handle remembered before windsor#877, when the grant was on
+ * `patches/` itself: it cannot reach `racks/`, so it is forgotten and the
+ * grant asked for again on the engine's source folder.
+ */
+export const isPatchesOnlyGrant = (handle: ChromeDirectoryHandle): boolean =>
+  handle.name === LIBRARY_SUBFOLDERS.patches;
+
+/** `patches/` and `racks/` under the granted folder, each created when missing. */
+export async function openLibraryFolders(root: ChromeDirectoryHandle): Promise<LibraryFolders> {
+  const open = async (name: string): Promise<PatchFolder> =>
+    wrapDirectoryHandle(await root.getDirectoryHandle(name, { create: true }));
+  return {
+    patches: await open(LIBRARY_SUBFOLDERS.patches),
+    racks: await open(LIBRARY_SUBFOLDERS.racks),
   };
 }
 
