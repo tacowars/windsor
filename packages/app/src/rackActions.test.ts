@@ -138,6 +138,11 @@ describe('rackFromPart (decision 2)', () => {
     );
     expect(rackFromPart(model.doc, hat, BARE, ids)?.patchSource).toBe('hat');
     expect('patchSource' in (rackFromPart(model.doc, arp, BARE, ids) as RackFile)).toBe(false);
+    // A song keeps any non-empty link, but the file takes a slug: one that is none is left out.
+    model.merge(raw({ parts: { [hat]: { patchSource: 'custom patch' } } }));
+    const file = rackFromPart(model.doc, hat, BARE, ids) as RackFile;
+    expect('patchSource' in file).toBe(false);
+    expect(loadRackFile('hat-rack', JSON.parse(serialiseRackFile(file))).problems).toEqual([]);
   });
 
   it('is null for an empty slot', () => {

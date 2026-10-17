@@ -18,6 +18,7 @@ import type {
 } from '@windsor/engine';
 import {
   PATCH_FILE_FORMAT,
+  PATCH_ID_RULE,
   RACK_FILE_FORMAT,
   RACK_FILE_KIND,
   SEEDED_KINDS,
@@ -95,7 +96,9 @@ export function rackFromPart(
   const part = partAt(doc, slot);
   const patch = part && doc.patches?.[part.preset];
   if (!part || !patch) return null;
-  const source = part.patchSource ?? (libraryIds.has(part.preset) ? part.preset : undefined);
+  // The song keeps any non-empty link; the file takes a slug only, so a link that is none is left out.
+  const own = part.patchSource !== undefined && PATCH_ID_RULE.test(part.patchSource);
+  const source = own ? part.patchSource : libraryIds.has(part.preset) ? part.preset : undefined;
   return {
     format: RACK_FILE_FORMAT,
     kind: RACK_FILE_KIND,
