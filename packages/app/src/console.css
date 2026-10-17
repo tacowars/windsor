@@ -3994,16 +3994,38 @@ body.chord-dragging {
   opacity: 0.4;
 }
 
-/* Expanded: the device over the page on an opaque ground; its stand-in in the pane. */
+/* An expanded view, the Roll's or Spectre's workbench (record
+   2026-10-17-expanded-views-below-the-header; mockup
+   docs/design/expanded-views-below-header-mockup.html): on an opaque ground
+   in the tab root, filling the window below the header, which stays live
+   above it. While one is on screen the console stops at the window's foot,
+   so the page cannot scroll under it; the header itself is untouched. On
+   another tab it is hidden, still open (expandedViewFrame.ts). */
+.console:has(> .tab-root > .roll-overlay:not([hidden])) {
+  height: 100vh;
+  height: 100dvh;
+}
+.tab-root:has(> .roll-overlay:not([hidden])) {
+  position: relative;
+  /* Below the header's stacking (.chrome z-index 5), so what the header
+     drops down still shows over the view. */
+  z-index: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 .roll-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 15;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 24px;
+  /* Today's 24px at the sides and foot, 16px under the header. */
+  padding: 16px 24px 24px;
   background: var(--ground);
+}
+.roll-overlay[hidden] {
+  display: none;
 }
 .roll-overlay-head {
   display: flex;

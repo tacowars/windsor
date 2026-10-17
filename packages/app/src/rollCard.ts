@@ -25,6 +25,7 @@
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { patternOf } from './partEdits';
 import { DARK, readPlayhead } from './regionPlayhead';
 import { type RollControls, rollControls } from './rollControls';
 import { type RollEditing, rollEditing } from './rollEditing';
@@ -125,9 +126,14 @@ class RollDevice {
       repaint: () => this.paint(),
     });
     this.expander = rollExpander({
+      ctx,
       slot,
       body: this.body,
       title: () => `${partAt(ctx.model.doc, slot)?.name ?? ''} — ${KIND_LABELS.roll}`,
+      holds: () => {
+        const there = region === undefined || partAt(ctx.model.doc, slot)?.regions[region];
+        return Boolean(there) && patternOf(ctx.model.doc, slot, region)?.kind === 'roll';
+      },
       changed: () => {
         this.envelopes.closePopovers();
         this.spot.forget();

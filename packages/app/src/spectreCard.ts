@@ -174,6 +174,7 @@ function openBench(view: SpectreView, from: HTMLElement, closed: () => void): vo
   openSpectreBench({
     ...view,
     accent: getComputedStyle(from).getPropertyValue('--kc').trim(),
+    from,
     closed: () => {
       closed();
       view.ctx.render();
