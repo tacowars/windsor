@@ -83,6 +83,7 @@ input {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* The header (#708, windsor#11, windsor#520): sticky above every tab. Its
@@ -7991,7 +7992,7 @@ body.env-dragging .env-canvas {
 .toasts {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
   z-index: 20;
   display: flex;
   flex-direction: column;

@@ -38,6 +38,9 @@ nothing, unlike a music app.
 
 ## What the installed app does differently
 
+- **Its bottom edge clears the Home indicator.** The bottom safe-area inset
+  is reserved on `.console` and `.toasts`, so the last section, the keys,
+  the one-screen-high views and the toasts stop above the gesture area.
 - **Its storage is its own.** The installed app's IndexedDB is separate
   from the browser tab's, so the user library and the autosaved song do not
   carry over. A song moves in by Export in the tab and Import in the app.
