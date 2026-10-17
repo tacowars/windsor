@@ -16,7 +16,7 @@ the algorithm's index. Algorithm 11 takes the same kernel path and the same
 per-edge code as every other algorithm. The routing is the sound, so there
 is no cheaper design that sounds the same.
 
-Measured on an Apple M4 Pro Mac mini (Mac16,11, 64 GB, macOS 26.5.1), in
+Measured on a 14-core arm64 desktop with 64 GB, macOS 26.5.1, in
 HeadlessChrome 155 (the project's chrome-devtools MCP), on an
 `OfflineAudioContext` at 48 kHz running the real FM worklet. A background
 research job was running on the machine (load average about 9 on 14 cores),
