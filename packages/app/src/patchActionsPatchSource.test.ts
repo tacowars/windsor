@@ -2,8 +2,9 @@
  * The library actions on a part playing its own copy of a library patch
  * (windsor#669 decision 4): the origin, the modified marker's baseline and
  * Save reach the library entry its `patchSource` names; Save, Discard and
- * Revert write only this part's copy; Save as… and Init drop the link; and a
- * deleted entry leaves the copy a document patch.
+ * Revert write only this part's copy; Save as… and Init drop the link, and
+ * the rack link with it (windsor#862); and a deleted entry leaves the copy a
+ * document patch.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -80,8 +81,8 @@ async function linkedScope() {
   const entry = library.entries['kick']!.patch;
   model.merge({
     parts: {
-      [hat]: { preset: 'kick-2', patchSource: 'kick' },
-      [arp]: { preset: 'kick-3', patchSource: 'kick' },
+      [hat]: { preset: 'kick-2', patchSource: 'kick', rackSource: 'kick-rack' },
+      [arp]: { preset: 'kick-3', patchSource: 'kick', rackSource: 'kick-rack' },
     },
     patches: { kick: clonePatch(entry), 'kick-2': clonePatch(entry), 'kick-3': clonePatch(entry) },
   } as DocumentPartial);
@@ -163,14 +164,18 @@ describe("a part's own copy of a library patch (windsor#669)", () => {
     expect(partAt(scope.ctx.model.doc, kick)?.preset).toBe('kick');
   });
 
-  it('drops the link on Save as… and on Init', async () => {
+  it('drops the links on Save as… and on Init, and keeps them through a knob edit', async () => {
     const scope = await linkedScope();
+    scope.ctx.change({ patches: { 'kick-2': { volume: 0.1 } } });
+    expect(partAt(scope.ctx.model.doc, hat)?.rackSource).toBe('kick-rack');
     const working = patchOf(scope.ctx, 'kick-2')!;
     const { id } = await copyToNew({ ...scope, working, meta: { ...META, name: 'Kick Mine' } });
     expect(partAt(scope.ctx.model.doc, hat)?.preset).toBe(id);
     expect(partAt(scope.ctx.model.doc, hat)?.patchSource).toBeUndefined();
+    expect(partAt(scope.ctx.model.doc, hat)?.rackSource).toBeUndefined();
     initPatch({ ...scope, slot: arp });
     expect(partAt(scope.ctx.model.doc, arp)?.patchSource).toBeUndefined();
+    expect(partAt(scope.ctx.model.doc, arp)?.rackSource).toBeUndefined();
   });
 });
 

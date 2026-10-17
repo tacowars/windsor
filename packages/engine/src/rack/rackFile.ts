@@ -33,9 +33,8 @@
  */
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
 import type { InsertRegistry, InsertSpec } from '../inserts/insertRegistry';
-import { INSERT_KINDS, insertSlot, normaliseInserts } from '../inserts/insertRegistry';
+import { INSERT_KINDS, SLOT_FIELD, normaliseInserts } from '../inserts/insertRegistry';
 import { MAX_INSERTS } from '../inserts/insertConstants';
-import { isKeyedSpec } from '../inserts/sidechainSource';
 import type { Patch } from '../patch/patch';
 import { PATCH_FILE_FORMAT, PATCH_ID_RULE, loadPatchFile } from '../patch/patchLibrary';
 import { SEQUENCER_KINDS, type RegionPattern, type SequencerKind } from '../song/arrangement';
@@ -123,13 +122,27 @@ function patchSection(
   }
 }
 
-/** A keyed insert's sidechain when it names a slot, at `at`; '' otherwise. */
-function slotKeyProblem(spec: InsertSpec, at: string): string {
-  if (!isKeyedSpec(spec)) return '';
-  const source = spec.sidechain;
+/**
+ * A raw entry's sidechain when it names a slot, at `at`; '' otherwise. Read
+ * before the chain is normalised, kind-agnostic: a slot child's external key
+ * is rewritten to `internal` by the normaliser (`slotLimits`), so only the
+ * raw file still shows it, and a key on a kind that takes none is dropped as
+ * an unknown field there anyway.
+ */
+function slotKeyProblem(entry: Record<string, unknown>, at: string): string {
+  const source = entry['sidechain'];
   return isRecord(source) && typeof source.track === 'number'
     ? `${at}.sidechain: keyed from slot ${source.track} — a rack names no part`
     : '';
+}
+
+/** Every raw entry's slot key problem, its slot child's included, in chain order. */
+function slotKeyProblems(raw: Record<string, unknown>[]): string[] {
+  return raw.flatMap((entry, i) => {
+    const at = `inserts[${i}]`;
+    const child = entry[SLOT_FIELD];
+    return [slotKeyProblem(entry, at), isRecord(child) ? slotKeyProblem(child, `${at}.slot`) : ''];
+  });
 }
 
 /** The chain: refused for its shape or a dangling kind, kept with its clamps listed otherwise. */
@@ -144,14 +157,10 @@ function chainSection(
     isRecord(entry) ? [] : [`inserts[${i}]: expected an object`],
   );
   if (junk.length) return { problems: junk };
+  const entries = raw as Record<string, unknown>[];
   const n = new FieldNormaliser();
-  const inserts = normaliseInserts(raw, 'inserts', n, registry);
-  const keyed = inserts.flatMap((spec, i) => {
-    const at = `inserts[${i}]`;
-    const child = insertSlot(spec);
-    return [slotKeyProblem(spec, at), child ? slotKeyProblem(child, `${at}.slot`) : ''];
-  });
-  const problems = [...n.dangling, ...keyed.filter(Boolean)];
+  const inserts = normaliseInserts(entries, 'inserts', n, registry);
+  const problems = [...n.dangling, ...slotKeyProblems(entries).filter(Boolean)];
   if (problems.length) return { problems };
   return { inserts, notes: n.corrections };
 }

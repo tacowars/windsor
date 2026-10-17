@@ -181,6 +181,11 @@ describe('what refuses a rack file', () => {
       { inserts: [{ ...DEFAULT_COMPRESSOR, sidechain: { track: 2 } }] },
       /inserts\[0\]\.sidechain: keyed from slot 2/,
     ],
+    [
+      'a slot child keyed from a slot, which the normaliser would rewrite',
+      { inserts: [{ kind: 'echo', slot: { ...DEFAULT_COMPRESSOR, sidechain: { track: 3 } } }] },
+      /inserts\[0\]\.slot\.sidechain: keyed from slot 3/,
+    ],
     ['a sequencer that is not an object', { sequencer: 'grid' }, /sequencer: expected an object/],
     [
       'an unknown sequencer kind',
