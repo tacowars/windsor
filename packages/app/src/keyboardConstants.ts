@@ -77,3 +77,53 @@ export const QWERTY: Readonly<Record<string, number>> = {
 
 /** The tab whose part the QWERTY keys play: on any other tab they sound nothing (windsor#349). */
 export const AUDITION_TAB = 'parts';
+
+/**
+ * The expanded keyboard view (windsor#864, record
+ * `2026-10-17-the-keyboard-on-a-tablet` decisions 7 and 8): how many octaves
+ * its keys show and in how many rows, which the bar's Octaves and Rows pick.
+ * Two rows split the octaves evenly, the lower octaves on the lower row.
+ */
+export interface KeysPick {
+  readonly octaves: number;
+  readonly rows: number;
+}
+/** Octaves' options, 1 · 2 · 3 · 4, and Rows', 1 · 2. */
+export const VIEW_OCTAVES: readonly number[] = [1, 2, 3, 4];
+export const VIEW_ROWS: readonly number[] = [1, 2];
+/** The pick the view opens at until one is stored. */
+export const VIEW_PICK_DEFAULT: KeysPick = { octaves: 2, rows: 1 };
+/** The gap between two rows of keys. */
+export const VIEW_ROW_GAP_PX = 12;
+/** The view's sizes, written on its keys box as custom properties, as `TOUCH_ROW_CSS` is. */
+export const VIEW_CSS: Readonly<Record<string, string>> = {
+  '--black-key-w': String(BLACK_KEY_WIDTH),
+  '--black-key-h': String(BLACK_KEY_HEIGHT),
+  '--kb-row-gap': `${VIEW_ROW_GAP_PX}px`,
+};
+/** Where the pick is kept: a console preference, never song data (windsor#778 decision 7's pattern). */
+export const VIEW_PICK_STORAGE_KEY = 'windsor.keyboard.viewPick';
+
+/** Why an option is dimmed: what a tap on it writes in the bar's hint, and its title. */
+export const VIEW_HINTS = {
+  needsWidth: (octaves: number): string => `${octaves} octaves needs more width`,
+  needsTwoRows: (octaves: number): string => `${octaves} octaves needs 2 rows at this width`,
+  evenRows: '2 rows takes 2 or 4 octaves',
+};
+
+/** The view's words (US English, windsor#821). */
+export const VIEW_LABELS = {
+  title: 'Keyboard',
+  octaves: 'Octaves',
+  rows: 'Rows',
+  expand: 'Expand',
+  expandTitle: 'Expand: open the keyboard wide',
+  close: 'Close',
+  closeTitle: 'Close the keyboard (Esc)',
+  octDown: 'Oct −',
+  octUp: 'Oct +',
+  hold: 'Hold',
+  panic: 'Panic',
+};
+/** Expand's icon: the Roll rail's expand path (`rollExpand.ts`), in a 12 px box. */
+export const EXPAND_ICON_PATH = 'M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7';
