@@ -106,6 +106,8 @@ export function mountTabShell(
     buttons.set(tab.id, button);
     bar.appendChild(button);
     const panel = el('div', 'tab-panel');
+    // An expanded view finds the tab its card lives on by this (`expandedViewFrame.ts`).
+    panel.dataset.tab = tab.id;
     ctx.addTab(tab.id, panel, tab.render);
     root.appendChild(panel);
   }

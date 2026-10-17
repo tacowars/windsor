@@ -1,7 +1,8 @@
 /**
- * Spectre's workbench (record `2026-10-17-spectre-drawn-cells` decision 10):
- * the instrument the card's Expand opens over the page, on the console's
- * expanded-view ground (`.roll-overlay`). Three lanes of cells (gain, delay,
+ * Spectre's workbench (record `2026-10-17-spectre-drawn-cells` decision 10,
+ * amended by `2026-10-17-expanded-views-below-the-header`): the instrument
+ * the card's Expand opens below the console header, on the console's
+ * expanded-view ground (`expandedViewFrame.ts`). Three lanes of cells (gain, delay,
  * feedback) over one frequency axis, drawn on with brushes over the live
  * spectrum, with one selection across them, Follow, Listen, the Starting
  * point picker, the Shape row and each lane's moves.
@@ -9,13 +10,17 @@
  * It keeps no copy of the song: every edit commits the whole insert through
  * the card's model, and each frame it redraws when the document, the scope's
  * reports or its own state moved, so an undo from anywhere shows at once.
- * It closes on Esc or Close, or when the insert is gone; closing turns the
- * scope and Listen off, and the card redraws.
+ * It has no Undo or Redo of its own: the header's stay live above it, and
+ * Cmd/Ctrl-Z reaches them. It closes on Esc while it is on screen, on Close,
+ * when another expanded view opens, or when the insert is gone; closing
+ * turns the scope and Listen off, and the card redraws. On another tab it
+ * stays open, hidden, and reads no spectrum.
  */
 import { pitchMask, scaleOffsets } from '@windsor/engine';
 import type { SpectreCurve, SpectreScope, SpectreSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { type ExpandedFrame, mountExpandedView } from './expandedViewFrame';
 import { withGesture } from './gestureHooks';
 import { insertsOf, liveInsert } from './insertTarget';
 import type { InsertTarget } from './insertTarget';
@@ -50,6 +55,8 @@ export interface SpectreBenchHost {
   readonly index: number;
   /** The rack's accent, which the overlay, outside the rack, cannot inherit. */
   readonly accent: string;
+  /** An element of the card: the workbench belongs to that card's tab. */
+  readonly from: HTMLElement;
   current(): SpectreSpec;
   commit(next: SpectreSpec): void;
   /** After it closes: the card redraws what the workbench changed. */
@@ -83,7 +90,7 @@ function songKey(ctx: AppCtx): SpectreSongKey {
   return { root, offsets: scaleOffsets(scale) };
 }
 
-/** Open the workbench over the page; returns its close. */
+/** Open the workbench below the header; returns its close. */
 // eslint-disable-next-line max-lines-per-function -- composition: the overlay's parts, its loop and its keys, in one place
 export function openSpectreBench(host: SpectreBenchHost): () => void {
   const { ctx } = host;
@@ -308,18 +315,22 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
   let lastVersion = -1;
   let lastLive: SpectreScope | undefined;
   let raf = 0;
+  let mounted: ExpandedFrame | null = null;
   const frame = (): void => {
     if (!overlay.isConnected) return;
     raf = requestAnimationFrame(frame);
     if (insertsOf(ctx, host.slot)[host.index]?.kind !== 'spectre') return close();
     const spec = current();
     const live = scope();
-    live?.setActive(true);
+    // On another tab the workbench stays open but reads no spectrum and draws nothing.
+    const shown = mounted?.shown() === true;
+    live?.setActive(shown);
     if (live !== lastLive) {
       // An undo or redo can rebuild the live system: the new stage takes Listen from the bench.
       live?.setListen(state.listen);
       lastLive = live;
     }
+    if (!shown) return;
     const reports = live?.read().reports ?? 0;
     if (spec !== lastSpec && spec !== own) {
       // Moved from outside (an undo, a lane, the card): the controls follow it.
@@ -359,6 +370,8 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
     touch();
   };
   const onKey = (e: KeyboardEvent): void => {
+    // Only while it is on screen: on another tab its keys, Esc among them, are that tab's.
+    if (!mounted?.shown()) return;
     const action = benchKeyAction(benchKeyFacts(e));
     if (!action) return;
     e.preventDefault();
@@ -374,12 +387,12 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
     const live = scope();
     live?.setListen(false);
     live?.setActive(false);
-    overlay.remove();
+    mounted?.remove();
     document.removeEventListener('keydown', onKey);
     host.closed();
   };
   document.addEventListener('keydown', onKey);
-  document.body.appendChild(overlay);
+  mounted = mountExpandedView({ ctx, overlay, from: host.from, close });
   resize.observe(plot);
   fit();
   canvas.focus();
