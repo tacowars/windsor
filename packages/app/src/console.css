@@ -42,6 +42,27 @@ body {
   margin: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  /* The console is an instrument, not a page (windsor#814, now the whole page;
+     record 2026-10-17-the-console-selects-no-text): a press that lingers or
+     slides selects no text and raises no callout, on every tab and in every
+     dialog. Safari reads only the -webkit- form, so both are set wherever
+     selection is ruled on. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* An open dialog too: Chromium's own stylesheet turns selection back on for a
+   dialog in the top layer, and an author rule outranks it. */
+dialog {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* A field still selects, and the song library's tag chips are there to be copied. */
+:is(input, textarea, [contenteditable]),
+.songs .chip,
+.song-dlg .chip {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button,
@@ -235,6 +256,8 @@ input {
   text-align: right;
   font-variant-numeric: tabular-nums;
   cursor: ns-resize;
+  /* A drag handle until it is clicked: the number selects only while it takes typing. */
+  -webkit-user-select: none;
   user-select: none;
 }
 .transport-box-input[name='bars'],
@@ -249,6 +272,7 @@ input {
 .transport-box-input:focus {
   outline: none;
   cursor: text;
+  -webkit-user-select: text;
   user-select: text;
 }
 .transport-unit {
@@ -2516,7 +2540,6 @@ input.field.group-name {
   font-weight: 600;
   cursor: grab;
   touch-action: none;
-  user-select: none;
 }
 .chip:hover {
   background: var(--panel-hi);
@@ -2652,7 +2675,6 @@ body.chord-dragging {
   place-items: center;
   font-size: 9.5px;
   touch-action: none;
-  user-select: none;
 }
 .chord-strip .gcell.chord {
   color: var(--ink);
@@ -4162,8 +4184,6 @@ body.chord-dragging {
   z-index: 2;
   overflow: hidden;
   touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .renv-layer[data-tool='edit'] {
   cursor: crosshair;
@@ -4917,16 +4937,6 @@ body.chord-dragging {
 
 /* ---------- the Song view (#709): ruler, lanes, regions, the pane ---------- */
 
-/* The Song tab is an instrument, not a page (windsor#814): a press that
-   starts off a control and drags selects no text. A field still selects. */
-.tab-panel:has(> .lanes-scroll) {
-  -webkit-user-select: none;
-  user-select: none;
-}
-.tab-panel:has(> .lanes-scroll) :is(input, textarea, [contenteditable]) {
-  -webkit-user-select: text;
-  user-select: text;
-}
 .lanes-scroll {
   --pad-top: 12px;
   --pad-x: 14px;
@@ -5367,7 +5377,6 @@ select.field.compact {
   height: 22px;
   cursor: move;
   touch-action: none;
-  user-select: none;
 }
 .ruler-bar {
   position: relative;
@@ -5399,7 +5408,6 @@ select.field.compact {
   height: 12px;
   cursor: crosshair;
   touch-action: none;
-  user-select: none;
 }
 .loop-brace {
   position: absolute;
@@ -5449,7 +5457,6 @@ select.field.compact {
   background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar));
   background-position: -1px 0;
   touch-action: none;
-  user-select: none;
 }
 /* A part's lane carries its colour as --pc (windsor#642): the selected lane's border and its regions'. */
 .lane.selected {
@@ -5628,12 +5635,9 @@ select.field.compact {
   border-style: dashed;
 }
 /* The lane's context menu (windsor#826; record 2026-10-16-song-tab-context-menu, decisions 7 and 8):
-   iOS shows no callout on a long press, and a hovered or lit row previews its effect, dashed in the
-   carrier, as the approved mockups draw it: the region a paste or an add would land, the line a
-   split would cut at, and the loop brace a loop command would set. */
-.lane {
-  -webkit-touch-callout: none;
-}
+   a hovered or lit row previews its effect, dashed in the carrier, as the approved mockups draw it:
+   the region a paste or an add would land, the line a split would cut at, and the loop brace a loop
+   command would set. The callout a long press would raise is off for the whole page (body). */
 .lane-pv-reg {
   position: absolute;
   top: 3px;
@@ -5704,7 +5708,6 @@ select.field.compact {
   pointer-events: auto;
   cursor: grab;
   touch-action: none;
-  user-select: none;
   left: -6px;
   padding: 0 4px 12px 10px;
 }
@@ -5900,7 +5903,6 @@ select.field.compact {
   border: 1px solid var(--line);
   border-radius: var(--r);
   cursor: pointer;
-  user-select: none;
   touch-action: none;
 }
 .harmony-card .harmony-play svg {
@@ -6161,8 +6163,6 @@ select.field.compact {
 /* Under the toolbar's tools (windsor#349): a drag edits, never scrolls. */
 .lanes .auto-lane {
   touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .lanes[data-auto-tool='edit'] .auto-lane {
   cursor: crosshair;
@@ -6779,7 +6779,6 @@ select.field.auto-snap {
   border-radius: var(--r);
   cursor: ns-resize;
   touch-action: none;
-  user-select: none;
 }
 
 /* A knob a mode has no use for (windsor#334: Cutoff in Formant) hides by its attribute. */
@@ -7163,9 +7162,6 @@ select.field.auto-snap {
   border: 1px solid var(--line-bright);
   border-radius: var(--r);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  -webkit-touch-callout: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .context-menu-head {
   margin-bottom: 3px;
@@ -7911,6 +7907,8 @@ body.env-dragging .env-canvas {
   border-radius: 0 0 var(--r) var(--r);
   cursor: pointer;
   position: relative;
+  /* A finger that lingers or slides along the keys plays, never scrolls or selects. */
+  touch-action: none;
 }
 .key[data-black='1'] {
   background: linear-gradient(180deg, #14181a, #0d1012);
@@ -8318,7 +8316,6 @@ dialog.audio-gate::backdrop {
   font-weight: 400;
   line-height: 1.4;
   cursor: default;
-  user-select: auto;
   touch-action: auto;
 }
 .songs .chip:hover,
@@ -10092,7 +10089,6 @@ dialog.song-dlg {
   text-align: center;
   cursor: ns-resize;
   touch-action: none;
-  user-select: none;
 }
 .cc-val:hover {
   border-color: var(--line-bright);
