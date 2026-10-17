@@ -52,13 +52,13 @@ function memberBoxes(ctx: AppCtx, slot: number): MemberBox[] {
   ];
 }
 
-/** Write `options` as the rack `id` from the part on `slot`, and link the part to it; the id written. */
+/** Write `options` as the rack `id` from the part on `slot`, and link the part to it while it is still the one saved from. */
 async function writeRack(
   ctx: AppCtx,
   slot: number,
   id: string,
   options: RackSaveOptions,
-): Promise<string> {
+): Promise<{ id: string; linked: boolean }> {
   const file = rackFromPart(ctx.model.doc, slot, options, new Set(Object.keys(library.entries)));
   if (!file) throw new Error('This part has no patch to save as a rack.');
   // Pinned before the write, as Save pins them: another song opened, or the
@@ -67,14 +67,9 @@ async function writeRack(
   const song = ctx.model.openings;
   await writeRackFile(library, id, serialiseRackFile(file));
   const after = partAt(ctx.model.doc, slot);
-  if (
-    ctx.model.openings === song &&
-    after !== undefined &&
-    after.preset === own &&
-    after.rackSource !== id
-  )
-    ctx.change(partChange(slot, { rackSource: id }));
-  return id;
+  const still = ctx.model.openings === song && after !== undefined && after.preset === own;
+  if (still && after.rackSource !== id) ctx.change(partChange(slot, { rackSource: id }));
+  return { id, linked: still };
 }
 
 /** Save as rack…: the modal, then the write under a fresh id, then the link (decision 13). */
@@ -102,15 +97,18 @@ async function runSaveAsRack(ctx: AppCtx, opener: HTMLElement, refresh: () => vo
     lowCut: members['lowCut'] ?? false,
     sequencer: members['sequencer'] ?? false,
   };
-  const id = await writeRack(
+  const { id, linked } = await writeRack(
     ctx,
     slot,
     uniqueId(slugify(meta.name), Object.keys(library.racks)),
     options,
   );
+  const written = writtenText(library, id).replace('saved', 'saved rack');
   ctx.notify(
-    `${writtenText(library, id).replace('saved', 'saved rack')} — this part follows it`,
-    'success',
+    linked
+      ? `${written} — this part follows it`
+      : `${written} — the part moved on meanwhile, so it is not linked`,
+    linked ? 'success' : 'warning',
   );
   refresh();
 }
@@ -131,12 +129,15 @@ async function runSaveRack(ctx: AppCtx, refresh: () => void): Promise<void> {
   };
   const forks = !isRackWritable(library, rack.id);
   const id = forks ? uniqueId(slugify(rack.name), Object.keys(library.racks)) : rack.id;
-  await writeRack(ctx, slot, id, options);
+  const { linked } = await writeRack(ctx, slot, id, options);
+  const follows = linked
+    ? 'this part follows it'
+    : 'the part moved on meanwhile, so it is not linked';
   ctx.notify(
     forks
-      ? `built-in racks stay as they are: saved your "${rack.name}" as ${id}; this part follows it`
+      ? `built-in racks stay as they are: saved your "${rack.name}" as ${id}; ${follows}`
       : `saved rack "${rack.name}"`,
-    'success',
+    linked ? 'success' : 'warning',
   );
   refresh();
 }

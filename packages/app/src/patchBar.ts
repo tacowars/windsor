@@ -106,6 +106,19 @@ function patchBox(ctx: AppCtx, actions: PatchBarActions): HTMLElement {
 }
 
 /**
+ * Redraw the RACK tag in the box after a patch edit or a rack write, as
+ * `syncModifiedMarker` redraws the patch's dot: the rack's dot follows
+ * `rackDifferences` over the document's patch, which a knob push writes.
+ */
+export function syncRackTag(ctx: AppCtx): void {
+  const box = document.getElementById('patchBox');
+  if (!box) return;
+  document.getElementById('patchRackTag')?.remove();
+  const name = box.querySelector('.patch-box-name');
+  for (const node of rackTagNode(ctx, ctx.parts.selected)) name?.before(node);
+}
+
+/**
  * The RACK tag before the name while the part was loaded from a rack
  * (windsor#885, record `2026-10-17-racks` decision 19): its title names the
  * rack, and its dot is lit while the part differs from it (decision 14).

@@ -25,7 +25,7 @@ import { showTrapped } from './metadataModal';
 import { buildMacroCard } from './macroCard';
 import { midiPanel } from './midiPanel';
 import { dropInit } from './patchActions';
-import { keepBarFocus, patchBar } from './patchBar';
+import { keepBarFocus, patchBar, syncRackTag } from './patchBar';
 import {
   buildAlgPicker,
   buildDrive,
@@ -123,6 +123,7 @@ function patchEditor(ctx: AppCtx): PatchEditor {
     if (!push()) return;
     if (!wasDocument) syncPresetAndBadge(ctx, editor);
     syncModifiedMarker(ctx);
+    syncRackTag(ctx);
   };
   const editor: PatchEditor = {
     get patch() {
