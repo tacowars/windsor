@@ -76,6 +76,13 @@ function scope(model: DocumentModel) {
 /** A hand-written partial: the merge renormalises it, so its shape is the document's, not the type's. */
 const raw = (value: unknown): DocumentPartial => value as DocumentPartial;
 
+/** A raw chain as the song normalises it: every insert at its kind's defaults, its id kept. */
+function chain(inserts: unknown[]): RackFile['inserts'] {
+  const model = new DocumentModel(FULL_DOCUMENT);
+  model.merge(raw({ parts: { [kick]: { strip: { inserts } } } }));
+  return [...partAt(model.doc, kick)!.strip.inserts];
+}
+
 const partFields = (partial: DocumentPartial, slot: number): Record<string, unknown> =>
   (partial.parts as Record<number, Record<string, unknown>>)[slot]!;
 
@@ -214,6 +221,41 @@ describe('loadRackChange (decision 10)', () => {
     expect(partAt(model.doc, arp)?.automation?.map((lane) => lane.target)).toEqual([kept, strip]);
   });
 
+  it('drops a lane on a kept host id whose slot child or kind the rack changed', () => {
+    const model = song();
+    const { load, ids } = scope(model);
+    const slotRate = formatTargetId({ kind: 'insert', insertId: 'e1', field: 'slot.rate' });
+    const mix = formatTargetId({ kind: 'insert', insertId: 'e1', field: 'mix' });
+    const lanes = () => partAt(model.doc, arp)?.automation?.map((lane) => lane.target);
+    const withLanes = () =>
+      model.merge(
+        raw({
+          parts: {
+            [arp]: {
+              strip: { inserts: [{ kind: 'echo', id: 'e1', slot: { kind: 'chorus', id: 'c9' } }] },
+              automation: [slotRate, mix].map((target) => ({
+                target,
+                points: [{ tick: 0, value: 0.5 }],
+              })),
+            },
+          },
+        }),
+      );
+    const bare = rackFromPart(model.doc, kick, BARE, ids) as RackFile;
+    // The host kept with its slot emptied: the slot lane goes, the host's own stays.
+    withLanes();
+    expect(lanes()).toEqual([slotRate, mix]);
+    load(arp, { id: 'echo-rack', file: { ...bare, inserts: chain([{ kind: 'echo', id: 'e1' }]) } });
+    expect(lanes()).toEqual([mix]);
+    // The id kept but of another kind now: a row that kind has stays, a row it lacks goes.
+    withLanes();
+    load(arp, {
+      id: 'drive-rack',
+      file: { ...bare, inserts: chain([{ kind: 'drive', id: 'e1' }]) },
+    });
+    expect(lanes()).toEqual([mix]);
+  });
+
   it("keeps a same-kind part's seed and region patterns, and drops another kind's", () => {
     const model = song();
     const { rack, load } = scope(model);
@@ -244,7 +286,7 @@ describe('loadRackChange (decision 10)', () => {
 
   it('leaves a part with one ∞ region none when the rack is a Roll', () => {
     const model = song();
-    const { rack, load, ids } = scope(model);
+    const { load, ids } = scope(model);
     const asRoll = model.preview(setSequencerKind(model.doc, hat, 'roll'));
     const roll = withoutSeed(partAt(asRoll, hat)!.sequencer);
     const ref: RackRef = {
@@ -254,7 +296,6 @@ describe('loadRackChange (decision 10)', () => {
     const fields = partFields(load(drone, ref), drone);
     expect(fields['regions']).toEqual([]);
     expect(partAt(model.doc, drone)?.sequencer.kind).toBe('roll');
-    expect(rack).toBeDefined();
   });
 
   it("leaves the part's low cut and sequencer alone when the rack carries neither", () => {

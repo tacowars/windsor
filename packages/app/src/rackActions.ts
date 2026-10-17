@@ -26,6 +26,7 @@ import {
   parseTargetId,
   partAt,
   patchLeafDifferences,
+  targetRow,
 } from '@windsor/engine';
 import type { AutoCopies } from './autoCopies';
 import { partChange } from './context';
@@ -111,10 +112,15 @@ export function rackFromPart(
   };
 }
 
-/** True when `target` is not an insert's, or names an insert the new chain has. */
-function keptTarget(target: string, ids: ReadonlySet<string>): boolean {
+/**
+ * True when `target` is not an insert's, or is a row the new chain's insert
+ * of that id has: the same lookup the lane and CC normalisers make, so a
+ * target the engine would drop after the load (a host kept with its slot
+ * emptied, an id now of another kind) goes in the load itself.
+ */
+function keptTarget(target: string, specOf: (id: string) => InsertSpec | undefined): boolean {
   const parsed = parseTargetId(target);
-  return parsed?.kind !== 'insert' || ids.has(parsed.insertId);
+  return parsed?.kind !== 'insert' || targetRow(target, specOf) !== undefined;
 }
 
 /**
@@ -160,9 +166,12 @@ function rackLoad(
   const patchId = uniqueId(rack.id, taken);
   const source = file.patchSource;
   const patchSource = source && Object.hasOwn(library.entries, source) ? source : undefined;
-  const ids = new Set(file.inserts.flatMap((spec) => (spec.id === undefined ? [] : [spec.id])));
-  const automation = part.automation?.filter((lane) => keptTarget(lane.target, ids));
-  const ccMappings = part.ccMappings?.filter((mapping) => keptTarget(mapping.target, ids));
+  const specs = new Map(
+    file.inserts.flatMap((spec) => (spec.id === undefined ? [] : [[spec.id, spec] as const])),
+  );
+  const specOf = (id: string): InsertSpec | undefined => specs.get(id);
+  const automation = part.automation?.filter((lane) => keptTarget(lane.target, specOf));
+  const ccMappings = part.ccMappings?.filter((mapping) => keptTarget(mapping.target, specOf));
   const fields: Record<string, unknown> = {
     preset: patchId,
     patchSource,
