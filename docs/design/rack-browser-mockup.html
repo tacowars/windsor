@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The rack browser mockup, for tacowars to approve (windsor#875; record
+     docs/log/2026-10-17-racks.md, decisions 13, 18, 19 and 20). 2026-10-17.
+     Once approved, it is the spec for the rack UI ticket (issue D): the
+     browser's Kind facet and its rack rows, the info pane for a rack, the
+     patch bar's rack tag and its ⋯ menu, the Song tab's two entry points,
+     and the Save as rack… modal.
+     Today's browser is reproduced from a screenshot read in headless Chrome
+     from `npm run dev` on 2026-10-17, on the desktop at 1440 px: the facets
+     and their counts, the table with the search on "efm", and the EFM Bell
+     Perc pane, cell for cell. The frame's rules are copied from
+     packages/app/src/console.css (.patch-bar, .patch-browser, .pb-*,
+     .patch-menu, .context-menu, dialog) and its labels from the sources
+     (INSERT_LABELS, KIND_LABELS, ROW_SOURCE_LABELS, LANE_MENU_TEXT). Every
+     example value is a real one: the two patches are the built-in EFM Kick
+     and EFM Closed Hat with their own tags and summary lines;
+     the chains are today's insert kinds; the pattern is the Euclid default.
+     Static and self-contained apart from the fonts: the strip at the top is
+     the mockup's own state switcher, not part of the console; the facets,
+     the rows and the menus are drawings; nothing makes sound. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Rack Browser Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from packages/app/src/console.css. The app is dark only. */
+:root {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--ground); color: var(--ink); font: 13px/1.45 var(--f-ui); -webkit-font-smoothing: antialiased; }
+button, select, input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---------- the mockup's own page (not the console) ---------- */
+.mock-bar {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 8px 16px; background: #2a2140; border-bottom: 1px dashed var(--return);
+  font: 11px var(--f-ui); color: #cbbfe6;
+}
+.mock-bar b { font-family: var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px; color: var(--return); }
+.mock-bar label { display: inline-flex; gap: 6px; align-items: center; }
+.mock-bar select { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 3px 6px; font: 11px var(--f-ui); }
+.doc { max-width: 1480px; margin: 0 auto; padding: 20px 16px 48px; }
+.doc h1 { font: 700 20px/1.2 var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; margin: 8px 0 4px; }
+.doc h2 { font: 600 14px/1.3 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; margin: 34px 0 6px; }
+.doc h2 .tag { color: var(--inset); background: var(--return); border-radius: var(--r); padding: 1px 6px; margin-right: 8px; }
+.doc h2 .tag.ref { background: var(--ink-faint); }
+.doc h3 { font: 600 11px/1.2 var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin: 18px 0 6px; }
+.doc p, .doc li { color: var(--ink-dim); max-width: 92ch; }
+.doc p { margin: 6px 0; }
+.doc b, .doc strong { color: var(--ink); font-weight: 600; }
+.doc code { font: 11.5px var(--f-num); color: var(--ink); background: var(--inset); padding: 1px 4px; border-radius: var(--r); overflow-wrap: anywhere; }
+.doc ul, .doc ol { margin: 6px 0; padding-left: 20px; }
+.status { display: inline-block; font: 600 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--return); border: 1px dashed var(--return); border-radius: var(--r); padding: 2px 8px; }
+.mock-note { font: 11px var(--f-ui); color: #cbbfe6; background: #2a2140; border: 1px dashed var(--return); border-radius: var(--r); padding: 4px 8px; display: inline-block; margin: 4px 0 8px; }
+.new { outline: 1px dashed var(--return); outline-offset: 2px; }
+.new-mark { font: 600 9px var(--f-panel); letter-spacing: 0.12em; color: var(--return); border: 1px dashed var(--return); border-radius: var(--r); padding: 1px 5px; text-transform: uppercase; vertical-align: middle; }
+.frame { container-type: inline-size; background: var(--ground); border: 1px solid var(--line-bright); border-radius: 6px; overflow: hidden; margin: 10px 0; }
+.rowwrap { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-start; }
+.rowwrap > div { min-width: 0; }
+.measure { font: 11px var(--f-num); color: var(--ink-faint); margin: 6px 0 0; }
+.measure b { color: var(--carrier); font-weight: 500; }
+table.rows { border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+table.rows th, table.rows td { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-dim); }
+table.rows th { font: 600 9.5px var(--f-panel); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+table.rows td:first-child { color: var(--ink); white-space: nowrap; }
+
+/* ---------- console furniture, copied from console.css ---------- */
+.btn {
+  background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer;
+  color: var(--ink-dim); font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; height: 28px; white-space: nowrap;
+}
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.btn.primary { background: var(--carrier); border-color: var(--carrier); color: #111416; }
+.btn.ghost { background: transparent; }
+.btn.icon { padding: 6px 8px; }
+.btn:disabled { opacity: 0.4; cursor: default; background: var(--inset); color: var(--ink-dim); border-color: var(--line); }
+.btn[aria-pressed='true'] { background: var(--carrier); border-color: var(--carrier); color: #111416; }
+.field { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 7px; font: 12px var(--f-num); color: var(--ink); height: 28px; }
+.field-label { font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+.section-title { font: 600 10px var(--f-panel); letter-spacing: 0.17em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); margin-left: 2px; }
+.hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.5; margin: 0 0 8px; }
+
+/* the header: the tab row and the part strip, as the screenshot shows them */
+.app-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.tab { height: 28px; padding: 7px 14px; background: var(--inset); color: var(--ink-dim); font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; border: 0; }
+.tab.on { background: var(--carrier); color: #111416; }
+.cell { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 9px; font: 12px var(--f-num); color: var(--ink); height: 28px; display: inline-flex; align-items: center; gap: 5px; }
+.cell small { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; color: var(--ink-faint); text-transform: uppercase; }
+.part-strip { display: flex; align-items: stretch; gap: 4px; padding: 4px 16px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.pchip { position: relative; display: block; min-width: 70px; max-width: 150px; width: 150px; padding: 5px 10px 6px 9px; text-align: left; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid #6ea8e2; border-radius: var(--r); font-family: var(--f-ui); font-size: 13px; }
+.pchip .n { display: block; font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+.pchip .k { font-size: 9.5px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+.pchip .cl { position: absolute; right: 6px; top: 7px; display: grid; gap: 4px; }
+.pchip .cl i { display: block; width: 5px; height: 5px; border-radius: 50%; background: #3a4349; }
+.pchip .cl i.act { background: rgb(30, 40, 34); }
+.pm { position: relative; display: flex; gap: 3px; margin-left: auto; }
+.pm .pm-btn { display: flex; align-items: center; justify-content: center; min-width: 34px; height: 38px; padding: 0 10px; font-size: 15px; color: var(--ink); }
+
+/* the patch bar (.patch-bar and its boxes) */
+.patch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.patch-bar .bar-label { margin: 0; }
+.patch-bar input.field, .patch-bar select.field { font-family: var(--f-ui); font-size: 13px; padding: 5px 8px; }
+.patch-bar .bar-name { width: 120px; }
+.patch-bar .bar-seq { width: auto; min-width: 110px; }
+.patch-bar .bar-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.patch-bar .bar-grow { flex: 1; }
+.cc-count { display: inline-grid; place-items: center; min-width: 14px; height: 14px; margin-left: 5px; border-radius: 7px; background: var(--line-bright); color: var(--ink); font: 600 9px var(--f-num); }
+.patch-box-wrap { position: relative; flex: 1 1 300px; min-width: 300px; max-width: 420px; }
+.patch-box { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 5px 10px; cursor: pointer; text-align: left; }
+.patch-box-name { font-family: var(--f-ui); font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.patch-box-mod { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--carrier); }
+.patch-box-src { font-family: var(--f-ui); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+.patch-box-search { margin-left: auto; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+/* new: the RACK tag while the part has a rackSource (decision 19, settled on this mockup): on the box's one line, before the name, carrying the rack's dot. */
+.patch-box-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 16px; padding: 0 6px; border: 1px solid var(--line-bright); border-radius: var(--r); font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.box-demo { display: grid; gap: 10px; max-width: 420px; }
+.box-demo .patch-box { cursor: default; }
+.box-demo .hint { margin: 0 0 2px; }
+body:not([data-rack='on']) .rack-only { display: none !important; }
+body[data-rack='on'] .norack-only { display: none !important; }
+
+/* the ⋯ menu (.patch-menu) */
+.patch-menu { display: flex; flex-direction: column; min-width: 200px; padding: 4px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55); }
+.patch-menu-item { background: transparent; border: 0; border-radius: 2px; padding: 6px 10px; text-align: left; white-space: nowrap; font-size: 12.5px; color: var(--ink); cursor: pointer; }
+.patch-menu-item:hover:not(:disabled) { background: #2f3a40; }
+.patch-menu-item:disabled { color: var(--ink-faint); cursor: default; }
+.patch-menu-sep { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--line); }
+
+/* the full-pane browser (.patch-browser) */
+.patch-browser { position: relative; display: grid; grid-template-columns: 230px minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr); height: 710px; background: var(--ground); border-top: 1px solid var(--line-bright); }
+@container (max-width: 900px) {
+  .patch-browser { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; height: auto; }
+  .pb-facets, .pb-results, .pb-info { max-height: 420px; }
+}
+.pb-head { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 16px; background: var(--panel-hi); border-bottom: 1px solid var(--line); }
+.pb-title { font: 700 14px var(--f-panel); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); }
+.pb-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.pb-head input.pb-search { flex: 0 1 380px; min-width: 160px; max-width: none; font-family: var(--f-ui); font-size: 13px; padding: 5px 8px; }
+.pb-head .pb-hint { margin: 0; }
+.pb-part { color: var(--carrier); }
+.pb-grow { flex: 1; }
+.pb-facets, .pb-results, .pb-info { min-height: 0; overflow-y: auto; }
+.pb-facets { border-right: 1px solid var(--line); }
+.pb-facets .section { padding: 12px 14px; }
+.pb-facet { display: flex; justify-content: space-between; width: 100%; padding: 4px 8px; border: 0; border-radius: 2px; background: transparent; font-size: 12.5px; color: var(--ink-dim); text-align: left; cursor: pointer; }
+.pb-facet:hover { color: var(--ink); }
+.pb-facet[aria-pressed='true'] { background: #2f3a40; color: var(--ink); }
+.pb-count { font: 11px var(--f-num); color: var(--ink-faint); }
+.pb-tags, .pb-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pb-tag, .pb-chips span { font-size: 11px; color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 2px 8px; }
+.pb-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pb-table th { position: sticky; top: 0; text-align: left; font: 600 9.5px var(--f-panel); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--ground); }
+.pb-table td { padding: 6px 10px; border-bottom: 1px solid #1d2326; color: var(--ink-dim); white-space: nowrap; cursor: pointer; }
+.pb-table td:first-child { color: var(--ink); }
+.pb-table tbody tr:hover td { background: var(--panel-hi); }
+.pb-table tr.hl td { background: #2f3a40; }
+/* new: a rack row's chain line and its pattern mark (decision 18). */
+.pb-chain { color: var(--ink-dim); }
+.pb-chain .arrow { color: var(--ink-faint); margin: 0 4px; }
+.pb-pattern { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; font: 500 10.5px var(--f-num); color: var(--modulator); }
+.pb-pattern .glyph { font-size: 11px; line-height: 1; }
+.pb-info { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-left: 1px solid var(--line); }
+.pb-info .hint { margin: 0; }
+.pb-name { font: 700 18px var(--f-panel); letter-spacing: 0.06em; color: var(--ink); }
+.pb-desc { margin: 0; line-height: 1.5; color: var(--ink-dim); }
+.pb-env { display: block; flex: none; width: 100%; height: 50px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.pb-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* new: the rack's rows in the pane (decision 18), labelled for issue D. */
+.pb-rack { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.pb-rack dt { font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); padding-top: 2px; }
+.pb-rack dd { margin: 0; font-size: 12.5px; color: var(--ink); min-width: 0; }
+.pb-rack dd small { display: block; font-size: 11px; color: var(--ink-faint); }
+.pb-rack .ins { display: flex; align-items: center; gap: 7px; line-height: 1.6; white-space: nowrap; }
+.pb-rack .ins .pwr { font-size: 12px; color: var(--modulator); }
+.pb-rack .ins.off .pwr, .pb-rack .ins.off .kind { color: var(--ink-faint); }
+.pb-rack .ins .key { font: 11px var(--f-num); color: var(--carrier); }
+.pb-rack .ins.off .key { color: var(--ink-faint); }
+body:not([data-kind='racks']) .racks-only { display: none !important; }
+body[data-kind='racks'] .patches-only { display: none !important; }
+
+/* the Song tab's context menu (.context-menu), mouse size */
+.context-menu { position: relative; display: inline-block; min-width: 220px; padding: 4px 0; background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.context-menu-head { margin-bottom: 3px; padding: 3px 12px 5px; border-bottom: 1px solid var(--line); color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+.context-menu button { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 32px; padding: 0 12px; background: none; border: 0; color: var(--ink); font: 12px var(--f-ui); text-align: left; cursor: pointer; white-space: nowrap; }
+.context-menu button:hover:not(:disabled), .context-menu button.hl { background: var(--panel-hi); }
+.context-menu button:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.context-menu button .tag { margin-left: auto; color: var(--ink-faint); font: 9.5px var(--f-num); }
+.context-menu button .sub { margin-left: auto; color: var(--ink-dim); font-size: 13px; }
+.context-menu hr { margin: 3px 0; border: 0; border-top: 1px solid var(--line); }
+/* the Song tab's lane, as the screenshot shows it, for the menu to sit on */
+.lane-stage { position: relative; background: var(--ground); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 16px 16px; overflow: hidden; }
+.lane { display: flex; align-items: stretch; height: 38px; }
+.lane .cellname { width: 160px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px; background: var(--panel); border: 1px solid #6ea8e2; border-right-width: 2px; font: 600 11px var(--f-panel); color: var(--ink); }
+.lane .cellname .num { display: grid; place-items: center; width: 22px; height: 100%; background: #6ea8e2; color: #111416; font: 600 12px var(--f-panel); margin-left: -8px; }
+.lane .reg { flex: 1; position: relative; background: #1c232a; border: 1px solid #6ea8e2; border-left: 0; }
+.lane .reg span { position: absolute; left: 8px; top: 9px; font: 500 9px var(--f-num); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.lane .reg i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+
+/* the dialog (dialog, .dlg-body), drawn as a card over a backdrop */
+.backdrop { background: rgba(10, 13, 15, 0.72); padding: 30px 16px; display: flex; justify-content: center; }
+.dlg { background: var(--panel); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); max-width: 720px; width: 100%; }
+.dlg-body { padding: 16px; display: flex; flex-direction: column; gap: 11px; }
+.dlg .field { width: 100%; max-width: 260px; }
+.dlg textarea.field { height: auto; min-height: 64px; max-width: none; font-family: inherit; font-size: 12.5px; resize: vertical; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--inset); font-size: 11.5px; }
+.chip b { color: var(--ink-dim); font-weight: 400; font-size: 13px; line-height: 1; padding: 0 2px; }
+/* new: the two member checkboxes (decision 13). */
+.members { display: grid; gap: 6px; }
+.member { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 4px 10px; align-items: start; font-size: 12.5px; }
+.member input { margin: 2px 0 0; width: 14px; height: 14px; accent-color: var(--carrier); }
+.member .hint { grid-column: 2; margin: 0; }
+</style>
+
+<div class="mock-bar">
+  <b>Mockup</b>
+  <label>Kind facet <select id="kindSwitch"><option value="patches">Patches · today, reproduced</option><option value="racks" selected>Racks · proposed</option></select></label>
+  <label>The selected part <select id="rackSwitch"><option value="off">plays a patch, no rack</option><option value="on" selected>was loaded from the rack Kick Drive</option></select></label>
+  <span>Desktop at 1440 px, the device of today's screenshot. Dashed purple marks what is new.</span>
+</div>
+
+<div class="doc">
+  <h1>Rack browser mockup</h1>
+  <p><span class="status">For tacowars to approve</span> &nbsp; windsor#875 · record <code>docs/log/2026-10-17-racks.md</code>, decisions 13, 18, 19 and 20.</p>
+  <p>A <b>rack</b> is a part's sound saved as one library object: its patch, its insert chain, and when asked its low cut and its sequencer. This page shows where racks appear in the console: the one browser with a <b>Kind</b> facet, the info pane for a rack, the patch bar's rack tag and its ⋯ menu, the Song tab's two entry points, and the <b>Save as rack…</b> modal. Switch the Kind facet above to compare the browser as it is today with the browser on Racks; the frame, the sizes and the type are the same.</p>
+  <p>The example racks are built from two built-in patches. <b>Kick Drive</b> is the EFM Kick through Classic Drive and a bus compressor keyed from another part, with a Reverb switched off, a low cut at 45 Hz and the Euclid pattern at its defaults. <b>Dub Hat</b> is the EFM Closed Hat through Dub delay and Filter, with no low cut and no sequencer in the rack. Today's browser is reproduced with the search on <code>efm</code>, the same eleven rows in both states' counts. The part plays the Euclid pattern with a low cut at 45 Hz in both of its states: the sequencer and the low cut are the part's, whether a rack set them or not, and the no-rack state is the part Kick Drive was saved from.</p>
+
+  <h2><span class="tag">1</span>The Parts tab: the bar and the browser</h2>
+  <p>The tab row, the part strip and the patch bar as today's screenshot shows them, then the full-pane browser under the bar. On <b>Racks</b> the table lists racks and the pane describes the selected one; the facets below Kind are the shared ones, counted over racks.</p>
+
+  <div class="frame">
+    <div class="app-head">
+      <div class="tabs"><button class="tab on">Parts</button><button class="tab">Mixer</button><button class="tab">Song</button><button class="tab">⚙</button></div>
+      <span class="cell"><small>&nbsp;</small>20%</span>
+      <span class="cell">Tap</span>
+      <span class="cell">120.00 <small>BPM</small></span>
+      <span class="cell">4 <small>Bars</small></span>
+      <span class="cell">1/16</span>
+      <span class="cell">4/4</span>
+      <span class="cell">C</span>
+      <span class="cell">minor</span>
+      <span class="cell">1.1.1</span>
+      <button class="btn icon">▶</button><button class="btn icon">■</button><button class="btn icon">‖</button>
+    </div>
+    <div class="part-strip">
+      <button class="pchip"><span class="n">Part 1</span><span class="k">1 · Euclid</span><span class="cl"><i></i><i class="act"></i></span></button>
+      <div class="pm"><button class="btn pm-btn" title="Add a part (1 of 16)">+</button><button class="btn pm-btn" disabled>−</button></div>
+    </div>
+
+    <div class="patch-bar">
+      <span class="field-label bar-label">Part</span>
+      <input class="field bar-name" value="Part 1" aria-label="Name of the part on slot 0">
+      <select class="field bar-seq" aria-label="Sequencer"><option>Seq: Euclid</option></select>
+      <button class="btn">MIDI CC <span class="cc-count">0</span></button>
+      <span class="bar-sep"></span>
+      <span class="field-label bar-label">Patch</span>
+      <button class="btn icon">◀</button><button class="btn icon">▶</button>
+      <div class="patch-box-wrap">
+        <button class="patch-box" id="patchBox">
+          <span class="patch-box-tag rack-only new" title="Loaded from the rack Kick Drive">Rack</span>
+          <span class="patch-box-name rack-only">Kick Drive</span><span class="patch-box-name norack-only">EFM Kick</span>
+          <span class="patch-box-src">Drums · this song</span>
+          <span class="patch-box-search">⌕ search</span>
+        </button>
+      </div>
+      <button class="btn">Save</button><button class="btn">Save as…</button><button class="btn">Init</button>
+      <button class="btn icon" aria-label="Patch actions">⋯</button>
+      <span class="bar-grow"></span>
+      <button class="btn" aria-pressed="true">⤢ Browse patches</button>
+    </div>
+
+    <div class="patch-browser" role="region" aria-label="Patch browser">
+      <div class="pb-head">
+        <span class="pb-title patches-only">Patches</span><span class="pb-title racks-only">Racks</span>
+        <span class="pb-sep"></span>
+        <input class="field pb-search" type="search" value="efm" placeholder="Search sounds or tags…" aria-label="Search">
+        <span class="hint pb-hint">Loading into <b class="pb-part">Part 1</b></span>
+        <span class="pb-grow"></span>
+        <button class="btn">Library folder…</button>
+        <button class="btn">✕ Close</button>
+      </div>
+
+      <div class="pb-facets">
+        <div class="section new">
+          <div class="section-title"><span>Kind</span> <span class="new-mark">new</span></div>
+          <button class="pb-facet patches-only" aria-pressed="true"><span>Patches</span><span class="pb-count">11</span></button>
+          <button class="pb-facet racks-only" aria-pressed="false"><span>Patches</span><span class="pb-count">11</span></button>
+          <button class="pb-facet patches-only" aria-pressed="false"><span>Racks</span><span class="pb-count">2</span></button>
+          <button class="pb-facet racks-only" aria-pressed="true"><span>Racks</span><span class="pb-count">2</span></button>
+        </div>
+        <div class="section">
+          <div class="section-title"><span>Source</span></div>
+          <button class="pb-facet"><span>This song</span><span class="pb-count patches-only">1</span><span class="pb-count racks-only">0</span></button>
+          <button class="pb-facet"><span>Built-in</span><span class="pb-count patches-only">10</span><span class="pb-count racks-only">0</span></button>
+          <button class="pb-facet"><span>Library</span><span class="pb-count patches-only">0</span><span class="pb-count racks-only">2</span></button>
+        </div>
+        <div class="section">
+          <div class="section-title"><span>Category</span></div>
+          <button class="pb-facet" aria-pressed="true"><span>All</span><span class="pb-count patches-only">11</span><span class="pb-count racks-only">2</span></button>
+          <button class="pb-facet"><span>Drums</span><span class="pb-count patches-only">11</span><span class="pb-count racks-only">2</span></button>
+          <span class="patches-only">
+            <button class="pb-facet"><span>Pads</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Soundtrack FX</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Strings</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Plucks</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Basses</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Legacy FX</span><span class="pb-count">0</span></button>
+            <button class="pb-facet"><span>Leads</span><span class="pb-count">0</span></button>
+          </span>
+        </div>
+        <div class="section">
+          <div class="section-title"><span>Tags</span></div>
+          <div class="pb-tags patches-only">
+            <button class="pb-tag">mono</button><button class="pb-tag">analog</button><button class="pb-tag">short</button><button class="pb-tag">noise</button><button class="pb-tag">dark</button><button class="pb-tag">metal</button><button class="pb-tag">dub</button><button class="pb-tag">digital</button><button class="pb-tag">soft</button><button class="pb-tag">warm</button><button class="pb-tag">original</button><button class="pb-tag">sub</button><button class="pb-tag">long</button><button class="pb-tag">tension</button><button class="pb-tag">efm</button><button class="pb-tag">slow</button><button class="pb-tag">ensemble</button><button class="pb-tag">low</button><button class="pb-tag">hat</button><button class="pb-tag">kick</button><button class="pb-tag">perc</button><button class="pb-tag">bowed</button><button class="pb-tag">hollow</button><button class="pb-tag">muted</button><button class="pb-tag">strings</button><button class="pb-tag">tom</button><button class="pb-tag">cold</button><button class="pb-tag">evolving</button><button class="pb-tag">glass</button><button class="pb-tag">rough</button><button class="pb-tag">airy</button><button class="pb-tag">atonal</button><button class="pb-tag">edm</button><button class="pb-tag">ambient</button><button class="pb-tag">bell</button><button class="pb-tag">chord</button><button class="pb-tag">glitch</button><button class="pb-tag">mechanical</button><button class="pb-tag">restless</button><button class="pb-tag">vast</button><button class="pb-tag">vocal</button><button class="pb-tag">bright</button><button class="pb-tag">cymbal</button><button class="pb-tag">fx</button>
+          </div>
+          <div class="pb-tags racks-only">
+            <button class="pb-tag">mono</button><button class="pb-tag">efm</button><button class="pb-tag">digital</button><button class="pb-tag">kick</button><button class="pb-tag">sub</button><button class="pb-tag">hat</button><button class="pb-tag">metal</button><button class="pb-tag">short</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pb-results" tabindex="0">
+        <table class="pb-table patches-only">
+          <thead><tr><th>Name</th><th>Category</th><th>Tags</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr class="hl"><td>EFM Bell Perc</td><td>Drums</td><td>efm, perc, digital, bell, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Clap</td><td>Drums</td><td>efm, clap, digital, noise, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Closed Hat</td><td>Drums</td><td>efm, hat, digital, metal, short, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Cowbell</td><td>Drums</td><td>efm, perc, digital, metal, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Crash</td><td>Drums</td><td>efm, cymbal, digital, metal, long, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Kick</td><td>Drums</td><td>efm, kick, digital, sub, mono</td><td>This song</td></tr>
+            <tr><td>EFM Open Hat</td><td>Drums</td><td>efm, hat, digital, metal, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Rim</td><td>Drums</td><td>efm, perc, digital, short, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Snare</td><td>Drums</td><td>efm, snare, digital, noise, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Tom</td><td>Drums</td><td>efm, tom, digital, mono</td><td>Built-in</td></tr>
+            <tr><td>EFM Zap</td><td>Drums</td><td>efm, perc, digital, glitch, short, mono</td><td>Built-in</td></tr>
+          </tbody>
+        </table>
+        <table class="pb-table racks-only">
+          <thead><tr><th>Name</th><th>Category</th><th class="new">Chain</th><th>Tags</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr class="hl">
+              <td>Kick Drive</td><td>Drums</td>
+              <td><span class="pb-chain">Classic Drive<span class="arrow">→</span>Bus compressor<span class="arrow">→</span>Reverb</span><span class="pb-pattern" title="Carries a Euclid pattern"><span class="glyph">▦</span>Euclid</span></td>
+              <td>efm, kick, digital, sub, mono</td><td>Library</td>
+            </tr>
+            <tr>
+              <td>Dub Hat</td><td>Drums</td>
+              <td><span class="pb-chain">Dub delay<span class="arrow">→</span>Filter</span></td>
+              <td>efm, hat, digital, metal, short, mono</td><td>Library</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pb-info patches-only">
+        <div class="pb-name">EFM Bell Perc</div>
+        <div class="hint pb-detail">Drums · Built-in</div>
+        <div class="pb-chips"><span>efm</span><span>perc</span><span>digital</span><span>bell</span><span>mono</span></div>
+        <p class="pb-desc">A 1:3.5 bell struck short: 350 ms ring on the played note with the modulator gone in 80 ms. A melodic drum voice for the grid; C4 to C6.</p>
+        <div class="hint pb-summary">Algorithm 01 · 1 carrier · Filter LP · Drive off</div>
+        <svg class="pb-env" viewBox="0 0 305 48" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="44" x2="305" y2="44" stroke="#3d4950" stroke-dasharray="2 3"/><path d="M0 44 L2 6 C10 24, 30 36, 70 40 C140 43, 230 44, 305 44" fill="none" stroke="#e0a44e" stroke-width="1.4"/></svg>
+        <div class="pb-actions"><button class="btn primary">Load into Part 1</button><button class="btn">Save as…</button></div>
+        <div class="pb-actions"><button class="btn ghost" disabled>Rename</button><button class="btn ghost" disabled>Delete</button><button class="btn ghost" disabled>Show in folder</button></div>
+        <p class="hint">Built-ins are read-only; Rename and Delete act on your library and song patches. Loading copies the patch into the song.</p>
+      </div>
+
+      <div class="pb-info racks-only">
+        <div class="pb-name">Kick Drive</div>
+        <div class="hint pb-detail">Drums · Library · Rack</div>
+        <div class="pb-chips"><span>efm</span><span>kick</span><span>digital</span><span>sub</span><span>mono</span></div>
+        <p class="pb-desc">The EFM Kick into Classic Drive and a bus compressor keyed from another part. The Reverb is in the chain switched off, for the breakdown.</p>
+        <dl class="pb-rack new">
+          <dt>Patch</dt><dd>Kick Drive<small>the rack's own name (decision 6) · from the library patch EFM Kick (efm-kick)</small></dd>
+          <dt>Chain</dt>
+          <dd>
+            <div class="ins"><span class="pwr">⏻</span><span class="kind">Classic Drive</span></div>
+            <div class="ins"><span class="pwr">⏻</span><span class="kind">Bus compressor</span><span class="key" title="The key is written disconnected: a rack names no part">key disconnected</span></div>
+            <div class="ins off"><span class="pwr">⏻</span><span class="kind">Reverb</span><span class="key">off</span></div>
+          </dd>
+          <dt>Sequencer</dt><dd>Euclid</dd>
+          <dt>Low cut</dt><dd>45 Hz</dd>
+        </dl>
+        <div class="hint pb-summary">Algorithm 01 · 1 carrier · Filter LP · Drive on</div>
+        <svg class="pb-env" viewBox="0 0 305 48" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="44" x2="305" y2="44" stroke="#3d4950" stroke-dasharray="2 3"/><path d="M0 44 L2 6 C14 26, 40 36, 90 40 C160 43, 240 44, 305 44" fill="none" stroke="#e0a44e" stroke-width="1.4"/></svg>
+        <div class="pb-actions"><button class="btn primary">Load into Part 1</button></div>
+        <div class="pb-actions"><button class="btn ghost">Rename</button><button class="btn ghost">Delete</button><button class="btn ghost">Export</button></div>
+        <p class="hint">Built-in racks are read-only; Rename and Delete act on your racks. Loading copies the rack's patch into the song and replaces the part's chain, and its low cut and sequencer where the rack carries them.</p>
+      </div>
+    </div>
+  </div>
+  <p class="measure">Frame: the browser's grid is today's, <b>230 px</b> facets · the table · <b>340 px</b> pane, under a 50 px header; the pane's name is 18 px Chakra Petch, its rows 12.5 px Plex Sans. The rack rows' labels are 9 px uppercase, as the modal's field labels. Below 900 px of container width the three columns stack, each scrolling on its own.</p>
+
+  <h3>What the rack state changes, row by row</h3>
+  <table class="rows">
+    <tr><th>Where</th><th>Today (Patches)</th><th>On Racks</th><th>Source</th></tr>
+    <tr><td>Facets</td><td>Source, Category, Tags</td><td><b>Kind</b> first, Patches 11 | Racks 2 under the <code>efm</code> search, counted as every facet is: the rows the table would show on picking it, the search and the other facets kept. Source, Category and Tags count over racks. Source counts a song copy as This song, since a copy shadows its library row (<code>stepListing</code>): the part played an unedited copy of the EFM Kick under its own id, and a copy under a library id is never dropped when the part moves on (<code>leftCopyDrop</code>), so in both states the facet reads This song 1 and Built-in 10 and the EFM Kick row reads This song. The rack load's own copy, Kick Drive, is outside the <code>efm</code> search: a song-own copy carries no library tags.</td><td>decision 18; <code>facets()</code></td></tr>
+    <tr><td>Head</td><td>PATCHES · search · Loading into Part 1</td><td>The title follows the kind: RACKS. The search field and the part are the same.</td><td>decision 18</td></tr>
+    <tr><td>Table</td><td>Name, Category, Tags, Source</td><td>Name, Category, <b>Chain</b>, Tags, Source. The chain is the kinds' labels in order with →; a rack with a sequencer adds <b>▦ Euclid</b>, the kind's label, in the modulator color after the chain.</td><td><code>INSERT_LABELS</code>, <code>KIND_LABELS</code></td></tr>
+    <tr><td>Pane: head</td><td>name, <code>category · source</code>, tags, description</td><td>The same, the source line reading <code>Drums · Library · Rack</code>.</td><td>decision 20</td></tr>
+    <tr><td>Pane: rack rows</td><td>—</td><td><b>Patch</b> the embedded patch's name, which is the rack's own (decision 6: the file writes its name into its patch copy), under it its library origin (name and id) or "a patch of its own" when the rack has no <code>patchSource</code> or names a patch the library no longer holds (deleted, or on another browser): an unresolved source reads as none, as <code>patchOrigin</code> reads a deleted patch, and the link stays in the file. <b>Chain</b> one line per insert: the power glyph lit (modulator) when enabled and faint when off, the kind's label, then <code>key disconnected</code> in the carrier color on an insert whose external sidechain is written <code>{ track: null }</code>. <b>Sequencer</b> the kind's label, or the row absent when the rack carries none. <b>Low cut</b> in Hz, or absent when the rack carries none.</td><td>decisions 3 and 18; <code>fmtHz</code></td></tr>
+    <tr><td>Pane: patch rows</td><td>summary line, envelope sketch</td><td>Kept, read from the embedded patch.</td><td><code>patchInfo</code></td></tr>
+    <tr><td>Pane: buttons</td><td>Load into Part 1, Save as… · Rename, Delete, Show in folder</td><td><b>Load into Part 1</b> (decision 10, with the discard guard of decision 11) · <b>Rename</b>, <b>Delete</b>, <b>Export</b> (decision 17). No Save as…: a rack is copied by loading it and saving it as a rack again.</td><td>decisions 10, 11, 17</td></tr>
+  </table>
+
+  <h2><span class="tag">2</span>The patch bar: the rack tag and the ⋯ menu</h2>
+  <p>While the selected part has a <code>rackSource</code>, the patch box gains a <b>RACK</b> tag before the name, on the one line the box has today, so the bar's height does not change (settled by tacowars: a second line made the bar taller, a box of its own cost its width). The name stays the patch's own, which is the rack's right after a load (decision 6), so one name serves both; a song copy renamed later keeps its own name beside the tag, whose title names the rack. The tag carries the <b>rack's dot</b>, lit when the part's patch, chain, low cut or sequencer differs from the library rack, the sequencer compared without its seed, the chain compared with its external sidechain keys cleared as the file writes them (decision 3: a rack names no part, so a part keyed from another part is clean against the rack it was saved from), and a member the rack lacks never counting (decision 14, <code>rackDifferences</code>), so it is unlit right after a load or a save. A <code>rackSource</code> whose rack the library no longer holds (deleted, or on another browser) reads as no rack: no tag, no Save rack or Revert rack, no rack guard; the link stays on the part, so a rack of that id restored brings them back. The dot after the name stays the <b>patch's own</b>, lit by the patch's modified rule over <code>patchSource</code> alone and never by a chain, low cut or sequencer edit. Both rules leave the patch's <code>name</code> out of the comparison (settled by tacowars, item 5 below): a name is metadata Save writes anyway, so a dot means a sound edit, and the rack's dot is unlit right after a load or a Save as rack…. The patch's dot keeps its own answer through both: unlit when the part's patch is its library patch in sound, as in the frame, whose rack was saved from the unedited EFM Kick, and lit when the rack was saved over unsaved knob edits, since the embedded patch keeps its <code>patchSource</code> and still differs from it, before the save and after a later load. Switch the part above to see the box with and without the tag; the frame draws the rack state right after the load, with neither dot. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
+  <div class="box-demo">
+    <p class="hint">No rack: the part plays the EFM Kick unedited.</p>
+    <div class="patch-box"><span class="patch-box-name">EFM Kick</span><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+    <p class="hint">Right after Kick Drive is loaded: neither dot is lit (its patch is the EFM Kick unedited; a rack saved over knob edits keeps the patch's dot lit). The copy is named Kick Drive and its <code>patchSource</code> is EFM Kick, and the name is left out of both comparisons (item 5). Right after Save as rack… on the no-rack part the box reads the same but for the name: the song patch keeps its name, EFM Kick, the rack's embedded patch takes Kick Drive, and neither dot is lit either.</p>
+    <div class="patch-box"><span class="patch-box-tag new" title="Loaded from the rack Kick Drive">Rack</span><span class="patch-box-name">Kick Drive</span><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+    <p class="hint">After a knob edit and an insert edit: both dots lit; Save rack and Revert rack are enabled in ⋯.</p>
+    <div class="patch-box"><span class="patch-box-tag new" title="Loaded from the rack Kick Drive; the part differs from the rack">Rack<i class="patch-box-mod" title="Differs from the rack"></i></span><span class="patch-box-name">Kick Drive</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+  </div>
+  <div class="rowwrap">
+    <div>
+      <h3>The part plays a patch, no rack</h3>
+      <div class="patch-menu" role="menu">
+        <button class="patch-menu-item">Rename…</button>
+        <button class="patch-menu-item">Revert to library</button>
+        <button class="patch-menu-item" disabled title="Remove from your library; built-ins stay">Delete</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item new">Save as rack…</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item">Library folder…</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item">Patch JSON</button>
+      </div>
+    </div>
+    <div>
+      <h3>The part was loaded from Kick Drive, right after the load</h3>
+      <div class="patch-menu" role="menu">
+        <button class="patch-menu-item">Rename…</button>
+        <button class="patch-menu-item">Revert to library</button>
+        <button class="patch-menu-item" disabled title="Remove from your library; built-ins stay">Delete</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item new">Save as rack…</button>
+        <button class="patch-menu-item new" disabled title="Save over this rack; built-in racks stay read-only, so Save forks one to a new id">Save rack</button>
+        <button class="patch-menu-item new" disabled title="Load the library rack again; the part's edits to it go">Revert rack</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item">Library folder…</button>
+        <hr class="patch-menu-sep">
+        <button class="patch-menu-item">Patch JSON</button>
+      </div>
+    </div>
+    <div>
+      <h3>The entries' titles (hover text)</h3>
+      <table class="rows">
+        <tr><th>Entry</th><th>Title</th><th>Enabled</th></tr>
+        <tr><td>Save as rack…</td><td>Save this part's patch and effects as a new rack in your library</td><td>While the part has a patch</td></tr>
+        <tr><td>Save rack</td><td>Save over this rack; built-in racks stay read-only, so Save forks one to a new id</td><td>While the rack's dot is lit</td></tr>
+        <tr><td>Revert rack</td><td>Load the library rack again; the part's edits to it go</td><td>While the rack's dot is lit</td></tr>
+      </table>
+      <p class="hint">Rename…, Revert to library and Delete keep their meaning over the patch, so a rack-loaded part has two levels of save, the patch's and the rack's (decision 14). Delete is disabled in both states as today: the part's patch is a song copy of a built-in, which <code>canDelete</code> refuses. Save rack and Revert rack are drawn disabled because the menu is drawn right after the load, when the rack's dot is unlit; they enable with it, as the table says.</p>
+    </div>
+  </div>
+
+  <h2><span class="tag">3</span>The Song tab: Load rack… and Add part from rack…</h2>
+  <p>The lane's context menu (windsor#825) gains <b>Load rack…</b> in its last group, with the part's other actions; it opens the browser on Racks with that part as the target, as ⤢ Browse patches opens it on Patches. The header's <b>+</b> gains <b>Add part from rack…</b> (decision 12). Both menus are drawn at the mouse size; the touch size follows the context menu's own rules (44 px rows, no key hints).</p>
+  <div class="rowwrap">
+    <div>
+      <h3>A right-click on a part's region (a part with no sequencer)</h3>
+      <div class="lane-stage">
+        <div class="lane">
+          <div class="cellname"><span class="num">1</span>▷ &nbsp;<span style="font: 10px var(--f-num); color: var(--ink-faint)">M S</span></div>
+          <div class="reg"><span>∞ No sequencer</span><i style="left: 25%"></i><i style="left: 50%"></i><i style="left: 75%"></i></div>
+        </div>
+        <div class="context-menu" role="menu" style="margin: 6px 0 0 240px">
+          <div class="context-menu-head">Part 1 · bars 1–4 · at bar 2</div>
+          <button>Cut<span class="tag">⌘X</span></button>
+          <button>Copy<span class="tag">⌘C</span></button>
+          <button disabled>Paste at bar 2<span class="tag">nothing copied</span></button>
+          <button>Duplicate<span class="tag">⌘D</span></button>
+          <button>Delete<span class="tag">⌫</span></button>
+          <button>Split here<span class="tag">⌥-click</span></button>
+          <hr>
+          <button>Zoom to region</button>
+          <button>Loop region</button>
+          <hr>
+          <button>Set sequencer<span class="sub">›</span></button>
+          <hr>
+          <button class="new hl">Load rack…</button>
+          <button>Bounce part to Roll…</button>
+          <button>Part color…</button>
+        </div>
+      </div>
+      <p class="hint">The rows above Load rack… are today's for a region on a part with no sequencer, as a new song's Part 1 is. On a part with a sequencer the Set sequencer group is the card's pattern actions, and Load rack… sits in the same last group.</p>
+    </div>
+    <div>
+      <h3>The header's + (a right-click or a long press, settled)</h3>
+      <div class="lane-stage" style="display: flex; justify-content: flex-end; gap: 8px; align-items: flex-start; min-height: 150px">
+        <div class="pm" style="margin: 0">
+          <button class="btn pm-btn new" title="Add a part (1 of 16)">+</button><button class="btn pm-btn" disabled>−</button>
+          <div class="context-menu" role="menu" style="position: absolute; right: 0; top: 42px">
+            <div class="context-menu-head">Parts · 1 of 16</div>
+            <button>Add part</button>
+            <button class="new hl">Add part from rack…</button>
+          </div>
+        </div>
+      </div>
+      <p class="hint">A click on + adds a part as today. A right-click or a long press on it opens this two-row menu; Add part from rack… opens the browser on Racks with the new part as the target, and the part is added when a rack is loaded, never before, so a Close adds nothing.</p>
+    </div>
+  </div>
+
+  <h2><span class="tag">4</span>Save as rack…</h2>
+  <p>The metadata modal, as Save as… opens it, with the title and the hint changed and two checkboxes between the description and the buttons. It is drawn for the part in its no-rack state: it plays the EFM Kick with the Euclid pattern and a low cut at 45 Hz, the state Kick Drive was saved from, so both boxes come checked. The name is prefilled from the patch's name and becomes the rack's and the embedded patch's (decision 13), so on the rack-loaded part it would prefill Kick Drive; the category and the tags come from the patch's library entry; the id is <code>uniqueId(slug(name), rack ids)</code>, so a second EFM Kick rack is <code>efm-kick-2</code>.</p>
+  <div class="frame">
+    <div class="backdrop">
+      <div class="dlg" role="dialog" aria-labelledby="rackTitle">
+        <div class="dlg-body">
+          <div class="section-title" style="margin: 0"><span id="rackTitle">Save as rack…</span></div>
+          <p class="hint" style="margin: 0">Saves this part's patch and effects as a new rack in your library. The part keeps playing what it plays and follows the rack.</p>
+          <div><label class="field-label">Display name</label><input class="field" value="EFM Kick" style="font-family: var(--f-ui); font-size: 13px"></div>
+          <div><label class="field-label">Id (the file name)</label><input class="field" value="efm-kick" readonly></div>
+          <div><label class="field-label">Category</label><select class="field"><option>Drums</option></select></div>
+          <div><label class="field-label">Tags</label>
+            <div class="chips"><span class="chip">efm<b>×</b></span><span class="chip">kick<b>×</b></span><span class="chip">digital<b>×</b></span><span class="chip">sub<b>×</b></span><span class="chip">mono<b>×</b></span></div>
+            <input class="field" placeholder="Type a tag; Enter or comma adds it" style="margin-top: 6px">
+          </div>
+          <div><label class="field-label">Description</label><textarea class="field" rows="3"></textarea></div>
+          <p class="hint" style="margin: 0">Checking loudness…</p>
+          <div class="members new">
+            <label class="member"><input type="checkbox" checked><span>Include low cut <span class="hint" style="display: inline; margin-left: 6px">45 Hz</span></span><span class="hint">Checked when the part's low cut is above 20 Hz. Loading the rack then sets the part's low cut; unchecked, the rack leaves it alone.</span></label>
+            <label class="member"><input type="checkbox" checked><span>Include sequencer <span class="hint" style="display: inline; margin-left: 6px">Euclid</span></span><span class="hint">Checked when the part's sequencer is not None. The pattern is saved without its seed; loading the rack sets the part's sequencer and treats its regions as a kind change does.</span></label>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap"><button class="btn primary">Write</button><button class="btn">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Save as rack… keeps Save as…'s loudness line under the description, run on the embedded patch as it plays: a rack can be saved from Init or over unsaved knob edits, so the patch may never have been checked before.</p>
+
+  <h2><span class="tag">5</span>To decide</h2>
+  <p>Settled by tacowars on 2026-10-17 (PR windsor#876), and drawn above as settled:</p>
+  <ol>
+    <li><b>The + gesture.</b> A click adds a part as today; a right-click or a long press opens the two-row menu with Add part from rack….</li>
+    <li><b>The rack table's Chain column.</b> Chain beside Tags, as drawn.</li>
+    <li><b>Where the rack shows in the bar.</b> Neither a second line (it made the bar taller) nor a box of its own (it cost the bar's width): a RACK tag on the box's one line, carrying the rack's dot, the name the patch's own. Recorded as decision 19.</li>
+    <li><b>Source on Racks.</b> The three Source rows stay, This song reading 0, since a rack is never a song object (decision 1).</li>
+  </ol>
+  <ol start="5">
+    <li><b>The name leaf in the two dots.</b> Today's patch rule compares every leaf of the song copy against its <code>patchSource</code>, the name included, so a part just loaded from Kick Drive would show the patch's dot at once (its copy is named Kick Drive, its source EFM Kick); and Save as rack… under a new name writes that name into the rack's embedded patch but not into the song patch, so the rack's dot would light the moment the rack is saved. Settled: both comparisons leave <code>name</code> out, <code>isModified</code> for the patch's dot and <code>rackDifferences</code> for the rack's, everywhere, not only on rack-loaded parts. A dot means a sound edit; a renamed song copy loses its dot too, Rename… being a label change. Recorded in decision 14; issue D builds it.</li>
+  </ol>
+
+  <h2><span class="tag ref">ref</span>Provenance</h2>
+  <ul>
+    <li>Today's browser: a screenshot of <code>npm run dev</code> in headless Chrome on 2026-10-17, 1440 × 900, a new song on Part 1 with the search on <code>efm</code>; the facets, their counts, the eleven rows and the EFM Bell Perc pane are copied from the DOM. The Tags facet is drawn without its two tags that are model numbers (CLAUDE.md, Licence); the column scrolls on past what is drawn.</li>
+    <li>Rules and sizes: <code>packages/app/src/console.css</code> (the patch bar at 8677, the ⋯ menu at 8880, the browser at 8943, the context menu at 7179, the dialog at 8033).</li>
+    <li>Labels: <code>INSERT_LABELS</code> (<code>insertKnobTables.ts</code>), <code>KIND_LABELS</code> (<code>sequencerConstants.ts</code>), <code>ROW_SOURCE_LABELS</code> (<code>patchLibrary.ts</code>), <code>LANE_MENU_TEXT</code> and <code>LANE_MENU_KEYS</code> (<code>songLaneMenuModel.ts</code>), the sidechain's <code>Disconnected (external)</code> (<code>sidechainSelector.ts</code>).</li>
+    <li>Values: the EFM Kick (<code>efm-kick</code>, Algorithm 01 · 1 carrier · Filter LP · Drive on) and the EFM Closed Hat (<code>efm-hat-closed</code>) with their own tags; the Euclid defaults (16 steps, 5 pulses to start); the low cut's floor <code>LOW_CUT_MIN_HZ</code> = 20 Hz; the example low cut 45 Hz.</li>
+    <li>The envelope sketches are drawings of the pane's canvas for each patch, not the engine's curve; the build draws them with <code>drawEnv</code> as today.</li>
+  </ul>
+</div>
+
+<script>
+  const kind = document.getElementById('kindSwitch');
+  const rack = document.getElementById('rackSwitch');
+  const apply = () => {
+    document.body.dataset.kind = kind.value;
+    document.body.dataset.rack = rack.value;
+  };
+  kind.onchange = apply;
+  rack.onchange = apply;
+  apply();
+</script>
+</html>
