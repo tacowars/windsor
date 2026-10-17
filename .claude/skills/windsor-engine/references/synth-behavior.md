@@ -235,7 +235,7 @@ up the pool under Hold. The plate likewise sleeps once its input and its tail
 have both been silent for longer than anything can recirculate unseen
 (`worklet/reverb/reverbConstants.ts`), and never under HOLD.
 
-Every voice renders through one fixed-index kernel for all eleven algorithms
+Every voice renders through one fixed-index kernel for all twelve algorithms
 (#548): silent operators are skipped and the per-note `Math.pow` values are
 precomputed. The older generic loop is kept as the bit-identical reference
 behind the engine option `specialise: false`. A voice's Noise operators

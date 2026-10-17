@@ -370,7 +370,7 @@ export const CLOCK_RATE_LOSING = 0.99;
 export { OPERATOR_COUNT } from './worklet/fm/patchDefaults';
 
 /**
- * The 11 algorithms and their type live with the worklet that renders them
+ * The 12 algorithms and their type live with the worklet that renders them
  * (`worklet/fm/algorithms.ts`, #656) and are re-exported here for every
  * main-thread reader; one table, so the console's picker and the operator
  * cannot disagree.

@@ -1,6 +1,6 @@
 /* eslint-disable no-magic-numbers -- DSP: the operator indices and edge bits are the routing table itself; the tunables are fmConstants.ts (#654) */
 /**
- * The eleven operator topologies (#644) and the tables derived from them: the
+ * The twelve operator topologies (#644, windsor#895) and the tables derived from them: the
  * topological evaluation order, and for the fixed-index kernel (#548) each
  * algorithm's modulation edges and carrier bits.
  * Invariant: bit-identity by construction — a modulator list of three must
@@ -18,7 +18,8 @@
  * `carriers` lists the operators summed to the voice output.
  *
  * 0..7 are the classic four-operator topologies (as found on OPM/OPN);
- * 8..10 add the parallel/tapped shapes that make Operator expressive.
+ * 8..10 add the parallel/tapped shapes that make Operator expressive, and 11
+ * (windsor#895) keeps a three-deep stack beside a lone carrier.
  * ------------------------------------------------------------------ */
 
 const A = 0,
@@ -61,6 +62,8 @@ const ALGORITHMS: readonly Algorithm[] = [
   { name: 'Split Branch', label: 'D>C>(B,A)', mods: [[C], [C], [D], []], carriers: [A, B] },
   // 10: D,C,B -> A                            three modulators, one carrier
   { name: 'Triple Mod', label: '(D,C,B)>A', mods: [[B, C, D], [], [], []], carriers: [A] },
+  // 11: D -> C -> B, A free                   a three-deep stack beside a lone carrier
+  { name: 'Stack + One', label: 'D>C>B | A', mods: [[], [C], [D], []], carriers: [A, B] },
 ];
 
 /** Evaluation order so every modulator is computed before its target. */

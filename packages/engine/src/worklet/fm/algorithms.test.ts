@@ -15,8 +15,8 @@ import {
 } from './algorithms';
 
 describe('the algorithm tables', () => {
-  it('lists eleven topologies whose modulators are computed before their targets', () => {
-    expect(ALGORITHMS).toHaveLength(11);
+  it('lists twelve topologies whose modulators are computed before their targets', () => {
+    expect(ALGORITHMS).toHaveLength(12);
     ALGORITHMS.forEach((alg, k) => {
       const order = ALG_ORDER[k];
       expect([...order].sort()).toEqual([A, B, C, D]);
@@ -31,5 +31,11 @@ describe('the algorithm tables', () => {
     expect(ALG_EDGES[0]).toBe(EDGE_BA | EDGE_CB | EDGE_DC);
     expect(ALG_CARRIER_BITS[0]).toBe(1 << A);
     expect(ALG_CARRIER_BITS[7]).toBe(0b1111);
+  });
+
+  it('routes Stack + One as D into C into B, with B and a lone A heard (windsor#895)', () => {
+    expect(ALGORITHMS[11]).toMatchObject({ name: 'Stack + One', label: 'D>C>B | A' });
+    expect(ALG_EDGES[11]).toBe(EDGE_CB | EDGE_DC);
+    expect(ALG_CARRIER_BITS[11]).toBe((1 << A) | (1 << B));
   });
 });
