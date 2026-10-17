@@ -1,11 +1,14 @@
-/** Saved delay settings; tempo belongs to the song and never to the insert. */
+/** Saved Dub delay settings; tempo belongs to the song and never to the insert. */
 import type { FieldNormaliser } from '../song/arrangementFields';
 import {
   DELAY_BOUNDS,
+  DELAY_CHARACTERS,
   DELAY_DEFAULTS,
   DELAY_DIVISIONS,
-  DELAY_MODES,
   DELAY_DSP,
+  DELAY_FILTERS,
+  DELAY_MODES,
+  DELAY_WAVES,
 } from './delayConstants';
 
 export interface DelaySpec {
@@ -18,9 +21,21 @@ export interface DelaySpec {
   readonly leftMs: number;
   readonly rightMs: number;
   readonly feedback: number;
-  readonly highpass: number;
-  readonly lowpass: number;
+  readonly cross: number;
+  readonly sustain: boolean;
+  readonly filter: (typeof DELAY_FILTERS)[number];
+  readonly lowCut: number;
+  readonly cutoff: number;
+  readonly resonance: number;
+  readonly width: number;
+  readonly character: (typeof DELAY_CHARACTERS)[number];
   readonly drive: number;
+  readonly damping: number;
+  readonly dampingHz: number;
+  readonly wave: (typeof DELAY_WAVES)[number];
+  readonly modRate: number;
+  readonly wow: number;
+  readonly sweep: number;
   readonly mix: number;
   readonly outputDb: number;
   readonly enabled: boolean;
@@ -32,6 +47,9 @@ export const DEFAULT_DELAY: DelaySpec = {
   rightSync: true,
   leftDivision: '1/8D',
   rightDivision: '1/4',
+  filter: 'lowpass',
+  character: 'warm',
+  wave: 'drift',
   ...DELAY_DEFAULTS,
 };
 export const DELAY_NUMBERS = Object.keys(DELAY_BOUNDS) as Array<keyof typeof DELAY_BOUNDS>;
@@ -49,11 +67,14 @@ export function normaliseDelay(
     const [min, max] = DELAY_BOUNDS[name];
     values[name] = n.num(raw[name], values[name], min, max, `${path}.${name}`);
   }
-  for (const name of ['enabled', 'leftSync', 'rightSync'] as const)
+  for (const name of ['enabled', 'leftSync', 'rightSync', 'sustain'] as const)
     values[name] = n.bool(raw[name], values[name], `${path}.${name}`);
   for (const name of ['leftDivision', 'rightDivision'] as const)
     values[name] = n.pick(raw[name], divisions, values[name], `${path}.${name}`);
   values.mode = n.pick(raw.mode, DELAY_MODES, values.mode, `${path}.mode`);
+  values.filter = n.pick(raw.filter, DELAY_FILTERS, values.filter, `${path}.filter`);
+  values.character = n.pick(raw.character, DELAY_CHARACTERS, values.character, `${path}.character`);
+  values.wave = n.pick(raw.wave, DELAY_WAVES, values.wave, `${path}.wave`);
   return values;
 }
 

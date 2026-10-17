@@ -1,0 +1,18 @@
+{
+  "about": "sha256 of each Dub delay scenario's interleaved Float32 render (a noise burst, a 220 Hz tone and a C-E-G chord, then silence, 3 s) through inserts/delayGolden.test.ts. Written only by that test under WINDSOR_REFRESH_DELAY_GOLDEN=1, and only when a render change is intended.",
+  "hashes": {
+    "default": "f891f23af44dd0f78bf761e54ca8839803b876a9a63eb4467f9f9900adf9854f",
+    "default-44100": "b9464904ecde350eba4f108bbdae37553c8307468024f7426203950c893af2fb",
+    "default-96000": "f3871bcb0d72a8dcd6e0a4220faaa5e86e0c890e2211f390d4b5393ac02b7ea2",
+    "preset-tape": "d0e6e58f842a821591d3c57fa793fea94342b53c834b4aa6fde51b920c9a36cc",
+    "preset-dub": "688eb34c0a321845cec9015ce6c4e1fd8d1d3910bf3a37045a03a488e4b059ab",
+    "preset-runaway": "691dabfb2e2691c95776ff9aaaea3e95be7538bb3c8bf8f8e36f7155fb540473",
+    "preset-brigade": "1e70d8eb204769896f7cbd4ee79f1582205bee2c893cc04810194b53974fb1e6",
+    "preset-telephone": "81dc1543f38cf29437c49463db12b19fa6fc3b875571945346e7d938a892933a",
+    "preset-engine": "5962a568b9ed419c5fc89f603bd05dddd75365762bcf505c6cd21928f4958ec8",
+    "sustain": "dd3b271f625bb82b0001d4c4f9328c7a8cfba2b67b2711d16a91ffe79fbc1081",
+    "highpass": "c77ce69a2a694f0a71510b897b69aa64eff1054d1deb67bcd3e856fc19fb5ffd",
+    "fold": "426b0fe8dcdc95c7700db67a2f124d0d6cdcb74b68ecacc3df2bf729b9522b5c",
+    "motion": "89fbaa944de08a5a104c82a21f5f63e33fc0bf10c0b574e995bffaa8234d0589"
+  }
+}

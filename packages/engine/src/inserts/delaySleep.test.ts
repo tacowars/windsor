@@ -3,9 +3,10 @@
  * a delay whose lines hold nothing sleeps on its first silent block; fed
  * silence after full-scale noise it sleeps once no line write has crossed the
  * output floor for the line's whole length, which bounds the tail at the
- * repeats' fall to the floor (`log(floor) / log(Feedback)` repeats of the
+ * repeats' fall to the floor (`log(floor) / log(loop gain)` repeats of the
  * longer time) plus `maxSeconds`, and writes exact zeros; a delay that holds
- * its repeats up (Feedback at or past unity) never sleeps, even on a seed
+ * its repeats up (Sustain, or Feedback times the filter's peak at or past
+ * unity) never sleeps, even on a seed
  * under the output floor that its loop grows; a fresh delay seeded under the
  * floor waits the line's length before it sleeps; fed noise again it wakes
  * on that block and renders what a delay built with `sleep: false` renders,
@@ -40,11 +41,18 @@ const delay = (spec: Partial<DelaySpec>, sleep = true): SleepingProcessor =>
 function tailBlocks(spec: Partial<DelaySpec>): number {
   const params = delayParams(spec);
   const longest = Math.max(params.leftMs![0]!, params.rightMs![0]!) / DELAY_DSP.milliseconds;
-  const repeats = Math.log(DELAY_SLEEP.outputFloor) / Math.log(params.feedback![0]!) + 1;
+  // The loop's largest gain: Feedback times the filter's peak at its Resonance (`delayDsp.ts`'s `hold`).
+  const gain = 10 ** (params.resonance![0]! / 20);
+  const peak = gain > Math.SQRT1_2 ? gain / Math.sqrt(1 - 1 / (4 * gain * gain)) : 1;
+  const loop = params.feedback![0]! * peak;
+  const repeats = Math.log(DELAY_SLEEP.outputFloor) / Math.log(loop) + 1;
   return Math.ceil(((repeats * longest + DELAY_DSP.maxSeconds) * RATE) / QUANTUM);
 }
 
-const SPECS: Partial<DelaySpec>[] = [{}, { mode: 'ping-pong', feedback: 0.8, drive: 12 }];
+const SPECS: Partial<DelaySpec>[] = [
+  {},
+  { mode: 'ping-pong', feedback: 0.8, resonance: 0, cross: 1, drive: 12, wave: 'random', wow: 0.5 },
+];
 
 describe('the Dub delay asleep', () => {
   it('sleeps on its first silent block while its lines hold nothing', () => {
@@ -63,14 +71,36 @@ describe('the Dub delay asleep', () => {
     expect(peakFrom(run, slept)).toBe(0);
   });
 
-  it('never sleeps while its feedback holds the repeats up', () => {
-    const spec = { feedback: 1.2 };
-    const run = runBlocks(delay(spec), delayParams(spec), noise(LOUD), LOUD + 2 * LINE_BLOCKS);
+  it.each<Partial<DelaySpec>>([{ feedback: 1 }, { feedback: 0.7, resonance: 9 }])(
+    'never sleeps while its loop holds the repeats up: %o',
+    (spec) => {
+      const run = runBlocks(delay(spec), delayParams(spec), noise(LOUD), LOUD + 2 * LINE_BLOCKS);
+      expect(run.asleep.includes(true)).toBe(false);
+    },
+  );
+
+  it('never sleeps while Sustain holds what the loop carried, and sleeps once released', () => {
+    const held = delayParams({ sustain: true });
+    const run = runLegs(delay({}), [
+      { params: delayParams(), source: noise(LOUD), blocks: LOUD },
+      { params: held, source: silence(1), blocks: 2 * LINE_BLOCKS },
+    ]);
     expect(run.asleep.includes(true)).toBe(false);
+    expect(peakFrom(run, LOUD + 2 * LINE_BLOCKS - 1)).toBeGreaterThan(0.01);
+    const empty = runBlocks(delay({ sustain: true }), held, noise(LOUD), LOUD + 4);
+    // Sustain shuts the input out, so lines that never took any have nothing to hold.
+    expect(empty.asleep.slice(LOUD)).toEqual([true, true, true, true]);
   });
 
   it('never sleeps on a seed under the floor that its feedback grows', () => {
-    const spec = { leftSync: false, rightSync: false, leftMs: 1, rightMs: 1, feedback: 1.2 };
+    const spec = {
+      leftSync: false,
+      rightSync: false,
+      leftMs: 1,
+      rightMs: 1,
+      feedback: 1,
+      resonance: 12,
+    };
     const blocks = 400;
     const source = silence(blocks);
     const seed = (DELAY_SLEEP.inputFloor + DELAY_SLEEP.outputFloor) / 2;

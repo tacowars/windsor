@@ -750,7 +750,15 @@ export { applyTapePreset } from './inserts/tapePresets';
 
 export { DEFAULT_DELAY } from './inserts/delaySpec';
 export type { DelaySpec } from './inserts/delaySpec';
-export { DELAY_BOUNDS, DELAY_DIVISIONS, DELAY_MODES } from './inserts/delayConstants';
+export {
+  DELAY_BOUNDS,
+  DELAY_CHARACTERS,
+  DELAY_DIVISIONS,
+  DELAY_FILTERS,
+  DELAY_GOVERNOR,
+  DELAY_MODES,
+  DELAY_WAVES,
+} from './inserts/delayConstants';
 export { DELAY_PRESETS, applyDelayPreset, matchingDelayPreset } from './inserts/delayPresets';
 
 export { DEFAULT_ENSEMBLE } from './inserts/ensembleSpec';

@@ -205,7 +205,10 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 17 since windsor#842 (operator
+ * A document's document-format version: 18 since the Dub delay's loop was
+ * rebuilt (record `2026-10-17-dub-delay-regeneration`: its `highpass` and
+ * `lowpass` became `lowCut` and a shaped filter, and Feedback stops at unity;
+ * `SONG_MIGRATIONS[17]` translates each delay), after 17 since windsor#842 (operator
  * feedback runs to 10, and a step of 1 on a feedback target adds 5 where it
  * added 1, so an old song's step offsets play differently; record
  * `2026-10-16-operator-feedback-to-ten`, with no upgrade), after 16
@@ -226,7 +229,7 @@ export const ROLL_NOTES_MAX = 2048;
  * carries the steps 5 → 6 to 9 → 10 and 15 → 16, which no longer reach this
  * one.
  */
-export const ARRANGEMENT_VERSION = 17;
+export const ARRANGEMENT_VERSION = 18;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

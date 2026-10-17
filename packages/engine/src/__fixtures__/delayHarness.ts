@@ -1,24 +1,17 @@
 /** Runs the actual shipped delay processor with only browser globals shimmed. */
-import { DELAY_MODE_IDS } from '../inserts/delayConstants';
-import { DEFAULT_DELAY, delayMilliseconds } from '../inserts/delaySpec';
+import { delayParameters } from '../inserts/delayParameters';
+import { DEFAULT_DELAY } from '../inserts/delaySpec';
 import type { DelaySpec } from '../inserts/delaySpec';
 import { firstValues, generatedProcessor } from './generatedProcessor';
 
+/** The processor's parameters for `partial` over the defaults, as the insert writes them. */
 export function delayParams(
   partial: Partial<DelaySpec> = {},
   bpm = 120,
 ): Record<string, Float32Array> {
-  const spec = { ...DEFAULT_DELAY, ...partial };
-  const values = {
-    ...spec,
-    mode: DELAY_MODE_IDS[spec.mode],
-    leftMs: delayMilliseconds(spec, 'left', bpm),
-    rightMs: delayMilliseconds(spec, 'right', bpm),
-  };
+  const values = delayParameters({ ...DEFAULT_DELAY, ...partial }, bpm);
   return Object.fromEntries(
-    Object.entries(values)
-      .filter(([, value]) => typeof value !== 'string')
-      .map(([key, value]) => [key, new Float32Array([Number(value)])]),
+    Object.entries(values).map(([key, value]) => [key, new Float32Array([value])]),
   );
 }
 export interface DelayProcessorLike {

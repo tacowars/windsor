@@ -54,10 +54,19 @@ it('updates parameters without wiring changes and releases only owned edges', ()
   const stage = DELAY_INSERT.create(context.asAudioContext(), DEFAULT_DELAY);
   const node = stage.processor as unknown as DelayNode;
   const edges = context.nodes.map((n) => [...n.outbound]);
-  stage.set({ ...DEFAULT_DELAY, lowpass: 1200, feedback: 1.1, enabled: false });
+  stage.set({
+    ...DEFAULT_DELAY,
+    cutoff: 1200,
+    feedback: 0.9,
+    filter: 'peak',
+    sustain: true,
+    enabled: false,
+  });
   expect(context.nodes.map((n) => n.outbound)).toEqual(edges);
-  expect(node.parameters.get('lowpass')!.value).toBe(1200);
-  expect(node.parameters.get('feedback')!.value).toBe(1.1);
+  expect(node.parameters.get('cutoff')!.value).toBe(1200);
+  expect(node.parameters.get('feedback')!.value).toBeCloseTo(0.9, 6);
+  expect(node.parameters.get('filter')!.value).toBe(3);
+  expect(node.parameters.get('sustain')!.value).toBe(1);
   expect(node.parameters.get('enabled')!.value).toBe(0);
   const output = stage.output as unknown as FakeNode;
   output.connect(context.destination);

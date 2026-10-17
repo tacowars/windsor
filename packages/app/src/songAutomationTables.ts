@@ -257,8 +257,10 @@ function eqBandWhy(spec: InsertSpecOf<'eq'>, field: string): string | undefined 
 export const INACTIVE_WHY: InactiveWhy = {
   tape: (_spec, field) =>
     field === 'wear' ? "Tape's motion is split" : "Tape's motion is not split",
-  delay: (_spec, field) =>
-    field === 'leftMs' ? 'the left side is synced' : 'the right side is synced',
+  delay: (_spec, field) => {
+    if (field === 'width') return 'the filter is not band-pass or peak';
+    return field === 'leftMs' ? 'the left side is synced' : 'the right side is synced';
+  },
   'retro-reverb': (_spec, field) =>
     field === 'duration' ? 'Retro reverb is in reverb mode' : 'Retro reverb is not in reverb mode',
   'advanced-drive': (spec, field) => {

@@ -15,7 +15,8 @@ describe('delay insert and preset song contract', () => {
     expect(n.corrections).toEqual([]);
     const fixed = DELAY_INSERT.normalise(
       {
-        lowpass: -1,
+        cutoff: -1,
+        filter: 'notch',
         leftMs: Infinity,
         feedback: 50,
         enabled: 'false',
@@ -25,12 +26,13 @@ describe('delay insert and preset song contract', () => {
       n,
     );
     expect(fixed).toMatchObject({
-      lowpass: DELAY_BOUNDS.lowpass[0],
+      cutoff: DELAY_BOUNDS.cutoff[0],
+      filter: 'lowpass',
       leftMs: DEFAULT_DELAY.leftMs,
       feedback: DELAY_BOUNDS.feedback[1],
       enabled: true,
     });
-    expect(n.corrections).toHaveLength(5);
+    expect(n.corrections).toHaveLength(6);
   });
   it('has valid original starting points, preserving user mix/bypass on selection', () => {
     for (const preset of DELAY_PRESETS) {

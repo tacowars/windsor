@@ -9,9 +9,9 @@
  * `--expose-gc`, a 64 MB young generation and `--trace-generalization`, here
  * driven by `delayChangeScenario.ts`. The scenario plays a cycle of sixteen
  * steps, each a whole setting applied at its first quantum and then held while
- * the controls glide, with a short silence at its end: every mode, the insert
- * switched off and on, feedback from none to past unity, the filters, drive,
- * mix and output at their bounds, free and synced times from 1 ms to the
+ * the controls glide, with a short silence at its end: every mode, filter, character and
+ * motion shape, the insert switched off and on, feedback from none to unity
+ * with Sustain, the filter, drive, damping, motion, mix and output at their bounds, free and synced times from 1 ms to the
  * 12-second clamp, and song tempo changes alone (new `leftMs` and `rightMs`,
  * as `tempoInsertRegistry.ts` writes them). The input is stereo, mono or has
  * no channels (an inactive source). The silence after each switch-off puts
@@ -51,8 +51,8 @@ import {
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
-import { DELAY_MODE_IDS } from './delayConstants';
-import { DEFAULT_DELAY, DELAY_NUMBERS, delayMilliseconds } from './delaySpec';
+import { delayParameters } from './delayParameters';
+import { DEFAULT_DELAY } from './delaySpec';
 import type { DelaySpec } from './delaySpec';
 
 const TOLERANCE_BYTES = 16 * 1024;
@@ -63,33 +63,26 @@ const QUIET = 32;
 const STEPS: [Partial<DelaySpec>, number, DelayInput][] = [
   [{}, 120, 'stereo'],
   [{}, 96, 'stereo'],
-  [{ mode: 'ping-pong', feedback: 0.8 }, 140, 'mono'],
-  [{ mode: 'ping-pong', feedback: 0.8 }, 174, 'mono'],
-  [{ mode: 'mid-side', highpass: 400, lowpass: 3000, drive: 12 }, 110, 'stereo'],
-  [{ mode: 'mid-side', highpass: 400, lowpass: 3000, drive: 12 }, 60, 'none'],
+  [{ mode: 'ping-pong', feedback: 0.8, cross: 1 }, 140, 'mono'],
+  [{ mode: 'ping-pong', feedback: 0.8, cross: 1, wave: 'random' }, 174, 'mono'],
+  [{ mode: 'mid-side', lowCut: 400, cutoff: 3000, drive: 12, filter: 'bandpass' }, 110, 'stereo'],
+  [{ mode: 'mid-side', character: 'fold', drive: 30, filter: 'peak' }, 60, 'none'],
   [{ enabled: false }, 120, 'stereo'],
-  [{ feedback: 1.2, drive: 24, leftDivision: '1/16' }, 128, 'stereo'],
-  [{ leftSync: false, rightSync: false, leftMs: 1, rightMs: 8000 }, 128, 'mono'],
-  [{ mix: 0, outputDb: -24 }, 90, 'stereo'],
-  [{ mix: 1, outputDb: 12, highpass: 4000, lowpass: 200 }, 90, 'stereo'],
-  [{ leftDivision: '1/1', rightDivision: '1/1' }, 20, 'stereo'],
-  [{ leftDivision: '1/32T', rightDivision: '1/32' }, 200, 'mono'],
-  [{ feedback: 0 }, 150, 'none'],
+  [{ feedback: 1, resonance: 20, sustain: true, leftDivision: '1/16' }, 128, 'stereo'],
+  [{ leftSync: false, rightSync: false, leftMs: 1, rightMs: 8000, wow: 1 }, 128, 'mono'],
+  [{ mix: 0, outputDb: -24, sweep: 4, modRate: 10, wave: 'sine' }, 90, 'stereo'],
+  [{ mix: 1, outputDb: 12, lowCut: 1000, cutoff: 30, filter: 'highpass' }, 90, 'stereo'],
+  [{ leftDivision: '1/1', rightDivision: '1/1', damping: 30, dampingHz: 400 }, 20, 'stereo'],
+  [{ leftDivision: '1/32T', rightDivision: '1/32', wave: 'triangle' }, 200, 'mono'],
+  [{ feedback: 0, resonance: -12 }, 150, 'none'],
   [{ mode: 'ping-pong', enabled: false }, 150, 'stereo'],
-  [{ mode: 'mid-side', feedback: 1.05, highpass: 20, lowpass: 20000 }, 132, 'stereo'],
+  [{ mode: 'mid-side', feedback: 1, cross: 0.5, cutoff: 16000, width: 4 }, 132, 'stereo'],
 ];
 const CYCLE = STEPS.length * PERIOD;
 
 /** A step's parameter values, as `delayInsert.ts` writes them. */
 function step([partial, bpm, input]: (typeof STEPS)[number]): DelayChangeStep {
-  const spec: DelaySpec = { ...DEFAULT_DELAY, ...partial };
-  const values: Record<string, number> = {
-    mode: DELAY_MODE_IDS[spec.mode],
-    enabled: Number(spec.enabled),
-  };
-  for (const name of DELAY_NUMBERS) values[name] = spec[name];
-  values.leftMs = delayMilliseconds(spec, 'left', bpm);
-  values.rightMs = delayMilliseconds(spec, 'right', bpm);
+  const values = delayParameters({ ...DEFAULT_DELAY, ...partial }, bpm);
   return { names: Object.keys(values), values: Object.values(values), input };
 }
 
