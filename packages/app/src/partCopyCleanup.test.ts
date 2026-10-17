@@ -205,13 +205,14 @@ describe('a rename keeps the library link (windsor#671 decision 5)', () => {
     return ctx;
   }
 
-  it('links a copy renamed off a library id to that id, for Save and the marker', () => {
+  it('links a copy renamed off a library id to that id, for Save; the marker stays unlit, the name left out', () => {
     const ctx = onLibraryId();
     renamePatch(ctx, ICE, 'ice-bright', 'Ice Bright');
     expect(partAt(ctx.model.doc, 1)).toMatchObject({ preset: 'ice-bright', patchSource: ICE });
     const scope = { ctx, library, slot: 1 };
     expect(patchOrigin(scope)).toEqual({ kind: 'library', id: ICE });
-    expect(isModified(scope, ctx.model.doc.patches!['ice-bright']!)).toBe(true);
+    // Decision 14 of `2026-10-17-racks` as amended: a name is metadata, so a rename lights no dot.
+    expect(isModified(scope, ctx.model.doc.patches!['ice-bright']!)).toBe(false);
   });
 
   it("keeps a part's existing link, and sets none off a song-only id", () => {
