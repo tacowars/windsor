@@ -84,6 +84,13 @@ export interface DocumentPart extends MusicPart {
    * library link or it has none. Nothing that plays reads it.
    */
   readonly patchSource?: string;
+  /**
+   * The library rack id this part was loaded from (windsor#862, record
+   * `2026-10-17-racks` decision 9), with `patchSource`'s rules: the app's
+   * Save rack, Revert rack and rack modified marker find the entry through
+   * it. Absent when the part came from no rack. Nothing that plays reads it.
+   */
+  readonly rackSource?: string;
 }
 
 /**

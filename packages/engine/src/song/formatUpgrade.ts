@@ -13,9 +13,9 @@ export type Migration<T> = (value: T) => T;
 /** `table[n]` upgrades version `n` to `n + 1`. No entry is ever required. */
 export type MigrationTable<T> = Readonly<Record<number, Migration<T>>>;
 
-/** Why a saved song or patch was not loaded: which format, the version it carries and the one this build reads. */
+/** Why a saved song, patch or rack was not loaded: which format, the version it carries and the one this build reads. */
 export interface FormatRefusal {
-  readonly format: 'song' | 'patch';
+  readonly format: 'song' | 'patch' | 'rack';
   readonly found: number;
   readonly reads: number;
   /** The embedded patch id, when a song is refused for one of its patches. */
