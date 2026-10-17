@@ -1142,7 +1142,7 @@
         <div class="bench-body">
           <div class="bench-rail">
             ${seg(['Draw D', 'Push P', 'Smooth S', 'Erase E', 'Select M'], 'Draw D')}
-            ${knob('3', 'Width', -100)}
+            ${knob('3', 'Width', -119.6)}
             <div><span class="field-label">Levels</span><span class="field">off</span></div>
             ${toggle('Snap', true)}
           </div>
@@ -1202,17 +1202,17 @@
         <div class="well"><span class="add-slot">+<br>Add insert</span><span class="add-slot">+<br>Add insert</span></div>
         <div class="section-title">Send buses</div>
         <p class="hint">Every part reaches both buses through its sends. Each bus runs what it is sent through its inserts at its level, and both are saved with the song.</p>
-        <div class="well"><div class="bus">SEND A${knob('0.90', 'Level', 60, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
+        <div class="well"><div class="bus">SEND A${knob('0.90', 'Level', 108, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
           <div class="card"><span class="name">1 Reverb</span><div><span class="field-label">Starting point</span><span class="field" style="width:104px">Resident</span></div>
-          ${knob('25m', 'Pre', -120, 'amber')}${knob('6.35s', 'Decay', 20, 'amber')}${knob('1.40', 'Size', 70, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
-        <div class="well"><div class="bus">SEND B${knob('0.60', 'Level', 20, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
+          ${knob('25m', 'Pre', -128.3, 'amber')}${knob('6.35s', 'Decay', 28.7, 'amber')}${knob('1.40', 'Size', 70, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
+        <div class="well"><div class="bus">SEND B${knob('0.60', 'Level', 27, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
           <div class="card"><span class="name">1 Echo</span>${toggle('Sync', true, 'var(--carrier)')}
-          ${knob('1/8D', 'Time', -20, 'amber')}${knob('3.20k', 'Damp', 20, 'amber')}${knob('0.30', 'Regen', -60, 'amber')}${knob('+1.0dB', 'Q', -40, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
+          ${knob('1/8D', 'Time', 27, 'amber')}${knob('3.20k', 'Damp', 35.8, 'amber')}${knob('0.30', 'Regen', -49.7, 'amber')}${knob('+1.0dB', 'Q', -62.9, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
       </div>
       <div class="master"><div class="section-title" style="margin:0">Master out</div>
         <div class="meters"><span style="font:10px var(--f-num);color:var(--ink-dim)">−15.3 −15.3</span><i></i><i></i><i></i><i></i></div>
         ${seg(['Limiter', 'Soft clip', 'Hard clip', 'Off'], 'Limiter')}
-        <div style="margin-top:10px">${knob('−1.0 dBFS', 'Ceiling', -150)}</div></div></div>`,
+        <div style="margin-top:10px">${knob('−1.0 dBFS', 'Ceiling', 112.5)}</div></div></div>`,
       parts: () => `<div class="page"><div class="section-title">Part · Bass <span class="abridged">today, abridged</span></div>
         <div class="stand-in">The Parts tab, exactly as today: Bass's patch (Init, this song), its operators, algorithm, global, shape and modulation.<br>Nothing of the expanded view shows here.</div></div>`,
       settings: () => `<div class="page"><div class="section-title">Songs · Document · Export audio <span class="abridged">today, abridged</span></div>
