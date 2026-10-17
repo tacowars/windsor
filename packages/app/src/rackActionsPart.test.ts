@@ -10,6 +10,7 @@ import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArran
 import { addPartFromRackChange, rackDifferences, renamedRack, saveMembersFor } from './rackActions';
 import { ALL, BARE, rackTestScope, raw } from './__fixtures__/rackScope';
 import { loadBuiltIns } from './builtInLibrary';
+import { leftCopyDrop } from './partCopyCleanup';
 import { addPart } from './songParts';
 
 beforeAll(() => loadBuiltIns());
@@ -150,5 +151,21 @@ describe('the same rack loaded again (Revert rack, windsor#885)', () => {
     expect(partAt(model.doc, arp)!.preset).toBe(preset);
     expect(Object.keys(model.doc.patches ?? {})).toHaveLength(count);
     expect(model.doc.patches![preset]!.volume).toBe(ref.file.patch.volume);
+  });
+});
+
+describe('an automatic rack copy (windsor#885)', () => {
+  it('goes when its part moves on, witnessed by the rack it was loaded from', () => {
+    const model = song();
+    const { rack, load, library, auto } = scope(model);
+    const ref = rack();
+    library.racks = { 'kick-rack': { ...ref.file, id: 'kick-rack', problems: [] } };
+    load(arp, ref);
+    const preset = partAt(model.doc, arp)!.preset;
+    auto.add(preset);
+    // The copy is named after the rack, so no library patch witnesses it; the rack does.
+    expect(leftCopyDrop(model.doc, arp, 'kick', library, auto)).toEqual({ [preset]: null });
+    model.merge(raw({ patches: { [preset]: { volume: 0.123 } } }));
+    expect(leftCopyDrop(model.doc, arp, 'kick', library, auto)).toBeNull();
   });
 });

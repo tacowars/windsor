@@ -9,7 +9,7 @@
  * (`choosePreset`, `initPatch`, `copyToNew`) spread what this returns into
  * the `patches` of the change they already make.
  */
-import type { ArrangementDocument, Patch } from '@windsor/engine';
+import type { ArrangementDocument, DocumentPart, Patch } from '@windsor/engine';
 import { partAt, patchLeafDifferences } from '@windsor/engine';
 import type { AutoCopies } from './autoCopies';
 import { isInitPreset } from './libraryConstants';
@@ -26,14 +26,20 @@ import { libraryPatch } from './libraryModel';
 function autoCopyWitnesses(
   doc: Pick<ArrangementDocument, 'patches'>,
   id: string,
-  patchSource: string | undefined,
+  part: Pick<DocumentPart, 'patchSource' | 'rackSource'>,
   library: LibraryModel,
 ): Patch[] {
   const kept = Object.entries(doc.patches ?? {})
     .filter(([other]) => other !== id && !isInitPreset(other))
     .map(([, other]) => other);
-  const source = patchSource === undefined ? undefined : libraryPatch(library, patchSource);
-  return source ? [source, ...kept] : kept;
+  const source =
+    part.patchSource === undefined ? undefined : libraryPatch(library, part.patchSource);
+  // A rack load's copy is the rack's embedded patch (windsor#885): the rack it came from witnesses it.
+  const rack =
+    part.rackSource !== undefined && Object.hasOwn(library.racks, part.rackSource)
+      ? library.racks[part.rackSource]?.patch
+      : undefined;
+  return [...(source ? [source] : []), ...(rack ? [rack] : []), ...kept];
 }
 
 /**
@@ -60,7 +66,7 @@ export function leftCopyDrop(
   const patch = doc.patches && Object.hasOwn(doc.patches, left) ? doc.patches[left] : undefined;
   if (!patch || isInitPreset(left) || Object.hasOwn(library.entries, left)) return null;
   if (doc.parts.some((other) => other.slot !== slot && other.preset === left)) return null;
-  const witnesses = autoCopyWitnesses(doc, left, part.patchSource, library);
+  const witnesses = autoCopyWitnesses(doc, left, part, library);
   const unedited = witnesses.some((other) => patchLeafDifferences(patch, other).length === 0);
   return unedited ? { [left]: null } : null;
 }
