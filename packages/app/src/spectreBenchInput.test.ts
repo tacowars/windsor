@@ -87,6 +87,14 @@ function bench(selection: SpectreSpec['selection']) {
       this.press(cell);
       this.secondPress(cell);
     },
+    /** A still press and its click at `x` px, the `clicks`th in a row, and on the second its `dblclick`. */
+    pressAtX(x: number, clicks = 1) {
+      const where = { clientX: x, clientY: laneY };
+      fire(canvas, 'pointerdown', { ...where, detail: 0 });
+      fire(canvas, 'pointerup', { ...where, buttons: 0, detail: 0 });
+      fire(canvas, 'click', { ...where, detail: clicks });
+      if (clicks === 2) fire(canvas, 'dblclick', { ...where, detail: 2 });
+    },
     key: () => fire(canvas, 'keydown', { key: 'z' }),
   };
 }
@@ -101,6 +109,17 @@ describe('Select on the workbench', () => {
   it('clears on a double-click in one step, which undoes to the selection before it', () => {
     const b = bench([[20, 41]]);
     b.doubleClick(70);
+    expect(b.selection()).toEqual([]);
+    expect(b.steps).toHaveLength(1);
+    b.undo();
+    expect(b.selection()).toEqual([[20, 41]]);
+  });
+
+  it('takes a second press that drifts a pixel or two into the next cell as the double-click', () => {
+    const b = bench([[20, 41]]);
+    const boundary = xOfCell(layout, 71);
+    b.pressAtX(boundary - 1);
+    b.pressAtX(boundary + 1, 2);
     expect(b.selection()).toEqual([]);
     expect(b.steps).toHaveLength(1);
     b.undo();
@@ -151,12 +170,13 @@ describe('Select on the workbench', () => {
     expect(b.steps.map((s) => s.selection)).toEqual([[], [[70, 71]]]);
   });
 
-  it('starts a fresh step on a press at another cell inside the double-click window', () => {
+  it('starts a fresh step on a press well away from the last inside the double-click window', () => {
     const b = bench([[20, 41]]);
     b.press(70);
+    b.press(74);
     b.press(10);
     b.key();
     expect(b.selection()).toEqual([[10, 11]]);
-    expect(b.steps.map((s) => s.selection)).toEqual([[[20, 41]], [[70, 71]]]);
+    expect(b.steps.map((s) => s.selection)).toEqual([[[20, 41]], [[70, 71]], [[74, 75]]]);
   });
 });

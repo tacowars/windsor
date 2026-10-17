@@ -121,6 +121,8 @@ export const SPECTRE_BENCH = {
   /** What the window keeps across and down for the overlay's chrome. */
   sidePx: 320,
   chromePx: 220,
+  /** How far, in CSS px, a Select double-click's second press may land from its first (windsor#852). */
+  doubleClickPx: 4,
   font: '10px "IBM Plex Mono", ui-monospace, monospace',
   smallFont: '9px "IBM Plex Mono", ui-monospace, monospace',
 } as const;

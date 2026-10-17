@@ -35,7 +35,12 @@ import {
 import type { BrushAt, SpectreChannel } from './spectreCellEdits';
 import { cellOfX, laneAt, valueOfY } from './spectreBenchModel';
 import type { SpectreBenchLayout, SpectreLaneBox } from './spectreBenchModel';
-import { SPECTRE_BENCH_LABELS, SPECTRE_BRUSH, SPECTRE_TOOLS } from './spectreBenchTables';
+import {
+  SPECTRE_BENCH,
+  SPECTRE_BENCH_LABELS,
+  SPECTRE_BRUSH,
+  SPECTRE_TOOLS,
+} from './spectreBenchTables';
 import type { SpectreTool } from './spectreBenchTables';
 import { UNDO_MERGE_MS } from './undoConstants';
 
@@ -65,6 +70,8 @@ interface Stroke {
   /** Select: the selection when the press came, the press's cell and how it combines. */
   readonly base: SpectreSpec;
   readonly anchor: number;
+  /** Where the press landed on the canvas, in CSS px. */
+  readonly press: { readonly x: number; readonly y: number };
   readonly mode: 'replace' | 'add' | 'remove';
   /** Select, and the stroke has not left its first cell: its release holds the step for a double-click. */
   held: boolean;
@@ -133,19 +140,23 @@ function toolLabel(tool: SpectreTool): string {
   return `${SPECTRE_BENCH_LABELS.undo} ${SPECTRE_TOOLS.find((t) => t.id === tool)?.label ?? ''}`;
 }
 
-/** A still Select press's release: its lane, its cell and when, to know a double-click's second press by. */
+/** A still Select press: its lane, where it landed in CSS px and its release's time, to know a double-click's second press by. */
 interface StillPress {
   readonly curve: SpectreCurve;
-  readonly cell: number;
+  readonly x: number;
+  readonly y: number;
   readonly at: number;
 }
 
 /**
  * A double-click's second press (windsor#852): a left press with Select, on
- * the lane and cell of the last still press, within `UNDO_MERGE_MS` of its
- * release. Told by place and time, since a browser sends every pointer event
- * with `detail` 0. A pure read of the press and `still`, so it gives the same
- * answer to the held step's window listener and to the canvas's own.
+ * the lane of the last still press and within `doubleClickPx` of where it
+ * landed, within `UNDO_MERGE_MS` of its release. Told by place and time,
+ * since a browser sends every pointer event with `detail` 0, and by pixels
+ * rather than cells, since a cell is a few px wide and a double-click that
+ * drifts across a boundary is still one. A pure read of the press and
+ * `still`, so it gives the same answer to the held step's window listener and
+ * to the canvas's own.
  */
 function isSecondPress(host: SpectreInputHost, still: StillPress | null, e: Event): boolean {
   if (!still || e.type !== 'pointerdown' || e.target !== host.canvas) return false;
@@ -153,18 +164,19 @@ function isSecondPress(host: SpectreInputHost, still: StillPress | null, e: Even
   if (press.button !== 0 || host.tool() !== 'select') return false;
   if (performance.now() - still.at >= UNDO_MERGE_MS) return false;
   const at = local(host.canvas, press);
-  const layout = host.layout();
-  return laneAt(layout, at.y)?.curve === still.curve && cellOfX(layout, at.x) === still.cell;
+  const near = Math.hypot(at.x - still.x, at.y - still.y) <= SPECTRE_BENCH.doubleClickPx;
+  return near && laneAt(host.layout(), at.y)?.curve === still.curve;
 }
 
 /** Select's held step for a double-click (windsor#852), as the pointer handlers call it. */
 interface SelectHold {
   /** A still press's release: hold its step open for a double-click. */
-  release(stroke: Pick<Stroke, 'lane' | 'anchor'>): void;
-  /** Whether `e` is that double-click's second press, which starts no stroke. */
-  isSecondPress(e: Event): boolean;
-  /** A fresh press: no second press can follow the last still one. */
-  forget(): void;
+  release(stroke: Pick<Stroke, 'lane' | 'press'>): void;
+  /**
+   * A left press on the canvas: whether it is that double-click's second press,
+   * which starts no stroke. Any other press forgets the last still one.
+   */
+  press(e: Event): boolean;
   /** The double-click: clear the selection, into the held step or as a step of its own. */
   clear(): void;
 }
@@ -192,10 +204,14 @@ function selectHold(host: SpectreInputHost, win: EventTarget): SelectHold {
   return {
     release(stroke) {
       hold.touch();
-      still = { curve: stroke.lane.curve, cell: stroke.anchor, at: performance.now() };
+      const { x, y } = stroke.press;
+      still = { curve: stroke.lane.curve, x, y, at: performance.now() };
     },
-    isSecondPress: second,
-    forget: () => (still = null),
+    press(e) {
+      if (second(e)) return true;
+      still = null;
+      return false;
+    },
     clear() {
       still = null;
       hold.touch();
@@ -220,8 +236,7 @@ export function wireSpectreBench(host: SpectreInputHost, win: EventTarget = wind
   };
   canvas.addEventListener('pointerdown', (e) => {
     // A double-click's second press continues the held step, and starts no stroke.
-    if (e.button !== 0 || hold.isSecondPress(e)) return;
-    hold.forget();
+    if (e.button !== 0 || hold.press(e)) return;
     const at = local(canvas, e);
     const lane = laneAt(host.layout(), at.y);
     if (!lane) return;
@@ -241,6 +256,7 @@ export function wireSpectreBench(host: SpectreInputHost, win: EventTarget = wind
       y: at.y,
       base: host.spec(),
       anchor: cell,
+      press: at,
       mode: tool !== 'select' ? 'replace' : e.altKey ? 'remove' : e.shiftKey ? 'add' : 'replace',
       drawn,
       held: tool === 'select',
