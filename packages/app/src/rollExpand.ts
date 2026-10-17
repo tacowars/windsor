@@ -112,14 +112,19 @@ export function rollExpander(target: ExpandTarget): RollExpander {
     const device = target.body.closest<HTMLElement>('.seq-device');
     if (open || !device) return;
     const overlay = overlayFor(target.title());
-    // Mounted while the device is still in its tab, which the view then belongs to.
-    const frame = mountExpandedView({ ctx: target.ctx, overlay, from: device, close });
+    // The device is in the view, and the part marked open wide, before the
+    // mount closes the view open before it: that close may repaint this pane
+    // (a workbench's close renders the active tab), and the repainted card
+    // then opens wide and takes this view over, as after a Split.
     const standIn = standInFor(device);
     device.replaceWith(standIn);
     overlay.appendChild(device);
+    EXPANDED.add(target.slot);
+    // From the stand-in, still in the pane's tab, which the view belongs to.
+    const frame = mountExpandedView({ ctx: target.ctx, overlay, from: standIn, close });
     open = { device, standIn, frame };
     document.addEventListener('keydown', onKey);
-    // After the mount, whose closing of an older view of this part cleared the slot.
+    // Again after the mount, whose closing of an older view of this part cleared the slot.
     EXPANDED.add(target.slot);
     setIcon(button, true);
     target.changed(true);
