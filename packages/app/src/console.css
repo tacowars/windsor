@@ -4002,6 +4002,9 @@ body.chord-dragging {
    so the page cannot scroll under it; the header itself is untouched. On
    another tab it is hidden, still open (expandedViewFrame.ts). */
 .console:has(> .tab-root > .roll-overlay:not([hidden])) {
+  /* The base rule's 100vh minimum would outgrow the visible window while a
+     tablet browser's toolbar shows. */
+  min-height: 0;
   height: 100vh;
   height: 100dvh;
 }
