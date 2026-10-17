@@ -149,7 +149,12 @@ instrument that plays one finger per note.
    each the Drive switch's segmented control at the bar's height. The keys
    fit the view's width, with no sideways scrolling (`touch-action: none`
    leaves no swipe, and a scroll under a chord is wrong anyway), and the
-   view's height. A white key is never narrower than 44 px. Rows 2 is an
+   view's height. A white key is never narrower than 44 px, except that
+   one octave in one row is always offered and shares the room: the 44 px
+   floor decides which larger picks are offered, never whether one octave
+   can show, so below a 308 px room a white key goes under 44 px rather
+   than the view overflowing (at 320 px wide the room is
+   320 − 2 × 24 = 272 px and a white key 38.9 px). Rows 2 is an
    even split of 2 or 4 octaves, the lower octaves on the lower row. An
    Octaves tap takes effect whenever some row count allows that many
    octaves, and the rows follow: they stay if they allow it, else they

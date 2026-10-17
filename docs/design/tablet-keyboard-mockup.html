@@ -816,7 +816,9 @@
       landscape and 976 px in portrait. Its height is the window less the 127 px header, the 16 px
       above the bar, the 28 px bar, the 8 px under it and the 24 px at the bottom: 821 px in
       landscape, 1163 px in portrait. Two rows split it with a 12 px gap. A white key's width is
-      the room's width over the white keys in a row; red is under 44 px, disabled.
+      the room's width over the white keys in a row; red is under 44 px, disabled. One octave in
+      one row is always offered: below a 308 px room its white keys share the room under 44 px (at
+      320 px wide the room is 272 px and a white key 38.9 px) rather than the view overflowing.
     </p>
     <div class="table-wrap">
       <table>
@@ -979,7 +981,9 @@
       return roomW / ((7 * octaves) / rows);
     }
     // `rowsButton`: the reason is for a Rows option, not an Octaves one.
+    // One octave in one row is always offered: below a 308 px room its keys share the room under 44 px.
     function whyNot(roomW, octaves, rows, rowsButton = false) {
+      if (octaves === 1 && rows === 1) return '';
       if (rows === 2 && octaves % 2)
         return rowsButton ? '2 rows takes 2 or 4 octaves' : `${octaves} octave${octaves > 1 ? 's' : ''} can't split into 2 rows`;
       if (whiteWidth(roomW, octaves, rows) < WHITE_MIN) return `${octaves} octaves needs 2 rows at this width`;
@@ -994,7 +998,8 @@
     function whyNotOctaves(roomW, octaves, rows) {
       return rowsFor(roomW, octaves, rows) ? '' : `${octaves} octave${octaves > 1 ? 's' : ''} needs more width`;
     }
-    // The pick a room allows: the pick itself, else the same rows with fewer octaves, else one row with fewer.
+    // The pick a room allows: the pick itself, else the same rows with fewer octaves, else one row with fewer,
+    // else one octave in one row, which every room offers, so the view never draws nothing or overflows.
     function allowedPick(roomW, octaves, rows) {
       if (!whyNot(roomW, octaves, rows)) return { octaves, rows };
       for (let n = octaves - 1; n >= 1; n--) if (!whyNot(roomW, n, rows)) return { octaves: n, rows };
