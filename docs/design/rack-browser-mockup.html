@@ -6,7 +6,7 @@
      docs/log/2026-10-17-racks.md, decisions 13, 18, 19 and 20). 2026-10-17.
      Once approved, it is the spec for the rack UI ticket (issue D): the
      browser's Kind facet and its rack rows, the info pane for a rack, the
-     patch bar's rack line and its ⋯ menu, the Song tab's two entry points,
+     patch bar's rack tag and its ⋯ menu, the Song tab's two entry points,
      and the Save as rack… modal.
      Today's browser is reproduced from a screenshot read in headless Chrome
      from `npm run dev` on 2026-10-17, on the desktop at 1440 px: the facets
@@ -141,12 +141,11 @@ table.rows td:first-child { color: var(--ink); white-space: nowrap; }
 .patch-box-mod { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--carrier); }
 .patch-box-src { font-family: var(--f-ui); font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
 .patch-box-search { margin-left: auto; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
-/* new: the two-line box while the part has a rackSource (decision 19). */
-.patch-box-lines { display: grid; gap: 1px; min-width: 0; }
-.patch-box-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.patch-box-rack { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
-.patch-box-rack .field-label { margin: 0; font-size: 8.5px; color: var(--ink-faint); }
-.patch-box-rack b { font-weight: 600; color: var(--ink); }
+/* new: the RACK tag while the part has a rackSource (decision 19, settled on this mockup): on the box's one line, before the name, carrying the rack's dot. */
+.patch-box-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 16px; padding: 0 6px; border: 1px solid var(--line-bright); border-radius: var(--r); font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.box-demo { display: grid; gap: 10px; max-width: 420px; }
+.box-demo .patch-box { cursor: default; }
+.box-demo .hint { margin: 0 0 2px; }
 body:not([data-rack='on']) .rack-only { display: none !important; }
 body[data-rack='on'] .norack-only { display: none !important; }
 
@@ -253,7 +252,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
 <div class="doc">
   <h1>Rack browser mockup</h1>
   <p><span class="status">For tacowars to approve</span> &nbsp; windsor#875 · record <code>docs/log/2026-10-17-racks.md</code>, decisions 13, 18, 19 and 20.</p>
-  <p>A <b>rack</b> is a part's sound saved as one library object: its patch, its insert chain, and when asked its low cut and its sequencer. This page shows where racks appear in the console: the one browser with a <b>Kind</b> facet, the info pane for a rack, the patch bar's rack line and its ⋯ menu, the Song tab's two entry points, and the <b>Save as rack…</b> modal. Switch the Kind facet above to compare the browser as it is today with the browser on Racks; the frame, the sizes and the type are the same.</p>
+  <p>A <b>rack</b> is a part's sound saved as one library object: its patch, its insert chain, and when asked its low cut and its sequencer. This page shows where racks appear in the console: the one browser with a <b>Kind</b> facet, the info pane for a rack, the patch bar's rack tag and its ⋯ menu, the Song tab's two entry points, and the <b>Save as rack…</b> modal. Switch the Kind facet above to compare the browser as it is today with the browser on Racks; the frame, the sizes and the type are the same.</p>
   <p>The example racks are built from two built-in patches. <b>Kick Drive</b> is the EFM Kick through Classic Drive and a bus compressor keyed from another part, with a Reverb switched off, a low cut at 45 Hz and the Euclid pattern at its defaults. <b>Dub Hat</b> is the EFM Closed Hat through Dub delay and Filter, with no low cut and no sequencer in the rack. Today's browser is reproduced with the search on <code>efm</code>, the same eleven rows in both states' counts. The part plays the Euclid pattern with a low cut at 45 Hz in both of its states: the sequencer and the low cut are the part's, whether a rack set them or not, and the no-rack state is the part Kick Drive was saved from.</p>
 
   <h2><span class="tag">1</span>The Parts tab: the bar and the browser</h2>
@@ -288,10 +287,10 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       <button class="btn icon">◀</button><button class="btn icon">▶</button>
       <div class="patch-box-wrap">
         <button class="patch-box" id="patchBox">
-          <span class="patch-box-lines">
-            <span class="patch-box-line"><span class="patch-box-name rack-only">Kick Drive</span><span class="patch-box-name norack-only">EFM Kick</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span></span>
-            <span class="patch-box-line patch-box-rack rack-only new" title="Loaded from the rack Kick Drive; the dot: the part differs from the rack"><span class="field-label">Rack</span><b>Kick Drive</b><i class="patch-box-mod" title="Differs from the rack"></i></span>
-          </span>
+          <span class="patch-box-tag rack-only new" title="Loaded from the rack Kick Drive">Rack</span>
+          <span class="patch-box-name rack-only">Kick Drive</span><span class="patch-box-name norack-only">EFM Kick</span>
+          <i class="patch-box-mod rack-only" title="Edited since saved"></i>
+          <span class="patch-box-src">Drums · this song</span>
           <span class="patch-box-search">⌕ search</span>
         </button>
       </div>
@@ -435,8 +434,16 @@ body[data-kind='racks'] .patches-only { display: none !important; }
     <tr><td>Pane: buttons</td><td>Load into Part 1, Save as… · Rename, Delete, Show in folder</td><td><b>Load into Part 1</b> (decision 10, with the discard guard of decision 11) · <b>Rename</b>, <b>Delete</b>, <b>Export</b> (decision 17). No Save as…: a rack is copied by loading it and saving it as a rack again.</td><td>decisions 10, 11, 17</td></tr>
   </table>
 
-  <h2><span class="tag">2</span>The patch bar: the rack line and the ⋯ menu</h2>
-  <p>While the selected part has a <code>rackSource</code>, the patch box gains a second line under the patch's: <b>RACK</b>, the rack's name and its own modified dot. The patch's line then reads the rack's name too, since a rack-loaded part plays a patch of the rack's name (decision 6); the dot on that line stays the patch's own, lit by the patch's modified rule over <code>patchSource</code> alone and never by a chain, low cut or sequencer edit. The rack line's dot is lit when the part's patch, chain, low cut or sequencer differs from the library rack (decision 14). Switch the part above to see the box with and without it; the bar's height grows by that line only. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
+  <h2><span class="tag">2</span>The patch bar: the rack tag and the ⋯ menu</h2>
+  <p>While the selected part has a <code>rackSource</code>, the patch box gains a <b>RACK</b> tag before the name, on the one line the box has today, so the bar's height does not change (settled by tacowars: a second line made the bar taller, a box of its own cost its width). The name stays the patch's own, which is the rack's right after a load (decision 6), so one name serves both; a song copy renamed later keeps its own name beside the tag, whose title names the rack. The tag carries the <b>rack's dot</b>, lit when the part's patch, chain, low cut or sequencer differs from the library rack, the sequencer compared without its seed and a member the rack lacks never counting (decision 14, <code>rackDifferences</code>), so it is unlit right after a load. The dot after the name stays the <b>patch's own</b>, lit by the patch's modified rule over <code>patchSource</code> alone and never by a chain, low cut or sequencer edit. Switch the part above to see the box with and without the tag. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
+  <div class="box-demo">
+    <p class="hint">No rack: the part plays the EFM Kick unedited.</p>
+    <div class="patch-box"><span class="patch-box-name">EFM Kick</span><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+    <p class="hint">Right after Kick Drive is loaded: the rack's dot is unlit; the patch's dot is lit by today's rule, since the copy is named Kick Drive and its <code>patchSource</code> is EFM Kick (To decide, 5).</p>
+    <div class="patch-box"><span class="patch-box-tag new" title="Loaded from the rack Kick Drive">Rack</span><span class="patch-box-name">Kick Drive</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+    <p class="hint">After a knob edit and an insert edit: both dots lit; Save rack and Revert rack are enabled in ⋯.</p>
+    <div class="patch-box"><span class="patch-box-tag new" title="Loaded from the rack Kick Drive; the part differs from the rack">Rack<i class="patch-box-mod" title="Differs from the rack"></i></span><span class="patch-box-name">Kick Drive</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span><span class="patch-box-search">⌕ search</span></div>
+  </div>
   <div class="rowwrap">
     <div>
       <h3>The part plays a patch, no rack</h3>
@@ -512,7 +519,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       <p class="hint">The rows above Load rack… are today's for a region on a part with no sequencer, as a new song's Part 1 is. On a part with a sequencer the Set sequencer group is the card's pattern actions, and Load rack… sits in the same last group.</p>
     </div>
     <div>
-      <h3>The header's + (default: a right-click or a long press)</h3>
+      <h3>The header's + (a right-click or a long press, settled)</h3>
       <div class="lane-stage" style="display: flex; justify-content: flex-end; gap: 8px; align-items: flex-start; min-height: 150px">
         <div class="pm" style="margin: 0">
           <button class="btn pm-btn new" title="Add a part (1 of 16)">+</button><button class="btn pm-btn" disabled>−</button>
@@ -556,12 +563,16 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   <p class="hint">Save as rack… keeps Save as…'s loudness line under the description, run on the embedded patch as it plays: a rack can be saved from Init or over unsaved knob edits, so the patch may never have been checked before.</p>
 
   <h2><span class="tag">5</span>To decide</h2>
-  <p>The record leaves these open; the drawing above takes the first of each, marked default.</p>
+  <p>Settled by tacowars on 2026-10-17 (PR windsor#876), and drawn above as settled:</p>
   <ol>
-    <li><b>The + gesture.</b> <i>Default:</i> a click adds a part as today, and a right-click or a long press opens the menu with Add part from rack…. <i>Or:</i> a click always opens the two-row menu, one more tap on every add.</li>
-    <li><b>The rack table's Chain column.</b> <i>Default:</i> Chain beside Tags, as drawn. <i>Or:</i> Chain in place of Tags on Racks, the tags staying in the pane, which keeps a long chain from pushing Source off a narrow table.</li>
-    <li><b>Where the rack line sits.</b> <i>Default:</i> a second line inside the patch box, so the box stays the one place that names what the part plays. <i>Or:</i> a rack box of its own after ⋯, with its own ⌕, which costs the bar's width.</li>
-    <li><b>Source on Racks.</b> <i>Default:</i> the three Source rows stay, This song reading 0, since a rack is never a song object (decision 1). <i>Or:</i> the row is hidden on Racks.</li>
+    <li><b>The + gesture.</b> A click adds a part as today; a right-click or a long press opens the two-row menu with Add part from rack….</li>
+    <li><b>The rack table's Chain column.</b> Chain beside Tags, as drawn.</li>
+    <li><b>Where the rack shows in the bar.</b> Neither a second line (it made the bar taller) nor a box of its own (it cost the bar's width): a RACK tag on the box's one line, carrying the rack's dot, the name the patch's own. Recorded as decision 19.</li>
+    <li><b>Source on Racks.</b> The three Source rows stay, This song reading 0, since a rack is never a song object (decision 1).</li>
+  </ol>
+  <p>Still open, with a default for issue D:</p>
+  <ol start="5">
+    <li><b>The patch's dot right after a rack load.</b> Today's rule compares every leaf of the song copy against its <code>patchSource</code>, the name included, so a part just loaded from Kick Drive shows the patch's dot at once (its copy is named Kick Drive, its source EFM Kick), and Save offers to fork a patch named Kick Drive into the library. <i>Default:</i> leave the rule as it is and accept the lit dot, since the copy is a patch of its own by name. <i>Or:</i> leave the name out of the patch's comparison, for rack-loaded parts or everywhere, so the dot speaks for sound edits only; a renamed song copy would then lose its dot too.</li>
   </ol>
 
   <h2><span class="tag ref">ref</span>Provenance</h2>
