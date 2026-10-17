@@ -252,14 +252,29 @@ const PHASER_ROWS = [
 ];
 
 const D = DELAY_BOUNDS;
-/** A synced side's time comes from the tempo and its division (`delaySpec.ts`). */
+/**
+ * A synced side's time comes from the tempo and its division (`delaySpec.ts`);
+ * Width shapes only the band-pass and peak filters. Sustain is a switch lane.
+ */
 const DELAY_ROWS: InsertFieldRow<DelaySpec>[] = [
   when(row('leftMs', 'Left time', D.leftMs, 'log', 'ms'), (spec) => !spec.leftSync),
   when(row('rightMs', 'Right time', D.rightMs, 'log', 'ms'), (spec) => !spec.rightSync),
   row('feedback', 'Feedback', D.feedback),
-  row('highpass', 'Highpass', D.highpass, 'log', 'Hz'),
-  row('lowpass', 'Lowpass', D.lowpass, 'log', 'Hz'),
+  row('cross', 'Cross', D.cross),
+  row('sustain', 'Sustain', UNIT, 'switch'),
+  row('lowCut', 'Low cut', D.lowCut, 'log', 'Hz'),
+  row('cutoff', 'Cutoff', D.cutoff, 'log', 'Hz'),
+  row('resonance', 'Resonance', D.resonance, 'linear', 'dB'),
+  when(
+    row('width', 'Width', D.width, 'linear', 'oct'),
+    (spec) => spec.filter === 'bandpass' || spec.filter === 'peak',
+  ),
   row('drive', 'Drive', D.drive, 'linear', 'dB'),
+  row('damping', 'Damping', D.damping, 'linear', 'dB'),
+  row('dampingHz', 'Damping from', D.dampingHz, 'log', 'Hz'),
+  row('modRate', 'Motion rate', D.modRate, 'log', 'Hz'),
+  row('wow', 'Wow', D.wow),
+  row('sweep', 'Sweep', D.sweep, 'linear', 'oct'),
   row('mix', 'Mix', D.mix),
   row('outputDb', 'Output', D.outputDb, 'linear', 'dB'),
 ];

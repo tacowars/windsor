@@ -80,15 +80,18 @@ phase-matched multiband dry. The console's `advancedDriveCard.ts` owns the
 stage controls and uses engine functions for base response displays. See
 `docs/research/2026-09-26-701-drive/README.md` for semantics and audition.
 
-The Dub delay (#698) is `inserts/delaySpec.ts`, `delayConstants.ts`,
+The Dub delay (#698; loop rebuilt in record `2026-10-17-dub-delay-regeneration`)
+is `inserts/delaySpec.ts`, `delayConstants.ts`, `delayParameters.ts`,
 `delayInsert.ts` and `delayPresets.ts` / `delayPresetTables.ts`, with DSP under
 `worklet/delay/`. `tempoInsertRegistry.ts` carries song BPM to current and
-new/deferred inserts; tempo is not saved per insert. Stereo, ping-pong and
-mid/side modes share independently synced/free lane times, HP/LP filtering,
-saturating feedback, drive, mix and output gain. The console uses
-`app/src/delayCard.ts` / `delayTables.ts`; presets preserve Mix/output/enabled.
-Time changes bend pitch. See `docs/research/2026-09-25-698-delay/README.md`
-for semantics and audition steps.
+new/deferred inserts; tempo is not saved per insert. Every repeat passes the
+whole loop: the filter (four shapes, Resonance as the gain at the cutoff), the
+saturation (warm or fold) and its always-on RMS governor, which holds a
+resonant or sustained runaway at a ceiling, a low cut and a damping shelf; then
+Feedback (to unity), Cross and Sustain. One LFO adds Wow and Sweep. The
+console uses `app/src/delayCard.ts` / `delayTables.ts` (Time, Loop, Color,
+Motion); presets preserve Mix/output/Sustain/enabled. A version-17 song's
+delays are upgraded by `song/delayUpgrade.ts`. Time changes bend pitch.
 
 The Parametric EQ (windsor#198, record `2026-09-30-parametric-eq-insert`) is
 `inserts/eqSpec.ts` (eight bands of on, type, slope, freq, gain and Q, plus

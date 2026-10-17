@@ -14,6 +14,7 @@
  */
 import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { PATCH_MIGRATIONS, upgradePatch } from '../patch/patchMigrations';
+import { upgradeDelayEntry } from './delayUpgrade';
 import type { FormatRefusal, MigrationTable } from './formatUpgrade';
 import { declaredVersion, formatRefusal, runUpgrades } from './formatUpgrade';
 
@@ -79,25 +80,31 @@ const BLOOM_SCALE_RENAMES: Readonly<Record<string, string>> = {
   'pentatonic-minor': 'pentatonicMinor',
 };
 
-/** One insert entry with a bloom's Scale renamed, and a host's `slot` child through the same. */
-function renameBloomEntry(entry: unknown): unknown {
-  if (!isRecord(entry)) return entry;
-  let out = entry;
+/** A bloom entry with its Scale renamed; any other entry as it is. */
+function renameBloomEntry(entry: Record<string, unknown>): Record<string, unknown> {
   const scale = entry['scale'];
   if (
     entry['kind'] === 'bloom' &&
     typeof scale === 'string' &&
     Object.hasOwn(BLOOM_SCALE_RENAMES, scale)
   )
-    out = { ...out, scale: BLOOM_SCALE_RENAMES[scale] };
-  if (isRecord(entry['slot'])) out = { ...out, slot: renameBloomEntry(entry['slot']) };
-  return out;
+    return { ...entry, scale: BLOOM_SCALE_RENAMES[scale] };
+  return entry;
 }
 
-/** `holder` with its `inserts` chain renamed, when it is a record holding a list. */
-function renameBloomChain(holder: unknown): unknown {
+type EntryStep = (entry: Record<string, unknown>) => Record<string, unknown>;
+
+/** One insert entry through `step`, and a host's `slot` child through the same. */
+function throughEntry(entry: unknown, step: EntryStep): unknown {
+  if (!isRecord(entry)) return entry;
+  const out = step(entry);
+  return isRecord(entry['slot']) ? { ...out, slot: throughEntry(entry['slot'], step) } : out;
+}
+
+/** `holder` with its `inserts` chain through `step`, when it is a record holding a list. */
+function throughChain(holder: unknown, step: EntryStep): unknown {
   if (!isRecord(holder) || !Array.isArray(holder['inserts'])) return holder;
-  return { ...holder, inserts: holder['inserts'].map(renameBloomEntry) };
+  return { ...holder, inserts: holder['inserts'].map((entry) => throughEntry(entry, step)) };
 }
 
 /** Each value of a list or a record through `step`; anything else as it is. */
@@ -105,6 +112,23 @@ function eachOf(value: unknown, step: (item: unknown) => unknown): unknown {
   if (Array.isArray(value)) return value.map(step);
   if (!isRecord(value)) return value;
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, step(item)]));
+}
+
+/**
+ * Every insert in the song through `step`: each part's strip, each group's
+ * chain, the master's and each return's, and a host's `slot` child.
+ */
+function everyInsert(doc: RawDocument, step: EntryStep): RawDocument {
+  const out: RawDocument = { ...doc };
+  const chain = (holder: unknown): unknown => throughChain(holder, step);
+  if (Array.isArray(doc['parts']) || isRecord(doc['parts']))
+    out['parts'] = eachOf(doc['parts'], (part) =>
+      isRecord(part) && isRecord(part['strip']) ? { ...part, strip: chain(part['strip']) } : part,
+    );
+  if (doc['groups'] !== undefined) out['groups'] = eachOf(doc['groups'], chain);
+  if (doc['returns'] !== undefined) out['returns'] = eachOf(doc['returns'], chain);
+  if (doc['master'] !== undefined) out['master'] = chain(doc['master']);
+  return out;
 }
 
 /**
@@ -116,19 +140,7 @@ function eachOf(value: unknown, step: (item: unknown) => unknown): unknown {
  * host's `slot` child. The pitch classes are the same, so the song sounds as
  * it did. A version-9 snapshot already holds the current patch format.
  */
-function bloomScalesRenamed(doc: RawDocument): RawDocument {
-  const out: RawDocument = { ...doc };
-  if (Array.isArray(doc['parts']) || isRecord(doc['parts']))
-    out['parts'] = eachOf(doc['parts'], (part) =>
-      isRecord(part) && isRecord(part['strip'])
-        ? { ...part, strip: renameBloomChain(part['strip']) }
-        : part,
-    );
-  if (doc['groups'] !== undefined) out['groups'] = eachOf(doc['groups'], renameBloomChain);
-  if (doc['returns'] !== undefined) out['returns'] = eachOf(doc['returns'], renameBloomChain);
-  if (doc['master'] !== undefined) out['master'] = renameBloomChain(doc['master']);
-  return out;
-}
+const bloomScalesRenamed = (doc: RawDocument): RawDocument => everyInsert(doc, renameBloomEntry);
 
 /**
  * Version 15 → 16 (windsor#818, record `2026-10-16-tape-motion-on-a-square-law`):
@@ -144,7 +156,15 @@ function bloomScalesRenamed(doc: RawDocument): RawDocument {
 const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
 
 /**
- * Six upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10 and 15 → 16, and none from
+ * Version 17 → 18 (record `2026-10-17-dub-delay-regeneration`): every Dub
+ * delay in the song, wherever it sits, in the rebuilt loop's shape
+ * (`delayUpgrade.ts`). A version-17 snapshot already holds the current patch
+ * format, and no patch carries an insert, so `patches` is not touched.
+ */
+const delayLoopRebuilt = (doc: RawDocument): RawDocument => everyInsert(doc, upgradeDelayEntry);
+
+/**
+ * Seven upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10, 15 → 16 and 17 → 18, and none from
  * 16 to 17 (windsor#842: operator feedback runs to 10 and a feedback step's
  * span is 5, so an old song's step offsets on feedback play five times
  * deeper; tacowars keeps no song to carry, record
@@ -172,6 +192,7 @@ export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   8: retroSizeOnLogScale,
   9: bloomScalesRenamed,
   15: tapeMotionOnSquareLaw,
+  17: delayLoopRebuilt,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

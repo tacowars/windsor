@@ -1,20 +1,32 @@
 /**
- * The shared track/master delay card. Every control commits the whole insert
- * through ctx.change. Two pages (windsor#173): Time (starting point, routing,
- * each side's sync switch with its division or its ms, feedback and dry /
- * wet) and Tone (high pass, low pass, drive and output). The note on how
- * times work is the sides' tooltip. The on/off switch is the rack's rail.
+ * The shared track/master Dub delay card (record
+ * `2026-10-17-dub-delay-regeneration`). Every control commits the whole
+ * insert through ctx.change. Four pages: Time (starting point, routing, each
+ * side's sync switch with its division or its ms, Feedback, Cross, Sustain
+ * and dry / wet), Loop (the filter's shape, Cutoff, Resonance, Width and the
+ * low cut), Color (the saturation's character, Drive, Damping and Output)
+ * and Motion (the LFO's shape, Rate, Wow and Sweep). The note on how times
+ * work is the sides' tooltip. The on/off switch is the rack's rail.
  */
 import {
   DEFAULT_DELAY,
+  DELAY_CHARACTERS,
   DELAY_DIVISIONS,
+  DELAY_FILTERS,
   DELAY_MODES,
   DELAY_PRESETS,
+  DELAY_WAVES,
   applyDelayPreset,
   matchingDelayPreset,
 } from '@windsor/engine';
 import type { DelaySpec } from '@windsor/engine';
-import { DELAY_KNOBS, DELAY_MODE_LABELS } from './delayTables';
+import {
+  DELAY_CHARACTER_LABELS,
+  DELAY_FILTER_LABELS,
+  DELAY_KNOBS,
+  DELAY_MODE_LABELS,
+  DELAY_WAVE_LABELS,
+} from './delayTables';
 import { targetChange } from './insertTarget';
 import type { InsertCard } from './insertCards';
 import type { InsertKnobEntry } from './insertKnobTables';
@@ -24,7 +36,12 @@ import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
 
 const DELAY_NOTE =
-  'D = dotted · T = triplet. Synced times follow song BPM (maximum 12 s). Free times: 1–8000 ms. Time changes bend pitch. Feedback above 1 sustains regeneration.';
+  'D = dotted · T = triplet. Synced times follow song BPM (maximum 12 s). Free times: 1–8000 ms. Time changes bend pitch.';
+const SUSTAIN_NOTE =
+  'Sustain holds the loop at full feedback and shuts the input out: what the lines carry keeps passing the filter and saturation. The dry signal stays.';
+
+/** A field a knob may hold. */
+type DelayField = Exclude<keyof DelaySpec, 'kind'>;
 
 interface DelayView {
   readonly ctx: AppCtx;
@@ -38,6 +55,24 @@ interface DelayView {
 function sided(spec: DelaySpec, entry: InsertKnobEntry<DelaySpec>): InsertKnobEntry<DelaySpec> {
   if (spec.mode !== 'mid-side') return entry;
   return { ...entry, label: entry.label.replace('Left', 'Mid').replace('Right', 'Side') };
+}
+
+/** A picker over one of the spec's choices, its options labelled from `labels`. */
+function choice<K extends 'mode' | 'filter' | 'character' | 'wave'>(
+  view: DelayView,
+  o: {
+    field: K;
+    label: string;
+    values: readonly DelaySpec[K][];
+    labels: Readonly<Record<DelaySpec[K], string>>;
+  },
+): HTMLElement {
+  return insertSelect({
+    label: o.label,
+    options: o.values.map((value) => [value, o.labels[value]] as const),
+    value: view.current()[o.field],
+    change: (value) => view.commit({ ...view.current(), [o.field]: value }),
+  });
 }
 
 /** One side's sync switch, then its division while synced or its time knob while free. */
@@ -72,26 +107,72 @@ function timePage(view: DelayView): HTMLElement {
     value: matchingDelayPreset(s) ?? '',
     change: (id) => view.commit(applyDelayPreset(view.current(), id)),
   });
-  const routing = insertSelect({
+  const routing = choice(view, {
+    field: 'mode',
     label: 'Routing',
-    options: DELAY_MODES.map((mode) => [mode, DELAY_MODE_LABELS[mode]] as const),
-    value: s.mode,
-    change: (mode) => view.commit({ ...view.current(), mode: mode as DelaySpec['mode'] }),
+    values: DELAY_MODES,
+    labels: DELAY_MODE_LABELS,
   });
   const showMatch = (): void => {
     preset.querySelector('select')!.value = matchingDelayPreset(view.current()) ?? '';
   };
+  const sustain = insertSwitch('Sustain', s.sustain, (on) =>
+    view.commit({ ...view.current(), sustain: on }),
+  );
+  const held = wideColumn(sustain);
+  held.title = SUSTAIN_NOTE;
+  const knobs = (fields: DelayField[]): HTMLElement[] =>
+    insertKnobs(view.ctx, view.slot, view.index, pickKnobs(DELAY_KNOBS, fields), showMatch);
   return insertPage(
     wideColumn(preset, routing),
     sideColumn(view, 'left', showMatch),
     sideColumn(view, 'right', showMatch),
-    ...insertKnobs(
-      view.ctx,
-      view.slot,
-      view.index,
-      pickKnobs(DELAY_KNOBS, ['feedback', 'mix']),
-      showMatch,
-    ),
+    ...knobs(['feedback', 'cross']),
+    held,
+    ...knobs(['mix']),
+  );
+}
+
+function loopPage(view: DelayView): HTMLElement {
+  const filter = choice(view, {
+    field: 'filter',
+    label: 'Filter',
+    values: DELAY_FILTERS,
+    labels: DELAY_FILTER_LABELS,
+  });
+  const banded = view.current().filter === 'bandpass' || view.current().filter === 'peak';
+  const fields: DelayField[] = ['cutoff', 'resonance', ...(banded ? ['width' as const] : [])];
+  return insertPage(
+    wideColumn(filter),
+    ...insertKnobs(view.ctx, view.slot, view.index, pickKnobs(DELAY_KNOBS, [...fields, 'lowCut'])),
+  );
+}
+
+function colorPage(view: DelayView): HTMLElement {
+  const character = choice(view, {
+    field: 'character',
+    label: 'Character',
+    values: DELAY_CHARACTERS,
+    labels: DELAY_CHARACTER_LABELS,
+  });
+  const fields: DelayField[] = ['drive', 'damping', 'dampingHz', 'outputDb'];
+  return insertPage(
+    wideColumn(character),
+    ...insertKnobs(view.ctx, view.slot, view.index, pickKnobs(DELAY_KNOBS, fields)),
+  );
+}
+
+function motionPage(view: DelayView): HTMLElement {
+  const wave = choice(view, {
+    field: 'wave',
+    label: 'Shape',
+    values: DELAY_WAVES,
+    labels: DELAY_WAVE_LABELS,
+  });
+  const fields: DelayField[] = ['modRate', 'wow', 'sweep'];
+  return insertPage(
+    wideColumn(wave),
+    ...insertKnobs(view.ctx, view.slot, view.index, pickKnobs(DELAY_KNOBS, fields)),
   );
 }
 
@@ -111,9 +192,10 @@ export const delayCard: InsertCard = (ctx, slot, index) => {
       if (ctx.change(targetChange(ctx, slot, inserts)).ok) ctx.render();
     },
   };
-  const tone = pickKnobs(DELAY_KNOBS, ['highpass', 'lowpass', 'drive', 'outputDb']);
   return [
     { name: 'Time', build: () => timePage(view) },
-    { name: 'Tone', build: () => insertPage(...insertKnobs(ctx, slot, index, tone)) },
+    { name: 'Loop', build: () => loopPage(view) },
+    { name: 'Color', build: () => colorPage(view) },
+    { name: 'Motion', build: () => motionPage(view) },
   ];
 };

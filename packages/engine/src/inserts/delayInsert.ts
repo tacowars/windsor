@@ -1,30 +1,14 @@
 /** Fixed stereo worklet graph. Settings and song tempo only write parameters. */
 import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
-import { DELAY_BOUNDS, DELAY_DSP, DELAY_MODE_IDS, DELAY_NAME } from './delayConstants';
-import {
-  DEFAULT_DELAY,
-  DELAY_FIELDS,
-  DELAY_NUMBERS,
-  delayMilliseconds,
-  normaliseDelay,
-} from './delaySpec';
+import { DELAY_BOUNDS, DELAY_DSP, DELAY_NAME } from './delayConstants';
+import { delayParameters as delayValues, delayTiming as timing } from './delayParameters';
+import { DEFAULT_DELAY, DELAY_FIELDS, normaliseDelay } from './delaySpec';
 import type { DelaySpec } from './delaySpec';
 
-/** The two sides' times `set` and `setTempo` write: a synced side's from the tempo. */
-const timing = (spec: DelaySpec, bpm: number): Record<string, number> => ({
-  leftMs: delayMilliseconds(spec, 'left', bpm),
-  rightMs: delayMilliseconds(spec, 'right', bpm),
-});
-
-/** Every param `set` writes, by name, for `spec` at `bpm`. */
-function delayValues(spec: DelaySpec, bpm: number): Record<string, number> {
-  const values: Record<string, number> = {};
-  for (const name of DELAY_NUMBERS) values[name] = spec[name];
-  values.enabled = Number(spec.enabled);
-  values.mode = DELAY_MODE_IDS[spec.mode];
-  return { ...values, ...timing(spec, bpm) };
-}
+/** A field's param: the numbers' own, the switch, and Sustain, a switch lane of its own. */
+const sustainOrOwn = (field: string): string | undefined =>
+  field === 'sustain' ? field : ownParam(DELAY_BOUNDS)(field);
 
 function create(context: BaseAudioContext, initial: DelaySpec): InsertStage<DelaySpec> {
   let spec = initial;
@@ -44,7 +28,7 @@ function create(context: BaseAudioContext, initial: DelaySpec): InsertStage<Dela
   const params = workletFieldParams(
     processor,
     (name) => delayValues(spec, bpm)[name]!,
-    ownParam(DELAY_BOUNDS),
+    sustainOrOwn,
   );
   return {
     kind: 'delay',

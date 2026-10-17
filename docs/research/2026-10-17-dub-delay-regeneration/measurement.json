@@ -1,0 +1,559 @@
+{
+  "machine": {
+    "cpu": "Apple M4 Pro",
+    "cores": 14,
+    "darwin": "25.5.0",
+    "node": "v24.16.0"
+  },
+  "loadBefore": [
+    6.318359375,
+    23.25244140625,
+    16.8076171875
+  ],
+  "loadAfter": [
+    5.576171875,
+    22.25927734375,
+    16.56591796875
+  ],
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "plan": {
+    "rate": 48000,
+    "seconds": 20,
+    "bpm": 120,
+    "repeats": 3,
+    "instances": [
+      1,
+      4
+    ],
+    "modes": [
+      "default",
+      "runaway",
+      "sustain",
+      "motion",
+      "fold"
+    ],
+    "quantum": 128
+  },
+  "error": null,
+  "cells": [
+    {
+      "mode": "harness",
+      "instances": 0,
+      "repeats": 3,
+      "renderMs": {
+        "median": 4.09999942779541,
+        "min": 4.09999942779541,
+        "max": 4.199999809265137
+      },
+      "duty": 0.0002049999713897705,
+      "msPerQuantum": 0.0005466665903727213,
+      "outputPeak": 0.4979172348976135,
+      "outputRmsPerInstance": 0.10024424468262828
+    },
+    {
+      "mode": "default",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 173,
+        "min": 173,
+        "max": 173.5999994277954
+      },
+      "duty": 0.00865,
+      "msPerQuantum": 0.023066666666666666,
+      "outputPeak": 0.35342031717300415,
+      "outputRmsPerInstance": 0.06885216054210702
+    },
+    {
+      "mode": "default",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 703.6999998092651,
+        "min": 691,
+        "max": 744.8000001907349
+      },
+      "duty": 0.035184999990463255,
+      "msPerQuantum": 0.09382666664123535,
+      "outputPeak": 1.4136812686920166,
+      "outputRmsPerInstance": 0.06885216054210702
+    },
+    {
+      "mode": "runaway",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 182.80000019073486,
+        "min": 182.60000038146973,
+        "max": 183.5999994277954
+      },
+      "duty": 0.009140000009536743,
+      "msPerQuantum": 0.024373333358764647,
+      "outputPeak": 0.5616275668144226,
+      "outputRmsPerInstance": 0.17202286072642037
+    },
+    {
+      "mode": "runaway",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 716.5,
+        "min": 714.3999996185303,
+        "max": 719
+      },
+      "duty": 0.035825,
+      "msPerQuantum": 0.09553333333333333,
+      "outputPeak": 2.2465102672576904,
+      "outputRmsPerInstance": 0.17202286072642037
+    },
+    {
+      "mode": "sustain",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 157.69999980926514,
+        "min": 156.60000038146973,
+        "max": 160.0999994277954
+      },
+      "duty": 0.007884999990463257,
+      "msPerQuantum": 0.02102666664123535,
+      "outputPeak": 0.34854206442832947,
+      "outputRmsPerInstance": 0.07017097023901196
+    },
+    {
+      "mode": "sustain",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 619.2999992370605,
+        "min": 612.7000007629395,
+        "max": 626.6000003814697
+      },
+      "duty": 0.030964999961853028,
+      "msPerQuantum": 0.08257333323160806,
+      "outputPeak": 1.3941682577133179,
+      "outputRmsPerInstance": 0.07017097023901196
+    },
+    {
+      "mode": "motion",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 175.39999961853027,
+        "min": 173.19999980926514,
+        "max": 185.19999980926514
+      },
+      "duty": 0.008769999980926514,
+      "msPerQuantum": 0.023386666615804037,
+      "outputPeak": 0.3714583218097687,
+      "outputRmsPerInstance": 0.07783315118663509
+    },
+    {
+      "mode": "motion",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 683.1000003814697,
+        "min": 678.1000003814697,
+        "max": 691.6000003814697
+      },
+      "duty": 0.034155000019073484,
+      "msPerQuantum": 0.09108000005086261,
+      "outputPeak": 1.4858332872390747,
+      "outputRmsPerInstance": 0.07783315118663509
+    },
+    {
+      "mode": "fold",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 216.69999980926514,
+        "min": 214.80000019073486,
+        "max": 217.89999961853027
+      },
+      "duty": 0.010834999990463256,
+      "msPerQuantum": 0.028893333307902017,
+      "outputPeak": 0.36391007900238037,
+      "outputRmsPerInstance": 0.07535264091706699
+    },
+    {
+      "mode": "fold",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 799.3000001907349,
+        "min": 782.6000003814697,
+        "max": 826.7999992370605
+      },
+      "duty": 0.03996500000953674,
+      "msPerQuantum": 0.10657333335876464,
+      "outputPeak": 1.4556403160095215,
+      "outputRmsPerInstance": 0.07535264091706699
+    }
+  ],
+  "repeats": [
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "harness",
+        "instances": 0
+      },
+      "repeat": 0,
+      "ms": 4.199999809265137,
+      "peak": 0.4979172348976135,
+      "rms": 0.10024424468262828
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "harness",
+        "instances": 0
+      },
+      "repeat": 1,
+      "ms": 4.09999942779541,
+      "peak": 0.4979172348976135,
+      "rms": 0.10024424468262828
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "harness",
+        "instances": 0
+      },
+      "repeat": 2,
+      "ms": 4.09999942779541,
+      "peak": 0.4979172348976135,
+      "rms": 0.10024424468262828
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 173.5999994277954,
+      "peak": 0.35342031717300415,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 173,
+      "peak": 0.35342031717300415,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 173,
+      "peak": 0.35342031717300415,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 703.6999998092651,
+      "peak": 1.4136812686920166,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 691,
+      "peak": 1.4136812686920166,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "default",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 744.8000001907349,
+      "peak": 1.4136812686920166,
+      "rms": 0.06885216054210702
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 183.5999994277954,
+      "peak": 0.5616275668144226,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 182.60000038146973,
+      "peak": 0.5616275668144226,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 182.80000019073486,
+      "peak": 0.5616275668144226,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 716.5,
+      "peak": 2.2465102672576904,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 714.3999996185303,
+      "peak": 2.2465102672576904,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "runaway",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 719,
+      "peak": 2.2465102672576904,
+      "rms": 0.17202286072642037
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 160.0999994277954,
+      "peak": 0.34854206442832947,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 156.60000038146973,
+      "peak": 0.34854206442832947,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 157.69999980926514,
+      "peak": 0.34854206442832947,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 626.6000003814697,
+      "peak": 1.3941682577133179,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 612.7000007629395,
+      "peak": 1.3941682577133179,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "sustain",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 619.2999992370605,
+      "peak": 1.3941682577133179,
+      "rms": 0.07017097023901196
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 185.19999980926514,
+      "peak": 0.3714583218097687,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 175.39999961853027,
+      "peak": 0.3714583218097687,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 173.19999980926514,
+      "peak": 0.3714583218097687,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 678.1000003814697,
+      "peak": 1.4858332872390747,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 683.1000003814697,
+      "peak": 1.4858332872390747,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "motion",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 691.6000003814697,
+      "peak": 1.4858332872390747,
+      "rms": 0.07783315118663509
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 214.80000019073486,
+      "peak": 0.36391007900238037,
+      "rms": 0.07535264091706699
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 216.69999980926514,
+      "peak": 0.36391007900238037,
+      "rms": 0.07535264091706699
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 217.89999961853027,
+      "peak": 0.36391007900238037,
+      "rms": 0.07535264091706699
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 826.7999992370605,
+      "peak": 1.4556403160095215,
+      "rms": 0.07535264091706699
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 782.6000003814697,
+      "peak": 1.4556403160095215,
+      "rms": 0.07535264091706699
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "fold",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 799.3000001907349,
+      "peak": 1.4556403160095215,
+      "rms": 0.07535264091706699
+    }
+  ]
+}

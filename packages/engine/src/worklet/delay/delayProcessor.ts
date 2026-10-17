@@ -5,9 +5,17 @@
 import {
   DELAY_NAME,
   DELAY_BOUNDS,
+  DELAY_CHARACTER_IDS,
+  DELAY_CHARACTERS,
   DELAY_DEFAULTS,
   DELAY_DSP,
+  DELAY_FILTER_IDS,
+  DELAY_FILTERS,
+  DELAY_MODE_IDS,
+  DELAY_MODES,
   DELAY_SLEEP,
+  DELAY_WAVE_IDS,
+  DELAY_WAVES,
 } from '../../inserts/delayConstants';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
@@ -32,8 +40,23 @@ class DelayProcessor extends AudioWorkletProcessor {
         defaultValue: DELAY_DEFAULTS[name as keyof typeof DELAY_BOUNDS],
         automationRate: 'k-rate' as const,
       })),
-      { name: 'mode', minValue: 0, maxValue: 2, defaultValue: 0, automationRate: 'k-rate' },
-      { name: 'enabled', minValue: 0, maxValue: 1, defaultValue: 1, automationRate: 'k-rate' },
+      // The choices and switches, after the numbers: `delaySlots.ts`'s `DELAY_PARAM_KEYS` order.
+      ...(
+        [
+          ['mode', DELAY_MODES.length - 1, DELAY_MODE_IDS.stereo],
+          ['filter', DELAY_FILTERS.length - 1, DELAY_FILTER_IDS.lowpass],
+          ['character', DELAY_CHARACTERS.length - 1, DELAY_CHARACTER_IDS.warm],
+          ['wave', DELAY_WAVES.length - 1, DELAY_WAVE_IDS.drift],
+          ['sustain', 1, 0],
+          ['enabled', 1, 1],
+        ] as const
+      ).map(([name, maxValue, defaultValue]) => ({
+        name,
+        minValue: 0,
+        maxValue,
+        defaultValue,
+        automationRate: 'k-rate' as const,
+      })),
     ];
   }
 

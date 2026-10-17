@@ -8,7 +8,7 @@ import { DEFAULT_DELAY } from './delaySpec';
 import { applyDelayPreset } from './delayPresets';
 
 it.each([
-  ['saw-arp', 'trance', [36], 2],
+  ['saw-arp', 'tape', [36], 2],
   ['pad-drift', 'dub', [48, 55, 60], 6],
 ] as const)('processes %s in its intended register and gate', (patch, preset, notes, seconds) => {
   const fm = loadProcessor();
@@ -20,7 +20,7 @@ it.each([
     velocity: 0.7,
     frame: 0,
   }));
-  if (preset === 'trance') {
+  if (preset === 'tape') {
     events.push({ type: 'noteOff', id: 0, frame: fm.sampleRate / 4 });
     events.push({ type: 'noteOn', id: 1, note: 43, velocity: 1, frame: fm.sampleRate / 2 });
     events.push({ type: 'noteOff', id: 1, frame: (fm.sampleRate * 3) / 4 });

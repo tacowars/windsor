@@ -1,22 +1,14 @@
-/** Presets write sound settings; Mix, output and bypass stay user-owned. */
+/** Presets write sound settings; Mix, output, Sustain and bypass stay user-owned. */
 import { DEFAULT_DELAY } from './delaySpec';
 import type { DelaySpec } from './delaySpec';
 import { DELAY_PRESET_TABLE } from './delayPresetTables';
 
-type Settings = Omit<DelaySpec, 'kind' | 'mix' | 'outputDb' | 'enabled'>;
-const base: Settings = {
-  mode: DEFAULT_DELAY.mode,
-  leftSync: DEFAULT_DELAY.leftSync,
-  rightSync: DEFAULT_DELAY.rightSync,
-  leftDivision: DEFAULT_DELAY.leftDivision,
-  rightDivision: DEFAULT_DELAY.rightDivision,
-  leftMs: DEFAULT_DELAY.leftMs,
-  rightMs: DEFAULT_DELAY.rightMs,
-  feedback: DEFAULT_DELAY.feedback,
-  highpass: DEFAULT_DELAY.highpass,
-  lowpass: DEFAULT_DELAY.lowpass,
-  drive: DEFAULT_DELAY.drive,
-};
+type Settings = Omit<DelaySpec, 'kind' | 'mix' | 'outputDb' | 'enabled' | 'sustain'>;
+/** What a preset leaves to the user. */
+const USER_OWNED: readonly string[] = ['kind', 'mix', 'outputDb', 'enabled', 'sustain'];
+const base = Object.fromEntries(
+  Object.entries(DEFAULT_DELAY).filter(([key]) => !USER_OWNED.includes(key)),
+) as Settings;
 export const DELAY_PRESETS = DELAY_PRESET_TABLE.map((entry) => ({
   id: entry.id,
   label: entry.label,

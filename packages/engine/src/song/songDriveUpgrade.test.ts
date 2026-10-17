@@ -40,7 +40,8 @@ const versionFive = (): Record<string, unknown> => ({
 /**
  * The shipped steps and stand-ins 10 → 11 to 14 → 15 and 16 → 17: windsor#748,
  * windsor#761, windsor#764, windsor#746, windsor#771 and windsor#842 ship none, so
- * a version-10 to 14 or 16 song is refused, and
+ * a version-10 to 14 or 16 song is refused (17 → 18, the Dub delay's, ships and
+ * passes a delay-free song through), and
  * this reads a step's own work through to a version this build loads.
  */
 const PAST_TEN = {
@@ -64,7 +65,7 @@ const play = (patch: Patch): Float32Array =>
 
 describe('a version-5 song (windsor#300)', () => {
   it("opens at this build's version, through 6 to 10, with no correction, its drive out of the filter", () => {
-    expect(ARRANGEMENT_VERSION).toBe(17);
+    expect(ARRANGEMENT_VERSION).toBe(18);
     expect(KICK_PATCH.drive.gain).not.toBe(1); // the case is a driven patch
     const result = open(versionFive());
     expect(result.refused).toBeUndefined();

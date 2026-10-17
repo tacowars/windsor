@@ -120,37 +120,79 @@ asleep quantum out of its tank loop. `sleep: false` in `processorOptions`
 renders without it, for a test; `inserts/advancedDriveSleep.test.ts` holds
 the tail, the wake and the Mix 0 ring.
 
-`delay/` is the stereo/dub insert (#698), built as
-`generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
-state and routing, and `delayProcessor.ts` owns controls/lifetime/telemetry.
-Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
-exercise the shipped processor. Its separate `tsconfig.json` uses the
-existing erased-field settings. Controls live in `inserts/delayConstants.ts`
-and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
-The render allocates nothing (windsor#232): the controls are Float64Array
-slots (`delaySlots.ts`), a sample and a line's read or write pass through
-fields, and every double field is first written as NaN.
+`delay/` is the Dub delay (#698; its loop rebuilt in record
+`2026-10-17-dub-delay-regeneration`), built as `generated/delay-processor.js`.
+
+Its modules:
+- `delayProcessor.ts`: lifetime, descriptors and telemetry.
+- `delaySlots.ts`: the control slots, in descriptor order.
+- `delayControls.ts`: each block's targets in the loop's forms, and `glide`,
+  the per-sample move of every control and of the two shapes' crossfades,
+  which awake and asleep share.
+- `delayLoopFilter.ts`: the zero-delay-feedback state-variable filter, four
+  shapes from one state, Resonance as the gain at the cutoff.
+- `delaySaturation.ts`: warm and fold, and the always-on RMS governor that
+  holds a runaway at its ceiling.
+- `delayMotion.ts`: the seeded LFO for Wow and Sweep.
+- `delayDsp.ts`: the lines, routing, Cross, Sustain, the low cut and damping
+  shelf, and the sleep.
+
+The loop is read → filter → saturation and governor → low cut → shelf →
+× Feedback with Cross → + input → write.
+
+Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts`,
+which writes parameters through `inserts/delayParameters.ts` as the insert
+does, to exercise the shipped processor. Its separate `tsconfig.json` uses
+the existing erased-field settings. Controls live in
+`inserts/delayConstants.ts` and `delaySpec.ts`; song tempo is supplied
+through `tempoInsertRegistry.ts`.
+
+The render allocates nothing (windsor#232):
+- the controls are Float64Array slots;
+- a sample passes through fields (`value` on the filter, the saturation and
+  the route, `readMs` for a read);
+- the shapes' ids are small integers that cross calls as they are;
+- the motion's generator state is an Int32Array;
+- every double field is first written as NaN.
+
 `inserts/delayAllocation.test.ts` pins it on V8 through
 `__fixtures__/delayChangeScenario.ts`.
-It sleeps on silence (windsor#793, `DELAY_SLEEP`): `write` notes a line
-write above the output floor, or the first non-zero write into empty lines,
-and `drowse`, called from `configure` every block, counts the frames since
-the last one. Feedback runs past unity, so no span the controls set bounds
-the repeats; once no write has crossed the floor for the line's whole length
-(`maxSeconds`, 12 s: anything older is overwritten, and a time move can
-reach anything newer), or the lines hold exact zeros (built, or switched
-off), a silent block puts it to sleep, unless its loop can hold up what the
-lines carry. `configure` sets `held` when Feedback, current or target, is at or
-past unity in magnitude; the read, the ping-pong crossfade, the filters and
-the saturator add no gain, so that is the loop's only way to reach unity.
+
+No transcendental `Math` function is called: conversions go through
+`fm/portablePowers.ts`, `fm/portableTangent.ts` and `tapePortableMath.ts`.
+`inserts/delayGolden.test.ts` pins 15 scenarios (refresh with
+`WINDSOR_REFRESH_DELAY_GOLDEN=1`).
+
+It sleeps on silence (windsor#793, `DELAY_SLEEP`):
+- `write` notes a line write above the output floor, or the first non-zero
+  write into empty lines.
+- `drowse`, called from `configure` every block, counts the frames since the
+  last one.
+- Once no write has crossed the floor for the line's whole length
+  (`maxSeconds`, 12 s: anything older is overwritten, and a time move can
+  reach anything newer), or the lines hold exact zeros (built, or switched
+  off), a silent block puts it to sleep, unless its loop can hold up what
+  the lines carry.
+
+`hold` sets `held`:
+- when Sustain, current or target, is above 0;
+- when Feedback times the filter's largest gain at the current or target
+  Resonance (the low-pass peak Q / √(1 − 1/4Q²), which bounds the other
+  shapes) reaches unity.
+
+The governor's output RMS never exceeds its input's, and the read, Cross,
+the low cut and the shelf are at most unity, so that bound is the loop's.
 Held lines that are not empty never sleep (a write under the floor can grow
-past it) and wake if they slept, and their count restarts. Asleep: the
-processor writes zeros with no `tick`, the lines, filters and write position
-wait as they are, `rest` moves every glide and the switch a sample at a time
-in `tick`'s arithmetic with no audio, and the first loud
-block wakes it and renders in full. Its tail is the repeats' fall to the
-floor plus 12 s (21 s at the defaults); a delay held up by its feedback never
-sleeps. `sleep: false` in `processorOptions` is the tests' render without it;
+past it) and wake if they slept, and their count restarts.
+
+Asleep:
+- the processor writes zeros with no `tick`;
+- the lines and every filter, follower and tone state wait as they are;
+- `rest` runs `step` (the controls' glide, the motion and the filter's
+  tuning) a sample at a time as `tick` does, with no audio;
+- the first loud block wakes it and renders in full.
+
+`sleep: false` in `processorOptions` is the tests' render without it;
 `inserts/delaySleep.test.ts` holds the tail, the wake and the bits.
 
 `eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
