@@ -83,6 +83,14 @@ interface Held {
   el: HTMLElement | null;
 }
 
+/** What a pointer handler reads of its event: which pointer, and when. */
+export type PointerInput = Pick<PointerEvent, 'pointerId' | 'timeStamp'>;
+
+const POINTER_SOURCE_PREFIX = 'pointer:';
+
+/** A pointer's held-note source, named like MIDI's `midi:<input>:<note>`. */
+const pointerSource = (pointerId: number): string => `${POINTER_SOURCE_PREFIX}${pointerId}`;
+
 /** One note struck: its pitch, velocity, key and input event's `timeStamp`. */
 interface Strike {
   readonly note: number;
@@ -136,9 +144,9 @@ export class Keyboard {
       if (BLACK_KEYS.has(pitchClass(i))) key.dataset.black = '1';
       key.addEventListener('pointerdown', (e) => {
         key.setPointerCapture(e.pointerId);
-        this.press('mouse', i, key, e.timeStamp);
+        this.onPointerDown(e, i, key);
       });
-      const up = (e: PointerEvent): void => this.lift('mouse', false, e.timeStamp);
+      const up = (e: PointerEvent): void => this.onPointerUp(e);
       key.addEventListener('pointerup', up);
       key.addEventListener('pointercancel', up);
       box.appendChild(key);
@@ -177,6 +185,25 @@ export class Keyboard {
   /** One QWERTY release, by physical key so a Shift change between the two still lifts. */
   onKeyUp(e: KeyboardEvent): void {
     this.lift(e.code, false, e.timeStamp);
+  }
+
+  /**
+   * One pointer press on the key at `offset` (windsor#859). Each pointer is
+   * its own source, `pointer:<pointerId>`, so two fingers hold two notes and
+   * each lift stops its own; filed under one name, a second finger overwrote
+   * the first and that note rang on. A key another pointer already holds
+   * takes no second one, so its note and its light stay with the finger that
+   * struck it.
+   */
+  onPointerDown(e: PointerInput, offset: number, keyEl: HTMLElement): void {
+    const source = pointerSource(e.pointerId);
+    if (this.held.has(source) || this.pointerHolds(keyEl)) return;
+    this.press(source, offset, keyEl, e.timeStamp);
+  }
+
+  /** One pointer lifted or canceled: its own note stops, unless Hold keeps it. */
+  onPointerUp(e: PointerInput): void {
+    this.lift(pointerSource(e.pointerId), false, e.timeStamp);
   }
 
   shiftOctave(by: number): void {
@@ -282,6 +309,13 @@ export class Keyboard {
     }
     held.el?.classList.remove('down');
     this.held.delete(source);
+  }
+
+  /** Whether some pointer is holding `keyEl` down. */
+  private pointerHolds(keyEl: HTMLElement): boolean {
+    for (const [source, held] of this.held)
+      if (held.el === keyEl && source.startsWith(POINTER_SOURCE_PREFIX)) return true;
+    return false;
   }
 
   private syncLabel(): void {

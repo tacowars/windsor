@@ -16,13 +16,32 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AudioPart } from '@windsor/engine';
 import { AUDITION_TAB } from './keyboardConstants';
 import { Keyboard, isShortcutPress, qwertyPlaysOn } from './keyboard';
+import type { PointerInput } from './keyboard';
 import { MidiPerformer } from './midiPerformer';
 
-/** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep. */
+/** An on-screen key: only its `down` light, which a press sets and a lift clears. */
+interface FakeKey {
+  readonly classes: Set<string>;
+  readonly el: HTMLElement;
+}
+const fakeKeys: FakeKey[] = [];
+function fakeKey(): FakeKey {
+  const classes = new Set<string>();
+  const el = {
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+  } as unknown as HTMLElement;
+  const key = { classes, el };
+  fakeKeys.push(key);
+  return key;
+}
+const litKeys = (): number => fakeKeys.filter((k) => k.classes.has('down')).length;
+
+/** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep of `.key.down`. */
 const keysBox = { children: [] as HTMLElement[] };
 const fakeDocument = {
   getElementById: (id: string): unknown => (id === 'keys' ? keysBox : null),
-  querySelectorAll: (): HTMLElement[] => [],
+  querySelectorAll: (): HTMLElement[] =>
+    fakeKeys.filter((k) => k.classes.has('down')).map((k) => k.el),
 };
 
 const realDocument = Reflect.get(globalThis, 'document') as unknown;
@@ -62,6 +81,8 @@ function fakePart(name: string, log: string[]): AudioPart {
   } as unknown as AudioPart;
 }
 
+const pointer = (pointerId: number, timeStamp = 0): PointerInput => ({ pointerId, timeStamp });
+
 const press = (key: string, code: string, target: unknown = null): KeyboardEvent =>
   ({
     key,
@@ -81,6 +102,7 @@ describe('the audition keyboard', () => {
   let keyboard: Keyboard;
 
   beforeEach(() => {
+    fakeKeys.length = 0;
     log = [];
     part1 = fakePart('p1', log);
     part2 = fakePart('p2', log);
@@ -215,6 +237,76 @@ describe('the audition keyboard', () => {
     keyboard.onKeyUp({ ...press('a', 'KeyA'), timeStamp: 7 } as KeyboardEvent);
     keyboard.panic();
     expect(taps).toEqual([`p1 on KeyA ${keyboard.octave * 12} @6`, 'panic']);
+  });
+
+  it('holds each pointer’s note by its pointer, so every finger of a chord lifts its own', () => {
+    const [c, e] = [fakeKey(), fakeKey()];
+    const root = keyboard.octave * 12;
+    keyboard.onPointerDown(pointer(1), 0, c.el);
+    keyboard.onPointerDown(pointer(2), 4, e.el);
+    expect(log).toEqual([`p1 on ${root}`, `p1 on ${root + 4}`]);
+    // The first finger lifts last: each lift stops its own note, the other sounds on.
+    keyboard.onPointerUp(pointer(2));
+    expect(log.at(-1)).toBe('p1 off #2');
+    expect(litKeys()).toBe(1);
+    keyboard.onPointerUp(pointer(1));
+    expect(log.at(-1)).toBe('p1 off #1');
+    expect(litKeys()).toBe(0);
+    expect(keyboard.heldCount).toBe(0);
+  });
+
+  it('gives a key another pointer holds no second pointer, and lifts on a cancel', () => {
+    const [c, e] = [fakeKey(), fakeKey()];
+    keyboard.onPointerDown(pointer(1), 0, c.el);
+    keyboard.onPointerDown(pointer(2), 0, c.el);
+    expect(log).toEqual([`p1 on ${keyboard.octave * 12}`]);
+    keyboard.onPointerUp(pointer(2));
+    expect(log).toHaveLength(1);
+    expect(litKeys()).toBe(1);
+    // A cancel is a lift of that pointer's note and no other.
+    keyboard.onPointerDown(pointer(3), 4, e.el);
+    keyboard.onPointerUp(pointer(3));
+    expect(log.at(-1)).toBe('p1 off #2');
+    keyboard.onPointerUp(pointer(1));
+    expect(log.at(-1)).toBe('p1 off #1');
+    expect(litKeys()).toBe(0);
+  });
+
+  it('keeps every pointer’s note under Hold until Panic, and a later lift does nothing', () => {
+    const [c, e] = [fakeKey(), fakeKey()];
+    keyboard.hold = true;
+    keyboard.onPointerDown(pointer(1), 0, c.el);
+    keyboard.onPointerDown(pointer(2), 4, e.el);
+    keyboard.onPointerUp(pointer(1));
+    expect(log.some((line) => line.includes('off'))).toBe(false);
+    keyboard.panic();
+    expect(log.at(-1)).toBe('p1 panic');
+    expect(litKeys()).toBe(0);
+    expect(keyboard.heldCount).toBe(0);
+    log.length = 0;
+    keyboard.onPointerUp(pointer(2));
+    expect(log).toEqual([]);
+  });
+
+  it('tells its tap each pointer’s press and release under its own source', () => {
+    const taps: string[] = [];
+    keyboard.tap = {
+      press: (_part, source, pitch, _velocity, at) =>
+        void taps.push(`on ${source} ${pitch} @${at}`),
+      release: (_part, source, pitch, at) => void taps.push(`off ${source} ${pitch} @${at}`),
+      panic: () => void taps.push('panic'),
+    };
+    const root = keyboard.octave * 12;
+    keyboard.onPointerDown(pointer(7, 1), 0, fakeKey().el);
+    keyboard.onPointerDown(pointer(9, 2), 4, fakeKey().el);
+    keyboard.onPointerUp(pointer(7, 3));
+    keyboard.onPointerUp(pointer(9, 4));
+    expect(taps).toEqual([
+      `on pointer:7 ${root} @1`,
+      `on pointer:9 ${root + 4} @2`,
+      `off pointer:7 ${root} @3`,
+      `off pointer:9 ${root + 4} @4`,
+    ]);
   });
 
   it('calls back after a Panic so a MIDI performer forgets its notes', () => {
