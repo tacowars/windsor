@@ -28,7 +28,7 @@ import { assignPatchFields } from './partAutoName';
 import { leftCopyDrop } from './partCopyCleanup';
 import { buildPatchFile, patchFileText } from './patchFileWriter';
 import type { PatchMetadata } from './patchMetadata';
-import { copyMetadata, slugify, uniqueId } from './patchMetadata';
+import { copyMetadata, sansName, slugify, uniqueId } from './patchMetadata';
 
 export type PatchOrigin =
   | { kind: 'library'; id: string }
@@ -68,10 +68,12 @@ export function baselinePatch(scope: PatchScope, origin = patchOrigin(scope)): P
   return null;
 }
 
-/** True when the working patch differs from its library entry or Init defaults. */
+/** True when the working patch differs from its library entry or Init defaults, its name apart (`sansName`). */
 export function isModified(scope: PatchScope, working: Patch): boolean {
   const baseline = baselinePatch(scope);
-  return baseline !== null && patchLeafDifferences(working, baseline).length > 0;
+  return (
+    baseline !== null && patchLeafDifferences(sansName(working), sansName(baseline)).length > 0
+  );
 }
 
 export const canSave = (origin: PatchOrigin): boolean => origin.kind === 'library';

@@ -16,8 +16,21 @@ import { copyId, copySource, playerElsewhere } from './partPatchIsolation';
 import { PATCH_SOURCE_LABELS } from './patchLibrary';
 import { stepListing } from './patchStepModel';
 
-/** Retained across a rail rebuild, a part switch and the popover closing. */
-export const patchFilter: PresetFilter = { query: '', category: '', tag: '', source: '' };
+/** What the full-pane browser lists (windsor#884, record `2026-10-17-racks` decision 18): the patches, or the racks. */
+export type BrowserKind = 'patches' | 'racks';
+
+/**
+ * Retained across a rail rebuild, a part switch and the popover closing. The
+ * kind is the full-pane browser's alone: the popover and ◀ ▶ list patches
+ * whatever it says.
+ */
+export const patchFilter: PresetFilter & { kind: BrowserKind } = {
+  query: '',
+  category: '',
+  tag: '',
+  source: '',
+  kind: 'patches',
+};
 
 /**
  * Copy on selection: the exported song owns the sound even before its first

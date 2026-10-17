@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { partAt } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { addPartFromRackChange, rackDifferences } from './rackActions';
+import { addPartFromRackChange, rackDifferences, renamedRack } from './rackActions';
 import { ALL, BARE, rackTestScope, raw } from './__fixtures__/rackScope';
 import { loadBuiltIns } from './builtInLibrary';
 import { addPart } from './songParts';
@@ -85,5 +85,41 @@ describe('rackDifferences (decision 14)', () => {
       }),
     );
     expect(diff()).toEqual([]);
+  });
+});
+
+describe('the name leaf (decision 14 as amended, windsor#884)', () => {
+  it('never counts: a renamed song copy is unmodified against its rack', () => {
+    const model = song();
+    const { rack, load } = scope(model);
+    const ref = rack();
+    load(arp, ref);
+    const copy = model.doc.patches!['kick-rack']!;
+    model.merge(raw({ patches: { 'kick-rack': { ...copy, name: 'Other Name' } } }));
+    expect(
+      rackDifferences(partAt(model.doc, arp)!, model.doc.patches?.['kick-rack'], ref.file),
+    ).toEqual([]);
+  });
+
+  it('leaves a key from another part out of the chain comparison, as the file writes it (decision 3)', () => {
+    const model = song();
+    const { rack } = scope(model);
+    const ref = rack();
+    // The kick's own chain keys its compressor from the hat; the rack wrote that key disconnected.
+    const kick = partAt(model.doc, FULL_SLOT.kick)!;
+    expect(
+      rackDifferences(kick, model.doc.patches?.[kick.preset], {
+        ...ref.file,
+        patch: model.doc.patches![kick.preset]!,
+      }),
+    ).toEqual([]);
+  });
+
+  it('renames a rack and its patch together, the rest untouched', () => {
+    const { rack } = scope(song());
+    const renamed = renamedRack(rack().file, 'Kick Room');
+    expect(renamed.name).toBe('Kick Room');
+    expect(renamed.patch.name).toBe('Kick Room');
+    expect({ ...renamed, name: rack().file.name, patch: rack().file.patch }).toEqual(rack().file);
   });
 });
