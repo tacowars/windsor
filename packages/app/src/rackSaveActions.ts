@@ -19,6 +19,7 @@ import type { MenuItem } from './patchMenu';
 import { slugify, uniqueId } from './patchMetadata';
 import type { RackSaveOptions } from './rackActions';
 import { loadRackChange, rackDifferences, rackFromPart, saveMembersFor } from './rackActions';
+import { rackNameProblem } from './rackBrowserModel';
 import { isRackWritable, rackEntry, writeRackFile } from './rackLibrary';
 import { KIND_LABELS } from './sequencerConstants';
 import { fmtHz } from './consoleFormat';
@@ -60,10 +61,18 @@ async function writeRack(
 ): Promise<string> {
   const file = rackFromPart(ctx.model.doc, slot, options, new Set(Object.keys(library.entries)));
   if (!file) throw new Error('This part has no patch to save as a rack.');
+  // Pinned before the write, as Save pins them: another song opened, or the
+  // slot moved on, meanwhile gets no link. The file is still written.
   const own = partAt(ctx.model.doc, slot)?.preset;
+  const song = ctx.model.openings;
   await writeRackFile(library, id, serialiseRackFile(file));
-  // Pinned before the write, as Save pins them: the slot moved on meanwhile gets no link.
-  if (partAt(ctx.model.doc, slot)?.preset === own && partAt(ctx.model.doc, slot)?.rackSource !== id)
+  const after = partAt(ctx.model.doc, slot);
+  if (
+    ctx.model.openings === song &&
+    after !== undefined &&
+    after.preset === own &&
+    after.rackSource !== id
+  )
     ctx.change(partChange(slot, { rackSource: id }));
   return id;
 }
@@ -78,6 +87,8 @@ async function runSaveAsRack(ctx: AppCtx, opener: HTMLElement, refresh: () => vo
       initial: currentMetadata(scope, ctx.parts.patch),
       entries: library.entries,
       id: (name) => uniqueId(slugify(name), Object.keys(library.racks)),
+      // The name is a rack's: the patch library's names do not count, another rack's does.
+      nameProblem: (name) => rackNameProblem(name, library.racks),
       members: memberBoxes(ctx, slot),
       loudness: checkLoudness(ctx.parts.patch),
       opener,

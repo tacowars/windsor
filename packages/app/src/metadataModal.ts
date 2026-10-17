@@ -113,6 +113,8 @@ export interface MetadataRequest {
   id: string | ((name: string) => string);
   /** The entry being saved over, exempt from the name-uniqueness rule. */
   ownId?: string;
+  /** The name rule when it is not the patch library's: Save as rack… checks the racks (windsor#885). */
+  nameProblem?: (name: string) => string | null;
   loudness: Promise<LoudnessResult> | null;
   opener?: HTMLElement | null;
 }
@@ -251,8 +253,12 @@ export async function openMetadataModal(
     id.value = typeof request.id === 'string' ? request.id : request.id(name.value);
   };
   syncId();
+  const checkName = (): string | null =>
+    request.nameProblem
+      ? request.nameProblem(name.value)
+      : nameProblem(name.value, request.entries, request.ownId);
   name.oninput = (): void => {
-    problem.textContent = nameProblem(name.value, request.entries, request.ownId) ?? '';
+    problem.textContent = checkName() ?? '';
     syncId();
   };
   category.onchange = (): void => {
@@ -270,7 +276,7 @@ export async function openMetadataModal(
   $('metaConfirm').onclick = (): void => {
     const chosenCategory =
       category.value === NEW_CATEGORY ? newCategory.value.trim() : category.value;
-    const nameIssue = nameProblem(name.value, request.entries, request.ownId);
+    const nameIssue = checkName();
     const issue = nameIssue ?? (chosenCategory ? null : 'A category is required.');
     if (issue) {
       problem.textContent = issue;
