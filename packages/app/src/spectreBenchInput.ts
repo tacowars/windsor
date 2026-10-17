@@ -12,12 +12,15 @@
  * - **Erase** puts the cells it passes back at rest.
  * - **Select** marks the cells it spans across all three lanes: a plain drag
  *   replaces the selection, Shift adds, Alt takes away; a double-click clears.
+ *   A press that does not move holds its step open a moment after release
+ *   (`selectHold`), so a double-click's first press and its clear are one
+ *   step, and an undo brings back the selection from before it (windsor#852).
  *
  * The rules are `spectreCellEdits.ts`'s; this file reads the pointer.
  */
 import type { SpectreCurve, SpectreSpec } from '@windsor/engine';
-import { dragGesture, withGesture } from './gestureHooks';
-import type { OpenGesture } from './gestureHooks';
+import { dragGesture, mergedGesture } from './gestureHooks';
+import type { MergedGesture, OpenGesture } from './gestureHooks';
 import {
   drawStroke,
   editedCells,
@@ -62,6 +65,8 @@ interface Stroke {
   readonly base: SpectreSpec;
   readonly anchor: number;
   readonly mode: 'replace' | 'add' | 'remove';
+  /** Select, and the stroke has not left its first cell: its release holds the step for a double-click. */
+  held: boolean;
   /** The workbench's last Draw stroke ends, by `drawnKey`, for Shift's straight line. */
   readonly drawn: Map<string, BrushAt>;
 }
@@ -100,6 +105,7 @@ function strokeTo(
   const tool = host.tool();
   const now: BrushAt = { cell, value: drawnValue(host, lane, y) };
   if (tool === 'select') {
+    if (cell !== stroke.anchor) stroke.held = false;
     host.commit({
       ...selectCells(stroke.base, stroke.anchor, cell, stroke.mode),
       curves: spec.curves,
@@ -126,13 +132,39 @@ function toolLabel(tool: SpectreTool): string {
   return `${SPECTRE_BENCH_LABELS.undo} ${SPECTRE_TOOLS.find((t) => t.id === tool)?.label ?? ''}`;
 }
 
-/** Wire the pointer on `host.canvas`. */
-export function wireSpectreBench(host: SpectreInputHost): void {
+/**
+ * Select's held step (windsor#852): opened on a still press's release, inside
+ * the press's step before that closes, it keeps the step open while the rest
+ * of a double-click arrives on `canvas` (its click, its second press), so the
+ * clear folds into it. Anything else (a key, a press elsewhere, a fresh
+ * press) or the merge's timer closes it.
+ */
+function selectHold(canvas: EventTarget, win: EventTarget): MergedGesture {
+  return mergedGesture({
+    label: SPECTRE_BENCH_LABELS.select,
+    continues: (e) =>
+      e.target === canvas &&
+      (e.type === 'click' || (e.type === 'pointerdown' && (e as PointerEvent).detail > 1)),
+    win,
+  });
+}
+
+/** A double-click's clear: into the first press's held step, or a step of its own once that closed. */
+function clearSelection(host: SpectreInputHost, hold: MergedGesture): void {
+  hold.touch();
+  host.commit({ ...host.spec(), selection: [] });
+  hold.close();
+}
+
+/** Wire the pointer on `host.canvas`; `win` hears the releases and inputs that end a step. */
+export function wireSpectreBench(host: SpectreInputHost, win: EventTarget = window): void {
   const { canvas } = host;
   // Each open workbench starts with no stroke behind it.
   const drawn = new Map<string, BrushAt>();
+  const hold = selectHold(canvas, win);
   let stroke: Stroke | null = null;
   const stop = (e: PointerEvent): void => {
+    if (stroke?.held && stroke.gesture.open && e.type === 'pointerup') hold.touch();
     stroke?.gesture.close();
     stroke = null;
     if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
@@ -153,13 +185,14 @@ export function wireSpectreBench(host: SpectreInputHost): void {
     const from = tool === 'draw' && e.shiftKey ? (last ?? here) : here;
     stroke = {
       lane,
-      gesture: dragGesture(tool === 'select' ? SPECTRE_BENCH_LABELS.select : toolLabel(tool)),
+      gesture: dragGesture(tool === 'select' ? SPECTRE_BENCH_LABELS.select : toolLabel(tool), win),
       prev: from,
       y: at.y,
       base: host.spec(),
       anchor: cell,
       mode: tool !== 'select' ? 'replace' : e.altKey ? 'remove' : e.shiftKey ? 'add' : 'replace',
       drawn,
+      held: tool === 'select',
     };
     canvas.setPointerCapture(e.pointerId);
     strokeTo(host, stroke, at.x, at.y, e);
@@ -181,6 +214,6 @@ export function wireSpectreBench(host: SpectreInputHost): void {
   canvas.addEventListener('dblclick', (e) => {
     if (host.tool() !== 'select') return;
     e.preventDefault();
-    withGesture(SPECTRE_BENCH_LABELS.select, () => host.commit({ ...host.spec(), selection: [] }));
+    clearSelection(host, hold);
   });
 }
