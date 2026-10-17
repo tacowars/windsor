@@ -147,8 +147,12 @@ drum at C4.
 | `pumping-pad` | C3 E♭3 G3 struck, held | held | G3 moves to A♭3 | B♭2 D3 B♭3 |
 | `phased-arp` | C4! E♭4 G4 C5 E♭5 G5 C4! E♭4 G4 C5 E♭5 G5 C4! E♭4 G4 C5 | E♭5 G5 C4! E♭4 G4 C5 E♭5 G5 C4! E♭4 G4 C5 E♭5 G5 C4! E♭4 | E♭5 A♭5 C6 E♭6 A♭4! C5 E♭5 A♭5 C6 E♭6 A♭4! C5 E♭5 A♭5 C6 E♭6 | B♭4! D5 F5 B♭5 D6 F6 B♭4! D5 F5 B♭5 D6 F6 B♭4! D5 F5 B♭5 |
 
-The acid line slides on cells 4, 6, 11 and 15 of its sixteen (each into the
-next note) on a mono patch with sustain 0.55. The arp's lead is
+The acid line slides into cells 4, 6, 11 and 15 of its sixteen, each from
+the note before it: a cell's `slide` flag glides that cell's note in from
+the held one, and the note before runs to the slide's onset
+(`bassSequencer.ts`, `holdsToNext`). Cell 4 glides down from the accented
+octave of cell 3; cells 6, 11 and 15 glide up an octave. On a mono patch
+with sustain 0.55. The arp's lead is
 polyphonic, so its cells carry accents and no slides: a slide glides only
 on a mono patch.
 

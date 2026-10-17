@@ -12,7 +12,7 @@
 /** A 16-step trigger row from a string of `x` and `.`. */
 const row = (text) => [...text].map((c) => c === 'x');
 
-/** A Basslead or Arp cell: `n` a note, `r` a rest; `+` an octave up, `A` an accent, `S` a slide. */
+/** A Basslead or Arp cell: `n` a note, `r` a rest; `+` an octave up, `A` an accent, `S` a slide into this cell from the note before. */
 function cell(text) {
   if (text === 'r') return { kind: 'rest' };
   return {
