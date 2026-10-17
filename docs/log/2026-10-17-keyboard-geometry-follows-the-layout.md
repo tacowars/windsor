@@ -71,9 +71,10 @@ Hold drops the entry without a `noteOff`.
   boxes are read again. A finger held on a key in the top octave (offsets
   36 to 47) has no key in the new range, so its note lifts at the re-read:
   `noteOff` without Hold, kept ringing under Hold, and in both cases its
-  entry is gone and the finger plays nothing until it lifts and presses
-  again. Fingers on the lower three octaves keep their notes until they
-  move.
+  entry is gone. The pointer itself stays captured, so its next move onto
+  a visible key strikes afresh, as a finger sliding back onto the row
+  does; it plays nothing only while it rests where no key is. Fingers on
+  the lower three octaves keep their notes until they move.
 - **Close with a chord held under Hold.** Close is tapped while three
   fingers hold keys in the expanded view. The view's keys are gone, so
   every held pointer's key no longer exists and each lifts at the re-read:
