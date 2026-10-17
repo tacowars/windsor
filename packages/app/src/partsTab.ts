@@ -256,6 +256,9 @@ function wireJsonDialog(ctx: AppCtx, editor: PatchEditor): void {
   };
 }
 
+/** The contexts whose Parts tab already redraws the RACK tag when shown (one listener per context, not per render). */
+const tagOnShown = new WeakSet<AppCtx>();
+
 export function renderPartsTab(
   body: HTMLElement,
   ctx: AppCtx,
@@ -263,6 +266,14 @@ export function renderPartsTab(
   midi: MidiAccessor,
 ): void {
   body.innerHTML = GRID_HTML;
+  // A chain edit on the Mixer tab commits with a bare ctx.change, which marks no tab stale, so
+  // the tag re-reads the rack's dot each time this tab is shown (windsor#885).
+  if (!tagOnShown.has(ctx)) {
+    tagOnShown.add(ctx);
+    ctx.onTabShown('parts', (shown) => {
+      if (shown) syncRackTag(ctx);
+    });
+  }
   const editor = patchEditor(ctx);
   ctx.parts.reload();
   keyboard.followPart();

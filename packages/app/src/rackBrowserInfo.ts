@@ -25,6 +25,8 @@ export interface RackInfoHooks {
   readonly load: (id: string, opener: HTMLElement) => void;
   /** After a rack action: select `next` if given, reload the bar and the pane, focus the results. */
   readonly done: (next?: string) => void;
+  /** The browser is adding a part from a rack (decision 12): the primary button adds instead of loading. */
+  readonly adding?: boolean;
 }
 
 const POWER = '⏻';
@@ -155,12 +157,19 @@ export function rackBrowserInfo(
   const name = el('div', 'pb-name', row.name);
   const tags = el('div', 'pb-chips');
   for (const tag of row.tags) tags.appendChild(el('span', '', tag));
-  const load = button(
-    `Load into ${part?.name ?? 'part'}`,
-    'Load this rack into the part: its patch, effects, and its low cut and sequencer where it carries them (Enter or a double-click)',
-    part !== undefined,
-    'btn primary',
-  );
+  const load = hooks.adding
+    ? button(
+        'Add a part from this rack',
+        'Add a new part playing this rack: its patch, effects, and its low cut and sequencer where it carries them (Enter or a double-click)',
+        true,
+        'btn primary',
+      )
+    : button(
+        `Load into ${part?.name ?? 'part'}`,
+        'Load this rack into the part: its patch, effects, and its low cut and sequencer where it carries them (Enter or a double-click)',
+        part !== undefined,
+        'btn primary',
+      );
   load.onclick = (): void => hooks.load(row.id, load);
   const rename = button(
     'Rename',

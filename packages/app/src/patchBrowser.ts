@@ -204,7 +204,7 @@ function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
       .querySelector('.pb-info')
       ?.replaceWith(
         racks
-          ? rackBrowserInfo(ctx, row as RackRow | null, { load, done })
+          ? rackBrowserInfo(ctx, row as RackRow | null, { load, done, adding: state.pendingAdd })
           : browserInfo(ctx, row, { load, done }),
       );
   };
