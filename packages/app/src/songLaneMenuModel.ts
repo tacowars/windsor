@@ -49,6 +49,7 @@ export const LANE_MENU_TEXT = {
   setSequencer: 'Set sequencer',
   bounce: 'Bounce part to Roll…',
   colour: 'Part color…',
+  loadRack: 'Load rack…',
   add: 'Add region here',
   loopBar: 'Loop this bar',
   nothingCopied: 'nothing copied',
@@ -107,6 +108,8 @@ export interface LaneMenuCommands extends PatternGroupCommands {
   loop(range: LoopRange): void;
   bounce(): void;
   colour(): void;
+  /** Open the browser on Racks with this part as the target (windsor#885). */
+  loadRack(): void;
   setKind(kind: SequencerKind): void;
   /** Preview: a dashed box where a region would land. */
   showRegion(span: TickSpan): void;
@@ -218,12 +221,14 @@ function setSequencerMenu(commands: LaneMenuCommands, kinds: readonly SequencerK
   return { kind: 'submenu', label: LANE_MENU_TEXT.setSequencer, items };
 }
 
-/** Bounce part to Roll… where the pane's button is, and Part color…. */
+/** Load rack… (windsor#885), Bounce part to Roll… where the pane's button is, and Part color…. */
 function partRows(part: LanePart, commands: LaneMenuCommands): MenuItem[] {
   const bounce = bounceButtonState(part);
+  const load = row(LANE_MENU_TEXT.loadRack, () => commands.loadRack());
   const colour = row(LANE_MENU_TEXT.colour, () => commands.colour());
-  if (!bounce) return [colour];
+  if (!bounce) return [load, colour];
   return [
+    load,
     row(LANE_MENU_TEXT.bounce, () => commands.bounce(), { disabled: bounce.disabled }),
     colour,
   ];
@@ -294,7 +299,7 @@ function gapMenu(press: LaneMenuPress, commands: LaneMenuCommands): MenuSpec {
   );
   return {
     head: `${part.name} · bar ${barNumber(tick, bar)}`,
-    items: [pasteRow(press, commands), add, loop],
+    items: [pasteRow(press, commands), add, loop, SEPARATOR, ...partRows(part, commands)],
   };
 }
 

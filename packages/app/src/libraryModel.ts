@@ -55,6 +55,13 @@ export interface LibraryModel {
   oldFormatRacks: OldFormatPatch[];
 }
 
+/** The save toast, naming where a write went. */
+export function writtenText(model: LibraryModel, id: string): string {
+  if (model.folder) return `wrote ${id}.json to the folder`;
+  if (model.user) return `saved ${id} to your library`;
+  return `downloaded ${id}.json`;
+}
+
 /** The one instance the console shares; tests build their own with `pageLibrary()`. */
 export const library: LibraryModel = pageLibrary();
 

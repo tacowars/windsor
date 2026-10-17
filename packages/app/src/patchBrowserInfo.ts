@@ -13,7 +13,7 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { drawEnv } from './envCanvas';
 import { LIBRARY_FOLDER_PATH, LIBRARY_SUBFOLDERS } from './libraryConstants';
-import { isWritable, library, libraryPatch } from './libraryModel';
+import { isWritable, library, libraryPatch, writtenText } from './libraryModel';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
 import {
@@ -26,7 +26,6 @@ import {
 import type { ActionTarget } from './patchBrowserModel';
 import { patchInfo, rowActions } from './patchBrowserModel';
 import { renamePatch } from './patchLibrary';
-import { writtenText } from './libraryActions';
 import { copyMetadata, nameProblem, slugify, uniqueId } from './patchMetadata';
 
 export interface InfoHooks {

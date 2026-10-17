@@ -26,10 +26,16 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { openConfirm } from './metadataModal';
 import { openPartColourPicker, wireChipColour } from './partColourPicker';
+import { openContextMenu } from './contextMenu';
+import type { OpeningPress } from './contextMenuModel';
+import type { LongPressHandle } from './longPress';
+import { wireLongPress } from './longPress';
 import { addPartLive, removePartLive, setPartColourLive } from './partEdits';
+import { requestBrowser } from './patchBrowser';
 import { partListPopover } from './partStripList';
 import { watchStripLights } from './partStripLights';
 import {
+  ADD_MENU_TEXT,
   addPartTitle,
   canAddPart,
   canRemovePart,
@@ -100,6 +106,43 @@ function wireWheel(scroll: HTMLElement): void {
   );
 }
 
+/**
+ * The + button's menu (windsor#885, record `2026-10-17-racks` decision 19):
+ * a right-click or a touch or pen long press opens Add part and Add part
+ * from rack…, the second opening the browser on Racks with the add pending
+ * (`requestBrowser`); a click still adds a part at once.
+ */
+function wireAddMenu(ctx: AppCtx, add: HTMLButtonElement): LongPressHandle {
+  const open = (press: OpeningPress): void => {
+    if (add.disabled) return;
+    const count = ctx.model.doc.parts.length;
+    openContextMenu(
+      {
+        head: ADD_MENU_TEXT.head(count),
+        items: [
+          { kind: 'row', label: ADD_MENU_TEXT.add, run: () => void addPartLive(ctx) },
+          {
+            kind: 'row',
+            label: ADD_MENU_TEXT.fromRack,
+            run: () => requestBrowser(ctx, 'racks', true),
+          },
+        ],
+      },
+      press,
+    );
+  };
+  const hold = wireLongPress(add, (at) => open(at));
+  add.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!hold.claimContextMenu()) return;
+    const pointerType = e instanceof PointerEvent && e.pointerType !== '' ? e.pointerType : 'mouse';
+    const finger =
+      pointerType !== 'mouse' && e instanceof PointerEvent ? { pointerId: e.pointerId } : {};
+    open({ x: e.clientX, y: e.clientY, pointerType, ...finger });
+  });
+  return hold;
+}
+
 /** The strip's frame: built once; the chips inside are drawn again on every render and pick. */
 interface StripFrame {
   readonly root: HTMLElement;
@@ -123,7 +166,11 @@ function buildFrame(ctx: AppCtx, root: HTMLElement): StripFrame {
   next.onclick = (): void => page(1);
   const list = partListPopover(ctx, (slot) => pickPart(ctx, slot));
   const add = stripButton('btn pm-btn', '+', '');
-  add.onclick = (): void => void addPartLive(ctx);
+  const hold = wireAddMenu(ctx, add);
+  add.onclick = (): void => {
+    // The release of a long press that opened the menu adds nothing.
+    if (!hold.took()) void addPartLive(ctx);
+  };
   const remove = stripButton('btn pm-btn', '−', '');
   remove.onclick = (): void => confirmRemove(ctx, remove);
   const pm = el('div', 'pm');

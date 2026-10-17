@@ -23,6 +23,7 @@ import { el } from './dom';
 import { libraryFolderEntries } from './libraryActions';
 import { library } from './libraryModel';
 import type { PatchBarActions } from './patchBar';
+import type { BrowserKind } from './presetBrowser';
 import { facetColumn } from './patchBrowserFacets';
 import { browserInfo } from './patchBrowserInfo';
 import { paneKeys } from './patchBrowserKeys';
@@ -30,13 +31,22 @@ import { browserRows, keepSelection } from './patchBrowserModel';
 import { rackTable, resultsTable } from './patchBrowserTable';
 import { moveHighlight } from './patchStepModel';
 import { loadPreset, patchFilter, presetListing } from './presetBrowser';
-import { loadRackIntoPart } from './rackBrowserActions';
+import { addPartFromRack, loadRackIntoPart } from './rackBrowserActions';
 import { rackBrowserInfo } from './rackBrowserInfo';
 import type { RackRow } from './rackBrowserModel';
 import { kindCounts, rackListing } from './rackBrowserModel';
 
-/** Open or not, and the selected row: kept across the pane's rebuilds. */
-const state: { open: boolean; selected: string | null } = { open: false, selected: null };
+/**
+ * Open or not, the selected row, and (windsor#885) whether Add part from
+ * rack… is pending, so the next rack load adds the part, and whether the
+ * next sync hands focus to the search: kept across the pane's rebuilds.
+ */
+const state: {
+  open: boolean;
+  selected: string | null;
+  pendingAdd: boolean;
+  focusSearch: boolean;
+} = { open: false, selected: null, pendingAdd: false, focusSearch: false };
 
 const PANE_ID = 'patchBrowser';
 const SEARCH_ID = 'patchBrowserSearch';
@@ -67,9 +77,28 @@ export function openPatchBrowser(ctx: AppCtx, actions: PatchBarActions): void {
   focusBrowserSearch();
 }
 
+/**
+ * Open the browser on `kind` from elsewhere (the Song tab's Load rack…, the
+ * header's Add part from rack…, windsor#885): the Parts tab is shown and
+ * rendered, whose bar builds the pane, with focus in its search. With
+ * `addPart`, the next rack load adds a part rather than loading into the
+ * selected one, and a Close adds nothing.
+ */
+export function requestBrowser(ctx: AppCtx, kind: BrowserKind, addPart = false): void {
+  patchFilter.kind = kind;
+  state.open = true;
+  state.selected = null;
+  state.pendingAdd = addPart;
+  state.focusSearch = true;
+  // A switch is a tab-bar click (`tabShell.ts`), which shows the tab and syncs its button.
+  document.querySelector<HTMLButtonElement>('[data-tab="parts"]')?.click();
+  ctx.render();
+}
+
 /** Close the pane; `refocus` hands focus to ⤢ Browse patches so the keys play again. */
 export function closePatchBrowser(refocus: boolean): void {
   state.open = false;
+  state.pendingAdd = false;
   document.getElementById(PANE_ID)?.remove();
   syncBrowseButton();
   if (refocus) document.getElementById(BROWSE_ID)?.focus();
@@ -130,7 +159,8 @@ function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
   const search = pane.querySelector<HTMLInputElement>('.pb-search');
   if (search && search.value !== patchFilter.query) search.value = patchFilter.query;
   const hint = pane.querySelector('.pb-hint');
-  hint?.replaceChildren('Loading into ', el('b', 'pb-part', part?.name ?? '—'));
+  if (state.pendingAdd) hint?.replaceChildren('Adding a part from a rack');
+  else hint?.replaceChildren('Loading into ', el('b', 'pb-part', part?.name ?? '—'));
   const title = KIND_TITLES[patchFilter.kind];
   pane.querySelector('.pb-title')?.replaceChildren(title);
   pane.querySelector('.pb-results')?.setAttribute('aria-label', title);
@@ -145,10 +175,11 @@ function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
   const top = results?.scrollTop ?? 0;
   results?.replaceChildren(table);
   if (results) results.scrollTop = top;
-  const load = (id: string, opener?: HTMLElement): void =>
-    racks
-      ? loadRackIntoPart(ctx, id, actions, focusResults, opener)
-      : loadPreset(ctx, id, actions, focusResults);
+  const load = (id: string, opener?: HTMLElement): void => {
+    if (!racks) return loadPreset(ctx, id, actions, focusResults);
+    if (!state.pendingAdd) return loadRackIntoPart(ctx, id, actions, focusResults, opener);
+    if (addPartFromRack(ctx, id, actions, focusResults)) state.pendingAdd = false;
+  };
   const done = (next?: string): void => {
     if (next !== undefined) state.selected = next;
     actions.refresh();
@@ -236,6 +267,10 @@ export function syncPatchBrowser(ctx: AppCtx, actions: PatchBarActions): void {
     bar.after(pane);
   }
   fill(pane, ctx, actions);
+  if (state.focusSearch) {
+    state.focusSearch = false;
+    focusBrowserSearch();
+  }
 }
 
 let escapeWired = false;

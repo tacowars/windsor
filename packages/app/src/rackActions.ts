@@ -17,6 +17,7 @@ import type {
   SequencerSpec,
 } from '@windsor/engine';
 import {
+  LOW_CUT_MIN_HZ,
   PATCH_FILE_FORMAT,
   PATCH_ID_RULE,
   RACK_FILE_FORMAT,
@@ -46,6 +47,12 @@ export interface RackSaveOptions extends PatchMetadata {
   /** Include the part's sequencer, without its seed. */
   sequencer: boolean;
 }
+
+/** The two boxes' defaults (decision 13): the low cut when above its floor, the sequencer when the kind is not none. */
+export const saveMembersFor = (part: DocumentPart): { lowCut: boolean; sequencer: boolean } => ({
+  lowCut: part.strip.lowCut > LOW_CUT_MIN_HZ,
+  sequencer: part.sequencer.kind !== 'none',
+});
 
 /** A rack as the actions take it: its library id and its file. */
 export interface RackRef {

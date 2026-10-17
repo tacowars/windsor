@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { partAt } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { addPartFromRackChange, rackDifferences, renamedRack } from './rackActions';
+import { addPartFromRackChange, rackDifferences, renamedRack, saveMembersFor } from './rackActions';
 import { ALL, BARE, rackTestScope, raw } from './__fixtures__/rackScope';
 import { loadBuiltIns } from './builtInLibrary';
 import { addPart } from './songParts';
@@ -121,5 +121,17 @@ describe('the name leaf (decision 14 as amended, windsor#884)', () => {
     expect(renamed.name).toBe('Kick Room');
     expect(renamed.patch.name).toBe('Kick Room');
     expect({ ...renamed, name: rack().file.name, patch: rack().file.patch }).toEqual(rack().file);
+  });
+});
+
+describe('saveMembersFor (decision 13, windsor#885)', () => {
+  it('checks the low cut above its floor and the sequencer when the kind is not none', () => {
+    const model = song();
+    const { kick, hat } = FULL_SLOT;
+    // The scope sets the kick's low cut to 80 Hz; the hat keeps the floor.
+    expect(saveMembersFor(partAt(model.doc, kick)!)).toEqual({ lowCut: true, sequencer: true });
+    expect(saveMembersFor(partAt(model.doc, hat)!)).toEqual({ lowCut: false, sequencer: true });
+    model.merge(raw({ parts: { [hat]: { sequencer: { kind: 'none' } } } }));
+    expect(saveMembersFor(partAt(model.doc, hat)!)).toEqual({ lowCut: false, sequencer: false });
   });
 });

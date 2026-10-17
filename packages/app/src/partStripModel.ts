@@ -47,6 +47,13 @@ export const addPartTitle = (count: number, max: number = MUSIC_PARTS_MAX): stri
 
 export const removePartTitle = (name: string): string => `Remove ${name}…`;
 
+/** The + button's menu on a right-click or a long press (windsor#885, record `2026-10-17-racks` decision 19). */
+export const ADD_MENU_TEXT = {
+  head: (count: number, max: number = MUSIC_PARTS_MAX): string => `Parts · ${count} of ${max}`,
+  add: 'Add part',
+  fromRack: 'Add part from rack…',
+} as const;
+
 /** The chip row's scroll box, as the DOM measures it. */
 export interface ScrollBox {
   readonly scrollLeft: number;

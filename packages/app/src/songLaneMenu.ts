@@ -34,6 +34,7 @@ import { wireLongPress } from './longPress';
 import type { LoopRange } from './loopBraceModel';
 import { braceBox, loopChange } from './loopBraceModel';
 import { openPartColourPicker } from './partColourPicker';
+import { requestBrowser } from './patchBrowser';
 import { runPatternAction } from './patternActionRun';
 import { drawRegionChange, setPartColourLive, setSequencerKindLive } from './partEdits';
 import { laneScaleOf } from './partLaneBlocks';
@@ -172,6 +173,10 @@ function commands(
       openPartColourPicker(at, now, (colour) => setPartColourLive(view.ctx, slot, colour));
     },
     setKind: (kind) => void setSequencerKindLive(view.ctx, slot, kind),
+    loadRack() {
+      view.ctx.parts.pick(slot);
+      requestBrowser(view.ctx, 'racks');
+    },
     pattern(index, action) {
       // The card's own write; the pane then shows the edited pattern, its Rotate rebased.
       if (!runPatternAction(view.ctx, slot, index, action)) return;

@@ -12,6 +12,7 @@ import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { libraryButtons, libraryMenuEntries } from './libraryActions';
+import { library } from './libraryModel';
 import { partListControls } from './partListControls';
 import { badgeText, patchMenuEntries, patchSummary } from './patchLibrary';
 import type { MenuItem } from './patchMenu';
@@ -28,6 +29,8 @@ import type { StepDirection } from './patchStepModel';
 import { stepPartPatch } from './patchStepModel';
 import type { PatchLoader } from './presetBrowser';
 import { filteredListing, loadPreset, presetListing } from './presetBrowser';
+import { rackTag } from './rackBarModel';
+import { rackMenuEntries } from './rackSaveActions';
 
 export interface PatchBarActions extends PatchLoader {
   /** Reload the working patch and rebuild the bar and the editor: after a library action. */
@@ -81,6 +84,7 @@ function patchBox(ctx: AppCtx, actions: PatchBarActions): HTMLElement {
   dot.setAttribute('aria-label', 'unsaved edits');
   dot.hidden = true;
   box.append(
+    ...rackTagNode(ctx, slot),
     el('span', 'patch-box-name', summary.name),
     dot,
     el('span', 'patch-box-src', summary.detail),
@@ -101,11 +105,34 @@ function patchBox(ctx: AppCtx, actions: PatchBarActions): HTMLElement {
   return wrap;
 }
 
+/**
+ * The RACK tag before the name while the part was loaded from a rack
+ * (windsor#885, record `2026-10-17-racks` decision 19): its title names the
+ * rack, and its dot is lit while the part differs from it (decision 14).
+ */
+function rackTagNode(ctx: AppCtx, slot: number): HTMLElement[] {
+  const part = partAt(ctx.model.doc, slot);
+  const tag = rackTag(part, part && ctx.model.doc.patches?.[part.preset], library.racks);
+  if (!tag) return [];
+  const node = el('span', 'patch-box-tag', 'Rack');
+  node.id = 'patchRackTag';
+  node.title = tag.modified
+    ? `Loaded from the rack ${tag.name}; the part differs from it`
+    : `Loaded from the rack ${tag.name}`;
+  if (tag.modified) {
+    const dot = el('i', 'patch-box-mod');
+    dot.title = 'Differs from the rack';
+    dot.setAttribute('aria-label', 'rack edits');
+    node.appendChild(dot);
+  }
+  return [node];
+}
+
 function menuItems(ctx: AppCtx, actions: PatchBarActions): MenuItem[] {
   const own = patchMenuEntries(ctx, ctx.parts.selected);
   return [
     ...own,
-    ...libraryMenuEntries(ctx, actions.refresh),
+    ...libraryMenuEntries(ctx, actions.refresh, rackMenuEntries(ctx, actions.refresh)),
     SEPARATOR,
     {
       kind: 'action',
@@ -148,7 +175,7 @@ export function patchBar(ctx: AppCtx, actions: PatchBarActions): HTMLElement[] {
     stepButton(ctx, 1, actions),
     patchBox(ctx, actions),
     ...libraryRow(ctx, actions),
-    patchMenu('Rename, delete, library folder, patch JSON', () => menuItems(ctx, actions)),
+    patchMenu('Rename, delete, racks, library folder, patch JSON', () => menuItems(ctx, actions)),
     el('span', 'bar-grow'),
     browse,
   ];
