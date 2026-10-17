@@ -64,6 +64,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   filter: 'Filter',
   bloom: 'Bloom',
   pump: 'Pump',
+  spectre: 'Spectre',
 };
 
 /**
@@ -80,7 +81,7 @@ export const INSERT_GROUPS: readonly {
   { label: 'Drive', kinds: ['drive', 'advanced-drive', 'tape'] },
   { label: 'Dynamics', kinds: ['compressor', 'pump'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
-  { label: 'Time', kinds: ['echo', 'delay'] },
+  { label: 'Time', kinds: ['echo', 'delay', 'spectre'] },
   { label: 'Space', kinds: ['reverb', 'retro-reverb'] },
   // Bloom adds a layer rather than processing the sound (windsor#711).
   { label: 'Generate', kinds: ['bloom'] },

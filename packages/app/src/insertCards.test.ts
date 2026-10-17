@@ -74,7 +74,7 @@ describe('INSERT_CARDS', () => {
 
   it('offers a host’s slot every Add group less the host’s own kind (windsor#692)', () => {
     const groups = addPickerGroups('echo');
-    expect(groups.find((group) => group.label === 'Time')?.kinds).toEqual(['delay']);
+    expect(groups.find((group) => group.label === 'Time')?.kinds).toEqual(['delay', 'spectre']);
     expect(groups.flatMap((group) => group.kinds)).toHaveLength(INSERT_KIND_NAMES.length - 1);
     expect(addPickerGroups('eq').map((group) => group.label)[0]).toBe('Filter');
   });

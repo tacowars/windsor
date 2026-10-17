@@ -1,0 +1,9 @@
+{
+  // Spectre's own project: the audio-thread flags shared by the worklet
+  // projects (`../compressor/tsconfig.json`). It compiles `fm/portablePowers.ts`
+  // through its import. Its tests load the generated bundle from disk, under
+  // the engine's test project.
+  "extends": "../compressor/tsconfig.json",
+  "files": ["../fm/workletGlobals.d.ts"],
+  "include": ["./**/*.ts"]
+}

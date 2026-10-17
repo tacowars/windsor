@@ -20,6 +20,7 @@ import { graphParams } from './insertParamRig';
 export function openSpec(kind: InsertKindName): InsertSpec {
   const spec = { ...INSERT_KINDS[kind].defaults, enabled: true } as InsertSpec;
   if (spec.kind === 'delay') return { ...spec, leftSync: false, rightSync: false };
+  if (spec.kind === 'spectre') return { ...spec, sync: false, lfoSync: false };
   return spec.kind === 'pump' || spec.kind === 'echo' ? { ...spec, sync: false } : spec;
 }
 

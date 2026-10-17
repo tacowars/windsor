@@ -81,6 +81,7 @@ const BUNDLES = [
   'pump-processor.js',
   'retro-reverb-processor.js',
   'reverb-processor.js',
+  'spectre-processor.js',
   'tape-processor.js',
 ];
 /** The bundles whose render allocates nothing with the meter off, and the PR that made each so. */
@@ -98,6 +99,7 @@ const CLEAN = new Set([
   'filter-processor.js', // windsor#622, clean from the start
   'bloom-processor.js', // windsor#712, clean from the start
   'pump-processor.js', // record 2026-10-13-pump-insert, clean from the start
+  'spectre-processor.js', // record 2026-10-16-spectre-insert, clean from the start
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {

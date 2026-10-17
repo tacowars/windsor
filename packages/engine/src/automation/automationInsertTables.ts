@@ -50,6 +50,8 @@ import { EQ_BAND_COUNT, EQ_BOUNDS, EQ_FIRST_ORDER_SLOPE } from '../inserts/eqCon
 import { FILTER_BOUNDS } from '../inserts/filterConstants';
 import { PUMP_BOUNDS } from '../inserts/pumpConstants';
 import type { PumpSpec } from '../inserts/pumpSpec';
+import { SPECTRE_BOUNDS } from '../inserts/spectreConstants';
+import type { SpectreSpec } from '../inserts/spectreSpec';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -63,38 +65,17 @@ import {
 import type { AdvancedDriveSpec } from '../inserts/advancedDriveSpec';
 import type { DelaySpec } from '../inserts/delaySpec';
 import type { EqSpec } from '../inserts/eqSpec';
-import type { InsertKindName, InsertSpec } from '../inserts/insertRegistry';
+import type { InsertKindName } from '../inserts/insertRegistry';
 import { INSERT_KIND_NAMES, INSERT_KINDS, insertSlot, SLOT_FIELD } from '../inserts/insertRegistry';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';
 import type { TapeSpec } from '../inserts/tapeSpec';
 import { PHASER_BOUNDS } from '../inserts/phaserConstants';
 import { RETRO_REVERB_BOUNDS } from '../inserts/retroReverbConstants';
 import { TAPE_BOUNDS } from '../inserts/tapeConstants';
-import type { AutomationScale, AutomationTargetRow } from './automationLane';
+import { row, UNIT, when } from './automationInsertRow';
+import type { InsertFieldRow, InsertSpecOf } from './automationInsertRow';
 
-type Bounds = readonly [number, number];
-
-/** An insert kind's spec, by its name. */
-export type InsertSpecOf<K extends InsertKindName> = Extract<InsertSpec, { readonly kind: K }>;
-
-/**
- * An insert field's row. `available`, when present, says whether the DSP
- * reads the field under `spec`'s other settings; absent, it always does.
- */
-export interface InsertFieldRow<S extends InsertSpec = InsertSpec> extends AutomationTargetRow {
-  readonly available?: (spec: S) => boolean;
-  /** On a host's slot row (`slotRows`), the child kind whose field it moves. */
-  readonly childKind?: InsertKindName;
-}
-
-/** `r`, read by the DSP only where `available` holds. */
-const when = <S extends InsertSpec>(
-  r: AutomationTargetRow,
-  available: (spec: S) => boolean,
-): InsertFieldRow<S> => ({ ...r, available });
-
-/** A mix, a share or a depth: 0..1. */
-const UNIT: Bounds = [0, 1];
+export type { InsertFieldRow, InsertSpecOf } from './automationInsertRow';
 
 /**
  * The Echo's time knob starts its log sweep at 20 ms (the console's
@@ -111,17 +92,6 @@ const ECHO_TIME_LOG_FLOOR = 0.02;
  */
 const BLOOM_SWELL_LOG_FLOOR = 0.01;
 const BLOOM_SUSTAIN_LOG_FLOOR = 0.05;
-
-/** One row: a field, its label, its bounds, its scale and its unit. */
-function row(
-  target: string,
-  label: string,
-  [min, max]: Bounds,
-  scale: AutomationScale = 'linear',
-  unit = '',
-): AutomationTargetRow {
-  return { target, label, min, max, scale, unit };
-}
 
 const DRIVE_ROWS = [
   row('drive', 'Drive', [DRIVE_GAIN_MIN_DB, DRIVE_GAIN_MAX_DB], 'linear', 'dB'),
@@ -396,6 +366,41 @@ const PUMP_ROWS: InsertFieldRow<PumpSpec>[] = [
   row('smoothMs', 'Smooth', PU.smoothMs, 'linear', 'ms'),
 ];
 
+const SP = SPECTRE_BOUNDS;
+const spectreModOn = (spec: SpectreSpec): boolean => spec.mod !== 'off';
+/**
+ * Spectre's moves (records `2026-10-16-spectre-insert` and
+ * `2026-10-17-spectre-drawn-cells`): each curve's slide, offset and select
+ * (its selected cells moved), Spread, Scatter, Freeze as a switch, the
+ * modulation's three amounts while one is chosen, the LFO's rate while free
+ * and its three slots' depths, Mix and Output. The cells, the selection, the
+ * analysis and the choices are not targets.
+ */
+const SPECTRE_ROWS: InsertFieldRow<SpectreSpec>[] = [
+  row('gainShift', 'Gain shift', SP.gainShift, 'linear', 'oct'),
+  row('gainOffset', 'Gain offset', SP.gainOffset),
+  row('delayShift', 'Delay shift', SP.delayShift, 'linear', 'oct'),
+  row('delayOffset', 'Delay offset', SP.delayOffset),
+  row('feedbackShift', 'Feedback shift', SP.feedbackShift, 'linear', 'oct'),
+  row('feedbackOffset', 'Feedback offset', SP.feedbackOffset),
+  row('gainSelect', 'Gain select', SP.gainSelect),
+  row('delaySelect', 'Delay select', SP.delaySelect),
+  row('feedbackSelect', 'Feedback select', SP.feedbackSelect),
+  when(row('timeMs', 'Time', SP.timeMs, 'log', 'ms'), (spec: SpectreSpec) => !spec.sync),
+  row('scatter', 'Scatter', SP.scatter),
+  row('spread', 'Spread', SP.spread, 'linear', 'oct'),
+  row('freeze', 'Freeze', UNIT, 'switch'),
+  when(row('modA', 'Mod A', SP.modA), spectreModOn),
+  when(row('modB', 'Mod B', SP.modB), spectreModOn),
+  when(row('modC', 'Mod C', SP.modC), spectreModOn),
+  when(row('lfoHz', 'LFO rate', SP.lfoHz, 'log', 'Hz'), (spec: SpectreSpec) => !spec.lfoSync),
+  row('lfoDepth1', 'LFO depth 1', SP.lfoDepth1),
+  row('lfoDepth2', 'LFO depth 2', SP.lfoDepth2),
+  row('lfoDepth3', 'LFO depth 3', SP.lfoDepth3),
+  row('mix', 'Mix', SP.mix),
+  row('outputDb', 'Output', SP.outputDb, 'linear', 'dB'),
+];
+
 const B = BLOOM_BOUNDS;
 /**
  * bloom's continuous levers and Freeze, a switch lane held between points
@@ -452,6 +457,7 @@ const KIND_ROWS: KindRows = {
   filter: FILTER_ROWS,
   bloom: BLOOM_ROWS,
   pump: PUMP_ROWS,
+  spectre: SPECTRE_ROWS,
 };
 
 /** The prefix a host's slot rows carry (record `2026-10-11-wet-path-slot`). */

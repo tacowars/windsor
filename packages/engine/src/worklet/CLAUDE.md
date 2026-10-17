@@ -283,6 +283,47 @@ It does not sleep on silence yet. The compressor's pattern would fit (its
 output is the input times a gain), but one instance costs 1.1 % of a 48 kHz
 quantum (`docs/research/2026-10-13-pump-insert/`), so the saving is small.
 
+`spectre/` is Spectre, the spectral delay (records `2026-10-16-spectre-insert`
+and `2026-10-17-spectre-drawn-cells`),
+built as `generated/spectre-processor.js` with its own `tsconfig.json`
+(`compressor/`'s flags; it compiles `fm/portablePowers.ts` through its
+imports, so **an edit there rebuilds `spectre-processor.js` too**).
+`spectreProcessor.ts` owns the params, lifetime, the block's input peak and
+the messages: the drawn cells arrive as a payload (`processorOptions.cells`,
+then `cells` messages, copied in outside the render), and the workbench's
+`scope` and `listen`; the scope's one report object is posted at most
+`scopeHz` times a second (`spectreScope.ts`);
+`spectreDsp.ts` the frame clock, Mix, Output, the switch, a choice's fade
+and the sleep; `spectreLayouts.ts` every reachable layout's hop, poles,
+reach and gains, worked out at construction so a rebuild reads tables (rule
+5); `spectreChannel.ts` a channel's chain over `spectreFrames.ts` (the
+analysis, dry and overlap-add rings: the latency is the frame less one,
+wet and dry alike), `spectreFft.ts` (Windsor's own radix-2 real FFT, its
+twiddles from `tapePortableMath.ts`), `spectreWindows.ts` (square-root
+windows on both sides), `spectreBandMap.ts` (each channel's cells read band
+by band on the log-frequency axis, smooth or stepped, and `SpectreCellSet`,
+which holds the payload and the selection Follow aims at the key's or the
+chord's pitch classes, the stage's own `pitches` param; `spectreAim.ts` sets
+each frame's moves and sums the LFO's three slots), `spectreMemory.ts` (each
+band's complex feedback delay in whole frames, and Freeze in Hold or Carve) and `spectreMods.ts` over `spectreModsFrame.ts` /
+`spectreModsTime.ts` (the eleven input modulations), with `spectreLfo.ts`,
+`spectreControls.ts` and `spectreTurns.ts` (a seeded xorshift and a sine
+table). No transcendental `Math` runs anywhere the render depends on, the
+constructors included. The tests under `inserts/spectre*.test.ts` run the
+bundle through `__fixtures__/spectreHarness.ts`; `inserts/spectreGolden.test.ts`
+pins fourteen scenarios against `__fixtures__/spectreGolden.json` (refresh
+only with `WINDSOR_REFRESH_SPECTRE_GOLDEN=1`), and
+`inserts/spectreAllocation.test.ts` pins rules 2 and 7 through
+`__fixtures__/spectreChangeScenario.ts`, after a warm-up long enough for
+the two small `frame` methods to reach TurboFan. It sleeps on silence (the
+delay's pattern, `SPECTRE_SLEEP`): once no frame has written into the
+delays above the output floor for the longest reachable delay (8 s) and the
+modulations' memory, a silent block clears the wet path and frames stop;
+the controls, the LFO and Freeze step on, and the first loud block wakes it
+from rest. `sleep: false` in `processorOptions` is the tests' render
+without it; `inserts/spectreSleep.test.ts` holds the tail, the wake and the
+frozen hold.
+
 `bloom/` is bloom, the harmonic pad generator (windsor#712, record
 `2026-10-11-bloom-insert`), built as `generated/bloom-processor.js` with its
 own `tsconfig.json`. `bloomProcessor.ts` owns the descriptors, the block
@@ -554,7 +595,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`, `bloom/`, `pump/`,
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`, `filter/`, `bloom/`, `pump/`, `spectre/`,
    `outputStage/`, `tape/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so

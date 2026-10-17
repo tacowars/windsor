@@ -1,0 +1,19 @@
+{
+  "about": "sha256 of each Spectre scenario's interleaved Float32 render (a noise burst and a 330 Hz tone with its fifth, 1.5 s) through inserts/spectreGolden.test.ts. Written only by that test under WINDSOR_REFRESH_SPECTRE_GOLDEN=1, and only when a render change is intended.",
+  "hashes": {
+    "default": "61e40dd33db3e7db1d990ee08155b9a91f5fb157ee5fc622ee5500aac5edc305",
+    "wet": "e244248bafa9142e1c33915d10a639ce9f89f87dbad7c4f8c5a345f6352c4bb8",
+    "fine-4x": "f8960bbd3b2b989af411cf0ad95487d19beda6462ed3236fcc6c5f4cccafa930",
+    "coarse-hard-1x": "84366c983c8fc7cb16658be658ce02ebce845bc3fb5110c02844e6f32ee9dc25",
+    "freeze": "d71a3dd9a6b6a3bb9581a04d0f06035b3d6539922b2324fe9b15644df10bd759",
+    "lfo-spread-scatter": "38c94c5a8d38ff6c9d17b40b8b4094cf5b927fd53e3ba32a57cc25e51ae050ce",
+    "holes": "5ce3664ae42f5b0fbd919275648463d34bcc7f172ce76ae46f6bdf0c98acd573",
+    "scatter": "7081629718ffea6fdcf0bc22d0783ae465b72e2972dd03588d7a8d379e16e1de",
+    "smudge": "4779772ba1b7ab5efe3a0873d88b0df9a5fb3779529dc3f43c9f766e9050a51c",
+    "carve": "455a6249de74946319c4f55191609ac66e6b6c4e67a556dd841592015c78c43c",
+    "cells-steps-select": "17921bfa7caf3071b4b62863063bd4c7ea7182b60769aef3977d26155f5b5d77",
+    "phase": "b6219897c0b7e15cd4b84ec413c4ee9d53b570cde5f19904a1040bccf4af144d",
+    "default-44100": "8985b3dc753695feaf8e9670203e03c7b7f66200da026d9e98bf7d3ba962ce59",
+    "default-96000": "9335d425f92944e2cd6946cd4c61616a749b559b2c08bef9fdf21eea7ae7faa9"
+  }
+}

@@ -10318,3 +10318,232 @@ input.field.cc-val-input {
 .insert-row .pump-plot:focus-visible {
   outline-offset: 0;
 }
+
+/* Spectre (records 2026-10-16-spectre-insert and 2026-10-17-spectre-drawn-cells):
+   the lanes' thumbnail on the left of its first page, the Pump's plot's size
+   and frame. Freeze reuses Bloom's latching button. */
+.insert-page.spectre-page {
+  padding-left: 6px;
+}
+.spectre-plot-wrap {
+  position: relative;
+  flex: none;
+  align-self: center;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+/* Spectre's workbench (record 2026-10-17-spectre-drawn-cells decision 10):
+   the expanded-view ground (.roll-overlay) with the header across the top,
+   the tool rail on the left, the lanes' canvas in the middle with the
+   readout under it, each lane's column on the right, and the Shape row
+   along the bottom. */
+.spectre-bench .roll-overlay-head {
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.spectre-bench-head .field-wrap,
+.spectre-bench-head > div {
+  flex: none;
+}
+.spectre-bench-close {
+  margin-left: auto;
+}
+.spectre-bench-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+}
+.spectre-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 92px;
+}
+.spectre-tools {
+  flex-direction: column;
+}
+.spectre-tools button {
+  justify-content: flex-start;
+  padding: 6px 8px;
+  text-align: left;
+}
+.spectre-bench-centre {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.spectre-bench-plot {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.spectre-bench-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+.spectre-bench-canvas:focus {
+  /* The workbench takes focus on open, so the keys work at once; its lanes' frames show it. */
+  outline: none;
+}
+.spectre-readout {
+  flex: none;
+  min-height: 14px;
+  color: var(--ink-dim);
+  font-family: var(--f-num);
+  font-size: 10px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spectre-bench-side {
+  display: flex;
+  flex-direction: column;
+  width: 230px;
+}
+.spectre-lane-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0 8px;
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+}
+.spectre-lane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.spectre-lane-name {
+  flex: 1;
+  font-family: var(--f-panel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.spectre-lane-knobs {
+  display: flex;
+  gap: 4px;
+}
+.spectre-toggle {
+  height: 22px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink-dim);
+  font-family: var(--f-panel);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.spectre-toggle i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-bright);
+}
+.spectre-toggle:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.spectre-toggle[aria-pressed='true'] {
+  background: var(--kc, var(--modulator));
+  border-color: var(--kc, var(--modulator));
+  color: var(--inset);
+}
+.spectre-toggle[aria-pressed='true'] i {
+  background: var(--inset);
+}
+.spectre-shape {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.spectre-shape-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.spectre-shape-label {
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.spectre-shape-settings {
+  display: flex;
+  gap: 4px;
+}
+.spectre-shape .seg {
+  flex: none;
+}
+.spectre-shape .seg button {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+}
+.spectre-transforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.spectre-transforms button,
+.spectre-apply {
+  height: 24px;
+  padding: 0 9px;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink-dim);
+  font-family: var(--f-ui);
+  font-size: 11px;
+  cursor: pointer;
+}
+.spectre-transforms button:hover,
+.spectre-apply:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.spectre-apply:not(:disabled) {
+  border-color: var(--carrier);
+  color: var(--carrier);
+}
+.spectre-apply:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.spectre-thumb {
+  display: block;
+  cursor: pointer;
+}
+.spectre-thumb:focus-visible {
+  outline: 1px solid var(--kc, var(--modulator));
+  outline-offset: 0;
+}
+.spectre-expand {
+  margin-top: 6px;
+}

@@ -272,4 +272,9 @@ export const INACTIVE_WHY: InactiveWhy = {
   eq: eqBandWhy,
   pump: () => 'the Pump is synced',
   echo: () => 'the Echo is synced',
+  spectre: (_spec, field) => {
+    if (field === 'timeMs') return "Spectre's time is synced";
+    if (field === 'lfoHz') return "Spectre's LFO is synced";
+    return "Spectre's modulation is off";
+  },
 };
