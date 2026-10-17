@@ -33,6 +33,9 @@ between Roll parts meant closing the view, picking, and expanding again.
    is heard. On the Song tab that is a MIDI controller: the audition keys
    play only on the Parts tab, where the view is not on screen. Once the
    view closes, or another tab is shown, both go back to the selected part.
+   A Roll part with nothing to edit, no regions, so its pane shows only the
+   "No regions" hint, is handled the same way: the roll stays on its last
+   Roll part and Rec records there (tacowars's decision, fix round 2).
 4. **Each Roll part keeps its own roll state** for the session: zoom and
    fold as before, and now where its expanded notes pane was scrolled, so a
    part picked back opens where it was.

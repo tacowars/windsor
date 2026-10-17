@@ -133,6 +133,17 @@ describe('the part selection', () => {
     expect(expression(2)).toEqual([2, 0.5]);
   });
 
+  it("keeps the keyboard and Rec on the expanded roll's part when a part it can't follow is picked", () => {
+    const { ctx, live } = openContext();
+    addPartLive(ctx);
+    ctx.parts.pick(0);
+    // Bass is open wide; a pick of a Roll part with no regions draws no Roll card, so nothing takes the view over.
+    ctx.playOn(() => 0);
+    ctx.parts.pick(1);
+    expect(ctx.playedSlot()).toBe(0);
+    expect(ctx.livePart()).toBe(live.get(0));
+  });
+
   it('opens a song whose only part is slot 1 on slot 1, live at once', async () => {
     const { ctx } = openContext();
     const added = addPart(ctx.model.doc);

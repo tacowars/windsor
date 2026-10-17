@@ -27,6 +27,9 @@ export interface FollowInput {
  * pane's own choice (its first region):
  *
  * - no roll is open wide, or `slot` is not a Roll part: null;
+ * - `slot` is a Roll part with no regions: null too, so no Roll card is
+ *   drawn to take the view over, and the roll stays on its own part as for
+ *   a part that is not a Roll (decision 3, tacowars's decision);
  * - the roll is already open on `slot` (a pick back after a part that is
  *   not a Roll): the region it shows, so the view stays where it is;
  * - otherwise the region under the playhead, or null in a gap.
