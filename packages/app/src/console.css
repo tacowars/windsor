@@ -4075,6 +4075,110 @@ body.chord-dragging {
   font-size: 11px;
 }
 
+/* The expanded keyboard (windsor#864, record 2026-10-17-the-keyboard-on-a-tablet
+   decisions 7 and 8; mockup docs/design/tablet-keyboard-mockup.html): the
+   expanded-view ground with its bar across the top, Octaves and Rows as the
+   Drive switch's segmented control at the bar's 28 px, and the keys filling
+   the rest in one row or two, 12 px apart, the lower octaves on the lower
+   row. Every black key sits over the whites as on the touch row, whatever
+   the pointer. The sizes are keyboardConstants.ts's, written on the box by
+   Keyboard with each row's --whites and each black key's --after-white. */
+.kb-view .roll-overlay-head {
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.kb-title {
+  margin-right: 6px;
+}
+.kb-view .roll-overlay-head .status {
+  align-self: stretch;
+}
+.kb-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kb-pick-label {
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.seg.kb-seg {
+  --seg-color: var(--modulator);
+  flex-wrap: nowrap;
+}
+.seg.kb-seg button {
+  flex: none;
+  height: 28px;
+  padding: 0 4px;
+}
+/* Dimmed, still tappable: a tap writes the reason in the hint (.kb-hint). */
+.seg.kb-seg button[aria-disabled='true'],
+.seg.kb-seg button[aria-disabled='true']:hover {
+  background: #0e1113;
+  color: var(--line-bright);
+  cursor: not-allowed;
+}
+.kb-hint:empty {
+  display: none;
+}
+.kb-close {
+  margin-left: auto;
+}
+.kb-keys {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-row-gap);
+  touch-action: none;
+  user-select: none;
+}
+.kb-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+.kb-row .key[data-black='1'] {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  width: calc(100% / var(--whites) * var(--black-key-w));
+  height: calc(100% * var(--black-key-h));
+  left: calc(100% / var(--whites) * (var(--after-white) + 1 - var(--black-key-w) / 2));
+}
+/* The C of each octave named, as the bar's label names the lowest. */
+.kb-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 11px;
+  text-align: center;
+  pointer-events: none;
+}
+.key.down .kb-name {
+  color: #111416;
+}
+/* Expand on the keys row (decision 9): the Roll rail's icon before the word. */
+.kb-expand svg {
+  width: 12px;
+  height: 12px;
+  margin: -2px 6px -2px 0;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+}
+
 /* The Envelopes tab (windsor#707, epic windsor#699; the approved mockup
    docs/design/roll-envelopes-mockup.html). Its column takes the note
    controls' place, at their width; its layer covers the note pane, where

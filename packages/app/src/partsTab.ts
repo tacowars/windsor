@@ -18,6 +18,7 @@ import { knobSongTick, patchKnobAutomation } from './knobAutomation';
 import { heldOnPath, knobCcScope } from './knobCc';
 import { knobEnvelopeAt, type KnobEnvelopeQuery } from './knobEnvelope';
 import type { Keyboard } from './keyboard';
+import { keysExpandButton } from './keyboardExpand';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
 import { showTrapped } from './metadataModal';
@@ -98,11 +99,11 @@ const GRID_HTML = `
   </div>
   <div class="section keys-row">
     <div class="keys" id="keys"></div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap" id="keyButtons">
       <button class="btn" id="octDown" type="button">Oct &minus;</button>
-      <span class="status" id="octLabel">C4</span>
+      <span class="status" id="octLabel" data-oct-label>C4</span>
       <button class="btn" id="octUp" type="button">Oct +</button>
-      <button class="btn" id="holdBtn" type="button" aria-pressed="false">Hold</button>
+      <button class="btn" id="holdBtn" type="button" aria-pressed="false" data-keys-hold>Hold</button>
       <button class="btn" id="panicBtn" type="button">Panic</button>
     </div>
     <div id="midiSlot"></div>
@@ -268,15 +269,12 @@ export function renderPartsTab(
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);
   startScope($('scope') as HTMLCanvasElement, () => ctx.host.analyser);
+  // Expand ends the button group (windsor#864): the keyboard opened wide below the header.
+  $('keyButtons').append(keysExpandButton({ ctx, keyboard }));
   keyboard.render($('keys'));
   $('octDown').onclick = (): void => keyboard.shiftOctave(-1);
   $('octUp').onclick = (): void => keyboard.shiftOctave(1);
   $('panicBtn').onclick = (): void => keyboard.panic();
-  const hold = $('holdBtn');
-  hold.onclick = (): void => {
-    keyboard.hold = !keyboard.hold;
-    hold.setAttribute('aria-pressed', String(keyboard.hold));
-    if (!keyboard.hold) keyboard.panic();
-  };
+  $('holdBtn').onclick = (): void => keyboard.toggleHold();
   wireJsonDialog(ctx, editor);
 }
