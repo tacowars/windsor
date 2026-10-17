@@ -34,7 +34,12 @@ import {
   library,
   refreshLibrary,
 } from './libraryModel';
-import { connectRackFolder, connectUserRacks, disconnectRackFolder } from './rackLibrary';
+import {
+  connectRackFolder,
+  connectUserRacks,
+  disconnectRackFolder,
+  refreshRacks,
+} from './rackLibrary';
 import type { LibraryModel, SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
@@ -380,6 +385,7 @@ export function libraryFolderEntries(ctx: AppCtx): MenuItem[] {
     ...items,
     menuAction(ctx, 'Re-read folder', 'Read the folder again', async () => {
       await refreshLibrary(library);
+      await refreshRacks(library);
       // An explicit re-read says a refusal again, even one dismissed and unchanged.
       reportLibraryProblems(ctx, true);
       ctx.render();

@@ -30,8 +30,10 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 export const READ_BY_PATH = [
   // The worklet bundles every harness, golden and allocation probe loads.
   'packages/engine/src/worklet/generated/**',
-  // The patch library files, which the patch and index tests list and read.
+  // The patch library files, which the patch and index tests list and read,
+  // and the rack bank's (windsor#877), which the index test reads the same way.
   'packages/engine/src/patches/**',
+  'packages/engine/src/racks/**',
   // Goldens, reference JSON, saved songs, and the allocation probe and its
   // scenarios, which run in a child process.
   'packages/engine/src/__fixtures__/**',
