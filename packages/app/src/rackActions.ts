@@ -36,7 +36,7 @@ import type { LibraryModel } from './libraryModel';
 import { leftCopyDrop } from './partCopyCleanup';
 import type { Preview } from './partEdits';
 import type { PatchMetadata } from './patchMetadata';
-import { uniqueId } from './patchMetadata';
+import { sansName, uniqueId } from './patchMetadata';
 import { addPart, setSequencerKind } from './songParts';
 
 /** What Save as rack… collects: the metadata, and which optional members ride along. */
@@ -246,9 +246,16 @@ export function addPartFromRackChange(
   };
 }
 
+/** The rack under a new name, which is its embedded patch's too (decision 6); the id stays. */
+export function renamedRack(file: RackFile, name: string): RackFile {
+  return { ...file, name, patch: { ...file.patch, name } };
+}
+
 /**
  * The members on which the part differs from the rack it came from
- * (decision 14): the patch by its leaves, the chain, the low cut and the
+ * (decision 14): the patch by its leaves less its name, the chain with its
+ * external keys cleared as the file writes them (decision 3, so a part
+ * keyed from another part is clean against its rack), the low cut and the
  * sequencer less seed, a member the rack lacks never counting. Empty is
  * unmodified.
  */
@@ -258,8 +265,10 @@ export function rackDifferences(
   rack: RackFile,
 ): RackMember[] {
   const out: RackMember[] = [];
-  if (!patch || patchLeafDifferences(patch, rack.patch).length) out.push('patch');
-  if (patchLeafDifferences(part.strip.inserts, rack.inserts).length) out.push('inserts');
+  if (!patch || patchLeafDifferences(sansName(patch), sansName(rack.patch)).length)
+    out.push('patch');
+  if (patchLeafDifferences(part.strip.inserts.map(unkeyedWithChild), rack.inserts).length)
+    out.push('inserts');
   if (rack.lowCut !== undefined && part.strip.lowCut !== rack.lowCut) out.push('lowCut');
   if (rack.sequencer && patchLeafDifferences(withoutSeed(part.sequencer), rack.sequencer).length)
     out.push('sequencer');

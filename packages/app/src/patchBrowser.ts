@@ -1,31 +1,39 @@
 /**
  * The full-pane patch browser (windsor#522; record
  * `2026-10-03-parts-tab-layout` decision 5, the third tier, and the mockup's
- * layout B with its "Full browser" switch): ⤢ Browse patches in the bar, or
+ * layout B with its "Full browser" switch), the one browser for patches and
+ * racks (windsor#884, record `2026-10-17-racks` decision 18, the approved
+ * `docs/design/rack-browser-mockup.html`): ⤢ Browse patches in the bar, or
  * ⤢ Browse all in the search popover, opens it over the Parts tab's body
  * under the bar; ✕ Close, Esc or ⤢ again closes it. A header row (search,
- * the part it loads into, the library folder actions), the facets, the
- * results table and the info pane (`patchBrowserInfo.ts`). The rules are
- * `patchBrowserModel.ts`; the filter is `presetBrowser.ts`'s retained one,
- * so the popover and ◀ ▶ follow a choice made here.
+ * the part it loads into, the library folder actions), the facets
+ * (`patchBrowserFacets.ts`, Kind first), the results table
+ * (`patchBrowserTable.ts`) and the info pane (`patchBrowserInfo.ts`, or
+ * `rackBrowserInfo.ts` on Racks). The rules are `patchBrowserModel.ts` and
+ * `rackBrowserModel.ts`; the filter is `presetBrowser.ts`'s retained one, so
+ * the popover and ◀ ▶ follow a choice made here, the kind apart.
  *
  * The pane is the next sibling of `#patchBar`, put there by `syncPatchBrowser`
  * each time the bar is built, so a pick, a part switch or a whole-tab render
  * finds it again while it is open.
  */
-import type { PresetListing } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { libraryFolderEntries } from './libraryActions';
+import { library } from './libraryModel';
 import type { PatchBarActions } from './patchBar';
+import { facetColumn } from './patchBrowserFacets';
 import { browserInfo } from './patchBrowserInfo';
 import { paneKeys } from './patchBrowserKeys';
-import type { FacetField } from './patchBrowserModel';
-import { browserRows, facets, keepSelection, pickFacet } from './patchBrowserModel';
-import { ROW_SOURCE_LABELS } from './patchLibrary';
+import { browserRows, keepSelection } from './patchBrowserModel';
+import { rackTable, resultsTable } from './patchBrowserTable';
 import { moveHighlight } from './patchStepModel';
 import { loadPreset, patchFilter, presetListing } from './presetBrowser';
+import { loadRackIntoPart } from './rackBrowserActions';
+import { rackBrowserInfo } from './rackBrowserInfo';
+import type { RackRow } from './rackBrowserModel';
+import { kindCounts, rackListing } from './rackBrowserModel';
 
 /** Open or not, and the selected row: kept across the pane's rebuilds. */
 const state: { open: boolean; selected: string | null } = { open: false, selected: null };
@@ -72,105 +80,8 @@ export function togglePatchBrowser(ctx: AppCtx, actions: PatchBarActions): void 
   else openPatchBrowser(ctx, actions);
 }
 
-/** A facet's key, so a pick that redraws the column focuses the facet's new copy. */
-const facetKey = (field: FacetField, value: string): string => `${field}:${value}`;
-
-function facetRow(
-  key: string,
-  label: string,
-  count: string,
-  on: boolean,
-  pick: () => void,
-): HTMLElement {
-  const row = el('button', 'pb-facet') as HTMLButtonElement;
-  row.type = 'button';
-  row.dataset.facet = key;
-  row.setAttribute('aria-pressed', String(on));
-  row.append(el('span', '', label), el('span', 'pb-count', count));
-  row.onclick = pick;
-  return row;
-}
-
-function facetSection(title: string): HTMLElement {
-  const section = el('div', 'section');
-  const head = el('div', 'section-title');
-  head.appendChild(el('span', '', title));
-  section.appendChild(head);
-  return section;
-}
-
-/** The Source, Category and Tags facets; a pick sets the shared filter and refreshes. */
-function facetColumn(entries: readonly PresetListing[], refresh: () => void): HTMLElement {
-  const column = el('div', 'pb-facets');
-  const shown = facets(entries, patchFilter);
-  const pick =
-    (field: FacetField, value: string, key = facetKey(field, value)) =>
-    (): void => {
-      patchFilter[field] = pickFacet(patchFilter, field, value);
-      refresh();
-      // The column was redrawn: the keyboard stays on the facet it pressed.
-      document.querySelector<HTMLElement>(`.pb-facets [data-facet="${CSS.escape(key)}"]`)?.focus();
-    };
-  const source = facetSection('Source');
-  for (const row of shown.source)
-    source.appendChild(
-      facetRow(
-        facetKey('source', row.value),
-        row.label,
-        String(row.count),
-        patchFilter.source === row.value,
-        pick('source', row.value),
-      ),
-    );
-  const category = facetSection('Category');
-  for (const row of shown.category)
-    category.appendChild(
-      facetRow(
-        facetKey('category', row.value),
-        row.label,
-        String(row.count),
-        patchFilter.category === row.value,
-        // All is never a toggle: it clears the category.
-        row.value === ''
-          ? pick('category', patchFilter.category, facetKey('category', ''))
-          : pick('category', row.value),
-      ),
-    );
-  const tags = facetSection('Tags');
-  const chips = el('div', 'pb-tags');
-  for (const tag of shown.tags) {
-    const chip = el('button', 'pb-tag', tag) as HTMLButtonElement;
-    chip.type = 'button';
-    chip.dataset.facet = facetKey('tag', tag);
-    chip.setAttribute('aria-pressed', String(patchFilter.tag === tag));
-    chip.onclick = pick('tag', tag);
-    chips.appendChild(chip);
-  }
-  tags.appendChild(chips);
-  column.append(source, category, tags);
-  return column;
-}
-
-function resultsTable(rows: readonly PresetListing[]): HTMLTableElement {
-  const table = document.createElement('table');
-  table.className = 'pb-table';
-  const head = document.createElement('tr');
-  for (const name of ['Name', 'Category', 'Tags', 'Source']) head.appendChild(el('th', '', name));
-  table.createTHead().appendChild(head);
-  const body = table.createTBody();
-  for (const row of rows) {
-    const tr = document.createElement('tr');
-    tr.dataset.id = row.id;
-    tr.append(
-      el('td', '', row.name),
-      el('td', '', row.category),
-      el('td', '', row.tags.join(', ')),
-      el('td', '', ROW_SOURCE_LABELS[row.source]),
-    );
-    body.appendChild(tr);
-  }
-  return table;
-}
+/** The head's title and the results' name, by the kind shown (decision 18). */
+const KIND_TITLES = { patches: 'Patches', racks: 'Racks' } as const;
 
 /** The pane's fixed parts, built once per open: the header, the three columns. */
 function paneShell(): HTMLElement {
@@ -190,9 +101,9 @@ function paneShell(): HTMLElement {
   const results = el('div', 'pb-results');
   results.id = RESULTS_ID;
   results.tabIndex = 0;
-  results.setAttribute('aria-label', 'Patches');
+  results.setAttribute('aria-label', KIND_TITLES[patchFilter.kind]);
   head.append(
-    el('span', 'pb-title', 'Patches'),
+    el('span', 'pb-title', KIND_TITLES[patchFilter.kind]),
     el('span', 'pb-sep'),
     search,
     el('span', 'hint pb-hint'),
@@ -208,24 +119,41 @@ function paneShell(): HTMLElement {
 // eslint-disable-next-line max-lines-per-function -- one refresh: each part of the pane redrawn in order, sharing the rows and the selection
 function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
   const refresh = (): void => fill(pane, ctx, actions);
-  const entries = presetListing(ctx);
+  const racks = patchFilter.kind === 'racks';
+  const patches = presetListing(ctx);
+  const rackRows = rackListing(library.racks, library.userRackIds);
+  const entries = racks ? rackRows : patches;
   const rows = browserRows(entries, patchFilter);
   const part = partAt(ctx.model.doc, ctx.parts.selected);
-  state.selected = keepSelection(rows, state.selected, part?.preset ?? '');
+  const current = (racks ? part?.rackSource : part?.preset) ?? '';
+  state.selected = keepSelection(rows, state.selected, current);
   const search = pane.querySelector<HTMLInputElement>('.pb-search');
   if (search && search.value !== patchFilter.query) search.value = patchFilter.query;
   const hint = pane.querySelector('.pb-hint');
   hint?.replaceChildren('Loading into ', el('b', 'pb-part', part?.name ?? '—'));
+  const title = KIND_TITLES[patchFilter.kind];
+  pane.querySelector('.pb-title')?.replaceChildren(title);
+  pane.querySelector('.pb-results')?.setAttribute('aria-label', title);
   pane.querySelector('.pb-folder')?.replaceChildren(...folderButtons(ctx));
-  pane.querySelector('.pb-facets')?.replaceWith(facetColumn(entries, refresh));
+  pane
+    .querySelector('.pb-facets')
+    ?.replaceWith(facetColumn(entries, kindCounts(patches, rackRows, patchFilter), refresh));
   const results = pane.querySelector<HTMLElement>('.pb-results');
-  const table = resultsTable(rows);
+  const table = racks ? rackTable(rows as RackRow[]) : resultsTable(rows);
   // A refresh keeps the table where it was scrolled; a fresh pane centres the selection.
   const fresh = !results?.firstChild;
   const top = results?.scrollTop ?? 0;
   results?.replaceChildren(table);
   if (results) results.scrollTop = top;
-  const load = (id: string): void => loadPreset(ctx, id, actions, focusResults);
+  const load = (id: string, opener?: HTMLElement): void =>
+    racks
+      ? loadRackIntoPart(ctx, id, actions, focusResults, opener)
+      : loadPreset(ctx, id, actions, focusResults);
+  const done = (next?: string): void => {
+    if (next !== undefined) state.selected = next;
+    actions.refresh();
+    focusResults();
+  };
   const select = (id: string | null, scroll: ScrollLogicalPosition | null): void => {
     state.selected = id;
     for (const tr of table.tBodies[0]?.rows ?? []) {
@@ -234,17 +162,14 @@ function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
       tr.setAttribute('aria-selected', String(on));
       if (on && scroll) tr.scrollIntoView({ block: scroll });
     }
-    const row = rows.find((entry) => entry.id === id);
-    pane.querySelector('.pb-info')?.replaceWith(
-      browserInfo(ctx, row ?? null, {
-        load,
-        done: (next) => {
-          if (next !== undefined) state.selected = next;
-          actions.refresh();
-          focusResults();
-        },
-      }),
-    );
+    const row = rows.find((entry) => entry.id === id) ?? null;
+    pane
+      .querySelector('.pb-info')
+      ?.replaceWith(
+        racks
+          ? rackBrowserInfo(ctx, row as RackRow | null, { load, done })
+          : browserInfo(ctx, row, { load, done }),
+      );
   };
   table.onclick = (event): void => {
     const tr = (event.target as HTMLElement).closest<HTMLElement>('tr[data-id]');

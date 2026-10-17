@@ -3,7 +3,7 @@
  * display names, category and tag lists drawn from the library, tag
  * normalisation and suggestions, and the loudness warning's volume advice.
  */
-import type { LibraryEntry } from '@windsor/engine';
+import type { LibraryEntry, Patch } from '@windsor/engine';
 import { PATCH_ID_RULE } from '@windsor/engine';
 import { SUGGESTED_HEADROOM } from './libraryConstants';
 
@@ -89,4 +89,16 @@ export function copyMetadata(source: PatchMetadata): PatchMetadata {
 /** The volume that would bring `peak` to just under the clip line. */
 export function suggestedVolume(volume: number, peak: number): number {
   return (volume * SUGGESTED_HEADROOM) / peak;
+}
+
+/**
+ * The patch without its `name`, for the two modified dots (record
+ * `2026-10-17-racks` decision 14 as amended): a name is metadata Save writes
+ * anyway, so a dot means a sound edit, and neither dot is lit right after a
+ * rack load or a Save as rack…, whose patch copy takes the rack's name.
+ */
+export function sansName(patch: Patch): Omit<Patch, 'name'> {
+  const copy: Partial<Patch> = { ...patch };
+  delete copy.name;
+  return copy as Omit<Patch, 'name'>;
 }

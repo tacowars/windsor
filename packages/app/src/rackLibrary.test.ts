@@ -16,6 +16,7 @@ import type { PatchFolder } from './libraryFolder';
 import { disconnectLibrary, libraryProblemsText, pageLibrary } from './libraryModel';
 import { rackFromPart } from './rackActions';
 import {
+  canDeleteRack,
   connectRackFolder,
   connectUserRacks,
   disconnectRackFolder,
@@ -122,6 +123,7 @@ describe('writing and removing', () => {
     await writeRackFile(model, 'mine', serialiseRackFile(mine));
     expect(files.files.has('mine.json')).toBe(true);
     expect(rackEntry(model, 'mine')?.name).toBe('Mine');
+    expect(canDeleteRack(model, 'mine')).toBe(true);
     await removeRackFile(model, 'mine');
     expect(rackEntry(model, 'mine')).toBeUndefined();
     expect(files.files.has('mine.json')).toBe(false);
@@ -157,6 +159,7 @@ describe('writing and removing', () => {
     expect(downloads).toEqual(['kick-rack']);
     expect(rackEntry(model, 'kick-rack')?.name).toBe('Kick Rack');
     expect(isRackWritable(model, 'kick-rack')).toBe(true);
+    expect(canDeleteRack(model, 'kick-rack')).toBe(false);
     await writeRackFile(model, 'bad', '{"kind":"rack"}', download);
     expect(rackEntry(model, 'bad')).toBeUndefined();
     expect(model.rackProblems).toHaveLength(1);
