@@ -254,7 +254,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   <h1>Rack browser mockup</h1>
   <p><span class="status">For tacowars to approve</span> &nbsp; windsor#875 · record <code>docs/log/2026-10-17-racks.md</code>, decisions 13, 18, 19 and 20.</p>
   <p>A <b>rack</b> is a part's sound saved as one library object: its patch, its insert chain, and when asked its low cut and its sequencer. This page shows where racks appear in the console: the one browser with a <b>Kind</b> facet, the info pane for a rack, the patch bar's rack line and its ⋯ menu, the Song tab's two entry points, and the <b>Save as rack…</b> modal. Switch the Kind facet above to compare the browser as it is today with the browser on Racks; the frame, the sizes and the type are the same.</p>
-  <p>The example racks are built from two built-in patches. <b>Kick Drive</b> is the EFM Kick through Classic Drive and a bus compressor keyed from another part, with a Reverb switched off, a low cut at 45 Hz and the Euclid pattern at its defaults. <b>Dub Hat</b> is the EFM Closed Hat through Dub delay and Filter, with no low cut and no sequencer in the rack. Today's browser is reproduced with the search on <code>efm</code>, the same eleven rows in both states' counts.</p>
+  <p>The example racks are built from two built-in patches. <b>Kick Drive</b> is the EFM Kick through Classic Drive and a bus compressor keyed from another part, with a Reverb switched off, a low cut at 45 Hz and the Euclid pattern at its defaults. <b>Dub Hat</b> is the EFM Closed Hat through Dub delay and Filter, with no low cut and no sequencer in the rack. Today's browser is reproduced with the search on <code>efm</code>, the same eleven rows in both states' counts. The part plays the Euclid pattern with a low cut at 45 Hz in both of its states: the sequencer and the low cut are the part's, whether a rack set them or not, and the no-rack state is the part Kick Drive was saved from.</p>
 
   <h2><span class="tag">1</span>The Parts tab: the bar and the browser</h2>
   <p>The tab row, the part strip and the patch bar as today's screenshot shows them, then the full-pane browser under the bar. On <b>Racks</b> the table lists racks and the pane describes the selected one; the facets below Kind are the shared ones, counted over racks.</p>
@@ -274,15 +274,14 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       <button class="btn icon">▶</button><button class="btn icon">■</button><button class="btn icon">‖</button>
     </div>
     <div class="part-strip">
-      <button class="pchip"><span class="n">Part 1</span><span class="k rack-only">1 · Euclid</span><span class="k norack-only">1 · None</span><span class="cl"><i></i><i class="act"></i></span></button>
+      <button class="pchip"><span class="n">Part 1</span><span class="k">1 · Euclid</span><span class="cl"><i></i><i class="act"></i></span></button>
       <div class="pm"><button class="btn pm-btn" title="Add a part (1 of 16)">+</button><button class="btn pm-btn" disabled>−</button></div>
     </div>
 
     <div class="patch-bar">
       <span class="field-label bar-label">Part</span>
       <input class="field bar-name" value="Part 1" aria-label="Name of the part on slot 0">
-      <select class="field bar-seq rack-only" aria-label="Sequencer"><option>Seq: Euclid</option></select>
-      <select class="field bar-seq norack-only" aria-label="Sequencer"><option>Seq: None</option></select>
+      <select class="field bar-seq" aria-label="Sequencer"><option>Seq: Euclid</option></select>
       <button class="btn">MIDI CC <span class="cc-count">0</span></button>
       <span class="bar-sep"></span>
       <span class="field-label bar-label">Patch</span>
@@ -437,7 +436,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   </table>
 
   <h2><span class="tag">2</span>The patch bar: the rack line and the ⋯ menu</h2>
-  <p>While the selected part has a <code>rackSource</code>, the patch box gains a second line under the patch's: <b>RACK</b>, the rack's name and its own modified dot. The patch's line then reads the rack's name too, since a rack-loaded part plays a patch of the rack's name (decision 6); the dot on that line is the patch's own, lit when the part's patch, chain, low cut or sequencer differs from the library rack (decision 14). Switch the part above to see the box with and without it; the bar's height grows by that line only. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
+  <p>While the selected part has a <code>rackSource</code>, the patch box gains a second line under the patch's: <b>RACK</b>, the rack's name and its own modified dot. The patch's line then reads the rack's name too, since a rack-loaded part plays a patch of the rack's name (decision 6); the dot on that line stays the patch's own, lit by the patch's modified rule over <code>patchSource</code> alone and never by a chain, low cut or sequencer edit. The rack line's dot is lit when the part's patch, chain, low cut or sequencer differs from the library rack (decision 14). Switch the part above to see the box with and without it; the bar's height grows by that line only. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
   <div class="rowwrap">
     <div>
       <h3>The part plays a patch, no rack</h3>
@@ -529,7 +528,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   </div>
 
   <h2><span class="tag">4</span>Save as rack…</h2>
-  <p>The metadata modal, as Save as… opens it, with the title and the hint changed and two checkboxes between the description and the buttons. It is drawn for the part in its no-rack state, playing the EFM Kick. The name is prefilled from the patch's name and becomes the rack's and the embedded patch's (decision 13), so on the rack-loaded part it would prefill Kick Drive; the category and the tags come from the patch's library entry; the id is <code>uniqueId(slug(name), rack ids)</code>, so a second EFM Kick rack is <code>efm-kick-2</code>.</p>
+  <p>The metadata modal, as Save as… opens it, with the title and the hint changed and two checkboxes between the description and the buttons. It is drawn for the part in its no-rack state: it plays the EFM Kick with the Euclid pattern and a low cut at 45 Hz, the state Kick Drive was saved from, so both boxes come checked. The name is prefilled from the patch's name and becomes the rack's and the embedded patch's (decision 13), so on the rack-loaded part it would prefill Kick Drive; the category and the tags come from the patch's library entry; the id is <code>uniqueId(slug(name), rack ids)</code>, so a second EFM Kick rack is <code>efm-kick-2</code>.</p>
   <div class="frame">
     <div class="backdrop">
       <div class="dlg" role="dialog" aria-labelledby="rackTitle">
@@ -544,6 +543,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
             <input class="field" placeholder="Type a tag; Enter or comma adds it" style="margin-top: 6px">
           </div>
           <div><label class="field-label">Description</label><textarea class="field" rows="3"></textarea></div>
+          <p class="hint" style="margin: 0">Checking loudness…</p>
           <div class="members new">
             <label class="member"><input type="checkbox" checked><span>Include low cut <span class="hint" style="display: inline; margin-left: 6px">45 Hz</span></span><span class="hint">Checked when the part's low cut is above 20 Hz. Loading the rack then sets the part's low cut; unchecked, the rack leaves it alone.</span></label>
             <label class="member"><input type="checkbox" checked><span>Include sequencer <span class="hint" style="display: inline; margin-left: 6px">Euclid</span></span><span class="hint">Checked when the part's sequencer is not None. The pattern is saved without its seed; loading the rack sets the part's sequencer and treats its regions as a kind change does.</span></label>
@@ -553,7 +553,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       </div>
     </div>
   </div>
-  <p class="hint">Save as… for a patch shows a loudness line under the description. Save as rack… shows none: the embedded patch is the part's as it plays, already checked when it was saved.</p>
+  <p class="hint">Save as rack… keeps Save as…'s loudness line under the description, run on the embedded patch as it plays: a rack can be saved from Init or over unsaved knob edits, so the patch may never have been checked before.</p>
 
   <h2><span class="tag">5</span>To decide</h2>
   <p>The record leaves these open; the drawing above takes the first of each, marked default.</p>
