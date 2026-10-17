@@ -15,9 +15,11 @@ import { disconnectLibrary, libraryProblemsText, pageLibrary } from './libraryMo
 import { rackFromPart } from './rackActions';
 import {
   connectUserRacks,
+  exportOldFormatRack,
   isRackWritable,
   rackEntry,
   refreshRacks,
+  removeOldFormatRack,
   removeRackFile,
   writeRackFile,
 } from './rackLibrary';
@@ -119,6 +121,21 @@ describe('writing and removing', () => {
     await removeRackFile(model, 'mine');
     expect(rackEntry(model, 'mine')).toBeUndefined();
     expect(files.files.has('mine.json')).toBe(false);
+  });
+
+  it('exports and deletes an old-format rack, which is kept and never loaded', async () => {
+    const model = pageLibrary();
+    const files = store();
+    await connectUserRacks(model, files);
+    const exported: [string, string][] = [];
+    exportOldFormatRack(model, 'old-rack', (id, text) => void exported.push([id, text]));
+    expect(exported).toEqual([['old-rack', files.files.get('old-rack.json')]]);
+    expect(() => exportOldFormatRack(model, 'kick-rack')).toThrow(/not an old-format rack/);
+    await removeOldFormatRack(model, 'old-rack');
+    expect(files.files.has('old-rack.json')).toBe(false);
+    expect(model.oldFormatRacks).toEqual([]);
+    await expect(removeOldFormatRack(model, 'kick-rack')).rejects.toThrow(/not an old-format rack/);
+    expect(rackEntry(model, 'kick-rack')).toBeDefined();
   });
 
   it('refuses to remove what is not one of the user racks', async () => {

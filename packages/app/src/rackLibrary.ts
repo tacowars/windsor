@@ -8,7 +8,7 @@
  */
 import type { RackEntry } from '@windsor/engine';
 import { loadRackFile } from '@windsor/engine';
-import type { PatchFolder } from './libraryFolder';
+import type { OldFormatPatch, PatchFolder } from './libraryFolder';
 import { readFolderWith } from './libraryFolder';
 import type { LibraryModel } from './libraryModel';
 import { tracked } from './libraryModel';
@@ -92,6 +92,31 @@ export const writeRackFile = tracked(async function writeRackFile(
     model.rackNotes = [];
   }
 });
+
+/** An old-format rack by id, or undefined. */
+export const oldFormatRack = (model: LibraryModel, id: string): OldFormatPatch | undefined =>
+  model.oldFormatRacks.find((entry) => entry.id === id);
+
+/** Export an old-format rack: its stored text, byte for byte, as `<id>.json`. */
+export function exportOldFormatRack(
+  model: LibraryModel,
+  id: string,
+  download: (id: string, text: string) => void = downloadRackFile,
+): void {
+  const entry = oldFormatRack(model, id);
+  if (!entry) throw new Error(`"${id}" is not an old-format rack in this library.`);
+  download(id, entry.text);
+}
+
+/** Delete an old-format rack from the user's store, on the user's word, and re-read. */
+export const removeOldFormatRack = tracked(
+  async (model: LibraryModel, id: string): Promise<void> => {
+    if (!model.userRacks || !oldFormatRack(model, id))
+      throw new Error(`"${id}" is not an old-format rack in this library.`);
+    await model.userRacks.remove(rackFileName(id));
+    await refreshRacks(model);
+  },
+);
 
 /** Remove one of the user's racks and re-read; refused without a store or for an id that is not the user's. */
 export const removeRackFile = tracked(async (model: LibraryModel, id: string): Promise<void> => {
