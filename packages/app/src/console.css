@@ -7946,6 +7946,28 @@ body.env-dragging .env-canvas {
   background: var(--carrier);
   border-color: var(--carrier);
 }
+/* The keys row sized for fingers when any pointer is coarse (windsor#863, record
+   2026-10-17-the-keyboard-on-a-tablet decision 4): white keys of equal width, never
+   under the minimum while the row has the room, so the buttons wrap under the keys
+   first; black keys over the whites, centred on the line between their two. The
+   sizes are keyboardConstants.ts's, written on the box by Keyboard.render with
+   --whites and each black key's --after-white. */
+@media (any-pointer: coarse) {
+  .keys {
+    position: relative;
+    gap: 0;
+    height: var(--touch-row-h);
+    min-width: min(calc(var(--whites) * var(--white-key-min)), 100%);
+  }
+  .key[data-black='1'] {
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    width: calc(100% / var(--whites) * var(--black-key-w));
+    height: calc(100% * var(--black-key-h));
+    left: calc(100% / var(--whites) * (var(--after-white) + 1 - var(--black-key-w) / 2));
+  }
+}
 
 .status {
   font-family: var(--f-num);
