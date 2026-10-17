@@ -5,6 +5,12 @@
 var DELAY_NAME = "dub-delay";
 var DELAY_MODES = ["stereo", "ping-pong", "mid-side"];
 var DELAY_MODE_IDS = { stereo: 0, "ping-pong": 1, "mid-side": 2 };
+var DELAY_FILTERS = ["lowpass", "highpass", "bandpass", "peak"];
+var DELAY_FILTER_IDS = { lowpass: 0, highpass: 1, bandpass: 2, peak: 3 };
+var DELAY_CHARACTERS = ["warm", "fold"];
+var DELAY_CHARACTER_IDS = { warm: 0, fold: 1 };
+var DELAY_WAVES = ["sine", "triangle", "random", "drift"];
+var DELAY_WAVE_IDS = { sine: 0, triangle: 1, random: 2, drift: 3 };
 var DELAY_DIVISIONS = {
   "1/32": 0.125,
   "1/32T": 1 / 12,
@@ -26,38 +32,89 @@ var DELAY_DIVISIONS = {
 var DELAY_BOUNDS = {
   leftMs: [1, 8e3],
   rightMs: [1, 8e3],
-  feedback: [0, 1.2],
-  highpass: [20, 4e3],
-  lowpass: [200, 2e4],
-  drive: [0, 24],
+  /** The loop's gain where the filter passes; unity is the most, and sustain holds it there. */
+  feedback: [0, 1],
+  /** How much of each line's feedback crosses to the other: 1 alternates every repeat. */
+  cross: [0, 1],
+  lowCut: [20, 1e3],
+  cutoff: [30, 16e3],
+  /** The filter's gain at its cutoff (lowpass, highpass) or centre (bandpass, peak). */
+  resonance: [-12, 20],
+  /** Bandpass and peak width, in octaves. */
+  width: [0.2, 4],
+  drive: [0, 30],
+  /** The high-frequency loss each pass, a cut-only shelf. */
+  damping: [0, 30],
+  dampingHz: [400, 16e3],
+  modRate: [0.05, 10],
+  /** Delay-time wobble, a share of `DELAY_DSP.wowSpan`. */
+  wow: [0, 1],
+  /** Cutoff movement, in octaves each way. */
+  sweep: [0, 4],
   mix: [0, 1],
   outputDb: [-24, 12]
 };
 var DELAY_DEFAULTS = {
   leftMs: 375,
   rightMs: 500,
-  feedback: 0.45,
-  highpass: 80,
-  lowpass: 12e3,
-  drive: 0,
+  feedback: 0.55,
+  cross: 0.2,
+  lowCut: 90,
+  cutoff: 2800,
+  resonance: 3,
+  width: 1,
+  drive: 6,
+  damping: 6,
+  dampingHz: 3200,
+  modRate: 0.6,
+  wow: 0.15,
+  sweep: 0,
   mix: 0.3,
   outputDb: 0,
+  sustain: false,
   enabled: true
 };
 var DELAY_DSP = {
   defaultBpm: 120,
-  filterStates: 8,
-  polesPerChannel: 4,
   dbBase: 10,
+  dbDivisor: 20,
   // Four beats at 20 BPM. Slower imported sync times clamp; free mode has its own bound.
   maxSeconds: 12,
   secondsPerMinute: 60,
   milliseconds: 1e3,
   smoothSeconds: 0.03,
   timeSmoothSeconds: 0.06,
-  dbDivisor: 20,
-  feedbackCeiling: 2,
-  cutoffRateRatio: 0.45
+  /** Sustain's move into and out of the held loop. */
+  sustainSeconds: 0.025,
+  cutoffRateRatio: 0.45,
+  /** Samples between the loop filter's coefficient updates. */
+  filterInterval: 16,
+  /** The smallest Q the filter takes, so a deep cut stays a gentle knee. */
+  minimumQ: 0.5,
+  /** The time wobble's reach at Wow 1: a share of the delay time each way. */
+  wowSpan: 0.025,
+  /** The right side's LFO runs this share of a cycle ahead of the left's. */
+  stereoPhase: 0.25,
+  /** The warm curve's lean, which adds even harmonics; the low cut removes the offset it leaves. */
+  warmBias: 0.18,
+  /** How hard the fold's corners are rounded after the fold. */
+  foldSoftness: 1.3,
+  seed: 99540235
+};
+var DELAY_GOVERNOR = {
+  /** The RMS followers' time constant. */
+  detectSeconds: 0.022,
+  /** The gain's own smoothing, so the governor never ripples at audio rate. */
+  gainSeconds: 6e-3,
+  /** The loop's RMS ceiling, linear: about −4.4 dBFS. */
+  ceiling: 0.6,
+  /**
+   * The most the governor lifts a shape that has thinned its input, as a multiple of Drive's
+   * gain: a shape scaled down by Drive needs up to that much back, and a fold through zero more.
+   */
+  maxGain: 4,
+  /** A shaped signal this quiet in mean square has its gain held at unity. */
+  quietSquare: 1e-14
 };
 var DELAY_SLEEP = {
   inputFloor: 1e-9,
