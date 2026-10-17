@@ -10,21 +10,39 @@
  * tap only when the voice stops (a forced lift, or Panic, which the tap
  * hears as one); the sustain pedal's is `MidiPerformer`'s, which lifts on
  * pedal up.
+ *
+ * Its keys box captures every pointer (windsor#863): the key under a point
+ * comes from `keyAt` over the keys' boxes, read on the first pointer down and
+ * again after every re-render or resize, so a finger that slides along the
+ * row plays each key it crosses. A touch or pen strikes harder the further
+ * down the key it lands. On a touch layout the box's room sets the octaves
+ * it shows (record `2026-10-17-the-keyboard-on-a-tablet`, amended by
+ * `2026-10-17-keyboard-geometry-follows-the-layout`).
  */
 import type { AudioPart } from '@windsor/engine';
 import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
-import { $, el } from './dom';
+import { el } from './dom';
 import {
   AUDITION_TAB,
-  BLACK_KEYS,
+  COARSE_POINTER_QUERY,
   FIXED_VELOCITY,
   KEY_COUNT,
   OCTAVE_DEFAULT,
   OCTAVE_MAX,
   OCTAVE_MIN,
   QWERTY,
+  TOUCH_ROW_CSS,
 } from './keyboardConstants';
-import { pitchClass } from './consoleFormat';
+import {
+  afterWhite,
+  isBlackKey,
+  keyAt,
+  keyCountFor,
+  octavesFor,
+  strikeVelocity,
+  whiteCount,
+} from './keyboardLayout';
+import type { KeyBox, Point } from './keyboardLayout';
 import type { PerformerSink } from './midiPerformer';
 import type { NoteTap } from './rollRecorder';
 
@@ -80,23 +98,53 @@ interface Held {
   part: AudioPart;
   /** The MIDI note it plays, for the tap's release. */
   note: number;
+  /** Its key's offset in the row, which a re-render lights again; may lie outside the row. */
+  offset: number;
   el: HTMLElement | null;
 }
 
-/** What a pointer handler reads of its event: which pointer, and when. */
-export type PointerInput = Pick<PointerEvent, 'pointerId' | 'timeStamp'>;
+/** What a pointer handler reads of its event: which pointer, its kind, where and when. */
+export type PointerInput = Pick<
+  PointerEvent,
+  'pointerId' | 'pointerType' | 'clientX' | 'clientY' | 'timeStamp'
+>;
+
+/** One pointer down on the keys: the key under it, the note it holds, the velocity it struck with. */
+interface Finger {
+  offset: number | null;
+  source: string | null;
+  velocity: number | null;
+}
 
 const POINTER_SOURCE_PREFIX = 'pointer:';
 
-/** A pointer's held-note source, named like MIDI's `midi:<input>:<note>`. */
-const pointerSource = (pointerId: number): string => `${POINTER_SOURCE_PREFIX}${pointerId}`;
+/**
+ * A pointer's held-note source, named like MIDI's `midi:<input>:<note>`: a
+ * slide's strike and lift are two entries, so the tap records two notes.
+ */
+const pointerSource = (pointerId: number, note: number): string =>
+  `${POINTER_SOURCE_PREFIX}${pointerId}:${note}`;
 
 /** One note struck: its pitch, velocity, key and input event's `timeStamp`. */
 interface Strike {
   readonly note: number;
   readonly velocity: number;
+  readonly offset: number;
   readonly keyEl: HTMLElement | null;
   readonly timeStamp: number | undefined;
+}
+
+/**
+ * The room a keys box may take: its row's content width. The box itself is
+ * that wide whenever it shows two octaves (its `min-width` is 616 px capped
+ * at the row), but at one octave it shares a line with the buttons, so its
+ * own width would keep it at one octave on a row that has room for two.
+ */
+function roomFor(box: HTMLElement): number {
+  const row = box.parentElement;
+  if (!row) return box.clientWidth;
+  const style = getComputedStyle(row);
+  return row.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
 }
 
 export class Keyboard {
@@ -110,6 +158,13 @@ export class Keyboard {
   tap: NoteTap | null = null;
 
   private readonly held = new Map<string, Held>();
+  /** Every pointer down on the keys box, by `pointerId`. */
+  private readonly fingers = new Map<number, Finger>();
+  /** The row's keys by offset, as last rendered, and their boxes as last read. */
+  private keyEls: readonly HTMLElement[] = [];
+  private layout: readonly KeyBox[] = [];
+  private box: HTMLElement | null = null;
+  private resizes: ResizeObserver | null = null;
   /**
    * Every part this keyboard has struck a note on since the last Panic (#617).
    * `held` is not enough: under Hold a keyup drops the entry without a
@@ -135,23 +190,35 @@ export class Keyboard {
     return this.held.size;
   }
 
-  /** Build the keys into `box` and wire the octave label. */
+  /**
+   * Build the keys into `box`, wire its pointers and watch its size, and wire
+   * the octave label. A new box (the Parts tab rendered again) takes over the
+   * pointers still held, so their notes sound on and their lifts arrive.
+   */
   render(box: HTMLElement): void {
-    box.innerHTML = '';
-    for (let i = 0; i < KEY_COUNT; i++) {
-      const key = el('div', 'key');
-      key.dataset.offset = String(i);
-      if (BLACK_KEYS.has(pitchClass(i))) key.dataset.black = '1';
-      key.addEventListener('pointerdown', (e) => {
-        key.setPointerCapture(e.pointerId);
-        this.onPointerDown(e, i, key);
-      });
-      const up = (e: PointerEvent): void => this.onPointerUp(e);
-      key.addEventListener('pointerup', up);
-      key.addEventListener('pointercancel', up);
-      box.appendChild(key);
-    }
+    if (box !== this.box) this.watch(box);
+    this.build(box, this.keyEls.length || KEY_COUNT);
     this.syncLabel();
+  }
+
+  /**
+   * Take `keys` as the row's keys by offset, the one refresh after a render
+   * (windsor#879 decisions 1 and 2): read their boxes again, light the held
+   * notes' keys, and lift a held pointer whose key is gone. A pointer whose
+   * key is still shown keeps its note until its next move, which the new
+   * boxes judge.
+   */
+  adoptKeys(keys: readonly HTMLElement[]): void {
+    for (const finger of this.fingers.values()) {
+      if (finger.offset === null || finger.offset < keys.length) continue;
+      this.leaveKeys(finger);
+    }
+    this.keyEls = keys;
+    for (const held of this.held.values()) {
+      held.el = keys[held.offset] ?? null;
+      held.el?.classList.add('down');
+    }
+    this.readLayout();
   }
 
   /** Global QWERTY handling; call once. */
@@ -178,8 +245,8 @@ export class Keyboard {
     if (e.key === 'x') return this.shiftOctave(1);
     const off = QWERTY[e.key];
     if (off === undefined || this.held.has(e.code)) return;
-    const keyEl = ($('keys').children[off] as HTMLElement | undefined) ?? null;
-    this.press(e.code, off, keyEl, e.timeStamp);
+    const note = this.octave * SEMITONES_PER_OCTAVE + off;
+    this.play(e.code, { note, velocity: FIXED_VELOCITY, ...this.keyOf(off, e) });
   }
 
   /** One QWERTY release, by physical key so a Shift change between the two still lifts. */
@@ -188,22 +255,53 @@ export class Keyboard {
   }
 
   /**
-   * One pointer press on the key at `offset` (windsor#859). Each pointer is
-   * its own source, `pointer:<pointerId>`, so two fingers hold two notes and
-   * each lift stops its own; filed under one name, a second finger overwrote
-   * the first and that note rang on. A key another pointer already holds
-   * takes no second one, so its note and its light stay with the finger that
-   * struck it.
+   * One pointer down on the keys box (windsor#859, windsor#863). The first
+   * pointer down reads the keys' boxes; then the point is judged as a move.
+   * Each pointer holds its own notes, so two fingers hold two and each lift
+   * stops its own.
    */
-  onPointerDown(e: PointerInput, offset: number, keyEl: HTMLElement): void {
-    const source = pointerSource(e.pointerId);
-    if (this.held.has(source) || this.pointerHolds(keyEl)) return;
-    this.press(source, offset, keyEl, e.timeStamp);
+  onPointerDown(e: PointerInput): void {
+    if (this.fingers.has(e.pointerId)) return;
+    if (this.fingers.size === 0) this.readLayout();
+    this.fingers.set(e.pointerId, { offset: null, source: null, velocity: null });
+    this.onPointerMove(e);
+  }
+
+  /**
+   * A pointer down on the keys moved (record decision 5). Onto another key,
+   * it strikes that key and then lifts the one it left, at the velocity it
+   * first struck with; a key another pointer holds takes no second one, so
+   * the arriving pointer only lifts its own. Off every key it lifts, and it
+   * strikes afresh when it is back on a key.
+   */
+  onPointerMove(e: PointerInput): void {
+    const finger = this.fingers.get(e.pointerId);
+    if (!finger) return;
+    const point = { x: e.clientX, y: e.clientY };
+    const key = keyAt(point, this.layout);
+    if (!key) return this.leaveKeys(finger, e.timeStamp);
+    if (key.offset === finger.offset) return;
+    const left = finger.source;
+    finger.offset = key.offset;
+    finger.source = null;
+    if (!this.pointerHolds(key.offset)) {
+      finger.velocity ??= this.velocityOf(e, point, key);
+      const note = this.octave * SEMITONES_PER_OCTAVE + key.offset;
+      const source = pointerSource(e.pointerId, note);
+      // The octave moved under the finger and the new key plays the note it holds.
+      if (source === left) this.lift(left, false, e.timeStamp);
+      this.play(source, { note, velocity: finger.velocity, ...this.keyOf(key.offset, e) });
+      finger.source = source;
+    }
+    if (left !== null && left !== finger.source) this.lift(left, false, e.timeStamp);
   }
 
   /** One pointer lifted or canceled: its own note stops, unless Hold keeps it. */
   onPointerUp(e: PointerInput): void {
-    this.lift(pointerSource(e.pointerId), false, e.timeStamp);
+    const finger = this.fingers.get(e.pointerId);
+    if (!finger) return;
+    this.fingers.delete(e.pointerId);
+    if (finger.source !== null) this.lift(finger.source, false, e.timeStamp);
   }
 
   shiftOctave(by: number): void {
@@ -257,12 +355,11 @@ export class Keyboard {
     return {
       press: (note, velocity, timeStamp) => {
         const offset = note - this.octave * SEMITONES_PER_OCTAVE;
-        const keys = document.getElementById('keys');
-        const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
         this.play(`midi:${inputId}:${note}`, {
           note,
           velocity,
-          keyEl: (keyEl as HTMLElement | undefined) ?? null,
+          offset,
+          keyEl: this.keyEls[offset] ?? null,
           timeStamp,
         });
       },
@@ -278,25 +375,35 @@ export class Keyboard {
     };
   }
 
-  private press(
-    source: string,
+  /** The key at `offset`, if the row shows it, and the input event's `timeStamp`. */
+  private keyOf(
     offset: number,
-    keyEl: HTMLElement | null,
-    timeStamp: number | undefined,
-  ): void {
-    const note = this.octave * SEMITONES_PER_OCTAVE + offset;
-    this.play(source, { note, velocity: FIXED_VELOCITY, keyEl, timeStamp });
+    e: { readonly timeStamp: number },
+  ): Pick<Strike, 'offset' | 'keyEl' | 'timeStamp'> {
+    return { offset, keyEl: this.keyEls[offset] ?? null, timeStamp: e.timeStamp };
   }
 
   private play(source: string, strike: Strike): void {
     const part = this.getPart();
     if (!part) return;
-    const { note, velocity, keyEl, timeStamp } = strike;
+    const { note, velocity, offset, keyEl, timeStamp } = strike;
     const id = part.noteOn(note, velocity);
     this.sounded.add(part);
     keyEl?.classList.add('down');
-    this.held.set(source, { id, part, note, el: keyEl });
+    this.held.set(source, { id, part, note, offset, el: keyEl });
     this.tap?.press(part, source, note, velocity, timeStamp);
+  }
+
+  /** A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6). */
+  private velocityOf(e: PointerInput, point: Point, key: KeyBox): number {
+    return e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
+  }
+
+  /** A pointer off every key: its note lifts, and its next key strikes afresh. */
+  private leaveKeys(finger: Finger, timeStamp?: number): void {
+    const left = finger.source;
+    Object.assign(finger, { offset: null, source: null, velocity: null });
+    if (left !== null) this.lift(left, false, timeStamp);
   }
 
   /** A key let go: its note stops unless Hold keeps it (`force` stops it anyway). */
@@ -311,11 +418,78 @@ export class Keyboard {
     this.held.delete(source);
   }
 
-  /** Whether some pointer is holding `keyEl` down. */
-  private pointerHolds(keyEl: HTMLElement): boolean {
+  /** Whether some pointer is holding the key at `offset` down. */
+  private pointerHolds(offset: number): boolean {
     for (const [source, held] of this.held)
-      if (held.el === keyEl && source.startsWith(POINTER_SOURCE_PREFIX)) return true;
+      if (held.offset === offset && source.startsWith(POINTER_SOURCE_PREFIX)) return true;
     return false;
+  }
+
+  /** Read every key's box: the one place the layout touches the page. */
+  private readLayout(): void {
+    this.layout = this.keyEls.map((key, offset) => {
+      const { left, top, right, bottom } = key.getBoundingClientRect();
+      return { offset, black: isBlackKey(offset), left, top, right, bottom };
+    });
+  }
+
+  /** Build `count` keys into `box`, with the custom properties the touch row is laid out from. */
+  private build(box: HTMLElement, count: number): void {
+    box.innerHTML = '';
+    const keys: HTMLElement[] = [];
+    for (let offset = 0; offset < count; offset++) {
+      const key = el('div', 'key');
+      key.dataset.offset = String(offset);
+      if (isBlackKey(offset)) {
+        key.dataset.black = '1';
+        key.style.setProperty('--after-white', String(afterWhite(offset)));
+      }
+      keys.push(key);
+    }
+    for (const [name, value] of Object.entries(TOUCH_ROW_CSS)) box.style.setProperty(name, value);
+    box.style.setProperty('--whites', String(whiteCount(count)));
+    box.append(...keys);
+    this.adoptKeys(keys);
+  }
+
+  /**
+   * Wire a new keys box: its pointers, the pointers still held on the old one,
+   * and a `ResizeObserver` that reads the boxes again on every resize and, on
+   * a touch layout, shows the octaves its room allows (record decision 10).
+   */
+  private watch(box: HTMLElement): void {
+    this.resizes?.disconnect();
+    this.box = box;
+    box.addEventListener('pointerdown', (e) => {
+      box.setPointerCapture(e.pointerId);
+      this.onPointerDown(e);
+    });
+    box.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    const up = (e: PointerEvent): void => this.onPointerUp(e);
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
+    for (const [pointerId, finger] of this.fingers) {
+      try {
+        box.setPointerCapture(pointerId);
+      } catch {
+        // That pointer is no longer down: nothing will lift it but this.
+        this.fingers.delete(pointerId);
+        this.leaveKeys(finger);
+      }
+    }
+    this.resizes = new ResizeObserver(() => this.onResize(box));
+    this.resizes.observe(box);
+  }
+
+  /** The keys box resized: show the octaves its room allows, else read the boxes again. */
+  private onResize(box: HTMLElement): void {
+    const room = roomFor(box);
+    if (room === 0) return; // The Parts tab is hidden.
+    const count = matchMedia(COARSE_POINTER_QUERY).matches
+      ? keyCountFor(octavesFor(room))
+      : KEY_COUNT;
+    if (count === this.keyEls.length) this.readLayout();
+    else this.build(box, count);
   }
 
   private syncLabel(): void {
