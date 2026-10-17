@@ -459,15 +459,15 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       </div>
     </div>
     <div>
-      <h3>The part was loaded from Kick Drive</h3>
+      <h3>The part was loaded from Kick Drive, right after the load</h3>
       <div class="patch-menu" role="menu">
         <button class="patch-menu-item">Rename…</button>
         <button class="patch-menu-item">Revert to library</button>
         <button class="patch-menu-item" disabled title="Remove from your library; built-ins stay">Delete</button>
         <hr class="patch-menu-sep">
         <button class="patch-menu-item new">Save as rack…</button>
-        <button class="patch-menu-item new">Save rack</button>
-        <button class="patch-menu-item new">Revert rack</button>
+        <button class="patch-menu-item new" disabled title="Save over this rack; built-in racks stay read-only, so Save forks one to a new id">Save rack</button>
+        <button class="patch-menu-item new" disabled title="Load the library rack again; the part's edits to it go">Revert rack</button>
         <hr class="patch-menu-sep">
         <button class="patch-menu-item">Library folder…</button>
         <hr class="patch-menu-sep">
@@ -482,7 +482,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
         <tr><td>Save rack</td><td>Save over this rack; built-in racks stay read-only, so Save forks one to a new id</td><td>While the rack's dot is lit</td></tr>
         <tr><td>Revert rack</td><td>Load the library rack again; the part's edits to it go</td><td>While the rack's dot is lit</td></tr>
       </table>
-      <p class="hint">Rename…, Revert to library and Delete keep their meaning over the patch, so a rack-loaded part has two levels of save, the patch's and the rack's (decision 14). Delete is disabled in both states as today: the part's patch is a song copy of a built-in, which <code>canDelete</code> refuses.</p>
+      <p class="hint">Rename…, Revert to library and Delete keep their meaning over the patch, so a rack-loaded part has two levels of save, the patch's and the rack's (decision 14). Delete is disabled in both states as today: the part's patch is a song copy of a built-in, which <code>canDelete</code> refuses. Save rack and Revert rack are drawn disabled because the menu is drawn right after the load, when the rack's dot is unlit; they enable with it, as the table says.</p>
     </div>
   </div>
 
