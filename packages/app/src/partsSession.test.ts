@@ -81,6 +81,69 @@ describe('the part selection', () => {
     expect([one?.pitchBend.value, one?.modWheel.value]).toEqual([2, 0.5]);
   });
 
+  it("moves the keyboard's bend and wheel with the played slot: an expanded roll taken over, opened and closed", () => {
+    const { ctx, live } = openContext();
+    addPartLive(ctx);
+    addPartLive(ctx);
+    // The Expanded roll on the Song tab, as `rollExpand.ts`'s `shownRollSlot` names it.
+    let wide: number | null = null;
+    let songShown = true;
+    ctx.onTabShown('song', (shown) => (songShown = shown));
+    ctx.playOn(() => (songShown ? wide : null));
+    const keyboard = new Keyboard(() => ctx.livePart());
+    ctx.parts.onSelect(() => keyboard.followPart());
+    ctx.parts.pick(2);
+    let heard = 0;
+    ctx.parts.onSelect(() => heard++);
+    const sink = keyboard.midiSink('test');
+    const expression = (slot: number): number[] => {
+      const part = live.get(slot);
+      return [part?.pitchBend.value ?? -1, part?.modWheel.value ?? -1];
+    };
+
+    wide = 0; // Bass opens wide
+    ctx.playedMoved();
+    sink.bend(2);
+    sink.modWheel(0.5);
+    expect(expression(0)).toEqual([2, 0.5]);
+    expect(expression(2)).toEqual([0, 0]);
+
+    // A pick of Lead's chip: the selection's listeners hear it while Bass is still wide.
+    ctx.parts.pick(1);
+    expect(expression(0)).toEqual([2, 0.5]);
+    wide = 1; // Lead's card takes the view over
+    ctx.playedMoved();
+    expect(expression(0)).toEqual([0, 0]);
+    expect(expression(1)).toEqual([2, 0.5]);
+
+    heard = 0;
+    ctx.playedMoved();
+    expect(heard).toBe(0);
+
+    ctx.activate('parts'); // the view goes off screen with its tab
+    expect(expression(1)).toEqual([2, 0.5]); // Lead is also the selected part
+    ctx.parts.pick(2);
+    ctx.activate('song');
+    expect(expression(1)).toEqual([2, 0.5]);
+    expect(expression(2)).toEqual([0, 0]);
+
+    wide = null; // closed: back to the selected part
+    ctx.playedMoved();
+    expect(expression(1)).toEqual([0, 0]);
+    expect(expression(2)).toEqual([2, 0.5]);
+  });
+
+  it("keeps the keyboard and Rec on the expanded roll's part when a part it can't follow is picked", () => {
+    const { ctx, live } = openContext();
+    addPartLive(ctx);
+    ctx.parts.pick(0);
+    // Bass is open wide; a pick of a Roll part with no regions draws no Roll card, so nothing takes the view over.
+    ctx.playOn(() => 0);
+    ctx.parts.pick(1);
+    expect(ctx.playedSlot()).toBe(0);
+    expect(ctx.livePart()).toBe(live.get(0));
+  });
+
   it('opens a song whose only part is slot 1 on slot 1, live at once', async () => {
     const { ctx } = openContext();
     const added = addPart(ctx.model.doc);
