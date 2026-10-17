@@ -22,6 +22,7 @@ import {
   FILTER_WORKLET_URL,
   BLOOM_WORKLET_URL,
   PUMP_WORKLET_URL,
+  SPECTRE_WORKLET_URL,
   TAPE_WORKLET_URL,
   ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
@@ -90,6 +91,7 @@ export interface WorkletUrls {
   filterUrl?: string | URL;
   bloomUrl?: string | URL;
   pumpUrl?: string | URL;
+  spectreUrl?: string | URL;
 }
 
 export class FmEngine {
@@ -131,6 +133,7 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.filterUrl ?? FILTER_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.bloomUrl ?? BLOOM_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.pumpUrl ?? PUMP_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.spectreUrl ?? SPECTRE_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.outputStageUrl ?? OUTPUT_STAGE_WORKLET_URL);
     // Catches the sum of many parts peaking together. It starts on the
     // default settings; a song's own reach it through `AudioSystem`.

@@ -1,7 +1,7 @@
 /**
  * Every worklet insert's on/off switch is click-free (windsor#630): the
  * shipped bundles of Filter, the compressor, Phaser, Delay, Tape, Advanced
- * Drive, Retro Reverb, EQ, bloom and Pump, each switched off and back on under a steady
+ * Drive, Retro Reverb, EQ, bloom, Pump and Spectre, each switched off and back on under a steady
  * sine, crossfade dry and wet linearly over `INSERT_SWITCH_FADE_S`.
  *
  * - **No click:** no sample-to-sample step across either switch is larger
@@ -36,6 +36,7 @@ import { filterParams, loadFilter } from '../__fixtures__/filterHarness';
 import { loadPump, pumpParams } from '../__fixtures__/pumpHarness';
 import { loadPhaser, phaserParams } from '../__fixtures__/phaserHarness';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
+import { loadSpectre, spectreParams } from '../__fixtures__/spectreHarness';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
 import { DEFAULT_EQ } from './eqSpec';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
@@ -170,6 +171,16 @@ const KINDS: Kind[] = [
     },
     latency: 0,
     rings: false,
+  },
+  {
+    // Its frame's latency, wet and dry alike: a frame of 2 × 512 bands at 48 kHz, less one.
+    name: 'spectre',
+    load: () => {
+      const params = spectreParams({ mix: 0.8 });
+      return { processor: loadSpectre(RATE, params), params };
+    },
+    latency: 2 * 512 - 1,
+    rings: true,
   },
   {
     name: 'bloom',

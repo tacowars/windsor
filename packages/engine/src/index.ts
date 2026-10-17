@@ -715,6 +715,79 @@ export type { PumpDivision } from './inserts/pumpConstants';
 export { bendShape, pumpGain, pumpLengthMs, pumpLevelAt } from './inserts/pumpCurves';
 export type { PumpScope, PumpScopeReading } from './inserts/pumpInsert';
 export { isKeyedSpec, withSidechain } from './inserts/sidechainSource';
+// Spectre, the spectral delay insert (records `2026-10-16-spectre-insert` and
+// `2026-10-17-spectre-drawn-cells`).
+export { DEFAULT_SPECTRE } from './inserts/spectreSpec';
+export type { SpectreSpec } from './inserts/spectreSpec';
+export {
+  spectreCellAt,
+  spectreCellCentre,
+  spectreCellRead,
+  spectreCellValue,
+  spectreChannelCells,
+  spectreFlatCells,
+  spectreRampCells,
+  spectreSelectionMask,
+  spectreSelectionOf,
+} from './inserts/spectreCells';
+export type {
+  SpectreCellCurves,
+  SpectreCells,
+  SpectreCurveCells,
+  SpectreSelection,
+} from './inserts/spectreCells';
+export type { SpectreScope, SpectreScopeReading } from './inserts/spectreInsert';
+export { spectreDraws } from './inserts/spectreRecipes';
+export {
+  SPECTRE_PRESET_GROUPS,
+  SPECTRE_PRESETS,
+  applySpectrePreset,
+  matchingSpectrePreset,
+} from './inserts/spectrePresets';
+export type {
+  SpectrePreset,
+  SpectrePresetGroup,
+  SpectrePresetSettings,
+} from './inserts/spectrePresets';
+export {
+  SPECTRE_BANDS,
+  SPECTRE_BOUNDS,
+  SPECTRE_CELL_STEPS,
+  SPECTRE_CELLS,
+  SPECTRE_CURVES,
+  SPECTRE_DIVISIONS,
+  SPECTRE_DSP,
+  SPECTRE_FOLLOWS,
+  SPECTRE_FREEZE_MODES,
+  SPECTRE_GRIDS,
+  SPECTRE_LFO_DESTS,
+  SPECTRE_LFO_SHAPES,
+  SPECTRE_MOD_LABELS,
+  SPECTRE_MODS,
+  SPECTRE_OVERLAPS,
+  SPECTRE_REST,
+  SPECTRE_WINDOWS,
+} from './inserts/spectreConstants';
+export type {
+  SpectreBands,
+  SpectreCurve,
+  SpectreDivision,
+  SpectreFollow,
+  SpectreFreezeMode,
+  SpectreGrid,
+  SpectreLfoDest,
+  SpectreLfoShape,
+  SpectreMod,
+  SpectreOverlap,
+  SpectreWindow,
+} from './inserts/spectreConstants';
+export {
+  SPECTRE_AXIS_OCTAVES,
+  spectreAxisAt,
+  spectreAxisHz,
+  spectreGainDb,
+} from './inserts/spectreCurves';
+export { spectreGridMs, spectreTimeMs } from './inserts/spectreParameters';
 // bloom, the harmonic pad generator (windsor#712).
 export { DEFAULT_BLOOM } from './inserts/bloomSpec';
 export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';

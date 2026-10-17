@@ -8,6 +8,7 @@ import type { FieldNormaliser } from '../song/arrangementFields';
 import type { StripStage } from '../mixer/channelStrip';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { PumpScope } from './pumpInsert';
+import type { SpectreScope } from './spectreInsert';
 
 /**
  * A host's wet path (record `2026-10-11-wet-path-slot`): where its slot's
@@ -50,6 +51,12 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
    * level across the last cycle and the playhead, posted only while active.
    */
   readonly pumpScope?: PumpScope;
+  /**
+   * Spectre's scope and Listen (record `2026-10-17-spectre-drawn-cells`
+   * decisions 8 and 9): each channel's spectrum binned to the curves' cells
+   * while the workbench is open, and the selection soloed while it asks.
+   */
+  readonly spectreScope?: SpectreScope;
   /** Mixer-owned external detector routing, separate from program audio. */
   readonly detector?: { readonly input: AudioNode; setExternal(external: boolean): void };
   /**

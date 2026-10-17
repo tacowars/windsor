@@ -164,6 +164,28 @@ the worklet never imports the spec) and `pumpInsert.ts`), with DSP under
 `withSidechain` (`inserts/sidechainSource.ts`). Cost:
 `docs/research/2026-10-13-pump-insert/`.
 
+Spectre (records `2026-10-16-spectre-insert` and
+`2026-10-17-spectre-drawn-cells`) is the kind `spectre` in the Time group: a
+spectral delay, each frequency band with its own gain, delay and feedback
+read off three lanes of 180 drawn cells, one selection across them (which can
+follow the song's key or chord), an input modulation stage before them and an
+LFO of three slots on their moves. It is `inserts/spectre*`: `spectreSpec.ts`,
+`spectreConstants.ts`, `spectreCells.ts` (the cell model, its read and the
+payload the processor is posted), `spectreCurves.ts` (the axis),
+`spectreParameters.ts` (`SpectreParamSource`, so the worklet never imports
+the spec), `spectreInsert.ts` (the payload, Follow's `pitches` seam, the
+scope and Listen), and the preset bank (`spectrePresets.ts`, the group tables
+`spectrePresets*.ts` built from `spectreRecipes.ts`, levels measured by
+`docs/research/2026-10-17-spectre-workbench/presetRig.ts`). DSP is under
+`worklet/spectre/` (its map is in `worklet/CLAUDE.md`). The card is
+`app/src/spectreCard.ts` (the thumbnail `spectreThumb.ts`, the picker
+`spectrePresetPicker.ts`, `spectreTables.ts`); the workbench is
+`spectreBench.ts` over `spectreBenchParts.ts`, `spectreBenchShape.ts`,
+`spectreBenchInput.ts`, `spectreBenchDraw.ts` and the pure
+`spectreBenchModel.ts`, `spectreCellEdits.ts`, `spectreBenchTransforms.ts`,
+`spectreGenerators.ts`, `spectreBenchKeys.ts` and `spectreBenchTables.ts`.
+Cost: `docs/research/2026-10-16-spectre-insert/`.
+
 The wet-path slot (epic windsor#686, record `2026-10-11-wet-path-slot`): a
 **host** insert carries one child insert of another kind on its wet path,
 before its Mix. Echo and bloom are hosts. To make a kind a host:

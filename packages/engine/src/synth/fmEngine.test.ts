@@ -19,6 +19,7 @@ import {
   FILTER_WORKLET_URL,
   BLOOM_WORKLET_URL,
   PUMP_WORKLET_URL,
+  SPECTRE_WORKLET_URL,
   TAPE_WORKLET_URL,
   ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
@@ -54,6 +55,7 @@ describe('FmEngine.init', () => {
       String(FILTER_WORKLET_URL),
       String(BLOOM_WORKLET_URL),
       String(PUMP_WORKLET_URL),
+      String(SPECTRE_WORKLET_URL),
       String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
@@ -63,7 +65,7 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(14);
+    expect(context.modules).toHaveLength(15);
   });
 
   it('takes override URLs, together or one at a time', async () => {
@@ -82,6 +84,7 @@ describe('FmEngine.init', () => {
       filterUrl: 'blob:filter',
       bloomUrl: 'blob:bloom',
       pumpUrl: 'blob:pump',
+      spectreUrl: 'blob:spectre',
       outputStageUrl: 'blob:output-stage-processor',
     });
     expect(both.modules).toEqual([
@@ -98,6 +101,7 @@ describe('FmEngine.init', () => {
       'blob:filter',
       'blob:bloom',
       'blob:pump',
+      'blob:spectre',
       'blob:output-stage-processor',
     ]);
 
@@ -117,6 +121,7 @@ describe('FmEngine.init', () => {
       String(FILTER_WORKLET_URL),
       String(BLOOM_WORKLET_URL),
       String(PUMP_WORKLET_URL),
+      String(SPECTRE_WORKLET_URL),
       String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
