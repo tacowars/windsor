@@ -212,9 +212,15 @@ export function flipCells(cells: SpectreCells, mask: readonly boolean[]): number
   });
 }
 
-/** Move the masked cells' values one cell up (`by` 1) or down (−1); the edge cell keeps its value. */
+/**
+ * Move the masked cells' values one cell up (`by` 1) or down (−1) within the
+ * mask: a cell reads only a masked neighbour, so the vacated edge keeps its value.
+ */
 export const nudgeCells = (cells: SpectreCells, mask: readonly boolean[], by: 1 | -1): number[] =>
-  onMask(cells, mask, (v, i) => cells[clampCell(i - by)] ?? v);
+  onMask(cells, mask, (v, i) => {
+    const from = clampCell(i - by);
+    return mask[from] ? cells[from]! : v;
+  });
 
 /** A selection gesture over cells `from`..`to` (either order): replace, add to, or take from what is selected. */
 export function selectCells(

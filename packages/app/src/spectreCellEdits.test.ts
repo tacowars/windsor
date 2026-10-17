@@ -129,6 +129,17 @@ describe('the selection and the transforms', () => {
     expect(nudgeCells(ramp, ALL, 1)[10]).toBe(ramp[9]);
   });
 
+  it('nudges within the selection, the vacated edge keeping its value', () => {
+    const ramp = Array.from({ length: SPECTRE_CELLS }, (_, i) => i / SPECTRE_CELLS);
+    const mask = transformMask(withSelection(DEFAULT_SPECTRE, 5, 9));
+    const right = nudgeCells(ramp, mask, 1);
+    expect(right.slice(4, 11)).toEqual([4, 5, 5, 6, 7, 8, 10].map((i) => ramp[i]));
+    expect(right).not.toContain(ramp[9]);
+    const left = nudgeCells(ramp, mask, -1);
+    expect(left.slice(4, 11)).toEqual([4, 6, 7, 8, 9, 9, 10].map((i) => ramp[i]));
+    expect(left).not.toContain(ramp[5]);
+  });
+
   it('quantizes the delay lane to the grid and the others to Levels', () => {
     const spec = withCells(
       DEFAULT_SPECTRE,

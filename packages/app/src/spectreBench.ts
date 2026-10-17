@@ -306,6 +306,7 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
   let lastSpec: SpectreSpec | null = null;
   let lastReports = -1;
   let lastVersion = -1;
+  let lastLive: SpectreScope | undefined;
   let raf = 0;
   const frame = (): void => {
     if (!overlay.isConnected) return;
@@ -314,6 +315,11 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
     const spec = current();
     const live = scope();
     live?.setActive(true);
+    if (live !== lastLive) {
+      // An undo or redo can rebuild the live system: the new stage takes Listen from the bench.
+      live?.setListen(state.listen);
+      lastLive = live;
+    }
     const reports = live?.read().reports ?? 0;
     if (spec !== lastSpec && spec !== own) {
       // Moved from outside (an undo, a lane, the card): the controls follow it.
