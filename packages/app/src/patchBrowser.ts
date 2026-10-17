@@ -181,7 +181,10 @@ function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
   const load = (id: string, opener?: HTMLElement): void => {
     if (!racks) return loadPreset(ctx, id, actions, focusResults);
     if (!state.pendingAdd) return loadRackIntoPart(ctx, id, actions, focusResults, opener);
-    if (addPartFromRack(ctx, id, actions, focusResults)) state.pendingAdd = false;
+    // Cleared before the add, whose own render rebuilds this pane: the head line then
+    // reads Loading into the new part. A refused add (the song full) keeps the mode.
+    state.pendingAdd = false;
+    if (!addPartFromRack(ctx, id, actions, focusResults)) state.pendingAdd = true;
   };
   const done = (next?: string): void => {
     if (next !== undefined) state.selected = next;
