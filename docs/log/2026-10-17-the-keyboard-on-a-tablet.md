@@ -148,12 +148,20 @@ instrument that plays one finger per note.
    fit the view's width, with no sideways scrolling (`touch-action: none`
    leaves no swipe, and a scroll under a chord is wrong anyway), and the
    view's height. A white key is never narrower than 44 px: an option that
-   would go under it is disabled, with the reason in its title ("4 octaves
-   needs 2 rows at this width"). Rows 2 is offered for 2 and 4 octaves, an
-   even split, the lower octaves on the lower row; for 1 and 3 it is
-   disabled ("2 rows takes 2 or 4 octaves"). Default: 2 octaves, 1 row.
-   The pick is a console preference in `localStorage`, wrapped in
+   would go under it is disabled ("4 octaves needs 2 rows at this width").
+   A disabled option stays tappable, dimmed and `aria-disabled`, and a tap
+   on it leaves the pick as it is and writes the reason in a hint beside
+   Octaves and Rows until the next pick, since a touch never shows a
+   title; the title stays for the mouse. Rows 2 is offered for 2 and 4
+   octaves, an even split, the lower octaves on the lower row; for 1 and 3
+   it is disabled ("2 rows takes 2 or 4 octaves"). Default: 2 octaves,
+   1 row. The pick is a console preference in `localStorage`, wrapped in
    try/catch, never song data (the pattern of windsor#778 decision 7).
+   A pick is normalized before it renders, the default and a restored
+   preference alike, whenever the view opens or its room changes: the
+   view draws the pick if the room allows it, else the same rows with
+   fewer octaves, else one row with fewer octaves. The stored preference
+   stays what the user picked.
 
    The room is the viewport less the view's padding, 2 × 24 px: 1318 px in
    landscape (1366 px) and 976 px in portrait (1024 px). Its height is the
@@ -204,10 +212,14 @@ instrument that plays one finger per note.
     the keys row shows one octave: 7 white keys at 44 px is 308 px, so it
     fits 360 px. At 390 × 844 the keys take the row's 362 px, a white key
     51.7 px, with the buttons under them. The expanded view is the way to
-    play more. The key count becomes a layout value (24 wide, 12 on the
-    phone, `KEY_COUNT` and a phone count in `keyboardConstants.ts`); a
-    QWERTY offset past the shown keys plays with no key lit, as a MIDI note
-    outside the row does today (`midiSink`'s `offset < KEY_COUNT`).
+    play more. Its room at 390 × 844 is 390 − 2 × 24 = 342 px, so it allows
+    1 octave at 1 row and 2 octaves at 2 rows, each 342 ÷ 7 = 48.9 px, and
+    disables everything else (the next widest, 14 whites a row, is
+    24.4 px); the default opens at 1 octave, 1 row. The key count becomes a
+    layout value (24 wide, 12 on the phone, `KEY_COUNT` and a phone count in
+    `keyboardConstants.ts`); a QWERTY offset past the shown keys plays with
+    no key lit, as a MIDI note outside the row does today (`midiSink`'s
+    `offset < KEY_COUNT`).
 11. **Later**, not in this build:
     - pressure and aftertouch from `PointerEvent.pressure`;
     - a pitch ribbon, or a finger's slide becoming a bend;

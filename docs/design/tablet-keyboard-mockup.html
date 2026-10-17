@@ -610,7 +610,7 @@
       background: var(--modulator);
       color: #111416;
     }
-    .seg button:disabled {
+    .seg button[aria-disabled='true'] {
       color: var(--line-bright);
       background: #0e1113;
       cursor: not-allowed;
@@ -640,23 +640,14 @@
     .key.down .cname {
       color: #111416;
     }
-    /* Mockup only: a stand-in for the browser's own title tooltip. */
-    .tooltip {
-      position: absolute;
-      top: 34px;
-      right: 0;
-      z-index: 3;
-      padding: 4px 8px;
-      background: #f2f2f2;
-      color: #111;
-      border: 1px solid #888;
-      font: 12px system-ui, sans-serif;
-      white-space: nowrap;
+    /* A tap on a disabled option writes its reason here; console.css .roll-overlay-note. */
+    .pick-hint {
+      color: var(--ink-faint);
+      font-family: var(--f-num);
+      font-size: 10px;
     }
-    .tooltip .mock-tag {
-      position: absolute;
-      top: 28px;
-      right: 0;
+    .pick-hint:empty {
+      display: none;
     }
     /* Mockup only: the strike velocity zones on one key, with their values. */
     .zones {
@@ -792,12 +783,16 @@
         its name. The part chips stay live: pick Pad and the keyboard plays Pad.
       </li>
       <li>
-        <b>A disabled option keeps its place</b> and says why in its title. On the portrait
+        <b>A disabled option keeps its place</b>, dimmed and tappable: a tap leaves the pick as
+        it is and writes the reason beside Octaves and Rows until the next pick, and the mouse
+        also has it in the title. On the portrait
         tablet, 4 octaves in one row would make a white key 34.9 px, so it is disabled at 1 row
         ("4 octaves needs 2 rows at this width"); Rows 2 is disabled for 1 and 3 octaves
         ("2 rows takes 2 or 4 octaves"), and with 2 rows chosen, 1 and 3 octaves are disabled
         ("3 octaves can't split into 2 rows"). With 4 octaves chosen in portrait, Rows 1 is
-        disabled by the width.
+        disabled by the width. The view opens on the nearest allowed pick when the stored one
+        does not fit the room, the same rows with fewer octaves first, then one row: the phone's
+        default 2 octaves, 1 row opens at 1 octave, 1 row (342 ÷ 7 = 48.9 px).
       </li>
       <li>
         <b>The strike velocity</b> (touch and pen): 0.6 at a key's top edge, 0.8 at its middle,
@@ -964,10 +959,11 @@
       ['exp-land-4-2', 'Proposed · expanded, landscape, 4 octaves, 2 rows', 'landscape', 'expanded', 4, 2],
       ['exp-port-3-1', 'Proposed · expanded, portrait, 3 octaves, 1 row', 'portrait', 'expanded', 3, 1],
       ['exp-port-4-2', 'Proposed · expanded, portrait, 4 octaves, 2 rows', 'portrait', 'expanded', 4, 2],
-      ['exp-port-title', 'Proposed · the bar: 4 octaves disabled, with its title', 'portrait', 'expanded', 3, 1, 'title'],
+      ['exp-port-title', 'Proposed · the bar: 4 octaves disabled, its reason after a tap', 'portrait', 'expanded', 3, 1, 'title'],
       ['velocity', 'Proposed · strike velocity zones (0.6, 0.8, 1.0)', 'landscape', 'expanded', 2, 1, 'zones'],
     ];
-    const state = { frame: FRAMES[0], part: 'keys', octave: 4, octaves: 2, rows: 1, hold: false, open: false };
+    // `octaves` and `rows` are the stored preference, what the user picked; the view draws allowedPick of it.
+    const state = { frame: FRAMES[0], part: 'keys', octave: 4, octaves: 2, rows: 1, hold: false, open: false, hint: '' };
     const $ = (id) => document.getElementById(id);
     const ICON_EXPAND = '<path d="M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7"/>';
     const ICON_GEAR =
@@ -984,6 +980,16 @@
       if (whiteWidth(roomW, octaves, rows) < WHITE_MIN) return `${octaves} octaves needs 2 rows at this width`;
       return '';
     }
+    // The pick a room allows: the pick itself, else the same rows with fewer octaves, else one row with fewer.
+    function allowedPick(roomW, octaves, rows) {
+      if (!whyNot(roomW, octaves, rows)) return { octaves, rows };
+      for (let n = octaves - 1; n >= 1; n--) if (!whyNot(roomW, n, rows)) return { octaves: n, rows };
+      for (let n = octaves - 1; n >= 1; n--) if (!whyNot(roomW, n, 1)) return { octaves: n, rows: 1 };
+      return { octaves: 1, rows: 1 };
+    }
+    const roomOf = (device) => DEVICES[device][0] - 2 * VIEW_PAD_X;
+    // Applied whenever the view opens or its room changes: every render reads the room again.
+    const viewPick = () => allowedPick(roomOf(state.frame[2]), state.octaves, state.rows);
 
     /* ---------- the header ---------- */
     const chips = (phone) =>
@@ -1066,28 +1072,21 @@
 
     /* ---------- the expanded keyboard ---------- */
     function expandedHtml(device, extra) {
-      const [w, h] = DEVICES[device];
-      const roomW = w - 2 * VIEW_PAD_X;
+      const [, h] = DEVICES[device];
+      const roomW = roomOf(device);
+      const view = viewPick();
       const name = PARTS.find((p) => p[0] === state.part)[1];
+      // A disabled option stays tappable: aria-disabled, its reason in data-why for a tap and in title for the mouse.
+      const off = (why) => (why ? ` aria-disabled="true" data-why="${why}" title="${why}"` : '');
       const octSeg = [1, 2, 3, 4]
-        .map((n) => {
-          const why = whyNot(roomW, n, state.rows);
-          return `<button aria-pressed="${n === state.octaves}" data-octaves="${n}"${why ? ` disabled title="${why}"` : ''}>${n}</button>`;
-        })
+        .map((n) => `<button aria-pressed="${n === view.octaves}" data-octaves="${n}"${off(whyNot(roomW, n, view.rows))}>${n}</button>`)
         .join('');
       const rowSeg = [1, 2]
-        .map((n) => {
-          const why = whyNot(roomW, state.octaves, n, true);
-          return `<button aria-pressed="${n === state.rows}" data-rows="${n}"${why ? ` disabled title="${why}"` : ''}>${n}</button>`;
-        })
+        .map((n) => `<button aria-pressed="${n === view.rows}" data-rows="${n}"${off(whyNot(roomW, view.octaves, n, true))}>${n}</button>`)
         .join('');
-      const tip =
-        extra === 'title'
-          ? `<span class="tooltip">${whyNot(roomW, 4, 1)}<span class="mock-tag">Stand-in · the browser's title tooltip</span></span>`
-          : '';
-      const perRow = (12 * state.octaves) / state.rows;
+      const perRow = (12 * view.octaves) / view.rows;
       const rows = [];
-      for (let r = state.rows - 1; r >= 0; r--)
+      for (let r = view.rows - 1; r >= 0; r--)
         rows.push(
           keyRow({
             first: r * perRow,
@@ -1100,15 +1099,16 @@
           }),
         );
       const keyboard = rows.join('');
-      const ww = whiteWidth(roomW, state.octaves, state.rows);
+      const ww = whiteWidth(roomW, view.octaves, view.rows);
       const roomH = h - HEADER_TABLET - 16 - BAR - 8 - 24;
-      const rowH = state.rows === 1 ? roomH : (roomH - 12) / 2;
+      const rowH = view.rows === 1 ? roomH : (roomH - 12) / 2;
       return `<div class="overlay new">
         <div class="overlay-head">
           <span class="overlay-title">${name} — Keyboard</span>
           <button class="btn" data-oct="-1">Oct &minus;</button><span class="status">C${state.octave}</span><button class="btn" data-oct="1">Oct +</button>
-          <span class="pick"><span class="pick-label">Octaves</span><span class="seg">${octSeg}</span>${tip}</span>
+          <span class="pick"><span class="pick-label">Octaves</span><span class="seg">${octSeg}</span></span>
           <span class="pick"><span class="pick-label">Rows</span><span class="seg">${rowSeg}</span></span>
+          <span class="pick-hint" aria-live="polite">${state.hint}</span>
           <button class="btn" data-hold aria-pressed="${state.hold}">Hold</button><button class="btn">Panic</button>
           <span class="spacer"></span><button class="btn" data-close title="Close the keyboard (Esc)">Close</button>
         </div>
@@ -1133,7 +1133,7 @@
         };
       for (const b of c.querySelectorAll('[data-oct]'))
         b.onclick = () => {
-          const max = state.open ? OCTAVE_MAX[state.octaves] : OCTAVE_MAX[2];
+          const max = state.open ? OCTAVE_MAX[viewPick().octaves] : OCTAVE_MAX[2];
           state.octave = Math.min(max, Math.max(0, state.octave + Number(b.dataset.oct)));
           render();
         };
@@ -1148,28 +1148,33 @@
           render();
         };
       for (const b of c.querySelectorAll('[data-close]')) b.onclick = close;
-      for (const b of c.querySelectorAll('[data-octaves]'))
+      for (const b of c.querySelectorAll('[data-octaves], [data-rows]'))
         b.onclick = () => {
-          state.octaves = Number(b.dataset.octaves);
-          state.octave = Math.min(state.octave, OCTAVE_MAX[state.octaves]);
-          render();
-        };
-      for (const b of c.querySelectorAll('[data-rows]'))
-        b.onclick = () => {
-          state.rows = Number(b.dataset.rows);
+          // A disabled option leaves the pick as it is and shows why, until the next pick.
+          if (b.dataset.why) state.hint = b.dataset.why;
+          else {
+            const view = viewPick();
+            state.octaves = Number(b.dataset.octaves ?? view.octaves);
+            state.rows = Number(b.dataset.rows ?? view.rows);
+            state.octave = Math.min(state.octave, OCTAVE_MAX[state.octaves]);
+            state.hint = '';
+          }
           render();
         };
     }
     function close() {
       state.open = false;
+      state.hint = '';
       state.octave = Math.min(state.octave, OCTAVE_MAX[2]);
       render();
     }
     function pick(frame) {
       state.frame = frame;
-      const [, , , mode, octaves, rows] = frame;
+      const [, , , mode, octaves, rows, extra] = frame;
       state.open = mode === 'expanded';
       if (octaves) Object.assign(state, { octaves, rows });
+      // The bar frame shows the reason a tap on the disabled 4 writes.
+      state.hint = extra === 'title' ? whyNot(roomOf(frame[2]), 4, rows) : '';
       render();
     }
 
