@@ -83,6 +83,7 @@ input {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* The header (#708, windsor#11, windsor#520): sticky above every tab. Its
@@ -106,7 +107,10 @@ input {
   /* The approved mockup's rows (record 2026-10-03-parts-tab-layout): 8px
      around and between the transport row and the part strip. */
   gap: 8px;
-  padding: 8px 16px;
+  /* Clear of the status bar and the rounded corners in the installed iPad
+     app (windsor#888); every inset is 0 in a browser tab. */
+  padding: calc(8px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px
+    max(16px, env(safe-area-inset-left));
 }
 .head-row {
   /* 12px between groups (16px before windsor#520), so the tabs, the power
@@ -8000,7 +8004,7 @@ body.env-dragging .env-canvas {
 .toasts {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
   z-index: 20;
   display: flex;
   flex-direction: column;
