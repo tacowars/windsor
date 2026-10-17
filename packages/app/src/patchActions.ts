@@ -129,9 +129,9 @@ export function initPatch({ ctx, library, slot }: PatchScope): Patch {
   const patch = initPatchDefaults();
   const id = initPresetId(String(slot));
   const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
-  // Init is no library entry's copy: the part's `patchSource` goes (windsor#669).
+  // Init is no library entry's copy: the part's links go (windsor#669, windsor#862).
   ctx.change({
-    ...partChange(slot, { preset: id, patchSource: undefined }),
+    ...partChange(slot, { preset: id, patchSource: undefined, rackSource: undefined }),
     patches: { [id]: patch, ...dropped },
   });
   return patch;
@@ -238,7 +238,8 @@ export async function copyToNew(request: WriteRequest): Promise<CopyResult> {
     const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
     const dropped = leftCopyDrop(ctx.model.doc, slot, id, library, ctx.autoCopies);
     ctx.change({
-      ...partChange(slot, { ...fields, patchSource: undefined }),
+      // The new id is a library id, so the part is no copy and came from no rack (windsor#862).
+      ...partChange(slot, { ...fields, patchSource: undefined, rackSource: undefined }),
       patches: { [id]: file.patch, ...dropped },
     });
     if (wasInit) dropInit(ctx);

@@ -433,6 +433,12 @@ export {
 } from './patch/patchLibrary';
 export type { LibraryEntry, PatchFile } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
+// The rack library's file contract (windsor#862, record `2026-10-17-racks`):
+// a part's sound as one library object, loaded and written by the console.
+export { RACK_FILE_FORMAT, RACK_FILE_KIND, loadRackFile } from './rack/rackFile';
+export type { RackEntry, RackFile } from './rack/rackFile';
+export { serialiseRackFile } from './rack/rackFileSerialise';
+export { RackFormatError } from './rack/rackMigrations';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 // The operator width's bounds and the second LFO's defaults (windsor#54), an

@@ -24,9 +24,11 @@ export const patchFilter: PresetFilter = { query: '', category: '', tag: '', sou
  * knob edit. Each part owns its patch (windsor#669 decision 2): when another
  * part plays `name`, this part gets the same sound under a fresh id, linked
  * to its library entry by `patchSource`, so neither part's knobs move the
- * other's. A part re-picking what it plays keeps its link; any other pick
- * clears it. The unedited automatic copy the part leaves goes in the same
- * change (windsor#671), so undo brings it back with the part's old patch.
+ * other's. A part re-picking what it plays keeps its links; any other pick
+ * clears them, the rack link `rackSource` included (windsor#862, record
+ * `2026-10-17-racks` decision 9). The unedited automatic copy the part
+ * leaves goes in the same change (windsor#671), so undo brings it back with
+ * the part's old patch.
  */
 export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const doc = ctx.model.doc;
@@ -39,7 +41,9 @@ export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const id = holder ? copyId(doc, name, ids) : name;
   const fields = assignPatchFields(doc, slot, id, patch.name);
   const keepsLink = !holder && partAt(doc, slot)?.preset === name;
-  const link = keepsLink ? {} : { patchSource: holder && copySource(holder, name, ids) };
+  const link = keepsLink
+    ? {}
+    : { patchSource: holder && copySource(holder, name, ids), rackSource: undefined };
   const dropped = leftCopyDrop(doc, slot, id, library, ctx.autoCopies);
   const ok = ctx.change({
     ...partChange(slot, { ...fields, ...link }),

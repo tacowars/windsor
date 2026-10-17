@@ -66,6 +66,7 @@ const PART_KEYS = [
   'automation',
   'ccMappings',
   'patchSource',
+  'rackSource',
 ];
 
 export class ArrangementNormaliser extends FieldNormaliser {
@@ -244,7 +245,8 @@ export class ArrangementNormaliser extends FieldNormaliser {
       ...(automation && { automation }),
       // Absent stays absent too: a song without mappings exports as before (windsor#782).
       ...(ccMappings && { ccMappings }),
-      ...this.patchSource(o.patchSource, path),
+      ...this.libraryLink(o.patchSource, 'patchSource', path),
+      ...this.libraryLink(o.rackSource, 'rackSource', path),
     };
     return { part, path, colour: o.colour };
   }
@@ -295,13 +297,19 @@ export class ArrangementNormaliser extends FieldNormaliser {
   }
 
   /**
-   * The library id the part's copy came from (windsor#669): a non-empty
-   * string is kept, anything else is dropped, reported. Absent stays absent.
+   * A part's link to the library: the patch id its copy came from
+   * (`patchSource`, windsor#669) or the rack it was loaded from
+   * (`rackSource`, windsor#862). A non-empty string is kept, anything else
+   * is dropped, reported. Absent stays absent.
    */
-  private patchSource(raw: unknown, path: string): { patchSource?: string } {
+  private libraryLink<K extends 'patchSource' | 'rackSource'>(
+    raw: unknown,
+    key: K,
+    path: string,
+  ): Partial<Record<K, string>> {
     if (raw === undefined) return {};
-    if (typeof raw === 'string' && raw !== '') return { patchSource: raw };
-    this.correction(`${path}.patchSource: ${show(raw)} is not a library id — dropped`);
+    if (typeof raw === 'string' && raw !== '') return { [key]: raw } as Partial<Record<K, string>>;
+    this.correction(`${path}.${key}: ${show(raw)} is not a library id — dropped`);
     return {};
   }
 

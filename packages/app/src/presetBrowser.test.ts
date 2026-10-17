@@ -123,15 +123,18 @@ describe('each part owns its patch (windsor#669)', () => {
     ]);
   });
 
-  it("keeps a copy's link on a re-pick, and drops it on any other pick", () => {
+  it("keeps a copy's links on a re-pick, and drops them on any other pick", () => {
     const ctx = threeParts();
     choosePreset(ctx, 0, ID);
     choosePreset(ctx, 1, ID);
+    ctx.change({ parts: { 1: { rackSource: 'my-rack' } } });
     expect(choosePreset(ctx, 1, `${ID}-2`)).toBe(true);
     expect(partAt(ctx.model.doc, 1)?.patchSource).toBe(ID);
+    expect(partAt(ctx.model.doc, 1)?.rackSource).toBe('my-rack');
     expect(choosePreset(ctx, 1, 'score-amber-stab')).toBe(true);
     expect(partAt(ctx.model.doc, 1)?.preset).toBe('score-amber-stab');
     expect(partAt(ctx.model.doc, 1)?.patchSource).toBeUndefined();
+    expect(partAt(ctx.model.doc, 1)?.rackSource).toBeUndefined();
   });
 
   it('undoes a load that made a copy in one step, and redoes it', () => {

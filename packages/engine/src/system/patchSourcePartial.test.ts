@@ -1,7 +1,8 @@
 /**
- * A part's `patchSource` (windsor#669) is the app's library link and plays
- * nothing: a live partial setting or clearing it is applied without being
- * reported as an unknown field, and the rest of the partial still lands.
+ * A part's library links, `patchSource` (windsor#669) and `rackSource`
+ * (windsor#862), play nothing: a live partial setting or clearing either is
+ * applied without being reported as an unknown field, and the rest of the
+ * partial still lands.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -22,16 +23,16 @@ async function system(): Promise<AudioSystem> {
   return sys;
 }
 
-describe("a part's patchSource on the live system (windsor#669)", () => {
+describe.each(['patchSource', 'rackSource'] as const)("a part's %s on the live system", (key) => {
   it('is neither refused nor reported, set or cleared', async () => {
     const sys = await system();
     const { hat } = FULL_SLOT;
-    expect(sys.apply({ parts: { [hat]: { patchSource: 'bell' } } })).toEqual({
+    expect(sys.apply({ parts: { [hat]: { [key]: 'bell' } } })).toEqual({
       ok: true,
       ignored: [],
     });
     // The app clears the link with an explicit `undefined` (its `partChange` is untyped).
-    const cleared = { parts: { [hat]: { patchSource: undefined } } } as unknown as DocumentPartial;
+    const cleared = { parts: { [hat]: { [key]: undefined } } } as unknown as DocumentPartial;
     expect(sys.apply(cleared)).toEqual({
       ok: true,
       ignored: [],
@@ -42,7 +43,7 @@ describe("a part's patchSource on the live system (windsor#669)", () => {
     const sys = await system();
     const result = sys.apply({
       transport: { bpm: 90 },
-      parts: { [FULL_SLOT.hat]: { patchSource: 'bell', velocity: 0.5 } },
+      parts: { [FULL_SLOT.hat]: { [key]: 'bell', velocity: 0.5 } },
     });
     expect(result).toEqual({ ok: true, ignored: [] });
     expect(sys.readout().bpm).toBe(90);
