@@ -149,6 +149,9 @@ function paneShell(): HTMLElement {
 function fill(pane: HTMLElement, ctx: AppCtx, actions: PatchBarActions): void {
   const refresh = (): void => fill(pane, ctx, actions);
   const racks = patchFilter.kind === 'racks';
+  // The pending add is a rack's (decision 12): the Kind facet switched to Patches cancels it,
+  // so a patch loaded here goes into the selected part, as the head line then says.
+  if (!racks) state.pendingAdd = false;
   const patches = presetListing(ctx);
   const rackRows = rackListing(library.racks, library.userRackIds);
   const entries = racks ? rackRows : patches;
