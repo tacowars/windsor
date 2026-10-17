@@ -1,0 +1,1512 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The expanded views below the console header (windsor#851), desktop.
+     Spectre's workbench and the piano roll's expand view stop covering the
+     window and fill the space below the console header, so the transport,
+     undo and redo, the tabs and the part chips stay live. Reproduced from
+     screenshots of today taken on 2026-10-17 at 1440 x 900 in headless
+     Chrome, with Bass (a Roll part, 12 notes, a 1-bar loop in a 4-bar
+     region, C minor) playing at 120 BPM and a Spectre insert on Bass at its
+     Bleep Test starting point. Every value drawn is the one the app showed.
+     Static and self-contained: open it in a browser. The strip at the very
+     top is the mockup's own switcher, not part of the console. The tablet
+     mockup follows once tacowars approves this one. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Expanded Views</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --well: #0c0f10;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --carrier: #e0a44e;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --hot: #d2643c;
+      --part: #6ea6e6;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html,
+    body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+      display: flex;
+      flex-direction: column;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own switcher (not the console) ---------- */
+    .mock-bar {
+      flex: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font-family: var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 10px;
+      color: var(--return);
+    }
+    .mock-bar label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select {
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 6px;
+      font: 11px var(--f-ui);
+    }
+    .mock-bar a {
+      color: #cbbfe6;
+    }
+
+    /* ---------- the console ---------- */
+    .console {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    header.head {
+      flex: none;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .head-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .tabs {
+      display: inline-flex;
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .tab {
+      height: 28px;
+      padding: 0 14px;
+      background: var(--inset);
+      color: var(--ink-dim);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 0;
+    }
+    .tab.icon {
+      width: 36px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+    }
+    .tab[aria-selected='true'] {
+      background: var(--carrier);
+      color: #111416;
+    }
+    .tab .lamp {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      margin-left: 6px;
+      vertical-align: 2px;
+      background: var(--return);
+    }
+    .box {
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 9px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      font: 13px var(--f-num);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .box small {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.1em;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+    .box.btn {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+    .box.sq {
+      width: 28px;
+      justify-content: center;
+      padding: 0;
+    }
+    .box.sq[disabled] {
+      color: var(--line-bright);
+      cursor: default;
+    }
+    .box.sel::after {
+      content: '⌄';
+      margin-left: 8px;
+      color: var(--ink-dim);
+      transform: translateY(-3px);
+    }
+    .cpu {
+      width: 116px;
+      justify-content: space-between;
+    }
+    .cpu i {
+      width: 49px;
+      height: 6px;
+      border: 1px solid var(--line-bright);
+      border-radius: 1px;
+    }
+    .rec-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--line-bright);
+      margin: 0 3px;
+    }
+    .spacer {
+      flex: 1;
+    }
+    .play[aria-pressed='true'] {
+      background: var(--modulator);
+      border-color: var(--modulator);
+      color: #111416;
+    }
+    .pchip {
+      width: 150px;
+      height: 38px;
+      padding: 4px 10px;
+      text-align: left;
+      background: var(--part);
+      color: #10151a;
+      border: 0;
+      border-radius: var(--r);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      position: relative;
+    }
+    .pchip small {
+      display: block;
+      font: 500 9px var(--f-ui);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .pchip::after {
+      content: '';
+      position: absolute;
+      right: 6px;
+      top: 7px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #222;
+      box-shadow: 0 9px 0 #4caf50;
+    }
+    .pm {
+      width: 34px;
+      height: 38px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      color: var(--ink);
+    }
+
+    /* The space below the header: a tab's page, or an expanded view over it. */
+    .stage {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: auto;
+    }
+
+    /* ---------- the expanded view (console.css .roll-overlay) ---------- */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 24px 24px;
+      background: var(--ground);
+    }
+    /* Frame: today, the overlay covers the console, header and all. */
+    body.today .overlay {
+      padding: 24px;
+    }
+    body.today .console > .overlay-host {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+    }
+    .overlay-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .overlay-title {
+      font: 600 12px var(--f-panel);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .overlay-note {
+      color: var(--ink-faint);
+      font: 10px var(--f-num);
+    }
+    .field-label {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      display: block;
+      margin-bottom: 3px;
+    }
+    .field {
+      height: 29px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 8px 0 10px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      font: 12px var(--f-ui);
+      color: var(--ink);
+    }
+    .field::after {
+      content: '⌄';
+      transform: translateY(-3px);
+    }
+    .seg {
+      display: inline-flex;
+      gap: 1px;
+      background: var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .seg button {
+      height: 23px;
+      padding: 0 10px;
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: var(--inset);
+      color: var(--ink-dim);
+      border: 0;
+    }
+    .seg button[aria-pressed='true'] {
+      background: var(--modulator);
+      color: #111416;
+    }
+    .seg.amber button[aria-pressed='true'] {
+      background: var(--carrier);
+    }
+    .toggle {
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 8px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-dim);
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .toggle i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--line-bright);
+    }
+    .toggle[aria-pressed='true'] {
+      background: var(--modulator);
+      border-color: var(--modulator);
+      color: var(--inset);
+    }
+    .toggle[aria-pressed='true'] i {
+      background: var(--inset);
+    }
+    .knob {
+      display: inline-grid;
+      justify-items: center;
+      width: 54px;
+      gap: 1px;
+    }
+    .knob .dial {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid var(--line-bright);
+      position: relative;
+    }
+    .knob .dial::after {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 2px;
+      width: 2px;
+      height: 9px;
+      background: var(--ink);
+      transform-origin: 1px 9px;
+      transform: rotate(var(--a, 0deg));
+    }
+    .knob.teal .dial {
+      border-color: var(--modulator);
+    }
+    .knob .val {
+      font: 10px var(--f-num);
+      color: var(--ink);
+    }
+    .knob .lab {
+      font: 600 8.5px var(--f-panel);
+      letter-spacing: 0.1em;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ---------- Spectre's workbench ---------- */
+    .bench-head {
+      align-items: center;
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+    .bench-close {
+      margin-left: auto;
+    }
+    .bench-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 230px;
+      gap: 14px;
+    }
+    .bench-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bench-rail .seg {
+      flex-direction: column;
+    }
+    .bench-rail .seg button {
+      height: 25px;
+      text-align: left;
+    }
+    .bench-centre {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+    .bench-plot {
+      flex: 1;
+      min-height: 0;
+    }
+    .readout {
+      height: 14px;
+      font: 10px var(--f-num);
+      color: var(--ink-dim);
+      white-space: pre;
+      overflow: hidden;
+    }
+    .bench-side {
+      display: grid;
+      grid-template-rows: 1fr 1fr 1fr 40px;
+      gap: 11px;
+    }
+    .lane-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 8px;
+      border-left: 1px solid var(--line);
+      min-height: 0;
+      overflow: hidden;
+    }
+    .lane-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lane-name {
+      flex: 1;
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .lane-knobs {
+      display: grid;
+      grid-template-columns: 54px 54px;
+      gap: 2px 4px;
+      align-items: center;
+    }
+    .lane-knobs .knob:nth-child(3) {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+    .shape {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+    .shape-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .shape-label {
+      color: var(--ink-faint);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .plain {
+      height: 24px;
+      padding: 0 9px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-dim);
+      font: 11px var(--f-ui);
+    }
+    .plain[disabled] {
+      color: var(--ink-faint);
+      border-color: var(--line);
+    }
+    .transforms {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    /* ---------- the piano roll, expanded ---------- */
+    .roll-device {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 24px 243px minmax(0, 1fr);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+    }
+    .roll-rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-right: 1px solid var(--line);
+      color: var(--ink-faint);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.1em;
+    }
+    .roll-rail .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--modulator);
+    }
+    .roll-rail .name {
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      color: var(--ink);
+    }
+    .roll-rail .grow {
+      flex: 1;
+    }
+    .roll-rail button {
+      background: none;
+      border: 0;
+      color: var(--ink-faint);
+      padding: 2px;
+      line-height: 0;
+    }
+    .roll-rail button.expand {
+      color: var(--carrier);
+    }
+    .roll-rail .count {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font: 9px var(--f-num);
+    }
+    .roll-panel {
+      padding: 6px 8px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .roll-tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .roll-tabs span {
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      color: var(--ink-dim);
+      border-radius: var(--r);
+    }
+    .roll-tabs span.on {
+      background: var(--carrier);
+      color: #111416;
+    }
+    .roll-grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+    }
+    .mini-label {
+      display: flex;
+      justify-content: space-between;
+      font: 600 8.5px var(--f-panel);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 2px;
+    }
+    .mini-label em {
+      font: 9px var(--f-num);
+      text-transform: none;
+      letter-spacing: 0;
+      font-style: normal;
+    }
+    .stepper {
+      display: grid;
+      grid-template-columns: 20px 1fr 20px;
+      height: 22px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      font: 11px var(--f-num);
+      align-items: center;
+      text-align: center;
+    }
+    .stepper span,
+    .roll-panel .seg button {
+      white-space: nowrap;
+      overflow: hidden;
+      font-size: 9.5px;
+    }
+    .stepper b {
+      font-weight: 400;
+      color: var(--ink-dim);
+    }
+    .stepper .amber {
+      color: var(--carrier);
+    }
+    .zoom-row {
+      display: grid;
+      grid-template-columns: 12px 1fr;
+      align-items: center;
+      gap: 4px;
+      color: var(--ink-faint);
+      font-size: 10px;
+    }
+    .roll-panel .field {
+      height: 22px;
+      font: 11px var(--f-num);
+    }
+    .roll-panel .seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .roll-panel .seg button {
+      height: 22px;
+    }
+    .all-notes {
+      height: 22px;
+      width: 100%;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink);
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .vel-knobs {
+      display: flex;
+      justify-content: space-around;
+      border-top: 1px solid var(--line);
+      padding-top: 4px;
+    }
+    .roll-main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      padding: 4px 6px 6px;
+      gap: 4px;
+    }
+    .roll-info {
+      text-align: right;
+      font: 10px var(--f-num);
+      color: var(--ink-faint);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .roll-canvas {
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--line);
+    }
+
+    /* ---------- the tabs' pages, abridged ---------- */
+    .page {
+      padding: 12px 14px 24px;
+    }
+    .section-title {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0 10px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+    .hint {
+      color: var(--ink-faint);
+      font-size: 11.5px;
+      margin: 0 0 10px;
+    }
+    .abridged {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      color: var(--return);
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      padding: 1px 5px;
+      text-transform: uppercase;
+    }
+    .mixer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 250px;
+      gap: 14px;
+    }
+    .well {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      margin-bottom: 14px;
+    }
+    .add-slot {
+      width: 88px;
+      min-height: 150px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-faint);
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .card {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+    }
+    .card .name {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .bus {
+      width: 110px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      padding: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.08em;
+    }
+    .knob.amber .dial {
+      border-color: var(--carrier);
+    }
+    .master {
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      align-self: start;
+    }
+    .meters {
+      display: flex;
+      gap: 10px;
+      height: 200px;
+      align-items: flex-end;
+      margin: 10px 0;
+    }
+    .meters i {
+      width: 8px;
+      height: 46%;
+      background: repeating-linear-gradient(0deg, var(--modulator) 0 2px, transparent 2px 4px);
+    }
+    .stand-in {
+      margin: 18px 0;
+      padding: 40px 16px;
+      text-align: center;
+      border: 1px dashed var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-faint);
+      font-size: 12px;
+    }
+    .lane-strip {
+      display: grid;
+      grid-template-columns: 170px 1fr;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .lane-strip .bar {
+      height: 30px;
+      border: 1px solid var(--part);
+      border-radius: var(--r);
+      background: #22313f;
+      font: 9px var(--f-num);
+      color: var(--ink);
+      padding: 8px;
+      text-transform: uppercase;
+    }
+    .lane-strip .bar.harm {
+      border-color: var(--carrier);
+      background: #2a2a24;
+      text-transform: none;
+      font: 11px var(--f-ui);
+      padding: 6px 8px;
+    }
+
+    /* ---------- notes on the design ---------- */
+    .notes {
+      margin: 14px 16px 30px;
+      padding: 12px 14px;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      background: rgba(156, 123, 208, 0.06);
+      max-width: 980px;
+    }
+    .notes h2 {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--return);
+      margin: 0 0 8px;
+    }
+    .notes ol,
+    .notes ul {
+      margin: 0 0 10px;
+      padding-left: 20px;
+      color: var(--ink-dim);
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .notes b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    #notesHost {
+      flex: none;
+      max-height: 40vh;
+      overflow: auto;
+      border-top: 1px solid var(--line);
+    }
+    #notesHost[hidden] {
+      display: none;
+    }
+  </style>
+
+  <div class="mock-bar" aria-label="Mockup controls">
+    <b>Mockup · desktop</b>
+    <label
+      >Frame
+      <select id="mFrame">
+        <option value="proposed">Proposed: below the header</option>
+        <option value="today">Today: over the whole window</option>
+      </select>
+    </label>
+    <label
+      >Expanded
+      <select id="mView">
+        <option value="bench">Spectre workbench (Bass, insert 1)</option>
+        <option value="roll">Piano roll (Bass — Roll)</option>
+        <option value="none">Nothing (closed)</option>
+      </select>
+    </label>
+    <label
+      >Tab lamp (to decide)
+      <select id="mLamp">
+        <option value="off">off</option>
+        <option value="on">on</option>
+      </select>
+    </label>
+    <label
+      >Notes
+      <select id="mNotes">
+        <option value="hide">hidden</option>
+        <option value="show">shown below</option>
+      </select>
+    </label>
+    <span>Tabs, transport and chips are live: try Mixer, then Song. Esc or Close closes.</span>
+  </div>
+
+  <div class="console">
+    <header class="head" aria-label="Console header">
+      <div class="head-row">
+        <nav class="tabs" role="tablist" aria-label="Tabs">
+          <button class="tab" role="tab" data-tab="parts">Parts</button
+          ><button class="tab" role="tab" data-tab="mixer">Mixer</button
+          ><button class="tab" role="tab" data-tab="song">Song</button
+          ><button class="tab icon" role="tab" data-tab="settings" aria-label="Settings">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.73l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.27 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.18l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+              />
+            </svg>
+          </button>
+        </nav>
+        <span class="box cpu" title="CPU 1%, peak 0%, underruns 0"><i></i>1%</span>
+        <span class="rec-dot" aria-hidden="true"></span>
+        <button class="box sq" title="Undo Remove Spectre" aria-label="Undo">↶</button>
+        <button class="box sq" title="Nothing to redo" aria-label="Redo" disabled>↷</button>
+        <button class="box btn">Tap</button>
+        <span class="box">120.00 <small>BPM</small></span>
+        <span class="box">4 <small>Bars</small></span>
+        <span class="box">50 <small>%</small></span>
+        <span class="box sel">1/16</span>
+        <span class="box sel">4/4</span>
+        <span class="box sel">C</span>
+        <span class="box sel" style="min-width: 149px; justify-content: space-between">minor</span>
+        <span class="box" id="pos">3.1.2</span>
+        <span class="spacer"></span>
+        <button class="box sq play" id="play" aria-pressed="true" title="Play">▶</button>
+        <button class="box sq" title="Stop">■</button>
+        <button class="box sq" id="pause" title="Pause">‖</button>
+        <button class="box sq" title="Loop">⟲</button>
+      </div>
+      <div class="head-row">
+        <button class="pchip" title="Bass">Bass<small>1 · Roll</small></button>
+        <span class="spacer"></span>
+        <button class="pm" title="Add a part (1 of 16)">+</button>
+        <button class="pm" title="Remove Bass…">−</button>
+      </div>
+    </header>
+
+    <div class="stage" id="stage"></div>
+    <div class="overlay-host" id="overlayHost"></div>
+  </div>
+
+  <div id="notesHost" hidden>
+    <div class="notes">
+      <h2>What changes</h2>
+      <ol>
+        <li>
+          <b>Both views start below the console header</b> and fill the rest of the window: the
+          header keeps its two rows (tabs, CPU, undo and redo, the transport; the part chips) and
+          stays live. The view's padding is today's 24 px at the sides and bottom and 16 px under
+          the header.
+        </li>
+        <li>
+          <b>Nothing else moves inside either view.</b> Today's controls, in today's places, at
+          today's values. Each canvas is sized from its own CSS box × devicePixelRatio, so the roll
+          shows fewer rows at its 15 px/row zoom and Spectre's lanes are shorter (about 85 px less
+          at 1440 × 900).
+        </li>
+        <li>
+          <b>No Undo or Redo in the workbench header.</b> Record 2026-10-17-spectre-drawn-cells
+          decision 10 drew them there; the build left them out, and they are not added: the
+          console's Undo and Redo sit just above. Cmd/Ctrl-Z and Shift-Cmd/Ctrl-Z keep working.
+        </li>
+        <li>
+          <b>Switching tabs does not close a view.</b> Another tab shows its page as it does today,
+          with nothing of the view on it. The view belongs to the tab its card lives on (Song for
+          both examples here; Mixer for a Spectre on the master or a send), and going back to that
+          tab shows it still expanded, as it was left. Only Close (the roll's rail button) and Esc
+          close it.
+        </li>
+      </ol>
+      <h2>To decide</h2>
+      <ol>
+        <li>
+          <b>A lamp on the view's tab</b> while the view is open and another tab is shown (a small
+          purple dot on Song, behind the switcher's Tab lamp toggle). Proposed: yes, so the open
+          view is not forgotten.
+        </li>
+        <li>
+          <b>Esc on another tab.</b> Proposed: Esc closes the view only while its tab is shown, so
+          Esc in a Mixer dialog never closes a view the user cannot see.
+        </li>
+        <li>
+          <b>Another part chip while the roll is expanded.</b> Today the roll closes when its part
+          leaves the Song pane. With the chips reachable, proposed: the view stays open on its own
+          part and the pane under it changes, since decision 6 has only Close and Esc close it.
+        </li>
+        <li>
+          <b>Two views at once</b> (a roll on Song and a master Spectre on Mixer). Proposed: one at
+          a time; opening a second closes the first.
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- real values, read from the app on 2026-10-17 ---------- */
+    // Bass's roll: a 1-bar loop (96 ticks) in a 4-bar region, each note 5 ticks.
+    const NOTES = [
+      [0, 48, 1],
+      [12, 48, 0.6],
+      [18, 60, 0.8],
+      [24, 51, 1],
+      [36, 51, 0.6],
+      [42, 63, 0.8],
+      [48, 55, 1],
+      [60, 53, 0.7],
+      [66, 58, 0.9],
+      [72, 58, 1],
+      [84, 60, 0.8],
+      [90, 55, 0.6],
+    ];
+    const CHORD = new Set([0, 3, 7]); // C minor triad, the harmony lane's C min
+    // Bleep Test, left channel (Link on): 180 cells per lane.
+    const cells = (spans) => spans.flatMap(([n, v]) => Array(n).fill(v));
+    const LANES = [
+      { id: 'gain', label: 'Gain', top: '0 dB', bottom: '−∞', color: '#8b9a9e', v: cells([[180, 0.95]]) },
+      {
+        id: 'delay',
+        label: 'Delay',
+        top: 'full',
+        bottom: '0',
+        color: '#5fa8a0',
+        steps: 8,
+        v: cells([
+          [96, 0],
+          [21, 0.125],
+          [21, 0.25],
+          [21, 0.375],
+          [21, 0.5],
+        ]),
+      },
+      {
+        id: 'feedback',
+        label: 'Feedback',
+        top: '100%',
+        bottom: '0%',
+        color: '#9c7bd0',
+        v: cells([
+          [96, 0],
+          [84, 0.35],
+        ]),
+      },
+    ];
+    // The live spectrum's peaks as drawn at that moment (Hz, height 0–1).
+    const PEAKS = [
+      [20, 0.45], [42, 0.6], [88, 0.62], [129, 0.88], [174, 0.9], [212, 0.7], [259, 0.75],
+      [298, 0.65], [349, 0.5], [390, 0.4], [430, 0.36], [480, 0.3], [530, 0.26], [580, 0.2],
+      [640, 0.16], [700, 0.12], [760, 0.08],
+    ];
+    const HOVER_CELL = 130;
+    const READOUT =
+      '2.94k–3.05k Hz · F♯7   Gain −3.0 dB   Delay 250 ms · 0.50 beat   Feedback 35%';
+
+    const state = { frame: 'proposed', view: 'bench', viewTab: 'song', tab: 'song', tick: 198, playing: true, lamp: false };
+    const $ = (id) => document.getElementById(id);
+
+    /* ---------- small builders ---------- */
+    const knob = (val, lab, a = 0, cls = '') =>
+      `<span class="knob ${cls}"><span class="dial" style="--a:${a}deg"></span><span class="val">${val}</span><span class="lab">${lab}</span></span>`;
+    const toggle = (label, on, color) =>
+      `<button class="toggle" aria-pressed="${on}"${color ? ` style="background:${on ? color : ''};border-color:${on ? color : ''}"` : ''}><i></i>${label}</button>`;
+    const seg = (items, on, cls = '') =>
+      `<span class="seg ${cls}">${items.map((t) => `<button aria-pressed="${t === on}">${t}</button>`).join('')}</span>`;
+
+    function benchHtml() {
+      const cols = LANES.map((l) => {
+        const k = l.label[0];
+        return `<div class="lane-col"><div class="lane-head"><span class="lane-name" style="color:${l.color}">${l.label}</span>${toggle('Steps', !!l.steps)}${toggle('Link', true)}</div>
+        <div class="lane-knobs">${knob('0.00 oct', `${k} shift`)}${knob('0%', `${k} offset`)}${knob('0%', `${k} select`)}</div></div>`;
+      }).join('');
+      return `<div class="overlay spectre">
+        <div class="overlay-head bench-head">
+          <span class="overlay-title">Spectre — workbench</span>
+          <div style="width:135px"><span class="field-label">Starting point</span><span class="field">Bleep Test</span></div>
+          ${seg(['L', 'R'], 'L')}
+          <div style="width:69px"><span class="field-label">Follow</span><span class="field">Off</span></div>
+          ${toggle('Key', false)}${toggle('Listen', false)}
+          <span class="overlay-note">Esc closes</span>
+          <span class="seg bench-close"><button data-close>Close</button></span>
+        </div>
+        <div class="bench-body">
+          <div class="bench-rail">
+            ${seg(['Draw D', 'Push P', 'Smooth S', 'Erase E', 'Select M'], 'Draw D')}
+            ${knob('3', 'Width', -119.6)}
+            <div><span class="field-label">Levels</span><span class="field">off</span></div>
+            ${toggle('Snap', true)}
+          </div>
+          <div class="bench-centre"><div class="bench-plot"><canvas id="benchCanvas"></canvas></div>
+            <div class="readout">${READOUT}</div></div>
+          <div class="bench-side">${cols}</div>
+        </div>
+        <div class="shape">
+          <div class="shape-line"><span class="shape-label">Shape</span>
+            ${seg(['Sine', 'Tri', 'Square', 'Saw ↑', 'Saw ↓', 'Random', 'Harmonics', 'Key'], '')}
+            <button class="plain" disabled>Apply</button></div>
+          <div class="shape-line"><span class="shape-label">Lane</span>${seg(['1 Gain', '2 Delay', '3 Feedback'], '2 Delay')}
+            <span class="shape-label">Transform</span><span class="transforms">${['Smooth', 'Quantize', 'Flip ↔', 'Invert ↕', '◀', '▶', 'L→R', 'R→L', 'Reset'].map((t) => `<button class="plain">${t}</button>`).join('')}</span></div>
+        </div>
+      </div>`;
+    }
+
+    const ICON = (d) =>
+      `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2">${d}</svg>`;
+    function rollHtml() {
+      return `<div class="overlay roll">
+        <div class="overlay-head"><span class="overlay-title">Bass — Roll</span><span class="overlay-note">Expanded · Esc closes</span></div>
+        <div class="roll-device">
+          <div class="roll-rail"><span class="dot"></span><span class="name">Roll</span><span class="grow"></span>
+            <button class="expand" data-close title="Close the wide view (Esc)" aria-label="Close wide view">${ICON('<path d="M6.8 1.8v3.4h3.4M10.5 1.5 6.8 5.2M5.2 10.2V6.8H1.8M1.5 10.5l3.7-3.7"/>')}</button>
+            <span class="count">1/1</span>
+            <button title="Split">${ICON('<path d="M2 3h3v6H2zM7 3h3v6H7z"/>')}</button>
+            <button title="Delete">${ICON('<path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.5 3.5l.5 6.5h4l.5-6.5"/>')}</button></div>
+          <div class="roll-panel">
+            <div class="roll-tabs"><span class="on">Notes</span><span>Envelopes</span></div>
+            <div class="roll-grid2">
+              <div><div class="mini-label">Snap</div><span class="field">1/16</span></div>
+              <div><div class="mini-label">Zoom</div>
+                <div class="zoom-row">↔<span class="stepper"><b>−</b><span class="amber">fit</span><b>+</b></span></div></div>
+              <div><div class="mini-label">Loop <em>≤ 4 bars</em></div><span class="stepper"><b>−</b>1 bar<b>+</b></span></div>
+              <div class="zoom-row">↕<span class="stepper"><b>−</b><span>15 px/row</span><b>+</b></span></div>
+              <div><div class="mini-label">Keys</div>${seg(['12', 'Scale'], '12')}</div>
+              <div><div class="mini-label">Audition</div>${seg(['On', 'Off'], 'On')}</div>
+              <div><div class="mini-label">Fold</div>${seg(['All', 'Fold'], 'All')}</div>
+              <div><div class="mini-label">Rec</div>${seg(['Off', '● Rec'], 'Off', 'amber')}</div>
+            </div>
+            <div><div class="mini-label">Quantize <em>to 1/16</em></div><button class="all-notes">All notes</button></div>
+            <div class="mini-label" style="margin-top:4px">Velocity</div>
+            <div class="vel-knobs">${knob('0.80', 'Vel', 81, 'teal')}${knob('0.20', 'Acc vel', -81, 'teal')}${knob('1.00', 'Acc mod', 135, 'teal')}</div>
+          </div>
+          <div class="roll-main"><div class="roll-info">1-bar loop in a 4-bar region · 12 notes · C minor · snap 1/16</div>
+            <div class="roll-canvas"><canvas id="rollCanvas"></canvas></div></div>
+        </div>
+      </div>`;
+    }
+
+    /* ---------- the tabs' pages (abridged: they are unchanged) ---------- */
+    const PAGES = {
+      mixer: () => `<div class="page mixer"><div>
+        <div class="section-title">Master inserts <span class="abridged">today, abridged</span></div>
+        <p class="hint">Parts and sends → inserts → the master column.</p>
+        <div class="well"><span class="add-slot">+<br>Add insert</span><span class="add-slot">+<br>Add insert</span></div>
+        <div class="section-title">Send buses</div>
+        <p class="hint">Every part reaches both buses through its sends. Each bus runs what it is sent through its inserts at its level, and both are saved with the song.</p>
+        <div class="well"><div class="bus">SEND A${knob('0.90', 'Level', 108, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
+          <div class="card"><span class="name">1 Reverb</span><div><span class="field-label">Starting point</span><span class="field" style="width:104px">Resident</span></div>
+          ${knob('25m', 'Pre', -128.3, 'amber')}${knob('6.35s', 'Decay', 28.7, 'amber')}${knob('1.40', 'Size', 70, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
+        <div class="well"><div class="bus">SEND B${knob('0.60', 'Level', 27, 'amber')}</div><span class="add-slot">+<br>Add insert</span>
+          <div class="card"><span class="name">1 Echo</span>${toggle('Sync', true, 'var(--carrier)')}
+          ${knob('1/8D', 'Time', 27, 'amber')}${knob('3.20k', 'Damp', 35.8, 'amber')}${knob('0.30', 'Regen', -49.7, 'amber')}${knob('+1.0dB', 'Q', -62.9, 'amber')}${knob('1.00', 'Mix', 135, 'amber')}</div><span class="add-slot">+<br>Add insert</span></div>
+      </div>
+      <div class="master"><div class="section-title" style="margin:0">Master out</div>
+        <div class="meters"><span style="font:10px var(--f-num);color:var(--ink-dim)">−15.3 −15.3</span><i></i><i></i><i></i><i></i></div>
+        ${seg(['Limiter', 'Soft clip', 'Hard clip', 'Off'], 'Limiter')}
+        <div style="margin-top:10px">${knob('−1.0 dBFS', 'Ceiling', 112.5)}</div></div></div>`,
+      parts: () => `<div class="page"><div class="section-title">Part · Bass <span class="abridged">today, abridged</span></div>
+        <div class="stand-in">The Parts tab, exactly as today: Bass's patch (Init, this song), its operators, algorithm, global, shape and modulation.<br>Nothing of the expanded view shows here.</div></div>`,
+      settings: () => `<div class="page"><div class="section-title">Songs · Document · Export audio <span class="abridged">today, abridged</span></div>
+        <div class="stand-in">The Settings tab, exactly as today.<br>Nothing of the expanded view shows here.</div></div>`,
+      song: () => `<div class="page"><div class="section-title">Song <span class="abridged">today, abridged</span></div>
+        <div class="lane-strip"><span style="font:600 12px var(--f-panel)">HARMONY</span><span class="bar harm">C min</span></div>
+        <div class="lane-strip"><span style="font:600 12px var(--f-panel)">1 · Bass</span><span class="bar">∞ roll · 12 notes · 1 bar loop</span></div>
+        <div class="stand-in">The selected region's pane, as today: Bass — Roll (the Roll device, collapsed), then Insert effects with Spectre (Curves, Bleep Test, ⤢ Expand).</div></div>`,
+    };
+
+    /* ---------- canvases, sized from their CSS box × devicePixelRatio ---------- */
+    function sized(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      const g = canvas.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { g, w, h };
+    }
+
+    function drawBench() {
+      const canvas = $('benchCanvas');
+      if (!canvas) return;
+      const { g, w, h } = sized(canvas);
+      const x0 = 64;
+      const x1 = w - 2;
+      const ruler = 34;
+      const gap = 11;
+      const laneH = (h - ruler - 2 * gap) / 3;
+      const fx = (f) => x0 + ((x1 - x0) * Math.log10(f / 20)) / 3;
+      const cw = (x1 - x0) / 180;
+      g.font = '9px "IBM Plex Mono", monospace';
+      LANES.forEach((lane, li) => {
+        const top = li * (laneH + gap);
+        const bot = top + laneH;
+        g.fillStyle = '#121618';
+        g.fillRect(x0, top, x1 - x0, laneH);
+        if (lane.steps) {
+          g.strokeStyle = 'rgba(61,73,80,0.55)';
+          for (let s = 1; s < lane.steps; s++) {
+            const y = Math.round(bot - (laneH * s) / lane.steps) + 0.5;
+            g.beginPath();
+            g.moveTo(x0, y);
+            g.lineTo(x1, y);
+            g.stroke();
+          }
+        }
+        lane.v.forEach((v, i) => {
+          if (v <= 0) return;
+          const x = x0 + i * cw;
+          g.fillStyle = lane.color + '99';
+          g.fillRect(x, bot - v * laneH, Math.max(cw - 1, 1), v * laneH);
+        });
+        g.strokeStyle = lane.color;
+        g.lineWidth = 1.5;
+        g.beginPath();
+        lane.v.forEach((v, i) => {
+          const y = bot - v * laneH;
+          const x = x0 + i * cw;
+          i ? g.lineTo(x, y) : g.moveTo(x, y);
+          g.lineTo(x + cw, y);
+        });
+        g.stroke();
+        g.lineWidth = 1;
+        for (const [f, a] of PEAKS) {
+          const x = fx(f);
+          g.beginPath();
+          g.moveTo(x - 3, bot);
+          g.lineTo(x, bot - a * laneH * 0.9);
+          g.lineTo(x + 3, bot);
+          g.fillStyle = 'rgba(220,227,227,0.13)';
+          g.fill();
+          g.strokeStyle = 'rgba(220,227,227,0.35)';
+          g.stroke();
+        }
+        g.strokeStyle = lane.id === 'delay' ? '#5fa8a0' : '#2c3439';
+        g.strokeRect(x0 + 0.5, top + 0.5, x1 - x0 - 1, laneH - 1);
+        g.strokeStyle = 'rgba(220,227,227,0.45)';
+        g.strokeRect(x0 + (HOVER_CELL - 1) * cw + 0.5, top + 0.5, cw * 3, laneH - 1);
+        g.textAlign = 'right';
+        g.fillStyle = lane.color;
+        g.font = '600 9px "Chakra Petch", sans-serif';
+        g.fillText(lane.label.toUpperCase(), x0 - 6, top + 8);
+        g.font = '9px "IBM Plex Mono", monospace';
+        g.fillStyle = '#5e6b70';
+        g.fillText(lane.top, x0 - 6, top + 20);
+        g.fillText(lane.bottom, x0 - 6, bot - 2);
+      });
+      const ry = 3 * laneH + 2 * gap;
+      g.textAlign = 'center';
+      g.fillStyle = '#5e6b70';
+      for (const [f, t] of [[30, '30'], [50, '50'], [100, '100'], [200, '200'], [500, '500'], [1000, '1k'], [2000, '2k'], [5000, '5k'], [10000, '10k']])
+        g.fillText(t, fx(f), ry + 13);
+      g.fillStyle = '#8b9a9e';
+      for (let o = 1; o <= 9; o++) g.fillText(`C${o}`, fx(32.703 * 2 ** (o - 1)), ry + 26);
+    }
+
+    function drawRoll() {
+      const canvas = $('rollCanvas');
+      if (!canvas) return;
+      const { g, w, h } = sized(canvas);
+      const keys = 44;
+      const head = 32;
+      const vel = 34;
+      const row = 15;
+      const gx0 = keys;
+      const gw = w - keys;
+      const gh = h - head - vel;
+      const rows = Math.floor(gh / row);
+      const topPitch = 56 + Math.floor(rows / 2);
+      const bar = gw / 4;
+      const tx = (t) => gx0 + (t / 96) * bar;
+      const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      g.fillStyle = '#121618';
+      g.fillRect(0, 0, w, h);
+      for (let r = 0; r < rows; r++) {
+        const p = topPitch - r;
+        const pc = p % 12;
+        const y = head + r * row;
+        const black = [1, 3, 6, 8, 10].includes(pc);
+        g.fillStyle = black ? '#161b1e' : '#1a2024';
+        g.fillRect(gx0, y, gw, row);
+        g.fillStyle = pc === 0 ? '#e0a44e' : CHORD.has(pc) ? '#5a4a2e' : black ? '#0c0f10' : '#2c3439';
+        g.fillRect(0, y, keys - 1, row - 1);
+        g.fillStyle = pc === 0 ? '#111416' : '#8b9a9e';
+        g.font = '9px "IBM Plex Mono", monospace';
+        g.textAlign = 'left';
+        g.fillText(`${names[pc]}${Math.floor(p / 12) - 1}`, 4, y + 11);
+        if (pc === 0) {
+          g.fillStyle = '#2c3439';
+          g.fillRect(gx0, y + row - 1, gw, 1);
+        }
+      }
+      for (let s = 0; s <= 64; s++) {
+        const x = Math.round(gx0 + (s * bar) / 16) + 0.5;
+        g.strokeStyle = s % 16 === 0 ? '#3d4950' : s % 4 === 0 ? '#262d32' : '#1c2226';
+        g.beginPath();
+        g.moveTo(x, head);
+        g.lineTo(x, head + rows * row);
+        g.stroke();
+      }
+      // ruler, loop brace and chord lane
+      g.fillStyle = '#0c0f10';
+      g.fillRect(0, 0, w, head);
+      g.fillStyle = '#e0a44e';
+      g.font = '600 11px "Chakra Petch", sans-serif';
+      g.fillText('C min', 4, 13);
+      g.fillStyle = '#5e6b70';
+      g.font = '9px "IBM Plex Mono", monospace';
+      g.fillText(`bar ${Math.floor(state.tick / 96) + 1}`, 4, 26);
+      for (let b = 0; b < 4; b++) {
+        g.fillStyle = '#8b9a9e';
+        g.fillText(String(b + 1), gx0 + b * bar + 4, 10);
+        g.fillStyle = '#3d4950';
+        g.fillRect(gx0 + b * bar, 2, 1, 12);
+      }
+      g.fillStyle = '#e0a44e';
+      g.fillRect(gx0, 13, bar, 3);
+      g.fillRect(gx0 + bar - 4, 10, 6, 7);
+      g.fillStyle = '#5e6b70';
+      g.fillText('repeats ×4', gx0 + bar + 6, 15);
+      g.fillStyle = '#4a3f2c';
+      g.fillRect(gx0, 18, gw, 13);
+      g.fillStyle = '#e0a44e';
+      g.fillText('C min', gx0 + 4, 28);
+      // notes: bar 1 is the loop, bars 2–4 its repeats
+      for (let rep = 0; rep < 4; rep++) {
+        for (const [t, p, v] of NOTES) {
+          const r = topPitch - p;
+          if (r < 0 || r >= rows) continue;
+          const col = CHORD.has(p % 12) ? '224,164,78' : '95,168,160';
+          const a = rep ? 0.45 : 1;
+          g.fillStyle = `rgba(${col},${a})`;
+          g.fillRect(tx(t + rep * 96) + 1, head + r * row + 2, (5 / 96) * bar - 1, row - 4);
+          const vx = tx(t + rep * 96) + 1;
+          const vy = h - 2 - v * (vel - 8);
+          g.strokeStyle = `rgba(${col},${a})`;
+          g.beginPath();
+          g.moveTo(vx, h - 2);
+          g.lineTo(vx, vy);
+          g.stroke();
+          g.fillStyle = `rgba(${col},${a})`;
+          g.beginPath();
+          g.arc(vx, vy, 2.5, 0, 7);
+          g.fill();
+        }
+      }
+      // velocity lane
+      g.fillStyle = '#0c0f10';
+      g.fillRect(0, h - vel, keys, vel);
+      g.fillStyle = '#5fa8a0';
+      g.fillRect(4, h - vel + 2, keys - 8, 10);
+      g.fillStyle = '#111416';
+      g.font = '600 8px "Chakra Petch", sans-serif';
+      g.textAlign = 'center';
+      g.fillText('VEL', keys / 2, h - vel + 10);
+      g.fillStyle = '#5e6b70';
+      g.fillText('ACC', keys / 2, h - vel + 21);
+      g.fillText('RAT', keys / 2, h - vel + 31);
+      g.fillStyle = '#2c3439';
+      g.fillRect(keys, h - vel, gw, 1);
+      // the loop's end and the playhead
+      g.fillStyle = '#e0a44e';
+      g.fillRect(Math.round(gx0 + bar), head, 1, h - head);
+      g.fillRect(Math.round(tx(state.tick)), 0, 1, h);
+    }
+
+    /* ---------- render ---------- */
+    function viewOpen() {
+      return state.view !== 'none';
+    }
+    function render() {
+      document.body.classList.toggle('today', state.frame === 'today');
+      const showView = viewOpen() && (state.frame === 'today' || state.tab === state.viewTab);
+      for (const t of document.querySelectorAll('.tab')) {
+        t.setAttribute('aria-selected', String(t.dataset.tab === state.tab));
+        t.querySelector('.lamp')?.remove();
+        if (state.lamp && viewOpen() && t.dataset.tab === state.viewTab && state.tab !== state.viewTab) {
+          const lamp = document.createElement('span');
+          lamp.className = 'lamp';
+          lamp.title = 'An expanded view is open on this tab';
+          t.append(lamp);
+        }
+      }
+      $('stage').innerHTML = PAGES[state.tab]();
+      const host = state.frame === 'today' ? $('overlayHost') : $('stage');
+      $('overlayHost').innerHTML = '';
+      if (showView) host.insertAdjacentHTML('beforeend', state.view === 'bench' ? benchHtml() : rollHtml());
+      if (state.frame === 'proposed' && showView) $('stage').style.overflow = 'hidden';
+      else $('stage').style.overflow = 'auto';
+      for (const b of document.querySelectorAll('[data-close]')) b.onclick = close;
+      drawBench();
+      drawRoll();
+    }
+    function close() {
+      state.view = 'none';
+      $('mView').value = 'none';
+      render();
+    }
+    function position() {
+      const t = Math.floor(state.tick);
+      $('pos').textContent = `${Math.floor(t / 96) + 1}.${Math.floor((t % 96) / 24) + 1}.${Math.floor((t % 24) / 6) + 1}`;
+    }
+
+    for (const t of document.querySelectorAll('.tab'))
+      t.onclick = () => {
+        state.tab = t.dataset.tab;
+        render();
+      };
+    $('mFrame').onchange = (e) => {
+      state.frame = e.target.value;
+      render();
+    };
+    $('mView').onchange = (e) => {
+      state.view = e.target.value;
+      if (viewOpen()) state.tab = state.viewTab;
+      render();
+    };
+    $('mLamp').onchange = (e) => {
+      state.lamp = e.target.value === 'on';
+      render();
+    };
+    $('mNotes').onchange = (e) => {
+      $('notesHost').hidden = e.target.value !== 'show';
+      render();
+    };
+    $('play').onclick = () => {
+      state.playing = true;
+      $('play').setAttribute('aria-pressed', 'true');
+    };
+    $('pause').onclick = () => {
+      state.playing = false;
+      $('play').setAttribute('aria-pressed', 'false');
+    };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && viewOpen() && state.tab === state.viewTab) close();
+    });
+    window.addEventListener('resize', () => {
+      drawBench();
+      drawRoll();
+    });
+    // 120 BPM: 2 beats a second, 24 ticks a beat; the region is 4 bars of 96.
+    let last = performance.now();
+    function frame(now) {
+      if (state.playing) state.tick = (state.tick + ((now - last) / 1000) * 48) % 384;
+      last = now;
+      position();
+      drawRoll();
+      requestAnimationFrame(frame);
+    }
+    render();
+    document.fonts?.ready.then(render);
+    requestAnimationFrame(frame);
+  </script>
+</html>
