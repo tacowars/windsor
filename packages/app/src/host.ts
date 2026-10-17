@@ -330,6 +330,10 @@ export class EngineHost {
    * module cache without re-registering the processors. */
   private async start(document: ArrangementDocument, urls: WorkletUrls): Promise<void> {
     this.closeContext();
+    // Safari 17+ plays a 'playback' session through the ringer switch, as a
+    // music app does (windsor#888); other browsers lack the property.
+    const { audioSession } = navigator as Navigator & { audioSession?: { type: string } };
+    if (audioSession) audioSession.type = 'playback';
     this.context = new AudioContext({ latencyHint: 'interactive' });
     this.context.onstatechange = this.audioChanged;
     this.urls = urls;
