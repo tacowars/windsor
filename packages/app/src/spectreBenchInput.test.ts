@@ -4,8 +4,10 @@
  * it, while a press, a drag, Shift-add and Alt-remove stay one step each.
  * The canvas is a stand-in that is its own window, so every event fired on it
  * reaches the gesture's listeners with the canvas as its target; the history
- * is a stand-in that records a step at each outermost gesture end, as
- * `AppContext` does.
+ * is a stand-in that records a step at each outermost gesture end that
+ * changed the spec, as `AppContext` does. Every pointer event carries
+ * `detail` 0, as a browser sends it, so a second press is told apart by its
+ * place and time alone; only `click` and `dblclick` count clicks.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -38,7 +40,7 @@ function bench(selection: SpectreSpec['selection']) {
     },
     end: () => {
       if (--depth > 0) return;
-      if (before && before !== spec) steps.push(before);
+      if (before && JSON.stringify(before) !== JSON.stringify(spec)) steps.push(before);
       before = null;
     },
   });
@@ -69,12 +71,12 @@ function bench(selection: SpectreSpec['selection']) {
     undo: () => {
       spec = steps.pop()!;
     },
-    /** One press at `cell` dragged to `to`, released, and its click. */
-    press(cell: number, to = cell, fields: Record<string, unknown> = {}, detail = 1) {
-      fire(canvas, 'pointerdown', { ...at(cell), detail, ...fields });
-      if (to !== cell) fire(canvas, 'pointermove', at(to));
-      fire(canvas, 'pointerup', { ...at(to), buttons: 0 });
-      fire(canvas, 'click', { ...at(to), detail });
+    /** One press at `cell` dragged to `to`, released, and its click (the `clicks`th in a row). */
+    press(cell: number, to = cell, fields: Record<string, unknown> = {}, clicks = 1) {
+      fire(canvas, 'pointerdown', { ...at(cell), detail: 0, ...fields });
+      if (to !== cell) fire(canvas, 'pointermove', { ...at(to), detail: 0 });
+      fire(canvas, 'pointerup', { ...at(to), buttons: 0, detail: 0 });
+      fire(canvas, 'click', { ...at(to), detail: clicks });
     },
     /** A double-click's second press at `cell`, and its `dblclick`. */
     secondPress(cell: number) {
@@ -137,6 +139,24 @@ describe('Select on the workbench', () => {
     vi.advanceTimersByTime(UNDO_MERGE_MS);
     b.secondPress(70);
     expect(b.selection()).toEqual([]);
+    expect(b.steps.map((s) => s.selection)).toEqual([[[20, 41]], [[70, 71]]]);
+  });
+
+  it('starts a fresh stroke on a press at the same cell once the window has passed', () => {
+    const b = bench([]);
+    b.press(70);
+    vi.advanceTimersByTime(UNDO_MERGE_MS);
+    b.press(70, 75);
+    expect(b.selection()).toEqual([[70, 76]]);
+    expect(b.steps.map((s) => s.selection)).toEqual([[], [[70, 71]]]);
+  });
+
+  it('starts a fresh step on a press at another cell inside the double-click window', () => {
+    const b = bench([[20, 41]]);
+    b.press(70);
+    b.press(10);
+    b.key();
+    expect(b.selection()).toEqual([[10, 11]]);
     expect(b.steps.map((s) => s.selection)).toEqual([[[20, 41]], [[70, 71]]]);
   });
 });

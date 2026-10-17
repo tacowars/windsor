@@ -20,7 +20,7 @@
  */
 import type { SpectreCurve, SpectreSpec } from '@windsor/engine';
 import { dragGesture, mergedGesture } from './gestureHooks';
-import type { MergedGesture, OpenGesture } from './gestureHooks';
+import type { OpenGesture } from './gestureHooks';
 import {
   drawStroke,
   editedCells,
@@ -37,6 +37,7 @@ import { cellOfX, laneAt, valueOfY } from './spectreBenchModel';
 import type { SpectreBenchLayout, SpectreLaneBox } from './spectreBenchModel';
 import { SPECTRE_BENCH_LABELS, SPECTRE_BRUSH, SPECTRE_TOOLS } from './spectreBenchTables';
 import type { SpectreTool } from './spectreBenchTables';
+import { UNDO_MERGE_MS } from './undoConstants';
 
 /** What the pointer reads and calls on its workbench. */
 export interface SpectreInputHost {
@@ -132,28 +133,76 @@ function toolLabel(tool: SpectreTool): string {
   return `${SPECTRE_BENCH_LABELS.undo} ${SPECTRE_TOOLS.find((t) => t.id === tool)?.label ?? ''}`;
 }
 
+/** A still Select press's release: its lane, its cell and when, to know a double-click's second press by. */
+interface StillPress {
+  readonly curve: SpectreCurve;
+  readonly cell: number;
+  readonly at: number;
+}
+
+/**
+ * A double-click's second press (windsor#852): a left press with Select, on
+ * the lane and cell of the last still press, within `UNDO_MERGE_MS` of its
+ * release. Told by place and time, since a browser sends every pointer event
+ * with `detail` 0. A pure read of the press and `still`, so it gives the same
+ * answer to the held step's window listener and to the canvas's own.
+ */
+function isSecondPress(host: SpectreInputHost, still: StillPress | null, e: Event): boolean {
+  if (!still || e.type !== 'pointerdown' || e.target !== host.canvas) return false;
+  const press = e as PointerEvent;
+  if (press.button !== 0 || host.tool() !== 'select') return false;
+  if (performance.now() - still.at >= UNDO_MERGE_MS) return false;
+  const at = local(host.canvas, press);
+  const layout = host.layout();
+  return laneAt(layout, at.y)?.curve === still.curve && cellOfX(layout, at.x) === still.cell;
+}
+
+/** Select's held step for a double-click (windsor#852), as the pointer handlers call it. */
+interface SelectHold {
+  /** A still press's release: hold its step open for a double-click. */
+  release(stroke: Pick<Stroke, 'lane' | 'anchor'>): void;
+  /** Whether `e` is that double-click's second press, which starts no stroke. */
+  isSecondPress(e: Event): boolean;
+  /** A fresh press: no second press can follow the last still one. */
+  forget(): void;
+  /** The double-click: clear the selection, into the held step or as a step of its own. */
+  clear(): void;
+}
+
 /**
  * Select's held step (windsor#852): opened on a still press's release, inside
  * the press's step before that closes, it keeps the step open while the rest
- * of a double-click arrives on `canvas` (its click, its second press), so the
- * clear folds into it. Anything else (a key, a press elsewhere, a fresh
- * press) or the merge's timer closes it.
+ * of a double-click arrives on the canvas (its clicks, its second press), so
+ * the clear folds into it and one undo goes back to the selection from before
+ * the first press. Anything else (a key, a press elsewhere, a fresh press) or
+ * the merge's timer closes it.
  */
-function selectHold(canvas: EventTarget, win: EventTarget): MergedGesture {
-  return mergedGesture({
+function selectHold(host: SpectreInputHost, win: EventTarget): SelectHold {
+  let still: StillPress | null = null;
+  const second = (e: Event): boolean => isSecondPress(host, still, e);
+  const hold = mergedGesture({
     label: SPECTRE_BENCH_LABELS.select,
-    continues: (e) =>
-      e.target === canvas &&
-      (e.type === 'click' || (e.type === 'pointerdown' && (e as PointerEvent).detail > 1)),
+    continues: (e) => {
+      const on = (e.type === 'click' && e.target === host.canvas) || second(e);
+      if (!on) still = null;
+      return on;
+    },
     win,
   });
-}
-
-/** A double-click's clear: into the first press's held step, or a step of its own once that closed. */
-function clearSelection(host: SpectreInputHost, hold: MergedGesture): void {
-  hold.touch();
-  host.commit({ ...host.spec(), selection: [] });
-  hold.close();
+  return {
+    release(stroke) {
+      hold.touch();
+      still = { curve: stroke.lane.curve, cell: stroke.anchor, at: performance.now() };
+    },
+    isSecondPress: second,
+    forget: () => (still = null),
+    clear() {
+      still = null;
+      hold.touch();
+      host.commit({ ...host.spec(), selection: [] });
+      hold.close();
+    },
+  };
 }
 
 /** Wire the pointer on `host.canvas`; `win` hears the releases and inputs that end a step. */
@@ -161,16 +210,18 @@ export function wireSpectreBench(host: SpectreInputHost, win: EventTarget = wind
   const { canvas } = host;
   // Each open workbench starts with no stroke behind it.
   const drawn = new Map<string, BrushAt>();
-  const hold = selectHold(canvas, win);
+  const hold = selectHold(host, win);
   let stroke: Stroke | null = null;
   const stop = (e: PointerEvent): void => {
-    if (stroke?.held && stroke.gesture.open && e.type === 'pointerup') hold.touch();
+    if (stroke?.held && stroke.gesture.open && e.type === 'pointerup') hold.release(stroke);
     stroke?.gesture.close();
     stroke = null;
     if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
   };
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.detail > 1) return;
+    // A double-click's second press continues the held step, and starts no stroke.
+    if (e.button !== 0 || hold.isSecondPress(e)) return;
+    hold.forget();
     const at = local(canvas, e);
     const lane = laneAt(host.layout(), at.y);
     if (!lane) return;
@@ -214,6 +265,6 @@ export function wireSpectreBench(host: SpectreInputHost, win: EventTarget = wind
   canvas.addEventListener('dblclick', (e) => {
     if (host.tool() !== 'select') return;
     e.preventDefault();
-    clearSelection(host, hold);
+    hold.clear();
   });
 }
