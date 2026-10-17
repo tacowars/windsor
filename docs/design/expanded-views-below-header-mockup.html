@@ -1293,7 +1293,7 @@
         g.strokeStyle = lane.id === 'delay' ? '#5fa8a0' : '#2c3439';
         g.strokeRect(x0 + 0.5, top + 0.5, x1 - x0 - 1, laneH - 1);
         g.strokeStyle = 'rgba(220,227,227,0.45)';
-        g.strokeRect(x0 + HOVER_CELL * cw + 0.5, top + 0.5, cw * 2, laneH - 1);
+        g.strokeRect(x0 + (HOVER_CELL - 1) * cw + 0.5, top + 0.5, cw * 3, laneH - 1);
         g.textAlign = 'right';
         g.fillStyle = lane.color;
         g.font = '600 9px "Chakra Petch", sans-serif';
