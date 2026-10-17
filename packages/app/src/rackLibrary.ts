@@ -34,6 +34,14 @@ export const isRackWritable = (model: LibraryModel, id: string): boolean =>
 /** The store a write goes to: the folder while connected, else the user's; null without either. */
 const rackStore = (model: LibraryModel): PatchFolder | null => model.rackFolder ?? model.userRacks;
 
+/**
+ * True when Delete may act on `id`: a writable rack that a store holds. A rack
+ * written without a store was downloaded and kept in memory, and there is no
+ * file to remove.
+ */
+export const canDeleteRack = (model: LibraryModel, id: string): boolean =>
+  rackStore(model) !== null && isRackWritable(model, id);
+
 /** What a loaded rack's own soft problems (a clamp, a dropped key) read as in the library line. */
 const entryNotes = (entries: RackEntries): string[] =>
   Object.values(entries).flatMap((entry) =>

@@ -18,7 +18,7 @@ import { patchInfo } from './patchBrowserModel';
 import { deleteRack, exportRack, renameRack } from './rackBrowserActions';
 import type { RackInfo, RackInsertInfo, RackRow } from './rackBrowserModel';
 import { rackInfo, rackNameProblem } from './rackBrowserModel';
-import { isRackWritable, rackEntry } from './rackLibrary';
+import { canDeleteRack, isRackWritable, rackEntry } from './rackLibrary';
 
 export interface RackInfoHooks {
   /** Load the rack into the part, as a double-click or Enter does. */
@@ -176,10 +176,15 @@ export function rackBrowserInfo(
     const form = renameForm(ctx, row, hooks, back);
     name.replaceWith(form);
   };
+  const deletable = canDeleteRack(library, row.id);
   const remove = button(
     'Delete',
-    writable ? 'Remove from your racks; parts keep what they play' : 'Built-in racks are read-only',
-    writable,
+    deletable
+      ? 'Remove from your racks; parts keep what they play'
+      : writable
+        ? 'This browser cannot store racks, so the downloaded file is yours to delete'
+        : 'Built-in racks are read-only',
+    deletable,
     'btn ghost',
   );
   remove.onclick = (): void =>
