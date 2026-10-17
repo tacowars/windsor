@@ -215,6 +215,16 @@ input {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* The Scale picker as wide as the scale it shows, not its longest option
+   (149 px for "phrygian dominant"), and never past 100 px: the cap is the
+   whole fix where field-sizing is missing, and with the narrower CPU meter
+   it keeps the transport on the tabs' row at 1366 px, an iPad Pro 12.9"
+   held sideways. A longer name ends in an ellipsis; the list shows it whole. */
+.transport-picker select.field[name='scale'] {
+  field-sizing: content;
+  max-width: 100px;
+  text-overflow: ellipsis;
+}
 .transport-tap {
   font-size: 11px;
 }
@@ -7399,7 +7409,9 @@ input.field {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  width: 116px;
+  /* 116 px before the header had to fit an iPad Pro 12.9" held sideways:
+     the label carries the number, the bar only its shape. */
+  width: 90px;
   font-family: var(--f-num);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
