@@ -1,7 +1,9 @@
 /**
  * The Roll recorder wired to the console (windsor#663): its host over the
  * context, the live system's clock and the gestures; the keyboard's tap;
- * the selection, which ends a take when it moves; the context's
+ * the selection, which ends a take when it moves; the slot Rec records
+ * into and the keyboard plays (`ctx.playedSlot`), the Expanded roll's while
+ * it is on screen; the context's
  * `onBeforeEdit`, which ends it before a switch of song and splits it
  * before any other edit, and `onGestureEnd`, which writes what was played
  * during another control's drag; the transport's `onBeforeHalt`, which
@@ -18,6 +20,7 @@
 import type { AudioSystem } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { Keyboard } from './keyboard';
+import { shownRollSlot } from './rollExpand';
 import { type RecorderHost, RollRecorder } from './rollRecorder';
 import { ROLL_REC } from './rollTables';
 import { heardContextTime } from './rollTakeStamp';
@@ -43,7 +46,7 @@ function consoleHost(ctx: AppContext): RecorderHost {
   const system = (): AudioSystem | null => ctx.host.system;
   return {
     doc: () => ctx.model.doc,
-    selected: () => ctx.parts.selected,
+    selected: () => ctx.playedSlot(),
     livePart: () => ctx.livePart(),
     running: () => ctx.transport.running,
     position: () => ctx.transport.position(),
@@ -73,6 +76,9 @@ function consoleHost(ctx: AppContext): RecorderHost {
 export function mountRollRecorder(ctx: AppContext, keyboard: Keyboard): RollRecorder {
   const recorder = new RollRecorder(consoleHost(ctx));
   current = recorder;
+  // While a roll's Expanded view is on screen the keyboard plays its part and
+  // Rec records there, whichever part is picked (windsor#873 decision 3).
+  ctx.playOn(shownRollSlot);
   keyboard.tap = recorder;
   ctx.parts.onSelect(() => recorder.sync());
   ctx.onBeforeEdit((kind) => (kind === 'song' ? recorder.close() : recorder.split()));

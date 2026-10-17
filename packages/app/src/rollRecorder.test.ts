@@ -78,6 +78,24 @@ describe('a take', () => {
     expect(sw.notes(0)).toEqual([n(10, 60)]);
   });
 
+  it('records into the Expanded roll’s part while it is on screen, whichever part is picked', () => {
+    const r = armed(rig());
+    let shown: number | null = 0;
+    r.ctx.playOn(() => shown);
+    r.ctx.parts.pick(1);
+    r.press(10);
+    r.release(40);
+    expect(r.notes(0)).toEqual([n(10, 30)]);
+    expect(r.ctx.livePart()).toBe(r.part(0));
+    // The view closed: the take ends, and the picked part plays again.
+    r.press(50);
+    shown = null;
+    r.at(70);
+    r.rec.sync();
+    expect(r.notes(0)).toEqual([n(10, 30), n(50, 20)]);
+    expect(r.ctx.livePart()).toBe(r.part(1));
+  });
+
   it('ends every held note at Panic and runs on, all in one step', () => {
     const r = armed(rig());
     r.press(10, 60);

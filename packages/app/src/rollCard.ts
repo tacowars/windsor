@@ -20,7 +20,7 @@
  * when its chord moved, places the playhead, and reads Rec (`rollRecView.ts`,
  * windsor#663). A resize refits Fit and Fold, and the pane keeps its spot
  * across a repaint (`rollViewSpot.ts`). The view settings are the part's
- * for the session (`rollView.ts`).
+ * for the session (`rollView.ts`), and so is where the Expanded view sat.
  */
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -128,15 +128,17 @@ class RollDevice {
     this.expander = rollExpander({
       ctx,
       slot,
+      region,
       body: this.body,
       title: () => `${partAt(ctx.model.doc, slot)?.name ?? ''} — ${KIND_LABELS.roll}`,
       holds: () => {
         const there = region === undefined || partAt(ctx.model.doc, slot)?.regions[region];
         return Boolean(there) && patternOf(ctx.model.doc, slot, region)?.kind === 'roll';
       },
-      changed: () => {
+      // Open wide at the part's own wide spot (windsor#873 decision 4); back in the pane, centred.
+      changed: (expanded) => {
         this.envelopes.closePopovers();
-        this.spot.forget();
+        this.spot.startFrom(expanded ? this.view.wideSpot : null);
         this.paint();
       },
     });
@@ -280,9 +282,15 @@ class RollDevice {
     if (this.guideTargets) markKeys(this.guideTargets.keys, this.editing.editor.selectedPitches());
   }
 
+  /** The spot the pane sits at, kept as the part's wide spot while open wide. */
+  private keepWide(): void {
+    if (this.expander.isExpanded()) this.view.wideSpot = this.spot.kept;
+  }
+
   /** A scroll keeps the spot, and redraws the notes once the view leaves what was drawn. */
   private scrolled(): void {
     this.spot.keep(this.scene);
+    this.keepWide();
     this.envelopes.scrolled();
     const { scene, painted } = this;
     if (!scene || !painted || windowHolds(painted, this.spot.ticks(scene, 0))) return;
@@ -316,6 +324,7 @@ class RollDevice {
     this.guideKey = '';
     this.rec.summary(sourceSummary(this.source, snapOf(view.snap).label));
     this.spot.restore(this.scene, this.source.notes);
+    this.keepWide();
     this.paintWindow();
     this.controls.refresh();
     this.envelopes.paint();

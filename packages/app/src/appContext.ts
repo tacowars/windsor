@@ -100,6 +100,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private readonly gestureEnd = new Set<() => void>();
   /** Who follows each tab's shown state (`onTabShown`), by tab id. */
   private readonly shownListeners = new Map<string, Set<(shown: boolean) => void>>();
+  /** Names the slot the keyboard plays in place of the selected one, when it names one (`playOn`). */
+  private playedOver: () => number | null = () => null;
 
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
@@ -167,12 +169,26 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   }
 
   /**
-   * The live part the selected slot plays, resolved at the call: the keyboard
+   * Have the keyboard play the slot `over` names, while it names one, in
+   * place of the selected part: the Roll's Expanded view while it is on
+   * screen (windsor#873 decision 3, wired in `rollRecMount.ts`).
+   */
+  playOn(over: () => number | null): void {
+    this.playedOver = over;
+  }
+
+  /** The slot the keyboard plays and Rec records into: the selected part's, unless `playOn` names another. */
+  playedSlot(): number {
+    return this.playedOver() ?? this.parts.selected;
+  }
+
+  /**
+   * The live part the played slot (`playedSlot`) plays, resolved at the call: the keyboard
    * and a MIDI controller audition through it, and it must follow an enable
    * or a rebuild even while the Parts tab is hidden and its render deferred.
    */
   livePart(): AudioPart | null {
-    const part = partAt(this.model.doc, this.parts.selected);
+    const part = partAt(this.model.doc, this.playedSlot());
     return part ? this.host.part(part.slot) : null;
   }
 

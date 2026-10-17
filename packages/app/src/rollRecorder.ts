@@ -51,9 +51,12 @@ import { type HeldNote, RollTake } from './rollTake';
 /** What the recorder reads of the console and writes to it; the tests fake it. */
 export interface RecorderHost {
   doc(): ArrangementDocument;
-  /** The selected part's slot. */
+  /**
+   * The slot Rec records into: the selected part's, or the Expanded roll's
+   * while it is on screen (windsor#873 decision 3), which the keyboard plays.
+   */
   selected(): number;
-  /** The live part the selected slot plays: what the keyboard strikes. */
+  /** The live part that slot plays: what the keyboard strikes. */
   livePart(): AudioPart | null;
   running(): boolean;
   /** The transport tick the console draws the playhead at, for the switch's look. */
@@ -103,7 +106,12 @@ export class RollRecorder implements NoteTap {
     return this.armed;
   }
 
-  /** Where the selected part is at the playhead. */
+  /** The slot Rec records into (`RecorderHost.selected`): only its Roll device shows Rec live. */
+  target(): number {
+    return this.host.selected();
+  }
+
+  /** Where the part Rec records into is at the playhead. */
   place(): RecPlace {
     const { host } = this;
     return recPlace(host.doc(), host.selected(), host.position());

@@ -6,7 +6,8 @@
  * notes shows, Vel, Acc or Rat (windsor#754). They are console state, kept per part by slot
  * for the session and never written to the song. The device and the
  * Expanded view keep separate zooms. The Audition switch is the console's,
- * not a part's (`rollAudition.ts`).
+ * not a part's (`rollAudition.ts`). The Expanded view also keeps where its
+ * notes pane sat, so a part picked back opens at its own scroll.
  *
  * The ↔ zoom is px per beat, or Fit (null): the region in the notes pane's
  * width, refitted whenever that width changes. − and + leave Fit from the
@@ -35,6 +36,12 @@ export interface RollZoom {
   readonly row: number;
 }
 
+/** Where a notes pane sits: the tick at its left edge and the pitch in its middle. */
+export interface RollSpot {
+  readonly tick: number;
+  readonly pitch: number;
+}
+
 /** Which of the two views: the device in the pane, or Expanded. */
 export type RollViewKind = 'device' | 'wide';
 
@@ -61,6 +68,11 @@ export interface RollViewState {
   /** The length the next added note takes, in ticks: the last drawn or resized, at first the opening snap's. */
   lastTicks: number;
   zoom: Record<RollViewKind, RollZoom>;
+  /**
+   * Where the Expanded view's notes pane last sat, or null before it opened:
+   * a pick back to the part opens it there (windsor#873 decision 4).
+   */
+  wideSpot: RollSpot | null;
 }
 
 /**
@@ -80,6 +92,7 @@ export const defaultRollView = (): RollViewState => ({
     device: { beatPx: null, row: ROLL_ROW_DEFAULT.device },
     wide: { beatPx: null, row: ROLL_ROW_DEFAULT.wide },
   },
+  wideSpot: null,
 });
 
 /** The session's view settings, by part slot. */

@@ -51,6 +51,8 @@ import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { bodyGroups, harmonyGroup, headGroup, sizeLaneColumn } from './songLaneColumn';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
+import { wideRoll } from './rollExpand';
+import { followedRegion } from './rollWideFollow';
 import type { RegionClip } from './regionClipboard';
 import type { BarSpan } from './songZoomModel';
 import { refreshMixerCells } from './songMixerCell';
@@ -227,6 +229,18 @@ function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
   return { kind: 'part', slot: selection.slot, region: part.regions.length > 0 ? 0 : null };
 }
 
+/**
+ * A part a pick moved the selection to, with no region named, while a roll
+ * is open wide: the region the roll follows to (`rollWideFollow.ts`,
+ * windsor#873), whose card then takes the view over.
+ */
+function followWideRoll(ctx: AppCtx, selection: SongSelection): SongSelection {
+  if (selection?.kind !== 'part' || selection.region !== null) return selection;
+  const follow = { open: wideRoll(), tick: ctx.transport.position() };
+  const region = followedRegion(ctx.model.doc, selection.slot, follow);
+  return region === null ? selection : { ...selection, region };
+}
+
 // eslint-disable-next-line max-lines-per-function -- the view's one composition: the lanes, the pane, the watch and the SongView the lanes call back into read as one sequence
 function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): SongView {
   body.innerHTML = '';
@@ -235,7 +249,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): S
   const slots = ctx.model.doc.parts.map((p) => p.slot);
   const synced = syncSongSelection(state.selection, pick, state.picksSeen, slots);
   state.picksSeen = synced.seen;
-  state.selection = validSelection(ctx, synced.selection);
+  state.selection = validSelection(ctx, followWideRoll(ctx, synced.selection));
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
   sizeLaneColumn(lanes, state.mixerExpanded);
