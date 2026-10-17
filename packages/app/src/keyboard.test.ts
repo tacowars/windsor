@@ -365,7 +365,7 @@ describe('the audition keyboard', () => {
     keyboard.adoptKeys(oneOctave.map((k) => k.el));
     expect(log).toEqual([`p1 on ${root + 4}`, `p1 on ${root + 16}`, 'p1 off #2']);
     expect(oneOctave[4]?.classes.has('down')).toBe(true);
-    expect(litKeys()).toBe(2); // The old row's lit E is detached; the new row lights its own.
+    expect(litKeys()).toBe(1); // The old row's E goes dark; the new row lights its own.
     // The finger has not moved, but where it rests is C in the new boxes.
     keyboard.onPointerMove({ ...atE, clientY: atE.clientY + 1 });
     expect(log.slice(3)).toEqual([`p1 on ${root}`, 'p1 off #1']);

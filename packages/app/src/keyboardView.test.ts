@@ -108,6 +108,31 @@ describe('the audition keyboard in the expanded view', () => {
     expect(log.at(-1)).toBe('p1 panic');
   });
 
+  it('keeps a held finger’s note when more octaves bring the octave down, and lights its new key', () => {
+    for (let i = 0; i < 6; i++) keyboard.shiftOctave(1);
+    expect(keyboard.octave).toBe(8);
+    keyboard.onPointerDown(pointer(1, keys, 4));
+    const e8 = 8 * 12 + 4;
+    // Four octaves bound the octave at C6: E8 still sounds, lit on the key that now carries it.
+    const wide = row(48);
+    keyboard.adoptKeys(wide.map((k) => k.el));
+    expect(keyboard.octave).toBe(6);
+    expect(log).toEqual([`p1 on ${e8}`]);
+    expect(wide[e8 - 6 * 12]?.classes.has('down')).toBe(true);
+    expect(wide[4]?.classes.has('down')).toBe(false);
+    // A move within the key the finger is on strikes that key's note, E6, and lifts E8, as a slide.
+    keyboard.onPointerMove({ ...pointer(1, wide, 4), clientY: TOP + 0.3 * HEIGHT });
+    expect(log).toEqual([`p1 on ${e8}`, `p1 on ${6 * 12 + 4}`, 'p1 off #1']);
+    expect(wide.filter((k) => k.classes.has('down'))).toEqual([wide[4]]);
+  });
+
+  it('lifts a held finger whose note an octave shift takes off the keys', () => {
+    keyboard.onPointerDown(pointer(1, keys, 0));
+    keyboard.shiftOctave(1);
+    expect(log).toEqual([`p1 on ${(keyboard.octave - 1) * 12}`, 'p1 off #1']);
+    expect(keyboard.heldCount).toBe(0);
+  });
+
   it('stops a held pointer’s note when the view closes without Hold', () => {
     keyboard.onPointerDown(pointer(1, keys, 0));
     keyboard.collapse();

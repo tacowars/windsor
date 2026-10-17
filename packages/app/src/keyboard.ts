@@ -37,7 +37,7 @@ import {
 import { DEFAULT_SHAPE, buildKeys, homeSurface, sameShape } from './keyboardKeys';
 import type { KeysShape, KeysSurface } from './keyboardKeys';
 import { isBlackKey, keyAt, strikeVelocity } from './keyboardLayout';
-import type { KeyBox, Point } from './keyboardLayout';
+import type { KeyBox } from './keyboardLayout';
 import { octaveMaxFor } from './keyboardViewModel';
 import type { PerformerSink } from './midiPerformer';
 import type { NoteTap } from './rollRecorder';
@@ -237,16 +237,33 @@ export class Keyboard {
    */
   adoptKeys(keys: readonly HTMLElement[]): void {
     this.octave = Math.min(this.octave, this.octaveMax(keys.length));
-    for (const finger of this.fingers.values()) {
-      if (finger.offset === null || finger.offset < keys.length) continue;
-      this.leaveKeys(finger);
-    }
     this.keyEls = keys;
+    this.followNotes();
+    this.readLayout();
+  }
+
+  /**
+   * Light each held note's key at the octave and keys as they are now: a
+   * note is its holder's identity, not its key (record
+   * `2026-10-17-keyboard-geometry-follows-the-layout`). A pointer's key
+   * becomes the one now carrying its note, so its next move is judged
+   * against that key; a pointer whose note no shown key carries lifts, and
+   * so does one resting on a key past the row.
+   */
+  private followNotes(): void {
+    const base = this.octave * SEMITONES_PER_OCTAVE;
+    // Every light goes off before any comes on: one note's new key may be another's old.
+    for (const held of this.held.values()) held.el?.classList.remove('down');
     for (const held of this.held.values()) {
-      held.el = keys[held.offset] ?? null;
+      held.offset = held.note - base;
+      held.el = this.keyEls[held.offset] ?? null;
       held.el?.classList.add('down');
     }
-    this.readLayout();
+    for (const finger of this.fingers.values()) {
+      const held = finger.source === null ? undefined : this.held.get(finger.source);
+      if (held?.el) finger.offset = held.offset;
+      else if (held || (finger.offset ?? 0) >= this.keyEls.length) this.leaveKeys(finger);
+    }
   }
 
   /** Global QWERTY handling; call once. */
@@ -313,11 +330,10 @@ export class Keyboard {
     finger.offset = key.offset;
     finger.source = null;
     if (!this.pointerHolds(key.offset)) {
-      finger.velocity ??= this.velocityOf(e, point, key);
+      // A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6).
+      finger.velocity ??= e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
       const note = this.octave * SEMITONES_PER_OCTAVE + key.offset;
       const source = pointerSource(e.pointerId, note);
-      // The octave moved under the finger and the new key plays the note it holds.
-      if (source === left) this.lift(left, false, e.timeStamp);
       this.play(source, { note, velocity: finger.velocity, ...this.keyOf(key.offset, e) });
       finger.source = source;
     }
@@ -336,6 +352,7 @@ export class Keyboard {
   shiftOctave(by: number): void {
     const max = this.octaveMax(this.keyEls.length);
     this.octave = Math.min(max, Math.max(OCTAVE_MIN, this.octave + by));
+    this.followNotes();
     this.syncControls();
   }
 
@@ -422,11 +439,6 @@ export class Keyboard {
     keyEl?.classList.add('down');
     this.held.set(source, { id, part, note, offset, el: keyEl });
     this.tap?.press(part, source, note, velocity, timeStamp);
-  }
-
-  /** A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6). */
-  private velocityOf(e: PointerInput, point: Point, key: KeyBox): number {
-    return e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
   }
 
   /** A pointer off every key: its note lifts, and its next key strikes afresh. */
