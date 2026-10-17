@@ -36,21 +36,24 @@ const entryNotes = (entries: RackEntries): string[] =>
 
 /**
  * Re-read the user's rack store (after every write). Without one the racks
- * are none. A rack the loader refuses is named under `rackProblems`; one of
- * a format this build cannot read is kept under `oldFormatRacks`.
+ * are none. A rack the loader refuses is named under `rackProblems`; one it
+ * loaded with a correction is in `racks` and named under `rackNotes`; one
+ * of a format this build cannot read is kept under `oldFormatRacks`.
  */
 export const refreshRacks = tracked(async (model: LibraryModel): Promise<void> => {
   if (!model.userRacks) {
     model.racks = {};
     model.userRackIds = new Set();
     model.rackProblems = [];
+    model.rackNotes = [];
     model.oldFormatRacks = [];
     return;
   }
   const { entries, problems, oldFormat } = await readFolderWith(model.userRacks, loadRackFile);
   model.racks = entries;
   model.userRackIds = new Set(Object.keys(entries));
-  model.rackProblems = [...problems, ...entryNotes(entries)];
+  model.rackProblems = problems;
+  model.rackNotes = entryNotes(entries);
   model.oldFormatRacks = oldFormat;
 });
 
@@ -82,9 +85,11 @@ export const writeRackFile = tracked(async function writeRackFile(
     const entry = loadRackFile(id, JSON.parse(text));
     model.racks = { ...model.racks, [id]: entry };
     model.userRackIds = new Set([...model.userRackIds, id]);
-    model.rackProblems = entryNotes({ [id]: entry });
+    model.rackProblems = [];
+    model.rackNotes = entryNotes({ [id]: entry });
   } catch (error) {
     model.rackProblems = [error instanceof Error ? error.message : String(error)];
+    model.rackNotes = [];
   }
 });
 

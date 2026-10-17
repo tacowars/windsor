@@ -47,16 +47,21 @@ function folder(files: Map<string, string>): PatchFolder & { files: Map<string, 
   };
 }
 
-/** A store with a good rack, one of a future format, and one that is no rack file at all. */
+/** A store with a good rack, one of a future format, one that is no rack file at all, and one the loader clamps. */
 function store() {
   const good = goodRack();
   const old = { ...JSON.parse(serialiseRackFile(good)), format: RACK_FILE_FORMAT + 1 };
   const broken = { ...JSON.parse(serialiseRackFile(good)), kind: 'kit' };
+  const clamped = {
+    ...JSON.parse(serialiseRackFile(good)),
+    inserts: [{ kind: 'drive', id: 'd1', drive: 999 }],
+  };
   return folder(
     new Map([
       ['kick-rack.json', serialiseRackFile(good)],
       ['old-rack.json', `${JSON.stringify(old)}\n`],
       ['broken.json', `${JSON.stringify(broken)}\n`],
+      ['loud-rack.json', `${JSON.stringify(clamped)}\n`],
     ]),
   );
 }
@@ -65,7 +70,7 @@ describe('reading the rack store', () => {
   it('lists the good rack, keeps the old one and names the broken one', async () => {
     const model = pageLibrary();
     await connectUserRacks(model, store());
-    expect(Object.keys(model.racks)).toEqual(['kick-rack']);
+    expect(Object.keys(model.racks)).toEqual(['kick-rack', 'loud-rack']);
     expect(rackEntry(model, 'kick-rack')?.name).toBe('Kick Rack');
     expect(isRackWritable(model, 'kick-rack')).toBe(true);
     expect(isRackWritable(model, 'old-rack')).toBe(false);
@@ -74,6 +79,15 @@ describe('reading the rack store', () => {
     ]);
     expect(model.rackProblems).toHaveLength(1);
     expect(model.rackProblems[0]).toMatch(/^racks\/broken\.json: kind: expected "rack"/);
+  });
+
+  it('keeps a rack the loader corrected, and names the correction apart from the refusals', async () => {
+    const model = pageLibrary();
+    await connectUserRacks(model, store());
+    expect(rackEntry(model, 'loud-rack')).toBeDefined();
+    expect(model.rackNotes).toHaveLength(1);
+    expect(model.rackNotes[0]).toMatch(/^rack "loud-rack": inserts\[0\]\.drive/);
+    expect(model.rackProblems).toHaveLength(1);
   });
 
   it('is empty without a store', async () => {
@@ -87,7 +101,8 @@ describe('reading the rack store', () => {
     const model = pageLibrary();
     await connectUserRacks(model, store());
     await disconnectLibrary(model);
-    expect(Object.keys(model.racks)).toEqual(['kick-rack']);
+    expect(Object.keys(model.racks)).toEqual(['kick-rack', 'loud-rack']);
+    expect(model.rackNotes).toHaveLength(1);
     expect(model.userRacks).not.toBeNull();
   });
 });
@@ -124,20 +139,24 @@ describe('writing and removing', () => {
     await writeRackFile(model, 'bad', '{"kind":"rack"}', download);
     expect(rackEntry(model, 'bad')).toBeUndefined();
     expect(model.rackProblems).toHaveLength(1);
+    expect(model.rackNotes).toEqual([]);
   });
 });
 
 describe('the problem toast', () => {
-  it('says the patch refusals, the rack refusals, or both', async () => {
+  it('counts the patch refusals, the rack refusals and the rack corrections apart', async () => {
     const model = pageLibrary();
     expect(libraryProblemsText(model)).toBeNull();
     await connectUserRacks(model, store());
-    expect(libraryProblemsText(model)).toMatch(/^library: 1 rack file\(s\) refused — /);
+    expect(libraryProblemsText(model)).toMatch(
+      /^library: 1 rack file\(s\) refused — racks\/broken\.json: .* library: 1 rack correction\(s\) on load — rack "loud-rack"/,
+    );
     model.problems = ['patches/x.json: bad'];
     expect(libraryProblemsText(model)).toMatch(
       /^library: 1 patch file\(s\) refused — patches\/x\.json: bad library: 1 rack file\(s\)/,
     );
     await refreshRacks(model);
     expect(model.rackProblems).toHaveLength(1);
+    expect(model.rackNotes).toHaveLength(1);
   });
 });

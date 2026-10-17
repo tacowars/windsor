@@ -39,13 +39,15 @@ export interface LibraryModel {
    * The racks (windsor#868, record `2026-10-17-racks` decision 15), read and
    * written by `rackLibrary.ts`: the entries by id, the user's rack store in
    * IndexedDB (null until connected, or without IndexedDB), the ids that are
-   * the user's own, the last read's refusals, and the old-format racks kept
-   * for Export and Delete.
+   * the user's own, the last read's refusals, what a loaded rack was
+   * corrected on (a clamp, a dropped key: it is in `racks` all the same),
+   * and the old-format racks kept for Export and Delete.
    */
   racks: Readonly<Record<string, RackEntry>>;
   userRacks: PatchFolder | null;
   userRackIds: ReadonlySet<string>;
   rackProblems: string[];
+  rackNotes: string[];
   oldFormatRacks: OldFormatPatch[];
 }
 
@@ -68,6 +70,7 @@ export function pageLibrary(
     userRacks,
     userRackIds: new Set(),
     rackProblems: [],
+    rackNotes: [],
     oldFormatRacks: [],
   };
 }
@@ -160,11 +163,12 @@ export function connectLibrary(model: LibraryModel, folder: PatchFolder): Promis
 
 /** Back to the built-ins and the user's library; the racks, which no folder grant replaces yet, stay as they are. */
 export function disconnectLibrary(model: LibraryModel): Promise<void> {
-  const { racks, userRackIds, rackProblems, oldFormatRacks } = model;
+  const { racks, userRackIds, rackProblems, rackNotes, oldFormatRacks } = model;
   Object.assign(model, pageLibrary(model.user, model.userRacks), {
     racks,
     userRackIds,
     rackProblems,
+    rackNotes,
     oldFormatRacks,
   });
   return refreshLibrary(model);
@@ -272,15 +276,22 @@ export const removeOldFormat = tracked(async (model: LibraryModel, id: string): 
   await refreshLibrary(model);
 });
 
-/** The warning toast for the patch and rack files the last library read refused, or null when it refused none. */
+/**
+ * The warning toast for the patch and rack files the last library read
+ * refused, and the racks it loaded with a correction, or null when there
+ * is nothing to say.
+ */
 export function libraryProblemsText(model: LibraryModel): string | null {
-  const { problems, rackProblems } = model;
+  const { problems, rackProblems, rackNotes } = model;
   const lines = [
     problems.length
       ? `library: ${problems.length} patch file(s) refused — ${problems.join('; ')}`
       : '',
     rackProblems.length
       ? `library: ${rackProblems.length} rack file(s) refused — ${rackProblems.join('; ')}`
+      : '',
+    rackNotes.length
+      ? `library: ${rackNotes.length} rack correction(s) on load — ${rackNotes.join('; ')}`
       : '',
   ].filter(Boolean);
   return lines.length ? lines.join(' ') : null;
