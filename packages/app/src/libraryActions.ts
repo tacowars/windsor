@@ -32,6 +32,7 @@ import {
   library,
   refreshLibrary,
 } from './libraryModel';
+import { connectUserRacks } from './rackLibrary';
 import type { LibraryModel, SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
@@ -81,15 +82,18 @@ export function reportLibraryProblems(ctx: AppCtx, force = false): void {
 export function bootLibrary(
   user: PatchFolder | null,
   settle: SettleUserLibrary = awaitUserLibrary,
+  racks: PatchFolder | null = null,
 ): Promise<void> {
-  const load = loadBootLibrary(user);
+  const load = loadBootLibrary(user, racks);
   settle(load);
   return load;
 }
 
-async function loadBootLibrary(user: PatchFolder | null): Promise<void> {
+async function loadBootLibrary(user: PatchFolder | null, racks: PatchFolder | null): Promise<void> {
   library.user = user;
   await loadPageLibrary(library);
+  // The racks (windsor#868) read in after the patches, which their provenance names.
+  await connectUserRacks(library, racks);
   if (!folderApiAvailable()) return;
   const handle = await recallHandle();
   if (!handle) return;

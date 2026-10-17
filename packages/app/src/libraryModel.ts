@@ -8,7 +8,7 @@
  * read by the browser, the badge and the actions, so a save shows up
  * everywhere without a rebuild.
  */
-import type { Patch, PresetListing } from '@windsor/engine';
+import type { Patch, PresetListing, RackEntry } from '@windsor/engine';
 import { loadPatchFile } from '@windsor/engine';
 import { builtInEntries, loadBuiltIns } from './builtInLibrary';
 import type { OldFormatPatch, PatchFolder } from './libraryFolder';
@@ -35,12 +35,27 @@ export interface LibraryModel {
    * so never playable or assignable; kept for Export and Delete.
    */
   oldFormat: OldFormatPatch[];
+  /**
+   * The racks (windsor#868, record `2026-10-17-racks` decision 15), read and
+   * written by `rackLibrary.ts`: the entries by id, the user's rack store in
+   * IndexedDB (null until connected, or without IndexedDB), the ids that are
+   * the user's own, the last read's refusals, and the old-format racks kept
+   * for Export and Delete.
+   */
+  racks: Readonly<Record<string, RackEntry>>;
+  userRacks: PatchFolder | null;
+  userRackIds: ReadonlySet<string>;
+  rackProblems: string[];
+  oldFormatRacks: OldFormatPatch[];
 }
 
 /** The one instance the console shares; tests build their own with `pageLibrary()`. */
 export const library: LibraryModel = pageLibrary();
 
-export function pageLibrary(user: PatchFolder | null = null): LibraryModel {
+export function pageLibrary(
+  user: PatchFolder | null = null,
+  userRacks: PatchFolder | null = null,
+): LibraryModel {
   return {
     mode: 'page',
     entries: builtInEntries(),
@@ -49,6 +64,11 @@ export function pageLibrary(user: PatchFolder | null = null): LibraryModel {
     userIds: new Set(),
     problems: [],
     oldFormat: [],
+    racks: {},
+    userRacks,
+    userRackIds: new Set(),
+    rackProblems: [],
+    oldFormatRacks: [],
   };
 }
 
@@ -93,9 +113,10 @@ export function awaitUserLibrary(load: Promise<unknown>): void {
 /**
  * Every reload of the active library goes through this: the load is
  * recorded before the caller gets control back, so `libraryLoaded` never
- * resolves for a library that is no longer the one being read.
+ * resolves for a library that is no longer the one being read. The rack
+ * side (`rackLibrary.ts`) wraps its loads the same way.
  */
-const tracked =
+export const tracked =
   <A extends unknown[]>(load: (...args: A) => Promise<void>) =>
   (...args: A): Promise<void> => {
     const run = load(...args);
@@ -137,9 +158,15 @@ export function connectLibrary(model: LibraryModel, folder: PatchFolder): Promis
   return refreshLibrary(model);
 }
 
-/** Back to the built-ins and the user's library. */
+/** Back to the built-ins and the user's library; the racks, which no folder grant replaces yet, stay as they are. */
 export function disconnectLibrary(model: LibraryModel): Promise<void> {
-  Object.assign(model, pageLibrary(model.user));
+  const { racks, userRackIds, rackProblems, oldFormatRacks } = model;
+  Object.assign(model, pageLibrary(model.user, model.userRacks), {
+    racks,
+    userRackIds,
+    rackProblems,
+    oldFormatRacks,
+  });
   return refreshLibrary(model);
 }
 
@@ -245,11 +272,18 @@ export const removeOldFormat = tracked(async (model: LibraryModel, id: string): 
   await refreshLibrary(model);
 });
 
-/** The warning toast for the patch files the last library read refused, or null when it refused none. */
+/** The warning toast for the patch and rack files the last library read refused, or null when it refused none. */
 export function libraryProblemsText(model: LibraryModel): string | null {
-  const { problems } = model;
-  if (!problems.length) return null;
-  return `library: ${problems.length} patch file(s) refused — ${problems.join('; ')}`;
+  const { problems, rackProblems } = model;
+  const lines = [
+    problems.length
+      ? `library: ${problems.length} patch file(s) refused — ${problems.join('; ')}`
+      : '',
+    rackProblems.length
+      ? `library: ${rackProblems.length} rack file(s) refused — ${rackProblems.join('; ')}`
+      : '',
+  ].filter(Boolean);
+  return lines.length ? lines.join(' ') : null;
 }
 
 /** Raises an `error` toast; the one `ctx.notify` call a problem report needs. */

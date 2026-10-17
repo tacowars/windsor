@@ -1,10 +1,11 @@
 /**
  * The user's own state in IndexedDB (`2026-09-27-user-library-in-indexeddb`):
- * the `windsor` database, with the user's patches as a `PatchFolder`, the
- * session record as a `SongStore`, and (windsor#433, record
- * `2026-10-02-song-library`) the named songs as `SongRecords`. Every song
- * and patch value is the same text as its file, so one loader reads a
- * download, a folder file and a stored record alike.
+ * the `windsor` database, with the user's patches and (windsor#868, record
+ * `2026-10-17-racks`) their racks each as a `PatchFolder`, the session
+ * record as a `SongStore`, and (windsor#433, record `2026-10-02-song-library`)
+ * the named songs as `SongRecords`. Every song, patch and rack value is the
+ * same text as its file, so one loader reads a download, a folder file and a
+ * stored record alike.
  *
  * This is the one seam the Node tests cannot reach: the library model, the
  * song library and the autosave are tested over in-memory fakes of the three
@@ -17,6 +18,7 @@ import type { SongIndexRecord, SongRecords, StoredCheck } from './songLibrary';
 
 export interface UserStores {
   patches: PatchFolder;
+  racks: PatchFolder;
   songs: SongStore;
   library: SongRecords;
 }
@@ -44,8 +46,15 @@ function openDb(onBlocked: () => void): Promise<IDBDatabase> {
     };
     request.onupgradeneeded = (): void => {
       const db = request.result;
-      // Version 2 is additive: the two song stores join, and nothing else changes.
-      for (const store of [USER_DB.patches, USER_DB.songs, USER_DB.songIndex, USER_DB.songDocs]) {
+      // Every version is additive: 2 added the two song stores, 3 the racks; nothing else changes.
+      const stores = [
+        USER_DB.patches,
+        USER_DB.racks,
+        USER_DB.songs,
+        USER_DB.songIndex,
+        USER_DB.songDocs,
+      ];
+      for (const store of stores) {
         if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
       }
     };
@@ -75,24 +84,30 @@ function run<T>(
   });
 }
 
-function patchStore(db: IDBDatabase, beforeWrite: () => void): PatchFolder {
+/** One store of file texts by id (the patches, the racks) as a `PatchFolder` named `name`. */
+function textFolder(
+  db: IDBDatabase,
+  store: string,
+  name: string,
+  beforeWrite: () => void,
+): PatchFolder {
   return {
-    name: 'your library',
+    name,
     async list() {
-      const keys = await run(db, USER_DB.patches, 'readonly', (s) => s.getAllKeys());
+      const keys = await run(db, store, 'readonly', (s) => s.getAllKeys());
       return keys.map((key) => `${String(key)}${JSON_SUFFIX}`);
     },
-    async read(name) {
-      const text = await run<unknown>(db, USER_DB.patches, 'readonly', (s) => s.get(idOf(name)));
-      if (typeof text !== 'string') throw new Error(`${name}: not in your library`);
+    async read(file) {
+      const text = await run<unknown>(db, store, 'readonly', (s) => s.get(idOf(file)));
+      if (typeof text !== 'string') throw new Error(`${file}: not in ${name}`);
       return text;
     },
-    async write(name, text) {
+    async write(file, text) {
       beforeWrite();
-      await run(db, USER_DB.patches, 'readwrite', (s) => s.put(text, idOf(name)));
+      await run(db, store, 'readwrite', (s) => s.put(text, idOf(file)));
     },
-    async remove(name) {
-      await run(db, USER_DB.patches, 'readwrite', (s) => s.delete(idOf(name)));
+    async remove(file) {
+      await run(db, store, 'readwrite', (s) => s.delete(idOf(file)));
     },
   };
 }
@@ -267,7 +282,8 @@ export async function openUserStores(
   try {
     const db = await openDb(onBlocked);
     return {
-      patches: patchStore(db, beforeWrite),
+      patches: textFolder(db, USER_DB.patches, 'your library', beforeWrite),
+      racks: textFolder(db, USER_DB.racks, 'your racks', beforeWrite),
       songs: songStore(db, beforeWrite),
       library: songRecords(db, beforeWrite),
     };

@@ -74,12 +74,14 @@ export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
  * session record under `current`. Version 2 (windsor#433, record
  * `2026-10-02-song-library`) adds the named songs, additively: `songDocs`
  * holds each song's export text by song id, and `songIndex` the list's
- * cache derived from it.
+ * cache derived from it. Version 3 (windsor#868, record `2026-10-17-racks`
+ * decision 15) adds `racks`, each rack file's text by id, additively.
  */
 export const USER_DB = {
   name: 'windsor',
-  version: 2,
+  version: 3,
   patches: 'patches',
+  racks: 'racks',
   songs: 'songs',
   currentSong: 'current',
   songIndex: 'songIndex',

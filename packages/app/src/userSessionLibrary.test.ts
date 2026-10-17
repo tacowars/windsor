@@ -33,6 +33,15 @@ afterEach(async () => {
   await loadPageLibrary(library);
 });
 
+/** A rack store with nothing in it: the boot reads it after the patches (windsor#868). */
+const noRacks = (): PatchFolder => ({
+  name: 'racks',
+  list: () => Promise.resolve([]),
+  read: (name) => Promise.reject(new Error(name)),
+  write: () => Promise.resolve(),
+  remove: () => Promise.resolve(),
+});
+
 const userFile = (id: string): string => {
   const kick = PATCH_LIBRARY['kick']!;
   return serialisePatchFile({ ...kick, name: id, patch: { ...kick.patch, name: id } });
@@ -72,7 +81,7 @@ describe('bootUserState', () => {
       patches: { 'user-bell': makePatch({ name: 'Ice Needle' }) },
     });
     const songs = memorySessionStore();
-    opened({ patches: userPatches(), songs, library: memorySongRecords(songs) });
+    opened({ patches: userPatches(), racks: noRacks(), songs, library: memorySongRecords(songs) });
     expect(await imported).toBe(true);
     await booting;
     expect(partAt(ctx.model.doc, 1)).toMatchObject({
