@@ -63,7 +63,7 @@ interface Clock {
 function recorderOver(ctx: AppContext<TabPanel>, clock: Clock): RollRecorder {
   const rec = new RollRecorder({
     doc: () => ctx.model.doc,
-    selected: () => ctx.parts.selected,
+    selected: () => ctx.playedSlot(),
     livePart: () => ctx.livePart(),
     running: () => clock.running,
     position: () => clock.tick,
@@ -117,11 +117,11 @@ export function rig(loop?: { start: number; end: number }): Rig {
     },
     press: (tick, pitch = 60, source = 'KeyA') => {
       if (tick > clock.tick) at(tick);
-      rec.press(part(ctx.parts.selected), source, pitch, VEL, tick);
+      rec.press(part(ctx.playedSlot()), source, pitch, VEL, tick);
     },
     release: (tick, pitch = 60, source = 'KeyA') => {
       if (tick > clock.tick) at(tick);
-      rec.release(part(ctx.parts.selected), source, pitch, tick);
+      rec.release(part(ctx.playedSlot()), source, pitch, tick);
     },
     notes: (region) => {
       const pattern = partAt(ctx.model.doc, 0)?.regions[region]?.pattern;

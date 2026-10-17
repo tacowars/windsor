@@ -122,8 +122,9 @@ class RecView implements RollRecView {
   frame(): void {
     const recorder = rollRecorder();
     recorder?.sync();
-    const selected = this.host.ctx.parts.selected === this.host.slot;
-    const look = recorder && selected ? recorder.look() : 'no-region';
+    // The part Rec records into: the selected one, or the Expanded roll's while it is on screen.
+    const target = recorder?.target() === this.host.slot;
+    const look = recorder && target ? recorder.look() : 'no-region';
     this.show(look);
     const full = look === 'full' && recorder?.place().region === this.host.source().regionIndex;
     if (full !== this.full) {

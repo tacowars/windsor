@@ -12,22 +12,25 @@ import { type TickWindow, rollWindow } from './rollRepeats';
 import { nearestRow, rowIndexAt } from './rollRows';
 import { type RollScene, centrePitch } from './rollScene';
 import { ROLL_EMPTY_CENTRE_PITCH } from './rollTables';
-
-/** The tick at the left edge and the pitch in the middle. */
-interface ViewSpot {
-  readonly tick: number;
-  readonly pitch: number;
-}
+import type { RollSpot } from './rollView';
 
 /** One device's notes pane: its spot, kept and restored, and the ticks it shows. */
 export class RollViewSpot {
-  private spot: ViewSpot | null = null;
+  private spot: RollSpot | null = null;
 
   constructor(private readonly panes: RollPanes) {}
 
-  /** Forget the spot: the next paint centres the notes again (Expand opened or closed). */
-  forget(): void {
-    this.spot = null;
+  /** The spot kept, or null before the pane was laid out. */
+  get kept(): RollSpot | null {
+    return this.spot;
+  }
+
+  /**
+   * Start again from `spot` (Expand opened or closed): the next paint scrolls
+   * there, or, with none, centres the notes.
+   */
+  startFrom(spot: RollSpot | null): void {
+    this.spot = spot;
   }
 
   /** Remember where the pane sits over `scene`. */
