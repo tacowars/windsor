@@ -290,7 +290,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
       <div class="patch-box-wrap">
         <button class="patch-box" id="patchBox">
           <span class="patch-box-lines">
-            <span class="patch-box-line"><span class="patch-box-name">EFM Kick</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span></span>
+            <span class="patch-box-line"><span class="patch-box-name rack-only">Kick Drive</span><span class="patch-box-name norack-only">EFM Kick</span><i class="patch-box-mod" title="Edited since saved"></i><span class="patch-box-src">Drums · this song</span></span>
             <span class="patch-box-line patch-box-rack rack-only new" title="Loaded from the rack Kick Drive; the dot: the part differs from the rack"><span class="field-label">Rack</span><b>Kick Drive</b><i class="patch-box-mod" title="Differs from the rack"></i></span>
           </span>
           <span class="patch-box-search">⌕ search</span>
@@ -404,7 +404,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
         <div class="pb-chips"><span>efm</span><span>kick</span><span>digital</span><span>sub</span><span>mono</span></div>
         <p class="pb-desc">The EFM Kick into Classic Drive and a bus compressor keyed from another part. The Reverb is in the chain switched off, for the breakdown.</p>
         <dl class="pb-rack new">
-          <dt>Patch</dt><dd>EFM Kick<small>from the library patch EFM Kick (efm-kick)</small></dd>
+          <dt>Patch</dt><dd>Kick Drive<small>the rack's own name (decision 6) · from the library patch EFM Kick (efm-kick)</small></dd>
           <dt>Chain</dt>
           <dd>
             <div class="ins"><span class="pwr">⏻</span><span class="kind">Classic Drive</span></div>
@@ -427,17 +427,17 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   <h3>What the rack state changes, row by row</h3>
   <table class="rows">
     <tr><th>Where</th><th>Today (Patches)</th><th>On Racks</th><th>Source</th></tr>
-    <tr><td>Facets</td><td>Source, Category, Tags</td><td><b>Kind</b> first, Patches 167 | Racks 2, counted as every facet is: the rows the table would show on picking it. Source, Category and Tags count over racks.</td><td>decision 18; <code>facets()</code></td></tr>
+    <tr><td>Facets</td><td>Source, Category, Tags</td><td><b>Kind</b> first, Patches 11 | Racks 2 under the <code>efm</code> search, counted as every facet is: the rows the table would show on picking it, the search and the other facets kept. Source, Category and Tags count over racks.</td><td>decision 18; <code>facets()</code></td></tr>
     <tr><td>Head</td><td>PATCHES · search · Loading into Part 1</td><td>The title follows the kind: RACKS. The search field and the part are the same.</td><td>decision 18</td></tr>
     <tr><td>Table</td><td>Name, Category, Tags, Source</td><td>Name, Category, <b>Chain</b>, Tags, Source. The chain is the kinds' labels in order with →; a rack with a sequencer adds <b>▦ Euclid</b>, the kind's label, in the modulator color after the chain.</td><td><code>INSERT_LABELS</code>, <code>KIND_LABELS</code></td></tr>
     <tr><td>Pane: head</td><td>name, <code>category · source</code>, tags, description</td><td>The same, the source line reading <code>Drums · Library · Rack</code>.</td><td>decision 20</td></tr>
-    <tr><td>Pane: rack rows</td><td>—</td><td><b>Patch</b> the embedded patch's name, under it its library origin (name and id) or "a patch of its own" when the rack has no <code>patchSource</code>. <b>Chain</b> one line per insert: the power glyph lit (modulator) when enabled and faint when off, the kind's label, then <code>key disconnected</code> in the carrier color on an insert whose external sidechain is written <code>{ track: null }</code>. <b>Sequencer</b> the kind's label, or the row absent when the rack carries none. <b>Low cut</b> in Hz, or absent when the rack carries none.</td><td>decisions 3 and 18; <code>fmtHz</code></td></tr>
+    <tr><td>Pane: rack rows</td><td>—</td><td><b>Patch</b> the embedded patch's name, which is the rack's own (decision 6: the file writes its name into its patch copy), under it its library origin (name and id) or "a patch of its own" when the rack has no <code>patchSource</code>. <b>Chain</b> one line per insert: the power glyph lit (modulator) when enabled and faint when off, the kind's label, then <code>key disconnected</code> in the carrier color on an insert whose external sidechain is written <code>{ track: null }</code>. <b>Sequencer</b> the kind's label, or the row absent when the rack carries none. <b>Low cut</b> in Hz, or absent when the rack carries none.</td><td>decisions 3 and 18; <code>fmtHz</code></td></tr>
     <tr><td>Pane: patch rows</td><td>summary line, envelope sketch</td><td>Kept, read from the embedded patch.</td><td><code>patchInfo</code></td></tr>
     <tr><td>Pane: buttons</td><td>Load into Part 1, Save as… · Rename, Delete, Show in folder</td><td><b>Load into Part 1</b> (decision 10, with the discard guard of decision 11) · <b>Rename</b>, <b>Delete</b>, <b>Export</b> (decision 17). No Save as…: a rack is copied by loading it and saving it as a rack again.</td><td>decisions 10, 11, 17</td></tr>
   </table>
 
   <h2><span class="tag">2</span>The patch bar: the rack line and the ⋯ menu</h2>
-  <p>While the selected part has a <code>rackSource</code>, the patch box gains a second line under the patch's: <b>RACK</b>, the rack's name and its own modified dot, lit when the part's patch, chain, low cut or sequencer differs from the library rack (decision 14). Switch the part above to see the box with and without it; the bar's height grows by that line only. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
+  <p>While the selected part has a <code>rackSource</code>, the patch box gains a second line under the patch's: <b>RACK</b>, the rack's name and its own modified dot. The patch's line then reads the rack's name too, since a rack-loaded part plays a patch of the rack's name (decision 6); the dot on that line is the patch's own, lit when the part's patch, chain, low cut or sequencer differs from the library rack (decision 14). Switch the part above to see the box with and without it; the bar's height grows by that line only. The ⋯ menu gains a rack group after Delete: <b>Save as rack…</b> always, <b>Save rack</b> and <b>Revert rack</b> only in the rack state.</p>
   <div class="rowwrap">
     <div>
       <h3>The part plays a patch, no rack</h3>
@@ -529,7 +529,7 @@ body[data-kind='racks'] .patches-only { display: none !important; }
   </div>
 
   <h2><span class="tag">4</span>Save as rack…</h2>
-  <p>The metadata modal, as Save as… opens it, with the title and the hint changed and two checkboxes between the description and the buttons. The name is prefilled from the patch's name and becomes the rack's and the embedded patch's (decision 13); the category and the tags come from the patch's library entry; the id is <code>uniqueId(slug(name), rack ids)</code>, so a second EFM Kick rack is <code>efm-kick-2</code>.</p>
+  <p>The metadata modal, as Save as… opens it, with the title and the hint changed and two checkboxes between the description and the buttons. It is drawn for the part in its no-rack state, playing the EFM Kick. The name is prefilled from the patch's name and becomes the rack's and the embedded patch's (decision 13), so on the rack-loaded part it would prefill Kick Drive; the category and the tags come from the patch's library entry; the id is <code>uniqueId(slug(name), rack ids)</code>, so a second EFM Kick rack is <code>efm-kick-2</code>.</p>
   <div class="frame">
     <div class="backdrop">
       <div class="dlg" role="dialog" aria-labelledby="rackTitle">
