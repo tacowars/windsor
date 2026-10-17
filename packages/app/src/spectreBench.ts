@@ -134,6 +134,8 @@ export function openSpectreBench(host: SpectreBenchHost): () => void {
   const header = benchHeader({
     current,
     commit,
+    // A preset moves the columns' toggles and knobs: the next frame follows it as an outside edit.
+    picked: () => (own = null),
     channel: () => state.channel,
     setChannel: (channel) => {
       state.channel = channel;

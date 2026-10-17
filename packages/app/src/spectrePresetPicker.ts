@@ -4,7 +4,8 @@
  * `spacePicker`): `custom` when nothing matches, then the bank under its
  * groups. A pick writes the preset's whole sound in one undo step, the
  * user's Mix, Output, Freeze switch and on/off kept; `refresh` reads the
- * match back after any edit, from the card or the workbench.
+ * match back after any edit, from the card or the workbench. `picked` runs
+ * after a pick, so the owner repaints what the preset moved.
  */
 import {
   SPECTRE_PRESET_GROUPS,
@@ -26,10 +27,11 @@ const GROUPS = SPECTRE_PRESET_GROUPS.map((group) => ({
   })),
 }));
 
-/** The picker over `current()`, committing through `commit`. */
+/** The picker over `current()`, committing through `commit`, then calling `picked`. */
 export function spectrePresetPicker(
   current: () => SpectreSpec,
   commit: (next: SpectreSpec) => void,
+  picked: () => void,
 ): RefreshingControl {
   let refresh = (): void => {};
   const root = groupedSelect(SPECTRE_BENCH_LABELS.presetPicker, GROUPS, '', (value) => {
@@ -39,6 +41,7 @@ export function spectrePresetPicker(
       commit(applySpectrePreset(current(), Number(value))),
     );
     refresh();
+    picked();
   });
   const sel = root.querySelector('select') as HTMLSelectElement;
   const custom = new Option('custom', '');

@@ -1761,6 +1761,7 @@ var SpectreDsp = class {
     }
     this.enabled = c.enabled;
     this.bypassed = !c.enabled && this.level === 0;
+    if (this.changing && this.bypassed && this.fade === 1) this.apply();
     const slot = this.slot;
     slot[0] = c.outputDb * SPECTRE_DB_LOG2;
     exp2InPlace(slot, 0);

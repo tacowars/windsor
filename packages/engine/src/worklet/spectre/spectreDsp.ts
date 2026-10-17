@@ -23,7 +23,8 @@
  *   starts from rest.
  * - **A choice** (resolution, overlap, window) fades the whole output out
  *   over `transitionSeconds`, rebuilds from silence (the latency may change)
- *   and fades back in; an algorithm change resets that algorithm's state.
+ *   and fades back in; fully off, it lands at once. An algorithm change
+ *   resets that algorithm's state.
  * - **Sleep** (`drowse`, called by the processor after it sets each block's
  *   input `peak`): after a silent block, once no frame has written into the delays
  *   above the output floor for the memory's length and the modulations' own
@@ -246,6 +247,8 @@ class SpectreDsp {
     }
     this.enabled = c.enabled;
     this.bypassed = !c.enabled && this.level === 0;
+    // Fully off, the output is the late dry to the bit: a choice lands at once, with no fade.
+    if (this.changing && this.bypassed && this.fade === 1) this.apply();
     const slot = this.slot;
     slot[0] = c.outputDb * SPECTRE_DB_LOG2;
     exp2InPlace(slot, 0);

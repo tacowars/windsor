@@ -169,6 +169,8 @@ export function benchLaneColumn(
 export interface SpectreHeaderHost {
   current(): SpectreSpec;
   commit(next: SpectreSpec): void;
+  /** After a Starting point is picked: the lanes' columns follow the preset. */
+  picked(): void;
   channel(): SpectreChannel;
   setChannel(channel: SpectreChannel): void;
   showKey(): boolean;
@@ -186,7 +188,7 @@ const FOLLOW_OPTIONS: readonly (readonly [SpectreFollow, string])[] = [
 
 /** The header; `refresh` follows the document after an edit from elsewhere. */
 export function benchHeader(host: SpectreHeaderHost): { element: HTMLElement; refresh(): void } {
-  const picker = spectrePresetPicker(host.current, host.commit);
+  const picker = spectrePresetPicker(host.current, host.commit, host.picked);
   const channel = seg(
     [
       { value: '0', label: 'L' },

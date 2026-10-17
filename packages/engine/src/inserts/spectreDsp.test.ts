@@ -6,8 +6,9 @@
  * echo lands at its delay and its repeats fall by its feedback; Freeze holds
  * what the memory has in Hold and lets drawn feedback decay in Carve; Mix 0
  * is the late dry to the bit; a change of resolution fades through silence
- * and comes back at the new latency; posted cells are heard from the next
- * frame; Listen keeps only the selection; the scope bins each cell.
+ * and comes back at the new latency, and on an insert fully off lands at
+ * once; posted cells are heard from the next frame; Listen keeps only the
+ * selection; the scope bins each cell.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -141,6 +142,22 @@ describe('a change of resolution', () => {
     expect(Math.abs(out[fadeEnd]!)).toBe(0);
     for (let i = change * 128; i < fadeEnd; i++) expect(Math.abs(out[i]!)).toBeLessThan(0.61);
     expect(lateError(out, input, 4095, fadeEnd + 4096 + 2048)).toBeLessThan(1e-6);
+  });
+
+  it('lands at once on an insert fully off: the late dry to the bit, with no fade', () => {
+    const rate = 48000;
+    const off = { ...SPECTRE_TRANSPARENT, enabled: false, bands: '512' as const };
+    const params = spectreParams(off);
+    const processor = loadSpectre(rate, params);
+    const input = spectreSignal(rate / 2, (i) => tone(i, rate))[0]!;
+    const change = 100;
+    const out = runSpectre(processor, [input, input], params, (q) => {
+      if (q === change) setSpectre(params, { ...off, bands: '2048' });
+    }).left;
+    // The old latency's dry up to the change, then the new one's from an empty ring.
+    const at = change * 128;
+    for (let i = 1023; i < at; i++) expect(out[i]).toBe(input[i - 1023]);
+    for (let i = at; i < out.length; i++) expect(out[i]).toBe(i - at >= 4095 ? input[i - 4095] : 0);
   });
 });
 

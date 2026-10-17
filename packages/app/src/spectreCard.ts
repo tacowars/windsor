@@ -182,7 +182,8 @@ function openBench(view: SpectreView, from: HTMLElement, closed: () => void): vo
 }
 
 function curvesPage(view: SpectreView): HTMLElement {
-  const picker = spectrePresetPicker(view.current, view.commit);
+  // A pick moves the thumbnail and the Shift and Offset knobs: the card repaints.
+  const picker = spectrePresetPicker(view.current, view.commit, () => view.ctx.render());
   const thumb = spectreThumb(view.current, () => openBench(view, thumb.element, thumb.draw));
   const expand = seg(
     [{ value: 'wide', label: '⤢ Expand' }],

@@ -5,8 +5,8 @@
  *
  * - **Draw** sets the cells it passes to where the pointer is, along the line
  *   from its last position, so a fast drag leaves no gap; with Shift, a press
- *   draws straight from the last stroke's end. Levels and, on the delay lane,
- *   Snap round what it writes.
+ *   draws straight from the last stroke's end on that lane and channel, in
+ *   this workbench. Levels and, on the delay lane, Snap round what it writes.
  * - **Push** raises or lowers by the drag, softly toward the brush's edges;
  *   **Smooth** evens the cells out; pen pressure scales both.
  * - **Erase** puts the cells it passes back at rest.
@@ -62,10 +62,11 @@ interface Stroke {
   readonly base: SpectreSpec;
   readonly anchor: number;
   readonly mode: 'replace' | 'add' | 'remove';
+  /** The workbench's last Draw stroke ends, by `drawnKey`, for Shift's straight line. */
+  readonly drawn: Map<string, BrushAt>;
 }
 
-/** The last Draw stroke's end, per lane, for Shift's straight line. */
-const lastDrawn = new Map<SpectreCurve, BrushAt>();
+const drawnKey = (curve: SpectreCurve, channel: SpectreChannel): string => `${curve}:${channel}`;
 
 function local(canvas: HTMLCanvasElement, e: PointerEvent | MouseEvent): { x: number; y: number } {
   const box = canvas.getBoundingClientRect();
@@ -117,7 +118,7 @@ function strokeTo(
   } else next = smoothAt(cells, cell, width, SPECTRE_BRUSH.smoothStrength * pressure(e));
   stroke.prev = now;
   stroke.y = y;
-  if (tool === 'draw') lastDrawn.set(lane.curve, now);
+  if (tool === 'draw') stroke.drawn.set(drawnKey(lane.curve, channel), now);
   host.commit(withCells(spec, lane.curve, channel, next));
 }
 
@@ -128,6 +129,8 @@ function toolLabel(tool: SpectreTool): string {
 /** Wire the pointer on `host.canvas`. */
 export function wireSpectreBench(host: SpectreInputHost): void {
   const { canvas } = host;
+  // Each open workbench starts with no stroke behind it.
+  const drawn = new Map<string, BrushAt>();
   let stroke: Stroke | null = null;
   const stop = (e: PointerEvent): void => {
     stroke?.gesture.close();
@@ -146,7 +149,8 @@ export function wireSpectreBench(host: SpectreInputHost): void {
     const tool = host.tool();
     const cell = cellOfX(host.layout(), at.x);
     const here: BrushAt = { cell, value: drawnValue(host, lane, at.y) };
-    const from = tool === 'draw' && e.shiftKey ? (lastDrawn.get(lane.curve) ?? here) : here;
+    const last = drawn.get(drawnKey(lane.curve, host.channel()));
+    const from = tool === 'draw' && e.shiftKey ? (last ?? here) : here;
     stroke = {
       lane,
       gesture: dragGesture(tool === 'select' ? SPECTRE_BENCH_LABELS.select : toolLabel(tool)),
@@ -155,6 +159,7 @@ export function wireSpectreBench(host: SpectreInputHost): void {
       base: host.spec(),
       anchor: cell,
       mode: tool !== 'select' ? 'replace' : e.altKey ? 'remove' : e.shiftKey ? 'add' : 'replace',
+      drawn,
     };
     canvas.setPointerCapture(e.pointerId);
     strokeTo(host, stroke, at.x, at.y, e);
