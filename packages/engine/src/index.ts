@@ -439,6 +439,8 @@ export { RACK_FILE_FORMAT, RACK_FILE_KIND, loadRackFile } from './rack/rackFile'
 export type { RackEntry, RackFile } from './rack/rackFile';
 export { serialiseRackFile } from './rack/rackFileSerialise';
 export { RackFormatError } from './rack/rackMigrations';
+export { loadBuiltInRacks } from './rack/builtInRacks';
+export type { BuiltInRacks } from './rack/builtInRacks';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 // The operator width's bounds and the second LFO's defaults (windsor#54), an

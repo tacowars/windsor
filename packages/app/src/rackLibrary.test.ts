@@ -2,19 +2,23 @@
  * The library model's rack side (windsor#868, record `2026-10-17-racks`
  * decision 15) over an in-memory store: a read that keeps an old rack and
  * names a broken one, a write and a remove that re-read, the download path
- * without a store, and the one problem toast covering patches and racks.
+ * without a store, the one problem toast covering patches and racks, the
+ * built-in bank under the user's racks (windsor#877) and the folder grant's
+ * `racks/` over both.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { RackFile } from '@windsor/engine';
-import { RACK_FILE_FORMAT, serialiseRackFile } from '@windsor/engine';
+import { RACK_FILE_FORMAT, loadRackFile, serialiseRackFile } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { DocumentModel } from './documentModel';
 import type { PatchFolder } from './libraryFolder';
 import { disconnectLibrary, libraryProblemsText, pageLibrary } from './libraryModel';
 import { rackFromPart } from './rackActions';
 import {
+  connectRackFolder,
   connectUserRacks,
+  disconnectRackFolder,
   exportOldFormatRack,
   isRackWritable,
   rackEntry,
@@ -175,5 +179,56 @@ describe('the problem toast', () => {
     await refreshRacks(model);
     expect(model.rackProblems).toHaveLength(1);
     expect(model.rackNotes).toHaveLength(1);
+  });
+});
+
+/** A bank of one rack, as `loadBuiltInRacks` would hand it over. */
+function bank(id: string): Record<string, ReturnType<typeof loadRackFile>> {
+  const file = { ...goodRack(), name: 'Shipped', patch: { ...goodRack().patch, name: 'Shipped' } };
+  return { [id]: loadRackFile(id, JSON.parse(serialiseRackFile(file))) };
+}
+
+describe('the built-in racks (windsor#877)', () => {
+  it("lists the bank under the user's racks, read-only, and hides a user rack of a shipped id", async () => {
+    const model = pageLibrary();
+    await connectUserRacks(model, store(), bank('kick-rack'));
+    expect(Object.keys(model.racks)).toEqual(['kick-rack', 'loud-rack']);
+    expect(rackEntry(model, 'kick-rack')?.name).toBe('Shipped');
+    expect(isRackWritable(model, 'kick-rack')).toBe(false);
+    expect(isRackWritable(model, 'loud-rack')).toBe(true);
+    expect(model.rackProblems).toHaveLength(2);
+    expect(model.rackProblems[1]).toBe(
+      'your rack "kick-rack" is hidden by the built-in of the same id',
+    );
+    await expect(writeRackFile(model, 'kick-rack', serialiseRackFile(goodRack()))).rejects.toThrow(
+      /built-in rack/,
+    );
+    await expect(removeRackFile(model, 'kick-rack')).rejects.toThrow(/not one of your racks/);
+  });
+
+  it('is the whole listing without a user store', async () => {
+    const model = pageLibrary();
+    await connectUserRacks(model, null, bank('shipped'));
+    expect(Object.keys(model.racks)).toEqual(['shipped']);
+    expect(model.userRackIds.size).toBe(0);
+  });
+});
+
+describe("the folder grant's racks/ (windsor#877)", () => {
+  it("replaces the bank and the user's racks while connected, every rack writable, and gives them back", async () => {
+    const model = pageLibrary();
+    await connectUserRacks(model, store(), bank('shipped'));
+    const files = folder(new Map([['dev-rack.json', serialiseRackFile(goodRack())]]));
+    await connectRackFolder(model, files);
+    expect(Object.keys(model.racks)).toEqual(['dev-rack']);
+    expect(isRackWritable(model, 'dev-rack')).toBe(true);
+    await writeRackFile(model, 'shipped', serialiseRackFile(goodRack()));
+    expect(files.files.has('shipped.json')).toBe(true);
+    expect(isRackWritable(model, 'shipped')).toBe(true);
+    await removeRackFile(model, 'dev-rack');
+    expect(files.files.has('dev-rack.json')).toBe(false);
+    await disconnectRackFolder(model);
+    expect(Object.keys(model.racks)).toEqual(['shipped', 'kick-rack', 'loud-rack']);
+    expect(isRackWritable(model, 'shipped')).toBe(false);
   });
 });

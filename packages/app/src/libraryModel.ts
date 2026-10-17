@@ -44,7 +44,11 @@ export interface LibraryModel {
    * and the old-format racks kept for Export and Delete.
    */
   racks: Readonly<Record<string, RackEntry>>;
+  /** The shipped bank (windsor#877) as `connectUserRacks` took it, under the user's own in `racks`. */
+  builtInRacks: Readonly<Record<string, RackEntry>>;
   userRacks: PatchFolder | null;
+  /** The grant's `racks/` folder while connected (windsor#877), which replaces the built-ins and the user's racks. */
+  rackFolder: PatchFolder | null;
   userRackIds: ReadonlySet<string>;
   rackProblems: string[];
   rackNotes: string[];
@@ -67,7 +71,9 @@ export function pageLibrary(
     problems: [],
     oldFormat: [],
     racks: {},
+    builtInRacks: {},
     userRacks,
+    rackFolder: null,
     userRackIds: new Set(),
     rackProblems: [],
     rackNotes: [],
@@ -161,11 +167,14 @@ export function connectLibrary(model: LibraryModel, folder: PatchFolder): Promis
   return refreshLibrary(model);
 }
 
-/** Back to the built-ins and the user's library; the racks, which no folder grant replaces yet, stay as they are. */
+/** Back to the built-ins and the user's library; the racks are `rackLibrary.ts`'s and stay as they are. */
 export function disconnectLibrary(model: LibraryModel): Promise<void> {
-  const { racks, userRackIds, rackProblems, rackNotes, oldFormatRacks } = model;
+  const { racks, builtInRacks, rackFolder, userRackIds, rackProblems, rackNotes, oldFormatRacks } =
+    model;
   Object.assign(model, pageLibrary(model.user, model.userRacks), {
     racks,
+    builtInRacks,
+    rackFolder,
     userRackIds,
     rackProblems,
     rackNotes,

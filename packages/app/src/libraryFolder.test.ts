@@ -10,14 +10,34 @@ import { describe, expect, it } from 'vitest';
 import { serialisePatchFile } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { ChromeDirectoryHandle } from './libraryFolder';
-import { readFolderLibrary, wrapDirectoryHandle } from './libraryFolder';
+import {
+  isPatchesOnlyGrant,
+  openLibraryFolders,
+  readFolderLibrary,
+  wrapDirectoryHandle,
+} from './libraryFolder';
 
-/** A `FileSystemDirectoryHandle` stand-in over a map of file name → text. */
-function fakeHandle(files: Map<string, string>): ChromeDirectoryHandle & { log: string[] } {
+type FakeHandle = ChromeDirectoryHandle & { log: string[] };
+
+/** A `FileSystemDirectoryHandle` stand-in over a map of file name → text, with subfolders made on demand. */
+function fakeHandle(
+  files: Map<string, string>,
+  name = 'patches',
+  subfolders = new Map<string, FakeHandle>(),
+): FakeHandle {
   const log: string[] = [];
   return {
-    name: 'patches',
+    name,
     log,
+    getDirectoryHandle: (child, options) => {
+      const known = subfolders.get(child);
+      if (known) return Promise.resolve(known);
+      if (!options?.create) return Promise.reject(new Error(`no folder ${child}`));
+      log.push(`made ${child}`);
+      const made = fakeHandle(new Map(), child);
+      subfolders.set(child, made);
+      return Promise.resolve(made);
+    },
     async *values() {
       for (const name of files.keys()) yield { kind: 'file' as const, name };
       yield { kind: 'directory' as const, name: 'nested' };
@@ -108,5 +128,26 @@ describe('wrapDirectoryHandle', () => {
       'open new.json',
       'removed new.json',
     ]);
+  });
+});
+
+describe('openLibraryFolders (windsor#877)', () => {
+  it('opens patches/ and racks/ under the grant, making a missing one, and reads each', async () => {
+    const patches = fakeHandle(new Map([['kick.json', serialisePatchFile(kick)]]), 'patches');
+    const root = fakeHandle(new Map(), 'src', new Map([['patches', patches]]));
+    const folders = await openLibraryFolders(root);
+    expect(folders.patches.name).toBe('patches');
+    expect(folders.racks.name).toBe('racks');
+    expect(root.log).toEqual(['made racks']);
+    expect(await folders.patches.list()).toEqual(['kick.json']);
+    expect(await folders.racks.list()).toEqual([]);
+    await folders.racks.write('mine.json', '{}\n');
+    expect(await folders.racks.read('mine.json')).toBe('{}\n');
+    expect(await folders.patches.list()).toEqual(['kick.json']);
+  });
+
+  it('tells a grant on patches/ alone from one on the engine source folder', () => {
+    expect(isPatchesOnlyGrant(fakeHandle(new Map(), 'patches'))).toBe(true);
+    expect(isPatchesOnlyGrant(fakeHandle(new Map(), 'src'))).toBe(false);
   });
 });

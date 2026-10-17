@@ -1,13 +1,16 @@
 /**
  * The library model's rack side (windsor#868, record `2026-10-17-racks`
  * decision 15): the user's racks in IndexedDB read through the engine's one
- * rack loader, beside the patches `libraryModel.ts` reads. The store is a
- * `PatchFolder` under a second name, so the model and the tests reuse the
- * folder abstraction and its in-memory fakes. Built-in racks are a later
- * issue's and join here, under the user's own, as the built-in patches do.
+ * rack loader, beside the patches `libraryModel.ts` reads, under the built-in
+ * bank (windsor#877, decision 16) as the user's patches sit under the built-in
+ * patches. The developer's folder grant replaces both while connected, as it
+ * does for the patches. The stores are `PatchFolder`s under other names, so
+ * the model and the tests reuse the folder abstraction and its in-memory
+ * fakes.
  */
-import type { RackEntry } from '@windsor/engine';
+import type { BuiltInRacks, RackEntry } from '@windsor/engine';
 import { loadRackFile } from '@windsor/engine';
+import { builtInRackEntries } from './builtInRacks';
 import type { OldFormatPatch, PatchFolder } from './libraryFolder';
 import { readFolderWith } from './libraryFolder';
 import type { LibraryModel } from './libraryModel';
@@ -24,9 +27,12 @@ export const downloadRackFile = downloadPatchFile;
 export const rackEntry = (model: LibraryModel, id: string): RackEntry | undefined =>
   Object.hasOwn(model.racks, id) ? model.racks[id] : undefined;
 
-/** True when a write may go over `id`: one of the user's own racks. */
+/** True when a write may go over `id`: a rack of the connected folder, else one of the user's own. */
 export const isRackWritable = (model: LibraryModel, id: string): boolean =>
-  model.userRackIds.has(id);
+  model.rackFolder ? Object.hasOwn(model.racks, id) : model.userRackIds.has(id);
+
+/** The store a write goes to: the folder while connected, else the user's; null without either. */
+const rackStore = (model: LibraryModel): PatchFolder | null => model.rackFolder ?? model.userRacks;
 
 /** What a loaded rack's own soft problems (a clamp, a dropped key) read as in the library line. */
 const entryNotes = (entries: RackEntries): string[] =>
@@ -35,39 +41,82 @@ const entryNotes = (entries: RackEntries): string[] =>
   );
 
 /**
- * Re-read the user's rack store (after every write). Without one the racks
- * are none. A rack the loader refuses is named under `rackProblems`; one it
- * loaded with a correction is in `racks` and named under `rackNotes`; one
- * of a format this build cannot read is kept under `oldFormatRacks`.
+ * Re-read the racks (after every write): the connected folder's, every one
+ * writable; else the built-ins with the user's own over them, a user rack
+ * whose id a built-in has staying hidden behind it and named under
+ * `rackProblems`, as `refreshLibrary` keeps a built-in patch unshadowed. A
+ * rack the loader refuses is named under `rackProblems`; one it loaded with a
+ * correction is in `racks` and named under `rackNotes`; one of a format this
+ * build cannot read is kept under `oldFormatRacks`.
  */
-export const refreshRacks = tracked(async (model: LibraryModel): Promise<void> => {
-  if (!model.userRacks) {
-    model.racks = {};
+export const refreshRacks = tracked(async function refreshRacks(
+  model: LibraryModel,
+): Promise<void> {
+  const { builtInRacks: builtIns } = model;
+  const store = rackStore(model);
+  if (!store) {
+    model.racks = builtIns;
     model.userRackIds = new Set();
     model.rackProblems = [];
-    model.rackNotes = [];
+    model.rackNotes = entryNotes(builtIns);
     model.oldFormatRacks = [];
     return;
   }
-  const { entries, problems, oldFormat } = await readFolderWith(model.userRacks, loadRackFile);
-  model.racks = entries;
-  model.userRackIds = new Set(Object.keys(entries));
-  model.rackProblems = problems;
-  model.rackNotes = entryNotes(entries);
+  const { entries, problems, oldFormat } = await readFolderWith(store, loadRackFile);
   model.oldFormatRacks = oldFormat;
+  if (model.rackFolder) {
+    model.racks = entries;
+    model.userRackIds = new Set(Object.keys(entries));
+    model.rackProblems = problems;
+    model.rackNotes = entryNotes(entries);
+    return;
+  }
+  const clashes = Object.keys(entries).filter((id) => Object.hasOwn(builtIns, id));
+  const own = Object.fromEntries(
+    Object.entries(entries).filter(([id]) => !Object.hasOwn(builtIns, id)),
+  );
+  model.racks = { ...builtIns, ...own };
+  model.userRackIds = new Set(Object.keys(own));
+  model.rackProblems = [
+    ...problems,
+    ...clashes.map((id) => `your rack "${id}" is hidden by the built-in of the same id`),
+  ];
+  model.rackNotes = entryNotes(model.racks);
 });
 
-/** Attach the user's rack store (null where the browser has none) and read it. */
-export function connectUserRacks(model: LibraryModel, racks: PatchFolder | null): Promise<void> {
+/**
+ * Attach the user's rack store (null where the browser has none) under the
+ * shipped bank, as loaded by then, and read it. `builtIns` is a parameter so a
+ * test can bring its own bank.
+ */
+export function connectUserRacks(
+  model: LibraryModel,
+  racks: PatchFolder | null,
+  builtIns: BuiltInRacks = builtInRackEntries(),
+): Promise<void> {
+  model.builtInRacks = builtIns;
   model.userRacks = racks;
   return refreshRacks(model);
 }
 
+/** Point the racks at the grant's `racks/` folder and read it; the built-ins and the user's give way. */
+export function connectRackFolder(model: LibraryModel, folder: PatchFolder): Promise<void> {
+  model.rackFolder = folder;
+  return refreshRacks(model);
+}
+
+/** Back to the built-ins and the user's racks. */
+export function disconnectRackFolder(model: LibraryModel): Promise<void> {
+  model.rackFolder = null;
+  return refreshRacks(model);
+}
+
 /**
- * Write one rack file into the user's store and re-read it, or, with no
- * store (a browser without IndexedDB), a download plus the entry kept in
- * memory for the rest of the session, through the loader so a file it
- * would refuse never becomes an entry.
+ * Write one rack file into the folder or the user's store and re-read it,
+ * or, with neither (a browser without IndexedDB), a download plus the entry
+ * kept in memory for the rest of the session, through the loader so a file
+ * it would refuse never becomes an entry. A built-in id is refused outside
+ * the folder: built-ins are never shadowed.
  */
 export const writeRackFile = tracked(async function writeRackFile(
   model: LibraryModel,
@@ -75,8 +124,11 @@ export const writeRackFile = tracked(async function writeRackFile(
   text: string,
   download: (id: string, text: string) => void = downloadRackFile,
 ): Promise<void> {
-  if (model.userRacks) {
-    await model.userRacks.write(rackFileName(id), text);
+  if (rackEntry(model, id) && !isRackWritable(model, id))
+    throw new Error(`"${id}" is a built-in rack and stays read-only.`);
+  const store = rackStore(model);
+  if (store) {
+    await store.write(rackFileName(id), text);
     await refreshRacks(model);
     return;
   }
@@ -108,21 +160,22 @@ export function exportOldFormatRack(
   download(id, entry.text);
 }
 
-/** Delete an old-format rack from the user's store, on the user's word, and re-read. */
+/** Delete an old-format rack from its store, on the user's word, and re-read. */
 export const removeOldFormatRack = tracked(
   async (model: LibraryModel, id: string): Promise<void> => {
-    if (!model.userRacks || !oldFormatRack(model, id))
+    const store = rackStore(model);
+    if (!store || !oldFormatRack(model, id))
       throw new Error(`"${id}" is not an old-format rack in this library.`);
-    await model.userRacks.remove(rackFileName(id));
+    await store.remove(rackFileName(id));
     await refreshRacks(model);
   },
 );
 
-/** Remove one of the user's racks and re-read; refused without a store or for an id that is not the user's. */
+/** Remove a writable rack and re-read; refused without a store or for an id that is not writable. */
 export const removeRackFile = tracked(async (model: LibraryModel, id: string): Promise<void> => {
-  if (!model.userRacks)
-    throw new Error('This browser cannot store racks, so there is none to delete.');
+  const store = rackStore(model);
+  if (!store) throw new Error('This browser cannot store racks, so there is none to delete.');
   if (!isRackWritable(model, id)) throw new Error(`"${id}" is not one of your racks.`);
-  await model.userRacks.remove(rackFileName(id));
+  await store.remove(rackFileName(id));
   await refreshRacks(model);
 });
