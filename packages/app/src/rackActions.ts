@@ -22,6 +22,7 @@ import {
   RACK_FILE_FORMAT,
   RACK_FILE_KIND,
   SEEDED_KINDS,
+  SEQ_AUTOMATION_FIELDS,
   clonePatch,
   isKeyedSpec,
   parseTargetId,
@@ -115,15 +116,26 @@ export function rackFromPart(
   };
 }
 
+/** What a load's lanes and mappings are checked against: the rack's chain, and its sequencer kind when it brings one. */
+interface LoadedTargets {
+  readonly specOf: (id: string) => InsertSpec | undefined;
+  readonly seqKind: SequencerKind | undefined;
+}
+
 /**
- * True when `target` is not an insert's, or is a row the new chain's insert
- * of that id has: the same lookup the lane and CC normalisers make, so a
- * target the engine would drop after the load (a host kept with its slot
- * emptied, an id now of another kind) goes in the load itself.
+ * True when `target` survives the load: a strip or voice row always; an
+ * insert row the new chain's insert of that id has, by the lookup the lane
+ * and CC normalisers make; a sequencer row the rack's kind offers, by their
+ * table. A target the engine would drop after the load (a host kept with
+ * its slot emptied, an id now of another kind, a row the new sequencer kind
+ * lacks) goes in the load itself, so the live partial and the document agree.
  */
-function keptTarget(target: string, specOf: (id: string) => InsertSpec | undefined): boolean {
+function keptTarget(target: string, loaded: LoadedTargets): boolean {
   const parsed = parseTargetId(target);
-  return parsed?.kind !== 'insert' || targetRow(target, specOf) !== undefined;
+  if (parsed?.kind === 'insert') return targetRow(target, loaded.specOf) !== undefined;
+  if (parsed?.kind === 'seq' && loaded.seqKind !== undefined)
+    return (SEQ_AUTOMATION_FIELDS[loaded.seqKind] ?? []).includes(parsed.field);
+  return true;
 }
 
 /**
@@ -172,9 +184,12 @@ function rackLoad(
   const specs = new Map(
     file.inserts.flatMap((spec) => (spec.id === undefined ? [] : [[spec.id, spec] as const])),
   );
-  const specOf = (id: string): InsertSpec | undefined => specs.get(id);
-  const automation = part.automation?.filter((lane) => keptTarget(lane.target, specOf));
-  const ccMappings = part.ccMappings?.filter((mapping) => keptTarget(mapping.target, specOf));
+  const loaded: LoadedTargets = {
+    specOf: (id) => specs.get(id),
+    seqKind: file.sequencer?.kind,
+  };
+  const automation = part.automation?.filter((lane) => keptTarget(lane.target, loaded));
+  const ccMappings = part.ccMappings?.filter((mapping) => keptTarget(mapping.target, loaded));
   const fields: Record<string, unknown> = {
     preset: patchId,
     patchSource,

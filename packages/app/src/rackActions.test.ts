@@ -1,90 +1,30 @@
 /**
  * The pure rack rules (windsor#868, record `2026-10-17-racks` decisions 2,
- * 3, 10, 12 and 14) over the full fixture: a rack built from the kick, loaded
- * into another part, a part added from it, and the difference the modified
- * dot reads.
+ * 3 and 10) over the full fixture: a rack built from the kick, and a rack
+ * loaded into another part as one partial. The part added from a rack and
+ * the modified dot's difference are `rackActionsPart.test.ts`.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { DocumentPartial, Patch, RackFile } from '@windsor/engine';
+import type { Patch, RackFile } from '@windsor/engine';
 import {
   clonePatch,
   formatTargetId,
   loadRackFile,
   partAt,
+  seqTargetId,
   serialiseRackFile,
 } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { AutoCopies } from './autoCopies';
+import type { RackRef } from './rackActions';
+import { loadRackChange, rackFromPart, withoutSeed } from './rackActions';
+import { ALL, BARE, partFields, rackTestScope, raw } from './__fixtures__/rackScope';
 import { loadBuiltIns } from './builtInLibrary';
-import { DocumentModel } from './documentModel';
-import type { LibraryModel } from './libraryModel';
-import { pageLibrary } from './libraryModel';
-import type { RackRef, RackSaveOptions } from './rackActions';
-import {
-  addPartFromRackChange,
-  loadRackChange,
-  rackDifferences,
-  rackFromPart,
-  withoutSeed,
-} from './rackActions';
-import { addPart, setSequencerKind } from './songParts';
+import { setSequencerKind } from './songParts';
 
 beforeAll(() => loadBuiltIns());
 
-const { kick, hat, arp, drone } = FULL_SLOT;
-
-const META = { name: 'Kick Rack', category: 'Drums', tags: ['kick'], description: 'A test rack.' };
-const ALL: RackSaveOptions = { ...META, lowCut: true, sequencer: true };
-const BARE: RackSaveOptions = { ...META, lowCut: false, sequencer: false };
-
-/** The kick's chain as the song would hold it: a drive, a compressor keyed from the hat, an echo with a compressor in its slot. */
-const KICK_CHAIN = [
-  { kind: 'drive', id: 'd1' },
-  { kind: 'compressor', id: 'c1', sidechain: { track: hat } },
-  { kind: 'echo', id: 'e1', slot: { kind: 'compressor', id: 'c2' } },
-];
-
-/** The full fixture with the kick's chain and low cut set, normalised. */
-function song(): DocumentModel {
-  const model = new DocumentModel(FULL_DOCUMENT);
-  model.merge(
-    raw({
-      parts: { [kick]: { strip: { inserts: KICK_CHAIN, lowCut: 80 } } },
-    }),
-  );
-  return model;
-}
-
-function scope(model: DocumentModel) {
-  const library: LibraryModel = pageLibrary();
-  const ids = new Set(Object.keys(library.entries));
-  const auto = new AutoCopies();
-  const rack = (options = ALL): RackRef => ({
-    id: 'kick-rack',
-    file: rackFromPart(model.doc, kick, options, ids) as RackFile,
-  });
-  const load = (slot: number, ref: RackRef): DocumentPartial => {
-    const partial = loadRackChange(model.doc, slot, ref, library, auto);
-    if (!partial) throw new Error(`no part on slot ${slot}`);
-    model.merge(partial);
-    return partial;
-  };
-  return { library, ids, auto, rack, load };
-}
-
-/** A hand-written partial: the merge renormalises it, so its shape is the document's, not the type's. */
-const raw = (value: unknown): DocumentPartial => value as DocumentPartial;
-
-/** A raw chain as the song normalises it: every insert at its kind's defaults, its id kept. */
-function chain(inserts: unknown[]): RackFile['inserts'] {
-  const model = new DocumentModel(FULL_DOCUMENT);
-  model.merge(raw({ parts: { [kick]: { strip: { inserts } } } }));
-  return [...partAt(model.doc, kick)!.strip.inserts];
-}
-
-const partFields = (partial: DocumentPartial, slot: number): Record<string, unknown> =>
-  (partial.parts as Record<number, Record<string, unknown>>)[slot]!;
+const { kick, hat, arp, drone, song, scope, chain } = rackTestScope(FULL_DOCUMENT, FULL_SLOT);
 
 describe('rackFromPart (decision 2)', () => {
   it('takes the patch under the rack name, the chain with its keys cleared, the low cut and the pattern', () => {
@@ -261,6 +201,37 @@ describe('loadRackChange (decision 10)', () => {
     expect(lanes()).toEqual([mix]);
   });
 
+  it("drops a sequencer lane the rack's kind does not offer, and keeps one it does", () => {
+    const model = song();
+    const { load, ids } = scope(model);
+    const density = seqTargetId('density');
+    const gate = seqTargetId('gate');
+    const points = [{ tick: 0, value: 0.5 }];
+    // A Bass part with its two sequencer lanes; an Arp rack offers gate but not density.
+    model.merge(raw({ parts: { [arp]: { sequencer: { kind: 'bass', seed: 0 } } } }));
+    model.merge(
+      raw({
+        parts: {
+          [arp]: {
+            automation: [
+              { target: density, points },
+              { target: gate, points },
+            ],
+          },
+        },
+      }),
+    );
+    expect(partAt(model.doc, arp)?.automation).toHaveLength(2);
+    const asArp = model.preview(setSequencerKind(model.doc, hat, 'arp'));
+    const bare = rackFromPart(model.doc, kick, BARE, ids) as RackFile;
+    const file = { ...bare, sequencer: withoutSeed(partAt(asArp, hat)!.sequencer) };
+    const fields = partFields(load(arp, { id: 'arp-rack', file }), arp);
+    expect((fields['automation'] as { target: string }[]).map((lane) => lane.target)).toEqual([
+      gate,
+    ]);
+    expect(partAt(model.doc, arp)?.automation?.map((lane) => lane.target)).toEqual([gate]);
+  });
+
   it("keeps a same-kind part's seed and region patterns, and drops another kind's", () => {
     const model = song();
     const { rack, load } = scope(model);
@@ -319,77 +290,5 @@ describe('loadRackChange (decision 10)', () => {
     const model = song();
     const { rack, library, auto } = scope(model);
     expect(loadRackChange(model.doc, 9, rack(), library, auto)).toBeNull();
-  });
-});
-
-describe('addPartFromRackChange (decision 12)', () => {
-  it('adds the part on the lowest free slot playing the rack, with no Init patch written', () => {
-    const model = song();
-    const { rack, library, auto } = scope(model);
-    const ref = rack();
-    const added = addPartFromRackChange(model.doc, (raw) => model.preview(raw), ref, library, auto);
-    expect(added?.slot).toBe(4);
-    expect(Object.keys(added!.partial.patches ?? {})).toEqual(['kick-rack']);
-    model.merge(added!.partial);
-    const part = partAt(model.doc, 4)!;
-    expect(part.preset).toBe('kick-rack');
-    expect(part.rackSource).toBe('kick-rack');
-    expect(part.strip.inserts).toEqual(ref.file.inserts);
-    expect(part.strip.lowCut).toBe(80);
-    expect(part.sequencer.kind).toBe('euclidean');
-    expect(model.doc.parts).toHaveLength(5);
-    expect(Object.keys(model.doc.patches ?? {}).some((id) => id.startsWith('(init:'))).toBe(false);
-  });
-
-  it('is null when the song is full', () => {
-    const model = song();
-    const { rack, library, auto } = scope(model);
-    let doc = model.doc;
-    for (let added = addPart(doc); added; added = addPart(doc)) doc = model.preview(added.doc);
-    expect(
-      addPartFromRackChange(doc, (raw) => model.preview(raw), rack(), library, auto),
-    ).toBeNull();
-  });
-});
-
-describe('rackDifferences (decision 14)', () => {
-  function loaded(options = ALL) {
-    const model = song();
-    const { rack, load } = scope(model);
-    const ref = rack(options);
-    load(arp, ref);
-    const diff = () =>
-      rackDifferences(partAt(model.doc, arp)!, model.doc.patches?.['kick-rack'], ref.file);
-    return { model, ref, diff };
-  }
-
-  it('is empty right after a load', () => {
-    expect(loaded().diff()).toEqual([]);
-  });
-
-  it('names the member an edit touched', () => {
-    const { model, diff } = loaded();
-    model.merge(raw({ patches: { 'kick-rack': { volume: 0.1 } } }));
-    expect(diff()).toEqual(['patch']);
-    model.merge(
-      raw({
-        parts: { [arp]: { strip: { inserts: [{ kind: 'drive', id: 'd1', drive: 3 }] } } },
-      }),
-    );
-    expect(diff()).toEqual(['patch', 'inserts']);
-    model.merge(raw({ parts: { [arp]: { strip: { lowCut: 120 } } } }));
-    expect(diff()).toEqual(['patch', 'inserts', 'lowCut']);
-    model.merge(raw({ parts: { [arp]: { sequencer: { rotate: 3 } } } }));
-    expect(diff()).toEqual(['patch', 'inserts', 'lowCut', 'sequencer']);
-  });
-
-  it('never counts a member the rack lacks', () => {
-    const { model, diff } = loaded(BARE);
-    model.merge(
-      raw({
-        parts: { [arp]: { strip: { lowCut: 120 }, sequencer: { skipChance: 0.9 } } },
-      }),
-    );
-    expect(diff()).toEqual([]);
   });
 });
