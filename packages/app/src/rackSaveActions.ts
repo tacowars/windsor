@@ -19,7 +19,7 @@ import type { MenuItem } from './patchMenu';
 import { slugify, uniqueId } from './patchMetadata';
 import type { RackSaveOptions } from './rackActions';
 import { loadRackChange, rackDifferences, rackFromPart, saveMembersFor } from './rackActions';
-import { rackNameProblem } from './rackBrowserModel';
+import { forkName, rackNameProblem } from './rackBrowserModel';
 import { isRackWritable, rackEntry, writeRackFile } from './rackLibrary';
 import { KIND_LABELS } from './sequencerConstants';
 import { fmtHz } from './consoleFormat';
@@ -119,23 +119,25 @@ async function runSaveRack(ctx: AppCtx, refresh: () => void): Promise<void> {
   const part = partAt(ctx.model.doc, slot);
   const rack = part?.rackSource === undefined ? undefined : rackEntry(library, part.rackSource);
   if (!part || !rack) return;
+  const forks = !isRackWritable(library, rack.id);
+  // A fork is a rack of its own, so it takes a name no rack has (the rename rule).
+  const name = forks ? forkName(rack.name, library.racks) : rack.name;
   const options: RackSaveOptions = {
-    name: rack.name,
+    name,
     category: rack.category,
     tags: [...rack.tags],
     description: rack.description,
     lowCut: rack.lowCut !== undefined,
     sequencer: rack.sequencer !== undefined,
   };
-  const forks = !isRackWritable(library, rack.id);
-  const id = forks ? uniqueId(slugify(rack.name), Object.keys(library.racks)) : rack.id;
+  const id = forks ? uniqueId(slugify(name), Object.keys(library.racks)) : rack.id;
   const { linked } = await writeRack(ctx, slot, id, options);
   const follows = linked
     ? 'this part follows it'
     : 'the part moved on meanwhile, so it is not linked';
   ctx.notify(
     forks
-      ? `built-in racks stay as they are: saved your "${rack.name}" as ${id}; ${follows}`
+      ? `built-in racks stay as they are: saved your "${name}" as ${id}; ${follows}`
       : `saved rack "${rack.name}"`,
     linked ? 'success' : 'warning',
   );
@@ -159,6 +161,8 @@ function runRevertRack(ctx: AppCtx, refresh: () => void): void {
     return partial !== null && ctx.change(partial).ok;
   });
   if (!ok) return;
+  const copy = partAt(ctx.model.doc, slot)?.preset;
+  if (copy !== undefined) ctx.autoCopies.add(copy);
   refresh();
   ctx.render();
   ctx.notify(`"${file.name}" loaded again from the library`, 'success');

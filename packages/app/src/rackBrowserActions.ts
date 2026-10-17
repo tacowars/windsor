@@ -77,6 +77,8 @@ export function loadRackIntoPart(
             ctx.autoCopies,
           );
           if (!partial || !ctx.change(partial).ok) return false;
+          // The copy is the app's own, so it may go when unedited (windsor#671).
+          ctx.autoCopies.add(partAt(ctx.model.doc, slot)!.preset);
           loader.onPick();
           return true;
         });
@@ -119,6 +121,8 @@ export function addPartFromRack(
     return ctx.change(added.partial).ok ? added.slot : null;
   });
   if (slot === null) return false;
+  const copy = partAt(ctx.model.doc, slot)?.preset;
+  if (copy !== undefined) ctx.autoCopies.add(copy);
   ctx.parts.pick(slot);
   loader.onPick();
   ctx.render();

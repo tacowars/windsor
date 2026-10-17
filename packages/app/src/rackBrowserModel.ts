@@ -128,3 +128,12 @@ export function rackNameProblem(
   );
   return taken ? `A rack named "${trimmed}" already exists.` : null;
 }
+
+/** `name` as a fork of a built-in rack may use it: the name itself when free, else the first `name 2`, `name 3`… no rack has. */
+export function forkName(name: string, racks: Readonly<Record<string, RackEntry>>): string {
+  const free = (candidate: string): boolean => rackNameProblem(candidate, racks) === null;
+  if (free(name)) return name;
+  let n = 2;
+  while (!free(`${name} ${n}`)) n += 1;
+  return `${name} ${n}`;
+}

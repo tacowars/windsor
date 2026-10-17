@@ -185,7 +185,14 @@ function rackLoad(
   if (!part) return null;
   const { file } = rack;
   const taken = [...Object.keys(library.entries), ...Object.keys(doc.patches ?? {})];
-  const patchId = uniqueId(rack.id, taken);
+  // The same rack loaded again (Revert rack) writes over the part's own copy of it, so a
+  // revert leaves no copy behind; any other load gets a fresh id.
+  const ownCopy =
+    part.rackSource === rack.id &&
+    Object.hasOwn(doc.patches ?? {}, part.preset) &&
+    !Object.hasOwn(library.entries, part.preset) &&
+    !doc.parts.some((other) => other.slot !== slot && other.preset === part.preset);
+  const patchId = ownCopy ? part.preset : uniqueId(rack.id, taken);
   const source = file.patchSource;
   const patchSource = source && Object.hasOwn(library.entries, source) ? source : undefined;
   const specs = new Map(

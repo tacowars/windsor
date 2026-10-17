@@ -135,3 +135,20 @@ describe('saveMembersFor (decision 13, windsor#885)', () => {
     expect(saveMembersFor(partAt(model.doc, hat)!)).toEqual({ lowCut: false, sequencer: false });
   });
 });
+
+describe('the same rack loaded again (Revert rack, windsor#885)', () => {
+  it('writes over the part’s own copy and leaves none behind', () => {
+    const model = song();
+    const { rack, load } = scope(model);
+    const ref = rack();
+    load(arp, ref);
+    const preset = partAt(model.doc, arp)!.preset;
+    const count = Object.keys(model.doc.patches ?? {}).length;
+    model.merge(raw({ patches: { [preset]: { volume: 0.123 } } }));
+    load(arp, ref);
+    load(arp, ref);
+    expect(partAt(model.doc, arp)!.preset).toBe(preset);
+    expect(Object.keys(model.doc.patches ?? {})).toHaveLength(count);
+    expect(model.doc.patches![preset]!.volume).toBe(ref.file.patch.volume);
+  });
+});
