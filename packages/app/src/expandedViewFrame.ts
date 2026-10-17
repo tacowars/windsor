@@ -12,8 +12,13 @@
 import type { AppCtx } from './context';
 import { type ExpandedView, ExpandedViews } from './expandedViews';
 
+/** A mounted view, with the page's scroll from before it expanded. */
+interface FrameView extends ExpandedView {
+  scrollY: number;
+}
+
 /** The console's expanded views: one open at a time. */
-const VIEWS = new ExpandedViews<ExpandedView>();
+const VIEWS = new ExpandedViews<FrameView>();
 
 /** A mounted view's frame. */
 export interface ExpandedFrame {
@@ -38,10 +43,11 @@ export interface ExpandedMount {
 export function mountExpandedView(mount: ExpandedMount): ExpandedFrame {
   const { overlay } = mount;
   const tab = mount.from.closest<HTMLElement>('.tab-panel')?.dataset.tab;
-  const view: ExpandedView = { close: () => mount.close() };
-  VIEWS.opened(view);
-  // Read after the view before it closed and gave the page its scroll back.
-  const scrollY = window.scrollY;
+  const view: FrameView = { close: () => mount.close(), scrollY: 0 };
+  // A view this one takes over on screen (an undo repainting the pane under
+  // it) hands on the page's scroll from before the first expand; the page's
+  // own now would be the one clamped under that view.
+  view.scrollY = VIEWS.opened(view)?.scrollY ?? window.scrollY;
   (document.getElementById('tabRoot') ?? document.body).appendChild(overlay);
   const stop =
     tab === undefined
@@ -58,7 +64,7 @@ export function mountExpandedView(mount: ExpandedMount): ExpandedFrame {
       VIEWS.closed(view);
       overlay.remove();
       // Closed on another tab (another view opened there): that tab's page keeps its own scroll.
-      if (shown) window.scrollTo({ top: scrollY });
+      if (shown) window.scrollTo({ top: view.scrollY });
     },
   };
 }

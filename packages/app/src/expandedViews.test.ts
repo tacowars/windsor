@@ -64,4 +64,25 @@ describe('ExpandedViews', () => {
     views.tabShown(roll, false);
     expect(views.shown(bench)).toBe(true);
   });
+
+  it('a replaced view closes while still shown, and hands itself on only when it was on screen', () => {
+    const views = new ExpandedViews();
+    const sawShown: boolean[] = [];
+    const roll: ExpandedView = {
+      close: () => {
+        sawShown.push(views.shown(roll));
+        views.closed(roll);
+      },
+    };
+    const again = view();
+    views.opened(roll);
+    // An undo repaints the pane and the restored device takes over on the same screen.
+    expect(views.opened(again)).toBe(roll);
+    expect(sawShown).toEqual([true]);
+    expect(views.shown(again)).toBe(true);
+    // Replaced from another tab, the hidden view hands on nothing.
+    views.tabShown(again, false);
+    expect(views.opened(view())).toBeNull();
+    expect(again.closes).toBe(1);
+  });
 });

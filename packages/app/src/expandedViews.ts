@@ -23,12 +23,19 @@ export class ExpandedViews<V extends ExpandedView = ExpandedView> {
   private open: V | null = null;
   private onScreen = false;
 
-  /** `view` opens, on its own tab; the view open before it, if another, closes. */
-  opened(view: V): void {
+  /**
+   * `view` opens, on its own tab; the view open before it, if another, closes
+   * first, while it is still the open one, so its close sees whether it was
+   * on screen. Returns that view when it was on screen: `view` took over from
+   * it on the same screen (a repaint under it), and inherits what it kept.
+   */
+  opened(view: V): V | null {
     const before = this.open;
+    const wasShown = before !== null && before !== view && this.onScreen;
+    if (before && before !== view) before.close();
     this.open = view;
     this.onScreen = true;
-    if (before && before !== view) before.close();
+    return wasShown ? before : null;
   }
 
   /** `view` closed (its Close, Esc, or its subject gone); a view no longer open changes nothing. */
