@@ -45,8 +45,9 @@ function summarise(plan) {
   const cells = new Map();
   for (const r of records.filter((x) => x.kind === 'repeat')) {
     const id = `${r.cell.mode}/${r.cell.instances}`;
-    if (!cells.has(id)) cells.set(id, { ...r.cell, ms: [], peak: r.peak, rms: r.rms });
+    if (!cells.has(id)) cells.set(id, { ...r.cell, ms: [], scope: [], peak: r.peak, rms: r.rms });
     cells.get(id).ms.push(r.ms);
+    cells.get(id).scope.push(r.scopeReports);
   }
   return [...cells.values()].map((c) => {
     const ms = spread(c.ms);
@@ -60,6 +61,7 @@ function summarise(plan) {
       msPerQuantum: duty * QUANTUM_MS,
       outputPeak: c.peak,
       outputRmsPerInstance: c.rms,
+      scopeReports: c.scope,
     };
   });
 }
@@ -77,11 +79,16 @@ function finish(server, chrome, profile, done) {
     userAgent: done?.userAgent,
     plan: done?.plan,
     error: records.find((r) => r.kind === 'error')?.message ?? null,
+    check: records.find((r) => r.kind === 'check')?.tailRms ?? null,
     cells: summarise(done?.plan ?? { seconds: 20 }),
     repeats: records.filter((r) => r.kind === 'repeat'),
   };
   writeFileSync(new URL('./measurement.json', folder), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify(report.cells, null, 2));
+  console.log(JSON.stringify({ check: report.check, error: report.error }, null, 2));
+  for (const c of report.cells) {
+    const share = ((c.msPerQuantum / QUANTUM_MS) * 100).toFixed(2);
+    console.log(`${c.mode}/${c.instances}: ${c.msPerQuantum.toFixed(4)} ms (${share} %)`);
+  }
   server.close();
   chrome.on('exit', () => rmSync(profile, { recursive: true, force: true }));
   chrome.kill();

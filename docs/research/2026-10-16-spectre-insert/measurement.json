@@ -6,14 +6,14 @@
     "node": "v24.16.0"
   },
   "loadBefore": [
-    2.20751953125,
-    4.6513671875,
-    28.38330078125
+    4.6142578125,
+    6.4697265625,
+    6.1220703125
   ],
   "loadAfter": [
-    2.1923828125,
-    4.45263671875,
-    27.6240234375
+    3.3837890625,
+    5.900390625,
+    5.93017578125
   ],
   "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
   "plan": {
@@ -30,170 +30,399 @@
       "coarse",
       "fine",
       "blur",
-      "moving"
+      "moving",
+      "cells-stepped",
+      "select",
+      "follow-chord",
+      "scope"
     ],
     "editEveryQuanta": 16,
     "editShifts": [
       -1,
       1
     ],
-    "quantum": 128
+    "quantum": 128,
+    "drainMs": 200,
+    "checkSeconds": 4,
+    "delayedFrom": 0.1,
+    "tailFrom": 0.7
   },
   "error": null,
+  "check": {
+    "defaultCells": {
+      "delayed": 0.010468650352548969,
+      "fedBack": 0.0003511507354850458
+    },
+    "feedbackZeroed": {
+      "delayed": 0.009780781104759507,
+      "fedBack": 1.1352650567200247e-15
+    },
+    "fallbackCells": {
+      "delayed": 0.000012413202003239432,
+      "fedBack": 4.634827391887847e-32
+    }
+  },
   "cells": [
     {
       "mode": "harness",
       "instances": 0,
       "repeats": 3,
       "renderMs": {
-        "median": 3.90000057220459,
-        "min": 3.6999998092651367,
-        "max": 4.300000190734863
+        "median": 3.8999996185302734,
+        "min": 3.8000001907348633,
+        "max": 4.100000381469727
       },
-      "duty": 0.0001950000286102295,
-      "msPerQuantum": 0.0005200000762939453,
+      "duty": 0.00019499998092651366,
+      "msPerQuantum": 0.0005199999491373698,
       "outputPeak": 0.4979172348976135,
-      "outputRmsPerInstance": 0.10024424468262828
+      "outputRmsPerInstance": 0.10024424468262828,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "default",
       "instances": 1,
       "repeats": 3,
       "renderMs": {
-        "median": 288.19999980926514,
-        "min": 286.19999980926514,
-        "max": 289.69999980926514
+        "median": 202.89999961853027,
+        "min": 201.29999923706055,
+        "max": 204.0999994277954
       },
-      "duty": 0.014409999990463256,
-      "msPerQuantum": 0.03842666664123535,
-      "outputPeak": 0.28659534454345703,
-      "outputRmsPerInstance": 0.08845052220847124
+      "duty": 0.010144999980926514,
+      "msPerQuantum": 0.027053333282470702,
+      "outputPeak": 0.32475000619888306,
+      "outputRmsPerInstance": 0.08464269206590964,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "default",
       "instances": 4,
       "repeats": 3,
       "renderMs": {
-        "median": 1135.5,
-        "min": 1124,
-        "max": 1140.5
+        "median": 786,
+        "min": 783.3999996185303,
+        "max": 853.3000001907349
       },
-      "duty": 0.056775,
-      "msPerQuantum": 0.15139999999999998,
-      "outputPeak": 1.1463813781738281,
-      "outputRmsPerInstance": 0.08845052220847124
+      "duty": 0.0393,
+      "msPerQuantum": 0.1048,
+      "outputPeak": 1.2990000247955322,
+      "outputRmsPerInstance": 0.08464269206590964,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "coarse",
       "instances": 1,
       "repeats": 3,
       "renderMs": {
-        "median": 281.0999994277954,
-        "min": 279.3999996185303,
-        "max": 284.0999994277954
+        "median": 199.9000005722046,
+        "min": 199.5,
+        "max": 200.10000038146973
       },
-      "duty": 0.014054999971389771,
-      "msPerQuantum": 0.037479999923706056,
-      "outputPeak": 0.3290433883666992,
-      "outputRmsPerInstance": 0.08297720733491812
+      "duty": 0.00999500002861023,
+      "msPerQuantum": 0.026653333409627278,
+      "outputPeak": 0.32377806305885315,
+      "outputRmsPerInstance": 0.08441851898766425,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "coarse",
       "instances": 4,
       "repeats": 3,
       "renderMs": {
-        "median": 1107.6000003814697,
-        "min": 1104.1000003814697,
-        "max": 1108.1999998092651
+        "median": 792.2999992370605,
+        "min": 780,
+        "max": 808.1000003814697
       },
-      "duty": 0.055380000019073485,
-      "msPerQuantum": 0.14768000005086263,
-      "outputPeak": 1.3161735534667969,
-      "outputRmsPerInstance": 0.08297720733491812
+      "duty": 0.039614999961853026,
+      "msPerQuantum": 0.10563999989827473,
+      "outputPeak": 1.2951122522354126,
+      "outputRmsPerInstance": 0.08441851898766425,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "fine",
       "instances": 1,
       "repeats": 3,
       "renderMs": {
-        "median": 390.8999996185303,
-        "min": 388.69999980926514,
-        "max": 391.4000005722046
+        "median": 303.30000019073486,
+        "min": 302,
+        "max": 303.80000019073486
       },
-      "duty": 0.019544999980926514,
-      "msPerQuantum": 0.052119999949137366,
-      "outputPeak": 0.24895861744880676,
-      "outputRmsPerInstance": 0.0253669715078449
+      "duty": 0.015165000009536743,
+      "msPerQuantum": 0.040440000025431314,
+      "outputPeak": 0.3246094584465027,
+      "outputRmsPerInstance": 0.08444814862706809,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "fine",
       "instances": 4,
       "repeats": 3,
       "renderMs": {
-        "median": 1570.3000001907349,
-        "min": 1533.5999994277954,
-        "max": 1572.6999998092651
+        "median": 1205.2999992370605,
+        "min": 1193.8999996185303,
+        "max": 1249.5
       },
-      "duty": 0.07851500000953675,
-      "msPerQuantum": 0.20937333335876465,
-      "outputPeak": 0.995834469795227,
-      "outputRmsPerInstance": 0.0253669715078449
+      "duty": 0.06026499996185303,
+      "msPerQuantum": 0.1607066665649414,
+      "outputPeak": 1.2984378337860107,
+      "outputRmsPerInstance": 0.08444814862706809,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "blur",
       "instances": 1,
       "repeats": 3,
       "renderMs": {
-        "median": 314,
-        "min": 313.5,
-        "max": 317.1000003814697
+        "median": 224.20000076293945,
+        "min": 223.19999980926514,
+        "max": 225.9000005722046
       },
-      "duty": 0.0157,
-      "msPerQuantum": 0.04186666666666666,
-      "outputPeak": 0.33756372332572937,
-      "outputRmsPerInstance": 0.06483316316753329
+      "duty": 0.011210000038146973,
+      "msPerQuantum": 0.029893333435058594,
+      "outputPeak": 0.3018442988395691,
+      "outputRmsPerInstance": 0.06553430968717736,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "blur",
       "instances": 4,
       "repeats": 3,
       "renderMs": {
-        "median": 1221.5,
-        "min": 1219.8000001907349,
-        "max": 1222.8000001907349
+        "median": 864.1999998092651,
+        "min": 858.1999998092651,
+        "max": 882.7999992370605
       },
-      "duty": 0.061075,
-      "msPerQuantum": 0.16286666666666666,
-      "outputPeak": 1.3502548933029175,
-      "outputRmsPerInstance": 0.06483316316753329
+      "duty": 0.04320999999046326,
+      "msPerQuantum": 0.11522666664123535,
+      "outputPeak": 1.2073771953582764,
+      "outputRmsPerInstance": 0.06553430968717736,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "moving",
       "instances": 1,
       "repeats": 3,
       "renderMs": {
-        "median": 291.3999996185303,
-        "min": 289,
-        "max": 293.1000003814697
+        "median": 195.5,
+        "min": 194.29999923706055,
+        "max": 199.19999980926514
       },
-      "duty": 0.014569999980926514,
-      "msPerQuantum": 0.0388533332824707,
-      "outputPeak": 0.4868814945220947,
-      "outputRmsPerInstance": 0.07866588794860194
+      "duty": 0.009775,
+      "msPerQuantum": 0.02606666666666667,
+      "outputPeak": 0.4117264747619629,
+      "outputRmsPerInstance": 0.07797790414196262,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
     },
     {
       "mode": "moving",
       "instances": 4,
       "repeats": 3,
       "renderMs": {
-        "median": 1136.1000003814697,
-        "min": 1132,
-        "max": 1142.2000007629395
+        "median": 778.8999996185303,
+        "min": 774.8999996185303,
+        "max": 784
       },
-      "duty": 0.05680500001907349,
-      "msPerQuantum": 0.15148000005086262,
-      "outputPeak": 1.947525978088379,
-      "outputRmsPerInstance": 0.07866588794860194
+      "duty": 0.038944999980926515,
+      "msPerQuantum": 0.1038533332824707,
+      "outputPeak": 1.6469058990478516,
+      "outputRmsPerInstance": 0.07797790414196262,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "cells-stepped",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 197.5,
+        "min": 196.5,
+        "max": 199.30000019073486
+      },
+      "duty": 0.009875,
+      "msPerQuantum": 0.026333333333333334,
+      "outputPeak": 0.32475000619888306,
+      "outputRmsPerInstance": 0.08464269546701053,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "cells-stepped",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 780.5,
+        "min": 773.2999992370605,
+        "max": 782
+      },
+      "duty": 0.039025,
+      "msPerQuantum": 0.10406666666666665,
+      "outputPeak": 1.2990000247955322,
+      "outputRmsPerInstance": 0.08464269546701053,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "select",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 199.69999980926514,
+        "min": 198.5,
+        "max": 200.5
+      },
+      "duty": 0.009984999990463256,
+      "msPerQuantum": 0.02662666664123535,
+      "outputPeak": 0.3344714045524597,
+      "outputRmsPerInstance": 0.0936626897933194,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "select",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 788.0999994277954,
+        "min": 780.3000001907349,
+        "max": 802
+      },
+      "duty": 0.03940499997138977,
+      "msPerQuantum": 0.10507999992370605,
+      "outputPeak": 1.3378856182098389,
+      "outputRmsPerInstance": 0.0936626897933194,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "follow-chord",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 199.5,
+        "min": 199.39999961853027,
+        "max": 200.10000038146973
+      },
+      "duty": 0.009975,
+      "msPerQuantum": 0.0266,
+      "outputPeak": 0.32329434156417847,
+      "outputRmsPerInstance": 0.08552418034609835,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "follow-chord",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 792.5999994277954,
+        "min": 788.6999998092651,
+        "max": 815.8999996185303
+      },
+      "duty": 0.03962999997138977,
+      "msPerQuantum": 0.10567999992370605,
+      "outputPeak": 1.2931773662567139,
+      "outputRmsPerInstance": 0.08552418034609835,
+      "scopeReports": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "scope",
+      "instances": 1,
+      "repeats": 3,
+      "renderMs": {
+        "median": 206.9000005722046,
+        "min": 206.5999994277954,
+        "max": 222.5
+      },
+      "duty": 0.010345000028610229,
+      "msPerQuantum": 0.02758666674296061,
+      "outputPeak": 0.32475000619888306,
+      "outputRmsPerInstance": 0.08464269206590964,
+      "scopeReports": [
+        468,
+        468,
+        468
+      ]
+    },
+    {
+      "mode": "scope",
+      "instances": 4,
+      "repeats": 3,
+      "renderMs": {
+        "median": 827.3000001907349,
+        "min": 825.3999996185303,
+        "max": 829.8999996185303
+      },
+      "duty": 0.041365000009536745,
+      "msPerQuantum": 0.11030666669209799,
+      "outputPeak": 1.2990000247955322,
+      "outputRmsPerInstance": 0.08464269206590964,
+      "scopeReports": [
+        1872,
+        1872,
+        1872
+      ]
     }
   ],
   "repeats": [
@@ -204,9 +433,10 @@
         "instances": 0
       },
       "repeat": 0,
-      "ms": 3.90000057220459,
+      "ms": 3.8999996185302734,
       "peak": 0.4979172348976135,
-      "rms": 0.10024424468262828
+      "rms": 0.10024424468262828,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -215,9 +445,10 @@
         "instances": 0
       },
       "repeat": 1,
-      "ms": 4.300000190734863,
+      "ms": 3.8000001907348633,
       "peak": 0.4979172348976135,
-      "rms": 0.10024424468262828
+      "rms": 0.10024424468262828,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -226,9 +457,10 @@
         "instances": 0
       },
       "repeat": 2,
-      "ms": 3.6999998092651367,
+      "ms": 4.100000381469727,
       "peak": 0.4979172348976135,
-      "rms": 0.10024424468262828
+      "rms": 0.10024424468262828,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -237,9 +469,10 @@
         "instances": 1
       },
       "repeat": 0,
-      "ms": 289.69999980926514,
-      "peak": 0.28659534454345703,
-      "rms": 0.08845052220847124
+      "ms": 201.29999923706055,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -248,9 +481,10 @@
         "instances": 1
       },
       "repeat": 1,
-      "ms": 286.19999980926514,
-      "peak": 0.28659534454345703,
-      "rms": 0.08845052220847124
+      "ms": 202.89999961853027,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -259,9 +493,10 @@
         "instances": 1
       },
       "repeat": 2,
-      "ms": 288.19999980926514,
-      "peak": 0.28659534454345703,
-      "rms": 0.08845052220847124
+      "ms": 204.0999994277954,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -270,9 +505,10 @@
         "instances": 4
       },
       "repeat": 0,
-      "ms": 1140.5,
-      "peak": 1.1463813781738281,
-      "rms": 0.08845052220847124
+      "ms": 786,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -281,9 +517,10 @@
         "instances": 4
       },
       "repeat": 1,
-      "ms": 1135.5,
-      "peak": 1.1463813781738281,
-      "rms": 0.08845052220847124
+      "ms": 853.3000001907349,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -292,9 +529,10 @@
         "instances": 4
       },
       "repeat": 2,
-      "ms": 1124,
-      "peak": 1.1463813781738281,
-      "rms": 0.08845052220847124
+      "ms": 783.3999996185303,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -303,9 +541,10 @@
         "instances": 1
       },
       "repeat": 0,
-      "ms": 279.3999996185303,
-      "peak": 0.3290433883666992,
-      "rms": 0.08297720733491812
+      "ms": 199.9000005722046,
+      "peak": 0.32377806305885315,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -314,9 +553,10 @@
         "instances": 1
       },
       "repeat": 1,
-      "ms": 284.0999994277954,
-      "peak": 0.3290433883666992,
-      "rms": 0.08297720733491812
+      "ms": 200.10000038146973,
+      "peak": 0.32377806305885315,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -325,9 +565,10 @@
         "instances": 1
       },
       "repeat": 2,
-      "ms": 281.0999994277954,
-      "peak": 0.3290433883666992,
-      "rms": 0.08297720733491812
+      "ms": 199.5,
+      "peak": 0.32377806305885315,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -336,9 +577,10 @@
         "instances": 4
       },
       "repeat": 0,
-      "ms": 1104.1000003814697,
-      "peak": 1.3161735534667969,
-      "rms": 0.08297720733491812
+      "ms": 808.1000003814697,
+      "peak": 1.2951122522354126,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -347,9 +589,10 @@
         "instances": 4
       },
       "repeat": 1,
-      "ms": 1107.6000003814697,
-      "peak": 1.3161735534667969,
-      "rms": 0.08297720733491812
+      "ms": 792.2999992370605,
+      "peak": 1.2951122522354126,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -358,9 +601,10 @@
         "instances": 4
       },
       "repeat": 2,
-      "ms": 1108.1999998092651,
-      "peak": 1.3161735534667969,
-      "rms": 0.08297720733491812
+      "ms": 780,
+      "peak": 1.2951122522354126,
+      "rms": 0.08441851898766425,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -369,9 +613,10 @@
         "instances": 1
       },
       "repeat": 0,
-      "ms": 390.8999996185303,
-      "peak": 0.24895861744880676,
-      "rms": 0.0253669715078449
+      "ms": 302,
+      "peak": 0.3246094584465027,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -380,9 +625,10 @@
         "instances": 1
       },
       "repeat": 1,
-      "ms": 388.69999980926514,
-      "peak": 0.24895861744880676,
-      "rms": 0.0253669715078449
+      "ms": 303.80000019073486,
+      "peak": 0.3246094584465027,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -391,9 +637,10 @@
         "instances": 1
       },
       "repeat": 2,
-      "ms": 391.4000005722046,
-      "peak": 0.24895861744880676,
-      "rms": 0.0253669715078449
+      "ms": 303.30000019073486,
+      "peak": 0.3246094584465027,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -402,9 +649,10 @@
         "instances": 4
       },
       "repeat": 0,
-      "ms": 1572.6999998092651,
-      "peak": 0.995834469795227,
-      "rms": 0.0253669715078449
+      "ms": 1249.5,
+      "peak": 1.2984378337860107,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -413,9 +661,10 @@
         "instances": 4
       },
       "repeat": 1,
-      "ms": 1570.3000001907349,
-      "peak": 0.995834469795227,
-      "rms": 0.0253669715078449
+      "ms": 1205.2999992370605,
+      "peak": 1.2984378337860107,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -424,9 +673,10 @@
         "instances": 4
       },
       "repeat": 2,
-      "ms": 1533.5999994277954,
-      "peak": 0.995834469795227,
-      "rms": 0.0253669715078449
+      "ms": 1193.8999996185303,
+      "peak": 1.2984378337860107,
+      "rms": 0.08444814862706809,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -435,9 +685,10 @@
         "instances": 1
       },
       "repeat": 0,
-      "ms": 314,
-      "peak": 0.33756372332572937,
-      "rms": 0.06483316316753329
+      "ms": 224.20000076293945,
+      "peak": 0.3018442988395691,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -446,9 +697,10 @@
         "instances": 1
       },
       "repeat": 1,
-      "ms": 317.1000003814697,
-      "peak": 0.33756372332572937,
-      "rms": 0.06483316316753329
+      "ms": 223.19999980926514,
+      "peak": 0.3018442988395691,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -457,9 +709,10 @@
         "instances": 1
       },
       "repeat": 2,
-      "ms": 313.5,
-      "peak": 0.33756372332572937,
-      "rms": 0.06483316316753329
+      "ms": 225.9000005722046,
+      "peak": 0.3018442988395691,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -468,9 +721,10 @@
         "instances": 4
       },
       "repeat": 0,
-      "ms": 1222.8000001907349,
-      "peak": 1.3502548933029175,
-      "rms": 0.06483316316753329
+      "ms": 858.1999998092651,
+      "peak": 1.2073771953582764,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -479,9 +733,10 @@
         "instances": 4
       },
       "repeat": 1,
-      "ms": 1219.8000001907349,
-      "peak": 1.3502548933029175,
-      "rms": 0.06483316316753329
+      "ms": 882.7999992370605,
+      "peak": 1.2073771953582764,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -490,9 +745,10 @@
         "instances": 4
       },
       "repeat": 2,
-      "ms": 1221.5,
-      "peak": 1.3502548933029175,
-      "rms": 0.06483316316753329
+      "ms": 864.1999998092651,
+      "peak": 1.2073771953582764,
+      "rms": 0.06553430968717736,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -501,9 +757,10 @@
         "instances": 1
       },
       "repeat": 0,
-      "ms": 289,
-      "peak": 0.4868814945220947,
-      "rms": 0.07866588794860194
+      "ms": 199.19999980926514,
+      "peak": 0.4117264747619629,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -512,9 +769,10 @@
         "instances": 1
       },
       "repeat": 1,
-      "ms": 293.1000003814697,
-      "peak": 0.4868814945220947,
-      "rms": 0.07866588794860194
+      "ms": 194.29999923706055,
+      "peak": 0.4117264747619629,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -523,9 +781,10 @@
         "instances": 1
       },
       "repeat": 2,
-      "ms": 291.3999996185303,
-      "peak": 0.4868814945220947,
-      "rms": 0.07866588794860194
+      "ms": 195.5,
+      "peak": 0.4117264747619629,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -534,9 +793,10 @@
         "instances": 4
       },
       "repeat": 0,
-      "ms": 1142.2000007629395,
-      "peak": 1.947525978088379,
-      "rms": 0.07866588794860194
+      "ms": 774.8999996185303,
+      "peak": 1.6469058990478516,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -545,9 +805,10 @@
         "instances": 4
       },
       "repeat": 1,
-      "ms": 1136.1000003814697,
-      "peak": 1.947525978088379,
-      "rms": 0.07866588794860194
+      "ms": 778.8999996185303,
+      "peak": 1.6469058990478516,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
     },
     {
       "kind": "repeat",
@@ -556,9 +817,298 @@
         "instances": 4
       },
       "repeat": 2,
-      "ms": 1132,
-      "peak": 1.947525978088379,
-      "rms": 0.07866588794860194
+      "ms": 784,
+      "peak": 1.6469058990478516,
+      "rms": 0.07797790414196262,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 199.30000019073486,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 196.5,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 197.5,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 773.2999992370605,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 780.5,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "cells-stepped",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 782,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269546701053,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 199.69999980926514,
+      "peak": 0.3344714045524597,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 198.5,
+      "peak": 0.3344714045524597,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 200.5,
+      "peak": 0.3344714045524597,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 780.3000001907349,
+      "peak": 1.3378856182098389,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 802,
+      "peak": 1.3378856182098389,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "select",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 788.0999994277954,
+      "peak": 1.3378856182098389,
+      "rms": 0.0936626897933194,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 199.39999961853027,
+      "peak": 0.32329434156417847,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 199.5,
+      "peak": 0.32329434156417847,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 200.10000038146973,
+      "peak": 0.32329434156417847,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 792.5999994277954,
+      "peak": 1.2931773662567139,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 815.8999996185303,
+      "peak": 1.2931773662567139,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "follow-chord",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 788.6999998092651,
+      "peak": 1.2931773662567139,
+      "rms": 0.08552418034609835,
+      "scopeReports": 0
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 1
+      },
+      "repeat": 0,
+      "ms": 206.9000005722046,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 468
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 1
+      },
+      "repeat": 1,
+      "ms": 206.5999994277954,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 468
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 1
+      },
+      "repeat": 2,
+      "ms": 222.5,
+      "peak": 0.32475000619888306,
+      "rms": 0.08464269206590964,
+      "scopeReports": 468
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 4
+      },
+      "repeat": 0,
+      "ms": 827.3000001907349,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 1872
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 4
+      },
+      "repeat": 1,
+      "ms": 829.8999996185303,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 1872
+    },
+    {
+      "kind": "repeat",
+      "cell": {
+        "mode": "scope",
+        "instances": 4
+      },
+      "repeat": 2,
+      "ms": 825.3999996185303,
+      "peak": 1.2990000247955322,
+      "rms": 0.08464269206590964,
+      "scopeReports": 1872
     }
   ]
 }
