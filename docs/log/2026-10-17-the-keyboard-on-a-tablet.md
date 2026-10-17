@@ -243,6 +243,12 @@ instrument that plays one finger per note.
     `KEY_COUNT` and a one-octave count in `keyboardConstants.ts`); a QWERTY
     offset past the shown keys plays with no key lit, as a MIDI note
     outside the row does today (`midiSink`'s `offset < KEY_COUNT`).
+
+    **Amendment, 2026-10-17 (windsor#864):** the octave count reads the
+    keys row's content width through the `ResizeObserver`, not the keys
+    box's own width. At one octave the box shares a line with the buttons,
+    so its own width would keep it at one octave on a row with room for two
+    (`roomFor`, built in windsor#863, now in `keyboardKeys.ts`).
 11. **Later**, not in this build:
     - pressure and aftertouch from `PointerEvent.pressure`;
     - a pitch ribbon, or a finger's slide becoming a bend;

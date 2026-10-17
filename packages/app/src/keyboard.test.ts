@@ -7,7 +7,8 @@
  * lives on a part nothing but that part's own `panic` can silence.
  *
  * The console's `document` is stubbed down to what the class actually reads:
- * the `#octLabel` it writes and the `.key.down` sweep Panic does. The keys
+ * the octave labels and Hold buttons it writes, none here, and the
+ * `.key.down` sweep Panic does. The keys
  * are `keyboardRig`'s fakes with the boxes the touch row lays out
  * (windsor#863), handed to `adoptKeys` the way a render does, so a pointer is
  * a point on them. Note numbers are written as expressions of the keyboard's
@@ -31,11 +32,10 @@ import {
 } from './__fixtures__/keyboardRig';
 import type { FakeKey } from './__fixtures__/keyboardRig';
 
-/** Only what `keyboard.ts` touches: `#octLabel`, and Panic's sweep of `.key.down`. */
+/** Only what `keyboard.ts` touches: Panic's sweep of `.key.down`; no label or Hold button. */
 const fakeDocument = {
-  getElementById: (): unknown => null,
-  querySelectorAll: (): HTMLElement[] =>
-    fakeKeys.filter((k) => k.classes.has('down')).map((k) => k.el),
+  querySelectorAll: (selector: string): HTMLElement[] =>
+    selector === '.key.down' ? fakeKeys.filter((k) => k.classes.has('down')).map((k) => k.el) : [],
 };
 
 const realDocument = Reflect.get(globalThis, 'document') as unknown;
@@ -365,7 +365,7 @@ describe('the audition keyboard', () => {
     keyboard.adoptKeys(oneOctave.map((k) => k.el));
     expect(log).toEqual([`p1 on ${root + 4}`, `p1 on ${root + 16}`, 'p1 off #2']);
     expect(oneOctave[4]?.classes.has('down')).toBe(true);
-    expect(litKeys()).toBe(2); // The old row's lit E is detached; the new row lights its own.
+    expect(litKeys()).toBe(1); // The old row's E goes dark; the new row lights its own.
     // The finger has not moved, but where it rests is C in the new boxes.
     keyboard.onPointerMove({ ...atE, clientY: atE.clientY + 1 });
     expect(log.slice(3)).toEqual([`p1 on ${root}`, 'p1 off #1']);

@@ -18,31 +18,27 @@
  * down the key it lands. On a touch layout the box's room sets the octaves
  * it shows (record `2026-10-17-the-keyboard-on-a-tablet`, amended by
  * `2026-10-17-keyboard-geometry-follows-the-layout`).
+ *
+ * One keyboard, one box (windsor#864): while the expanded view is open the
+ * keys render into its box, in the rows its pick asks for, and back into the
+ * Parts row when it closes. The octave label is every `[data-oct-label]`
+ * and the Hold buttons every `[data-keys-hold]`, so the row's and the view's
+ * show the same keyboard.
  */
 import type { AudioPart } from '@windsor/engine';
 import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
-import { el } from './dom';
 import {
   AUDITION_TAB,
-  COARSE_POINTER_QUERY,
   FIXED_VELOCITY,
-  KEY_COUNT,
   OCTAVE_DEFAULT,
-  OCTAVE_MAX,
   OCTAVE_MIN,
   QWERTY,
-  TOUCH_ROW_CSS,
 } from './keyboardConstants';
-import {
-  afterWhite,
-  isBlackKey,
-  keyAt,
-  keyCountFor,
-  octavesFor,
-  strikeVelocity,
-  whiteCount,
-} from './keyboardLayout';
-import type { KeyBox, Point } from './keyboardLayout';
+import { DEFAULT_SHAPE, buildKeys, homeSurface, sameShape } from './keyboardKeys';
+import type { KeysShape, KeysSurface } from './keyboardKeys';
+import { isBlackKey, keyAt, strikeVelocity } from './keyboardLayout';
+import type { KeyBox } from './keyboardLayout';
+import { octaveMaxFor } from './keyboardViewModel';
 import type { PerformerSink } from './midiPerformer';
 import type { NoteTap } from './rollRecorder';
 
@@ -134,19 +130,6 @@ interface Strike {
   readonly timeStamp: number | undefined;
 }
 
-/**
- * The room a keys box may take: its row's content width. The box itself is
- * that wide whenever it shows two octaves (its `min-width` is 616 px capped
- * at the row), but at one octave it shares a line with the buttons, so its
- * own width would keep it at one octave on a row that has room for two.
- */
-function roomFor(box: HTMLElement): number {
-  const row = box.parentElement;
-  if (!row) return box.clientWidth;
-  const style = getComputedStyle(row);
-  return row.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-}
-
 export class Keyboard {
   octave = OCTAVE_DEFAULT;
   hold = false;
@@ -163,7 +146,15 @@ export class Keyboard {
   /** The row's keys by offset, as last rendered, and their boxes as last read. */
   private keyEls: readonly HTMLElement[] = [];
   private layout: readonly KeyBox[] = [];
-  private box: HTMLElement | null = null;
+  /** The C names of the view's keys, by octave. */
+  private names: readonly HTMLElement[] = [];
+  private shape: KeysShape = DEFAULT_SHAPE;
+  /** The Parts row's box, the expanded view's while it is open, and the one the keys are in. */
+  private home: KeysSurface | null = null;
+  private view: KeysSurface | null = null;
+  private surface: KeysSurface | null = null;
+  /** Every box whose pointers are wired, so a box the keys come back to is wired once. */
+  private readonly wired = new WeakSet<HTMLElement>();
   private resizes: ResizeObserver | null = null;
   /**
    * Every part this keyboard has struck a note on since the last Panic (#617).
@@ -191,14 +182,50 @@ export class Keyboard {
   }
 
   /**
-   * Build the keys into `box`, wire its pointers and watch its size, and wire
-   * the octave label. A new box (the Parts tab rendered again) takes over the
-   * pointers still held, so their notes sound on and their lifts arrive.
+   * Take `box` as the Parts row's keys box, and build the keys into it unless
+   * the expanded view has them. A new box (the Parts tab rendered again)
+   * takes over the pointers still held, so their notes sound on and their
+   * lifts arrive.
    */
   render(box: HTMLElement): void {
-    if (box !== this.box) this.watch(box);
-    this.build(box, this.keyEls.length || KEY_COUNT);
-    this.syncLabel();
+    this.home = homeSurface(box);
+    if (!this.view) this.show(this.home);
+    this.syncControls();
+  }
+
+  /** The expanded view opened (windsor#864): the keys move into its box, held pointers and all. */
+  expand(view: KeysSurface): void {
+    this.view = view;
+    this.show(view);
+  }
+
+  /**
+   * The expanded view closed: every pointer on its keys lifts (Hold keeps its
+   * note), and the keys go back into the Parts row at the row's bound.
+   */
+  collapse(): void {
+    this.view = null;
+    for (const finger of this.fingers.values()) this.leaveKeys(finger);
+    this.fingers.clear();
+    if (this.home?.box.isConnected) return this.show(this.home);
+    this.resizes?.disconnect();
+    this.surface = null;
+    this.adoptKeys([]);
+  }
+
+  /** Lay the keys out again for their box's room: after a resize, or a pick in the view. */
+  relayout(): void {
+    const shape = this.surface?.shape();
+    if (!this.surface || !shape) return;
+    if (sameShape(shape, this.shape)) this.readLayout();
+    else this.build(this.surface, shape);
+  }
+
+  /** Hold on or off, on every Hold button; turning it off is a Panic. */
+  toggleHold(): void {
+    this.hold = !this.hold;
+    this.syncControls();
+    if (!this.hold) this.panic();
   }
 
   /**
@@ -209,16 +236,34 @@ export class Keyboard {
    * boxes judge.
    */
   adoptKeys(keys: readonly HTMLElement[]): void {
-    for (const finger of this.fingers.values()) {
-      if (finger.offset === null || finger.offset < keys.length) continue;
-      this.leaveKeys(finger);
-    }
+    this.octave = Math.min(this.octave, this.octaveMax(keys.length));
     this.keyEls = keys;
+    this.followNotes();
+    this.readLayout();
+  }
+
+  /**
+   * Light each held note's key at the octave and keys as they are now: a
+   * note is its holder's identity, not its key (record
+   * `2026-10-17-keyboard-geometry-follows-the-layout`). A pointer's key
+   * becomes the one now carrying its note, so its next move is judged
+   * against that key; a pointer whose note no shown key carries lifts, and
+   * so does one resting on a key past the row.
+   */
+  private followNotes(): void {
+    const base = this.octave * SEMITONES_PER_OCTAVE;
+    // Every light goes off before any comes on: one note's new key may be another's old.
+    for (const held of this.held.values()) held.el?.classList.remove('down');
     for (const held of this.held.values()) {
-      held.el = keys[held.offset] ?? null;
+      held.offset = held.note - base;
+      held.el = this.keyEls[held.offset] ?? null;
       held.el?.classList.add('down');
     }
-    this.readLayout();
+    for (const finger of this.fingers.values()) {
+      const held = finger.source === null ? undefined : this.held.get(finger.source);
+      if (held?.el) finger.offset = held.offset;
+      else if (held || (finger.offset ?? 0) >= this.keyEls.length) this.leaveKeys(finger);
+    }
   }
 
   /** Global QWERTY handling; call once. */
@@ -285,11 +330,10 @@ export class Keyboard {
     finger.offset = key.offset;
     finger.source = null;
     if (!this.pointerHolds(key.offset)) {
-      finger.velocity ??= this.velocityOf(e, point, key);
+      // A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6).
+      finger.velocity ??= e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
       const note = this.octave * SEMITONES_PER_OCTAVE + key.offset;
       const source = pointerSource(e.pointerId, note);
-      // The octave moved under the finger and the new key plays the note it holds.
-      if (source === left) this.lift(left, false, e.timeStamp);
       this.play(source, { note, velocity: finger.velocity, ...this.keyOf(key.offset, e) });
       finger.source = source;
     }
@@ -304,9 +348,12 @@ export class Keyboard {
     if (finger.source !== null) this.lift(finger.source, false, e.timeStamp);
   }
 
+  /** Shift the keys by octaves, within the bound of the octaves shown (record decision 8). */
   shiftOctave(by: number): void {
-    this.octave = Math.min(OCTAVE_MAX, Math.max(OCTAVE_MIN, this.octave + by));
-    this.syncLabel();
+    const max = this.octaveMax(this.keyEls.length);
+    this.octave = Math.min(max, Math.max(OCTAVE_MIN, this.octave + by));
+    this.followNotes();
+    this.syncControls();
   }
 
   /**
@@ -394,11 +441,6 @@ export class Keyboard {
     this.tap?.press(part, source, note, velocity, timeStamp);
   }
 
-  /** A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6). */
-  private velocityOf(e: PointerInput, point: Point, key: KeyBox): number {
-    return e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
-  }
-
   /** A pointer off every key: its note lifts, and its next key strikes afresh. */
   private leaveKeys(finger: Finger, timeStamp?: number): void {
     const left = finger.source;
@@ -433,41 +475,40 @@ export class Keyboard {
     });
   }
 
-  /** Build `count` keys into `box`, with the custom properties the touch row is laid out from. */
-  private build(box: HTMLElement, count: number): void {
-    box.innerHTML = '';
-    const keys: HTMLElement[] = [];
-    for (let offset = 0; offset < count; offset++) {
-      const key = el('div', 'key');
-      key.dataset.offset = String(offset);
-      if (isBlackKey(offset)) {
-        key.dataset.black = '1';
-        key.style.setProperty('--after-white', String(afterWhite(offset)));
-      }
-      keys.push(key);
-    }
-    for (const [name, value] of Object.entries(TOUCH_ROW_CSS)) box.style.setProperty(name, value);
-    box.style.setProperty('--whites', String(whiteCount(count)));
-    box.append(...keys);
-    this.adoptKeys(keys);
+  /** The highest octave the keys may start at with `count` keys shown. */
+  private octaveMax(count: number): number {
+    return octaveMaxFor(Math.ceil(count / SEMITONES_PER_OCTAVE));
   }
 
   /**
-   * Wire a new keys box: its pointers, the pointers still held on the old one,
-   * and a `ResizeObserver` that reads the boxes again on every resize and, on
-   * a touch layout, shows the octaves its room allows (record decision 10).
+   * Put the keys in `surface`'s box, wired and watched, in the shape its room
+   * takes; a box they move out of is left empty.
+   */
+  private show(surface: KeysSurface): void {
+    if (surface.box !== this.surface?.box) {
+      this.surface?.box.replaceChildren();
+      this.watch(surface.box);
+    }
+    this.surface = surface;
+    this.build(surface, surface.shape() ?? DEFAULT_SHAPE);
+  }
+
+  private build(surface: KeysSurface, shape: KeysShape): void {
+    const { keys, names } = buildKeys(surface, shape);
+    this.shape = shape;
+    this.names = names;
+    this.adoptKeys(keys);
+    this.syncControls();
+  }
+
+  /**
+   * Wire a new keys box: its pointers, once, the pointers still held on the
+   * old one, and a `ResizeObserver` that lays the keys out again on every
+   * resize (record decision 10, windsor#879).
    */
   private watch(box: HTMLElement): void {
     this.resizes?.disconnect();
-    this.box = box;
-    box.addEventListener('pointerdown', (e) => {
-      box.setPointerCapture(e.pointerId);
-      this.onPointerDown(e);
-    });
-    box.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    const up = (e: PointerEvent): void => this.onPointerUp(e);
-    box.addEventListener('pointerup', up);
-    box.addEventListener('pointercancel', up);
+    if (!this.wired.has(box)) this.wire(box);
     for (const [pointerId, finger] of this.fingers) {
       try {
         box.setPointerCapture(pointerId);
@@ -477,23 +518,31 @@ export class Keyboard {
         this.leaveKeys(finger);
       }
     }
-    this.resizes = new ResizeObserver(() => this.onResize(box));
+    this.resizes = new ResizeObserver(() => this.relayout());
     this.resizes.observe(box);
   }
 
-  /** The keys box resized: show the octaves its room allows, else read the boxes again. */
-  private onResize(box: HTMLElement): void {
-    const room = roomFor(box);
-    if (room === 0) return; // The Parts tab is hidden.
-    const count = matchMedia(COARSE_POINTER_QUERY).matches
-      ? keyCountFor(octavesFor(room))
-      : KEY_COUNT;
-    if (count === this.keyEls.length) this.readLayout();
-    else this.build(box, count);
+  /** A box's pointers, which play only while the keys are in it. */
+  private wire(box: HTMLElement): void {
+    this.wired.add(box);
+    const mine = (): boolean => this.surface?.box === box;
+    box.addEventListener('pointerdown', (e) => {
+      if (!mine()) return;
+      box.setPointerCapture(e.pointerId);
+      this.onPointerDown(e);
+    });
+    box.addEventListener('pointermove', (e) => mine() && this.onPointerMove(e));
+    const up = (e: PointerEvent): void => this.onPointerUp(e);
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
   }
 
-  private syncLabel(): void {
-    const label = document.getElementById('octLabel');
-    if (label) label.textContent = `C${this.octave}`;
+  /** The octave on every label and the view's C names, and Hold on every Hold button. */
+  private syncControls(): void {
+    for (const label of document.querySelectorAll('[data-oct-label]'))
+      label.textContent = `C${this.octave}`;
+    this.names.forEach((name, octave) => (name.textContent = `C${this.octave + octave}`));
+    for (const button of document.querySelectorAll('[data-keys-hold]'))
+      button.setAttribute('aria-pressed', String(this.hold));
   }
 }
