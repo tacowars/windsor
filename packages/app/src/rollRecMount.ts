@@ -20,7 +20,7 @@
 import type { AudioSystem } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { Keyboard } from './keyboard';
-import { shownRollSlot } from './rollExpand';
+import { onWideMoved, shownRollSlot } from './rollExpand';
 import { type RecorderHost, RollRecorder } from './rollRecorder';
 import { ROLL_REC } from './rollTables';
 import { heardContextTime } from './rollTakeStamp';
@@ -78,7 +78,10 @@ export function mountRollRecorder(ctx: AppContext, keyboard: Keyboard): RollReco
   current = recorder;
   // While a roll's Expanded view is on screen the keyboard plays its part and
   // Rec records there, whichever part is picked (windsor#873 decision 3).
+  // Rec records into, and the keyboard's bend and wheel move to, the part
+  // played once the view opens, closes or is taken over.
   ctx.playOn(shownRollSlot);
+  onWideMoved(() => ctx.playedMoved());
   keyboard.tap = recorder;
   ctx.parts.onSelect(() => recorder.sync());
   ctx.onBeforeEdit((kind) => (kind === 'song' ? recorder.close() : recorder.split()));

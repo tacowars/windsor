@@ -49,7 +49,9 @@ between Roll parts meant closing the view, picking, and expanding again.
   with the pane drawn at the region `rollWideFollow.ts` names.
 - `AppContext.playedSlot()` is the slot the keyboard plays and Rec records
   into: the selected part's, or the expanded roll's while it is on screen.
-  The controller's bend and mod wheel still move to a part on a pick or an
-  expression change, so a bend held across the view's opening or closing
-  stays on the part that had it until the wheel or bend moves.
+  The controller's bend and mod wheel move with it: whenever the played
+  slot moves without the selection (the view opens, closes, is taken over
+  by another Roll part, or its tab is shown or hidden),
+  `AppContext.playedMoved()` tells the selection's listeners again, so a
+  held bend reaches the part the keys now play.
 - The CC knobs still follow the selected part, not the roll's.

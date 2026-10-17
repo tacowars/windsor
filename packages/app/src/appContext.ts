@@ -102,6 +102,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private readonly shownListeners = new Map<string, Set<(shown: boolean) => void>>();
   /** Names the slot the keyboard plays in place of the selected one, when it names one (`playOn`). */
   private playedOver: () => number | null = () => null;
+  /** The played slot the selection's listeners last heard (`playedMoved`). */
+  private heardPlayed = 0;
 
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
@@ -112,6 +114,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
       commit: (patch, parts) => this.commitPatch(patch, parts),
       doc: () => this.model.doc,
       invalidate: () => this.invalidate(),
+    });
+    // First, so every listener after it hears the slot this one records.
+    this.parts.onSelect(() => {
+      this.heardPlayed = this.playedSlot();
     });
     // The opening document's first part, should it lack slot 0.
     this.parts.resolve(0);
@@ -180,6 +186,17 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   /** The slot the keyboard plays and Rec records into: the selected part's, unless `playOn` names another. */
   playedSlot(): number {
     return this.playedOver() ?? this.parts.selected;
+  }
+
+  /**
+   * Tell the selection's listeners again when the played slot moved while
+   * the selection stood: the Expanded roll opened, closed, was taken over by
+   * another Roll part, or its tab was shown or hidden. The keyboard then
+   * hands its bend and wheel to the part it now plays (windsor#873 fix
+   * round 1). Unmoved, it tells nobody.
+   */
+  playedMoved(): void {
+    if (this.playedSlot() !== this.heardPlayed) this.parts.announce();
   }
 
   /**
@@ -536,6 +553,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (before !== null)
       for (const listener of this.shownListeners.get(before) ?? []) listener(false);
     if (now !== null) for (const listener of this.shownListeners.get(now) ?? []) listener(true);
+    this.playedMoved();
   }
 
   /** The one path a structural change takes: the live system rebuilt, every tab invalidated. */

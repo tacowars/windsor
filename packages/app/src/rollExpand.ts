@@ -44,6 +44,14 @@ export const wideRoll = (): WideRoll | null => WIDE;
 /** The part of the roll open wide while its view is on screen, or null: the keyboard and Rec play it. */
 export const shownRollSlot = (): number | null => (WIDE?.shown() ? WIDE.slot : null);
 
+/** Told once a view opens or closes, so the keyboard's bend and wheel follow `shownRollSlot`. */
+let wideMoved: () => void = () => {};
+
+/** Hear each open and close of the view (`ctx.playedMoved`, wired in `rollRecMount.ts`). */
+export function onWideMoved(listener: () => void): void {
+  wideMoved = listener;
+}
+
 /** What Expand needs of its card. */
 export interface ExpandTarget {
   readonly ctx: Pick<AppCtx, 'onTabShown'>;
@@ -124,13 +132,16 @@ export function rollExpander(target: ExpandTarget): RollExpander {
     const { device, standIn, frame } = open;
     open = null;
     document.removeEventListener('keydown', onKey);
-    // A card that took the view over is the roll open wide now: its close is its own.
-    if (WIDE === wide) WIDE = null;
+    // A card that took the view over is the roll open wide now: its close is
+    // its own, and its open tells who plays once it stands.
+    const mine = WIDE === wide;
+    if (mine) WIDE = null;
     setIcon(button, false);
     const back = standIn.isConnected;
     if (back) standIn.replaceWith(device);
     frame.remove();
     if (back) target.changed(false);
+    if (mine) wideMoved();
   }
   function expand(): void {
     const device = target.body.closest<HTMLElement>('.seq-device');
@@ -150,6 +161,7 @@ export function rollExpander(target: ExpandTarget): RollExpander {
     document.addEventListener('keydown', onKey);
     setIcon(button, true);
     target.changed(true);
+    wideMoved();
   }
   setIcon(button, false);
   button.onclick = (): void => (open ? close() : expand());
