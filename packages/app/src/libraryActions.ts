@@ -33,6 +33,7 @@ import {
   loadPageLibrary,
   library,
   refreshLibrary,
+  writtenText,
 } from './libraryModel';
 import {
   connectRackFolder,
@@ -40,7 +41,7 @@ import {
   disconnectRackFolder,
   refreshRacks,
 } from './rackLibrary';
-import type { LibraryModel, SettleUserLibrary } from './libraryModel';
+import type { SettleUserLibrary } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
@@ -189,13 +190,6 @@ async function forgetAndDisconnect(ctx: AppCtx): Promise<void> {
 }
 
 const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.parts.patch);
-
-/** The save toast, naming where the write went. */
-export function writtenText(model: LibraryModel, id: string): string {
-  if (model.folder) return `wrote ${id}.json to the folder`;
-  if (model.user) return `saved ${id} to your library`;
-  return `downloaded ${id}.json`;
-}
 
 interface CopyWording {
   title: string;
@@ -396,8 +390,12 @@ export function libraryFolderEntries(ctx: AppCtx): MenuItem[] {
   ];
 }
 
-/** The ⋯ menu's library entries: Delete, the folder actions, and any old-format patches. */
-export function libraryMenuEntries(ctx: AppCtx, refresh: () => void): MenuItem[] {
+/** The ⋯ menu's library entries: Delete, then `extra` (the rack group, windsor#885), the folder actions, and any old-format patches. */
+export function libraryMenuEntries(
+  ctx: AppCtx,
+  refresh: () => void,
+  extra: readonly MenuItem[] = [],
+): MenuItem[] {
   const origin = patchOrigin(scopeFor(ctx));
   const run = runner(ctx, refresh);
   const items: MenuItem[] = [
@@ -411,6 +409,7 @@ export function libraryMenuEntries(ctx: AppCtx, refresh: () => void): MenuItem[]
       run: (opener) => run(runDelete, opener),
     },
   ];
+  if (extra.length) items.push(SEPARATOR, ...extra);
   const folder = libraryFolderEntries(ctx);
   if (folder.length) items.push(SEPARATOR, ...folder);
   if (library.oldFormat.length)

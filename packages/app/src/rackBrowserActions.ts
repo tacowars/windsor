@@ -12,7 +12,7 @@ import { withGesture } from './gestureHooks';
 import { library } from './libraryModel';
 import { openConfirm } from './metadataModal';
 import type { PatchLoader } from './presetBrowser';
-import { loadRackChange, rackDifferences, renamedRack } from './rackActions';
+import { addPartFromRackChange, loadRackChange, rackDifferences, renamedRack } from './rackActions';
 import {
   downloadRackFile,
   isRackWritable,
@@ -77,6 +77,8 @@ export function loadRackIntoPart(
             ctx.autoCopies,
           );
           if (!partial || !ctx.change(partial).ok) return false;
+          // The copy is the app's own, so it may go when unedited (windsor#671).
+          ctx.autoCopies.add(partAt(ctx.model.doc, slot)!.preset);
           loader.onPick();
           return true;
         });
@@ -87,6 +89,46 @@ export function loadRackIntoPart(
     },
     (error: unknown) => ctx.notify(String(error), 'error'),
   );
+}
+
+/**
+ * Add a part playing rack `id` (decision 12, windsor#885): the new part on
+ * the lowest free slot with the rack loaded, one change, then selected and
+ * the tab rendered. False when the song is full or the engine refused.
+ */
+export function addPartFromRack(
+  ctx: AppCtx,
+  id: string,
+  loader: PatchLoader,
+  focus: () => void,
+): boolean {
+  const file = rackEntry(library, id);
+  if (!file) return false;
+  const slot = withGesture('Add part from rack', () => {
+    const preview = (raw: unknown): ReturnType<AppCtx['model']['preview']> =>
+      ctx.model.preview(raw);
+    const added = addPartFromRackChange(
+      ctx.model.doc,
+      preview,
+      { id, file },
+      library,
+      ctx.autoCopies,
+    );
+    if (!added) {
+      ctx.notify('The song is full: no part was added.', 'warning');
+      return null;
+    }
+    return ctx.change(added.partial).ok ? added.slot : null;
+  });
+  if (slot === null) return false;
+  const copy = partAt(ctx.model.doc, slot)?.preset;
+  if (copy !== undefined) ctx.autoCopies.add(copy);
+  ctx.parts.pick(slot);
+  loader.onPick();
+  ctx.render();
+  ctx.notify(`added ${partAt(ctx.model.doc, slot)?.name ?? 'a part'} from the rack "${file.name}"`);
+  focus();
+  return true;
 }
 
 /** Rename a user rack: the file's name and its patch's (decision 6), the id kept. */

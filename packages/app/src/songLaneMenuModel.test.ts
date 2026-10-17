@@ -8,124 +8,27 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { PartRegion, SequencerSpec } from '@windsor/engine';
-import {
-  DEFAULT_ARP_CONFIG,
-  DEFAULT_EUCLIDEAN_CONFIG,
-  DEFAULT_GRID_CONFIG,
-  DEFAULT_ROLL_CONFIG,
-  TICKS_PER_BAR,
-} from '@windsor/engine';
-import type { MenuItem, MenuRow, MenuSpec } from './contextMenuModel';
+import type { MenuItem, MenuRow } from './contextMenuModel';
 import { partLaneGeometry } from './partLaneModel';
 import type { RegionClip } from './regionClipboard';
 import { copyRegion, pasteRegion } from './regionClipboard';
 import { splitPartRegion } from './partEdits';
-import { ROLL_SNAPS, ROLL_SNAP_DEFAULT } from './rollTables';
-import type { LaneMenuCommands, LaneMenuPress } from './songLaneMenuModel';
 import { laneMenu, lanePressAt, whileFresh } from './songLaneMenuModel';
-
-const BAR = TICKS_PER_BAR;
-const SONG = 16 * BAR;
-/** A region from 1-based bar `first`, `bars` long. */
-const bars = (first: number, length: number): PartRegion => ({
-  start: (first - 1) * BAR,
-  duration: length * BAR,
-});
-
-type LanePart = LaneMenuPress['part'];
-const part = (
-  slot: number,
-  name: string,
-  sequencer: SequencerSpec,
-  regions: PartRegion[],
-): LanePart => ({ slot, name, sequencer, regions }) as LanePart;
-
-const acid = part(0, 'acid', { ...DEFAULT_GRID_CONFIG, kind: 'grid' }, [
-  bars(1, 4),
-  bars(5, 4),
-  bars(13, 4),
-]);
-const kick = part(
-  1,
-  'kick',
-  { ...DEFAULT_EUCLIDEAN_CONFIG, kind: 'euclidean', note: 36, hold: 1 },
-  [bars(1, 8), bars(9, 8)],
-);
-/** lead's roll: notes on a 3-bar loop, as the mockups draw it (one note stands in for their four). */
-const notes = [{ tick: 0, pitch: 60, ticks: 6, velocity: 100 }];
-const roll = { ...DEFAULT_ROLL_CONFIG, kind: 'roll' as const, loopTicks: 3 * BAR, notes };
-const lead = part(2, 'lead', roll, [bars(5, 4), bars(9, 4)]);
-const arp = part(3, 'arp', { ...DEFAULT_ARP_CONFIG, kind: 'arp' }, [bars(1, 8), bars(9, 8)]);
-const pad = part(4, 'pad', { kind: 'none' }, [bars(1, 16)]);
-
-/** A press `at` bars from the song's start (0-based, as the mockups' states give it). */
-const press = (
-  on: LanePart,
-  region: number | null,
-  at: number,
-  clip: RegionClip | null = null,
-): LaneMenuPress => ({
-  part: on,
-  region,
-  tick: at * BAR,
-  bar: BAR,
-  meter: '4/4',
-  songTicks: SONG,
-  snap: ROLL_SNAPS[ROLL_SNAP_DEFAULT] ?? { label: '1/16', ticks: 6 },
-  clip,
-  added: null,
-});
-
-/** The commands, each recording its call, over the clipboard `clipboard` reads. */
-function spy(clipboard: () => RegionClip | null = () => null): {
-  commands: LaneMenuCommands;
-  calls: [string, unknown][];
-} {
-  const calls: [string, unknown][] = [];
-  const record =
-    (name: string) =>
-    (arg?: unknown): void => {
-      calls.push([name, arg]);
-    };
-  const names =
-    'cut copy duplicate delete place zoom loop bounce colour setKind pattern showRegion showCut showLoop unpreview'.split(
-      ' ',
-    );
-  const commands = {
-    ...Object.fromEntries(names.map((n) => [n, record(n)])),
-    clipboard,
-  } as unknown as LaneMenuCommands;
-  return { commands, calls };
-}
-
-/** Each item as the mockups read it: a label with its tag, `(off)` when disabled, `▸` for a submenu, `—` a separator. */
-const shown = (items: readonly MenuItem[]): string[] =>
-  items.map((item) => {
-    if (item.kind === 'separator') return '—';
-    if (item.kind === 'submenu') return `${item.label} ▸`;
-    const tag = item.tag === undefined ? '' : ` [${item.tag}]`;
-    return `${item.label}${tag}${item.disabled === true ? ' (off)' : ''}`;
-  });
-
-const rowOf = (spec: MenuSpec, label: string): MenuRow => {
-  const item = spec.items.find((i) => i.kind === 'row' && i.label.startsWith(label));
-  if (item?.kind !== 'row') throw new Error(`no row ${label}`);
-  return item;
-};
-
-const EDITS = (paste: string): string[] => [
-  'Cut [⌘X]',
-  'Copy [⌘C]',
-  paste,
-  'Duplicate [⌘D]',
-  'Delete [⌫]',
-  'Split here [⌥-click]',
-  '—',
-  'Zoom to region',
-  'Loop region',
-  '—',
-];
+import {
+  BAR,
+  SONG,
+  bars,
+  acid,
+  kick,
+  lead,
+  arp,
+  pad,
+  press,
+  spy,
+  shown,
+  rowOf,
+  EDITS,
+} from './__fixtures__/laneMenuSong';
 
 describe("the mockups' states", () => {
   const { commands } = spy();
@@ -140,6 +43,7 @@ describe("the mockups' states", () => {
       'Reverse',
       'Fit region to pattern [1 bar]',
       '—',
+      'Load rack…',
       'Bounce part to Roll…',
       'Part color…',
     ]);
@@ -148,20 +52,26 @@ describe("the mockups' states", () => {
   it('Arp, Euclid and Roll: their groups (`songLanePatternGroup.test.ts`), then Bounce on Arp and Euclid only', () => {
     const arpSpec = laneMenu(press(arp, 0, 2.4), commands);
     expect(arpSpec.head).toBe('arp · bars 1–8 · at bar 3');
-    expect(shown(arpSpec.items).slice(-4)).toEqual([
+    expect(shown(arpSpec.items).slice(-5)).toEqual([
       'Reseed',
       '—',
+      'Load rack…',
       'Bounce part to Roll…',
       'Part color…',
     ]);
     const euclidSpec = laneMenu(press(kick, 1, 11.3), commands);
     expect(euclidSpec.head).toBe('kick · bars 9–16 · at bar 12');
-    expect(shown(euclidSpec.items).slice(-2)).toEqual(['Bounce part to Roll…', 'Part color…']);
+    expect(shown(euclidSpec.items).slice(-3)).toEqual([
+      'Load rack…',
+      'Bounce part to Roll…',
+      'Part color…',
+    ]);
     const rollSpec = laneMenu(press(lead, 0, 5.4), commands);
     expect(rollSpec.head).toBe('lead · bars 5–8 · at bar 6');
-    expect(shown(rollSpec.items).slice(-3)).toEqual([
+    expect(shown(rollSpec.items).slice(-4)).toEqual([
       'Fit region to pattern [3 bars]',
       '—',
+      'Load rack…',
       'Part color…',
     ]);
   });
@@ -170,7 +80,16 @@ describe("the mockups' states", () => {
     const added = { regions: [...acid.regions, bars(10, 1)], index: 3 };
     const spec = laneMenu({ ...press(acid, null, 9.4, gridClip), added }, commands);
     expect(spec.head).toBe('acid · bar 10');
-    expect(shown(spec.items)).toEqual(['Paste at bar 10', 'Add region here', 'Loop this bar']);
+    // The part's group closes a gap's menu too (windsor#885): Load rack… reaches every lane press.
+    expect(shown(spec.items)).toEqual([
+      'Paste at bar 10',
+      'Add region here',
+      'Loop this bar',
+      '—',
+      'Load rack…',
+      'Bounce part to Roll…',
+      'Part color…',
+    ]);
     // Where a click would draw nothing, Add region here is off.
     expect(rowOf(laneMenu(press(acid, null, 9.4), commands), 'Add region').disabled).toBe(true);
   });
@@ -182,6 +101,7 @@ describe("the mockups' states", () => {
       ...EDITS('Paste at bar 10 [nothing copied] (off)'),
       'Set sequencer ▸',
       '—',
+      'Load rack…',
       'Part color…',
     ]);
     const sub = spec.items.find((i) => i.kind === 'submenu');
@@ -313,10 +233,11 @@ describe('the region rows', () => {
     ]);
   });
 
-  it('Bounce, Part color and a Set sequencer kind run their commands', () => {
+  it('Bounce, Part color, Load rack… and a Set sequencer kind run their commands', () => {
     const { commands, calls } = spy();
     rowOf(laneMenu(press(acid, 0, 0), commands), 'Bounce').run();
     rowOf(laneMenu(press(acid, 0, 0), commands), 'Part color').run();
+    rowOf(laneMenu(press(acid, null, 9.4), commands), 'Load rack').run();
     const sub = laneMenu(press(pad, 0, 0), commands).items.find((i) => i.kind === 'submenu');
     const roll =
       sub?.kind === 'submenu'
@@ -326,6 +247,7 @@ describe('the region rows', () => {
     expect(calls).toEqual([
       ['bounce', undefined],
       ['colour', undefined],
+      ['loadRack', undefined],
       ['setKind', 'roll'],
     ]);
   });

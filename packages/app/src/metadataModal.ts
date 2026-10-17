@@ -87,15 +87,34 @@ export async function openConfirm(request: ConfirmRequest): Promise<boolean> {
   return answer;
 }
 
+/** One of Save as rack…'s member boxes (record `2026-10-17-racks` decision 13): what it includes, and its default. */
+export interface MemberBox {
+  readonly key: string;
+  readonly label: string;
+  /** The member's value beside the label: `45 Hz`, `Euclid`. */
+  readonly value: string;
+  readonly note: string;
+  readonly checked: boolean;
+}
+
+/** What the modal hands back: the metadata, and the member boxes' states when it showed any. */
+export interface MetadataAnswer extends PatchMetadata {
+  members?: Record<string, boolean>;
+}
+
 export interface MetadataRequest {
   title: string;
   hint: string;
   initial: PatchMetadata;
+  /** Save as rack…'s two boxes (windsor#885); absent for a patch. */
+  members?: readonly MemberBox[];
   entries: LibraryEntries;
   /** Save: the fixed id. Copy to new: derived from the name as it is typed. */
   id: string | ((name: string) => string);
   /** The entry being saved over, exempt from the name-uniqueness rule. */
   ownId?: string;
+  /** The name rule when it is not the patch library's: Save as rack… checks the racks (windsor#885). */
+  nameProblem?: (name: string) => string | null;
   loudness: Promise<LoudnessResult> | null;
   opener?: HTMLElement | null;
 }
@@ -154,6 +173,26 @@ function tagInput(entries: LibraryEntries, tags: string[]): { render: () => void
   return { render };
 }
 
+/** The member boxes, drawn into `#metaMembers`; empty and hidden for a patch. */
+function memberBoxes(boxes: readonly MemberBox[]): HTMLInputElement[] {
+  const host = $('metaMembers');
+  host.hidden = boxes.length === 0;
+  const inputs = boxes.map((box) => {
+    const label = el('label', 'member');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = `rack-member-${box.key}`;
+    input.checked = box.checked;
+    const text = el('span', '', `${box.label} `);
+    text.appendChild(el('span', 'hint member-value', box.value));
+    label.append(input, text, el('span', 'hint', box.note));
+    host.appendChild(label);
+    return input;
+  });
+  host.replaceChildren(...inputs.map((input) => input.parentElement!));
+  return inputs;
+}
+
 function loudnessLine(result: LoudnessResult, volume: number): string {
   const peak = result.peak.toFixed(VOLUME_DIGITS);
   if (!result.clips)
@@ -187,7 +226,7 @@ export function claimLoudnessLine(write: (line: string) => void): (line: string)
 export async function openMetadataModal(
   request: MetadataRequest,
   volume: number,
-): Promise<PatchMetadata | null> {
+): Promise<MetadataAnswer | null> {
   const dialog = $('metaDlg') as HTMLDialogElement;
   const name = $('metaName') as HTMLInputElement;
   const id = $('metaId') as HTMLInputElement;
@@ -208,13 +247,18 @@ export async function openMetadataModal(
   problem.textContent = '';
   const chips = tagInput(request.entries, tags);
   chips.render();
+  const members = memberBoxes(request.members ?? []);
 
   const syncId = (): void => {
     id.value = typeof request.id === 'string' ? request.id : request.id(name.value);
   };
   syncId();
+  const checkName = (): string | null =>
+    request.nameProblem
+      ? request.nameProblem(name.value)
+      : nameProblem(name.value, request.entries, request.ownId);
   name.oninput = (): void => {
-    problem.textContent = nameProblem(name.value, request.entries, request.ownId) ?? '';
+    problem.textContent = checkName() ?? '';
     syncId();
   };
   category.onchange = (): void => {
@@ -228,11 +272,11 @@ export async function openMetadataModal(
     ?.then((result) => showLoudness(loudnessLine(result, volume)))
     .catch((error: unknown) => showLoudness(`Loudness check unavailable: ${String(error)}`));
 
-  let answer: PatchMetadata | null = null;
+  let answer: MetadataAnswer | null = null;
   $('metaConfirm').onclick = (): void => {
     const chosenCategory =
       category.value === NEW_CATEGORY ? newCategory.value.trim() : category.value;
-    const nameIssue = nameProblem(name.value, request.entries, request.ownId);
+    const nameIssue = checkName();
     const issue = nameIssue ?? (chosenCategory ? null : 'A category is required.');
     if (issue) {
       problem.textContent = issue;
@@ -244,6 +288,11 @@ export async function openMetadataModal(
       category: chosenCategory,
       tags: normaliseTags(tags),
       description: description.value.trim(),
+      ...(request.members && {
+        members: Object.fromEntries(
+          request.members.map((box, i) => [box.key, members[i]?.checked ?? box.checked]),
+        ),
+      }),
     };
     dialog.close();
   };

@@ -8243,6 +8243,34 @@ dialog select.field {
 .chip button:hover {
   color: var(--hot);
 }
+/* Save as rack…'s two member boxes (windsor#885; record 2026-10-17-racks
+   decision 13, the approved docs/design/rack-browser-mockup.html). */
+.members {
+  display: grid;
+  gap: 6px;
+}
+.member {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+  font-size: 12.5px;
+}
+.member input {
+  margin: 2px 0 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--carrier);
+}
+.member .hint {
+  grid-column: 2;
+  margin: 0;
+}
+.member .member-value {
+  grid-column: auto;
+  display: inline;
+  margin-left: 6px;
+}
 
 /* ---------- the audio gate (windsor#578) ----------
    Built to the approved mockup, docs/design/audio-gate-mockup.html: one
@@ -8904,6 +8932,23 @@ dialog.song-dlg {
 }
 .patch-box-mod[hidden] {
   display: none;
+}
+/* The RACK tag while the part was loaded from a rack (windsor#885; record
+   2026-10-17-racks decision 19): on the box's one line before the name,
+   carrying the rack's dot. */
+.patch-box-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 16px;
+  padding: 0 6px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  font: 600 8.5px var(--f-panel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
 }
 .patch-box-src {
   font-family: var(--f-ui);

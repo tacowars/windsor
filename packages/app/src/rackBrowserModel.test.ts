@@ -10,7 +10,14 @@ import type { RackEntry } from '@windsor/engine';
 import { PATCH_FILE_FORMAT, RACK_FILE_FORMAT, RACK_FILE_KIND, loadRackFile } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { browserRows, facets } from './patchBrowserModel';
-import { chainLine, kindCounts, rackInfo, rackListing, rackNameProblem } from './rackBrowserModel';
+import {
+  chainLine,
+  forkName,
+  kindCounts,
+  rackInfo,
+  rackListing,
+  rackNameProblem,
+} from './rackBrowserModel';
 import { stepListing } from './patchStepModel';
 
 /** A rack around the built-in kick, with the members asked for. */
@@ -128,5 +135,12 @@ describe('a rack’s new name', () => {
     expect(rackNameProblem('bare kick', racks, 'kick-drive')).toMatch(/already exists/);
     expect(rackNameProblem('Kick Drive', racks, 'kick-drive')).toBeNull();
     expect(rackNameProblem('Kick Room', racks)).toBeNull();
+  });
+
+  it('forks a built-in under the first free numbered name', () => {
+    expect(forkName('Kick Room', racks)).toBe('Kick Room');
+    expect(forkName('Kick Drive', racks)).toBe('Kick Drive 2');
+    const two = { ...racks, 'kick-drive-2': rack('kick-drive-2', 'Kick Drive 2', []) };
+    expect(forkName('Kick Drive', two)).toBe('Kick Drive 3');
   });
 });
