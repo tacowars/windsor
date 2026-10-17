@@ -11,9 +11,8 @@
  * the Chrome API.
  */
 import type { FormatRefusal, LibraryEntry } from '@windsor/engine';
-import { PatchFormatError, loadPatchFile } from '@windsor/engine';
+import { PatchFormatError, RackFormatError, loadPatchFile } from '@windsor/engine';
 import { HANDLE_DB } from './libraryConstants';
-import type { LibraryEntries } from './patchMetadata';
 
 export interface PatchFolder {
   name: string;
@@ -25,7 +24,7 @@ export interface PatchFolder {
 }
 
 /**
- * A stored patch in a format this build cannot read
+ * A stored patch, or a rack (windsor#868), in a format this build cannot read
  * (`2026-09-28-format-versions-refuse-never-destroy`): kept, listed as old,
  * never playable, with its text exactly as stored for Export.
  */
@@ -37,13 +36,16 @@ export interface OldFormatPatch {
   refusal: FormatRefusal;
 }
 
-export interface FolderLibrary {
-  entries: LibraryEntries;
+/** What a read of a folder yields through a loader: the entries by id, and what did not load. */
+export interface FolderRead<E> {
+  entries: Readonly<Record<string, E>>;
   /** Files that did not load, each with the loader's message; shown, never fatal. */
   problems: string[];
   /** Files in a format this build cannot read, kept apart from `problems`. */
   oldFormat: OldFormatPatch[];
 }
+
+export type FolderLibrary = FolderRead<LibraryEntry>;
 
 /** The display name an old file gives itself, without trusting its shape. */
 function oldName(raw: unknown, id: string): string {
@@ -53,9 +55,20 @@ function oldName(raw: unknown, id: string): string {
 
 const JSON_SUFFIX = '.json';
 
-/** Every `<id>.json` in the folder through the library loader; a bad file is reported, an old one kept, neither fatal. */
-export async function readFolderLibrary(folder: PatchFolder): Promise<FolderLibrary> {
-  const entries: Record<string, LibraryEntry> = {};
+/** A format refusal from either loader: the file is old, not broken. */
+const isFormatRefusal = (error: unknown): error is PatchFormatError | RackFormatError =>
+  error instanceof PatchFormatError || error instanceof RackFormatError;
+
+/**
+ * Every `<id>.json` in the folder through `load`, the patch loader or the
+ * rack loader (windsor#868); a bad file is reported, an old one kept,
+ * neither fatal.
+ */
+export async function readFolderWith<E>(
+  folder: PatchFolder,
+  load: (id: string, raw: unknown) => E,
+): Promise<FolderRead<E>> {
+  const entries: Record<string, E> = {};
   const problems: string[] = [];
   const oldFormat: OldFormatPatch[] = [];
   const names = (await folder.list()).filter((name) => name.endsWith(JSON_SUFFIX)).sort();
@@ -66,15 +79,19 @@ export async function readFolderLibrary(folder: PatchFolder): Promise<FolderLibr
     try {
       text = await folder.read(name);
       raw = JSON.parse(text);
-      entries[id] = loadPatchFile(id, raw);
+      entries[id] = load(id, raw);
     } catch (error) {
-      if (error instanceof PatchFormatError) {
+      if (isFormatRefusal(error)) {
         oldFormat.push({ id, name: oldName(raw, id), text, refusal: error.refusal });
       } else problems.push(error instanceof Error ? error.message : String(error));
     }
   }
   return { entries, problems, oldFormat };
 }
+
+/** The folder through the patch library's loader. */
+export const readFolderLibrary = (folder: PatchFolder): Promise<FolderLibrary> =>
+  readFolderWith(folder, loadPatchFile);
 
 // --- The Chrome side: the handle, its permission and its IndexedDB home ---
 

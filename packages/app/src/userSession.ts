@@ -53,7 +53,7 @@ export async function bootUserState(ctx: AppCtx, gatePassed: Promise<void>): Pro
   };
   // The question and the library load run together; an open waits for the built-ins itself.
   const [, { stored, outcome, autosave }] = await Promise.all([
-    bootLibrary(stores?.patches ?? null, settleLibrary).then(() => {
+    bootLibrary(stores?.patches ?? null, settleLibrary, stores?.racks ?? null).then(() => {
       reportLibraryProblems(ctx);
       ctx.render();
     }),
