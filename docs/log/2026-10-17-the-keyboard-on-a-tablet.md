@@ -54,14 +54,17 @@ instrument that plays one finger per note.
    - (c) an expanded keyboard view fills the window (decisions 7 and 8).
 
    Nothing a QWERTY or MIDI player does changes.
-2. **Polyphony is the engine's.** A music part sounds at most 12 voices
-   (`MUSIC_PART_MAX_VOICES`, `packages/engine/src/audioConstants.ts`, which
-   `musicRoster.ts` passes to every part). A note that would make a
-   thirteenth steals one (`allocateVoice`, `worklet/fm/voiceAllocation.ts`):
-   a dormant voice first when dormancy is on, else the quietest released
-   voice still sounding, else the oldest held one, which fades out over
-   30 ms (`STEAL_FADE_SECONDS`, `stealVoice` in `voiceSteal.ts`) while the
-   new note takes a reserve slot. A patch with `spread` above 0 starts two
+2. **Polyphony is the engine's.** A music part holds at most 12 voices
+   that are not fading out (`MUSIC_PART_MAX_VOICES`,
+   `packages/engine/src/audioConstants.ts`, which `musicRoster.ts` passes
+   to every part). A note that would make a thirteenth steals one
+   (`allocateVoice`, `worklet/fm/voiceAllocation.ts`): a dormant voice
+   first when dormancy is on, else the quietest released voice still
+   sounding, else the oldest held one, which fades out over 30 ms
+   (`STEAL_FADE_SECONDS`, `stealVoice` in `voiceSteal.ts`) while the new
+   note takes a reserve slot. The stolen voice is still audible for those
+   30 ms, so 12 is the allocation limit, not a ceiling on what sounds at
+   one instant. A patch with `spread` above 0 starts two
    voices a note (`fmProcessor.ts`), so it steals at its seventh held note.
    A mono patch (`patch.mono`) plays its newest note and cuts the one
    before (`cutSounding`, `fmProcessor.ts`). The only other ceiling is the
@@ -73,12 +76,14 @@ instrument that plays one finger per note.
    pointer takes no second one. The keys carry `touch-action: none`
    (windsor#857), so a finger that lingers or slides plays and never
    scrolls. Both are the build's prerequisites.
-4. **The keys row sized for touch.** When the primary pointer is coarse,
-   `@media (pointer: coarse)`, the Parts tab's keys row is laid out for
-   fingers. A media query, where the context menu chose the opening press's
-   `pointerType` (`2026-10-16-song-tab-context-menu` decision 5, windsor#825
-   decision 3), because a keyboard is laid out before any press. On a fine
-   pointer nothing changes. The touch row:
+4. **The keys row sized for touch.** When any pointer is coarse,
+   `@media (any-pointer: coarse)`, the Parts tab's keys row is laid out for
+   fingers; `(pointer: coarse)` alone would miss a tablet whose trackpad
+   or mouse is the primary pointer. A media query, where the context menu
+   chose the opening press's `pointerType`
+   (`2026-10-16-song-tab-context-menu` decision 5, windsor#825 decision 3),
+   because a keyboard is laid out before any press. On a fine pointer
+   nothing changes. The touch row:
    - White keys of equal width, never narrower than 44 px while the row
      has 308 px: the keys box's `min-width` is the white key count × 44 px
      capped at the row's width, 616 px for 14 whites, so where the row
@@ -308,5 +313,6 @@ windsor#859's per-pointer sources assumed.
   a tall key gives a fine touch; 2 rows halve it.
 - The Roll's tap hears a slide as one note per key, and a touch strike's
   velocity is recorded as played (`2026-10-09-roll-recording` decision 6).
-- A tablet with a trackpad matches `(pointer: coarse)` and gets the touch
-  row; a mouse there plays at 0.9 as anywhere.
+- A tablet with a trackpad, and a laptop with a touch screen, match
+  `(any-pointer: coarse)` and get the touch row; a mouse there plays at
+  0.9 as anywhere.

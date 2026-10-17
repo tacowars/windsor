@@ -526,7 +526,7 @@
       color: var(--ink-faint);
     }
 
-    /* Proposed, under (pointer: coarse): white keys of equal width, never under
+    /* Proposed, under (any-pointer: coarse): white keys of equal width, never under
        44 px, the black keys over them at 60 % x 62 %, the row 110 px high. */
     .keys.touch {
       --white-min: 44px;
@@ -761,7 +761,7 @@
     <h2>What changes</h2>
     <ol>
       <li>
-        <b>The keys row on a touch screen</b> (<code>@media (pointer: coarse)</code>): white keys
+        <b>The keys row on a touch screen</b> (<code>@media (any-pointer: coarse)</code>): white keys
         of equal width, never under 44 px, the black keys over them at 60 % of a white key's
         width and 62 % of the row's height, centred on the line between their two white keys. The
         row is 110 px high (46 px today). Two octaves, as today, 14 white keys, when they fit at
