@@ -1,0 +1,1536 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "cores": 4,
+    "node": "v22.22.0",
+    "browser": "Chrome/141.0.7390.37"
+  },
+  "settings": {
+    "rounds": 2,
+    "seconds": 6,
+    "renders": 6,
+    "date": "2026-10-17T19:07:44.640Z"
+  },
+  "results": [
+    {
+      "rack": "acid-line",
+      "background": "drums",
+      "loadPct": 6.702616469018059,
+      "loadPctWith": 13.061938061938061,
+      "loadPctBare": 6.359321592920002,
+      "clockRate": 0.9978687226142224,
+      "msPerSecond": 110.87058823528317,
+      "msPerSecondBare": 154.9176470588564,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 12.987012987012985,
+            "processors": 13,
+            "underruns": 5,
+            "clockRate": 1.0000933886748382,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 7.42393789113471,
+            "processors": 11,
+            "underruns": 11,
+            "clockRate": 0.9978687226142224,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 13.136863136863138,
+            "processors": 13,
+            "underruns": 1,
+            "clockRate": 0.9995267895563521,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 5.294705294705294,
+            "processors": 11,
+            "underruns": 6,
+            "clockRate": 1.0007100826638933,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 299.8470588234418
+          },
+          "bare": {
+            "msPerAudioSecond": 195.2588235293241
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 272.78823529413955
+          },
+          "bare": {
+            "msPerAudioSecond": 164.2823529412203
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 306.0823529411984
+          },
+          "bare": {
+            "msPerAudioSecond": 142.95294117653634
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 313.56470588233105
+          },
+          "bare": {
+            "msPerAudioSecond": 153.23529411764707
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 263.2588235294337
+          },
+          "bare": {
+            "msPerAudioSecond": 155.81176470592618
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 267.2588235294337
+          },
+          "bare": {
+            "msPerAudioSecond": 154.02352941178663
+          }
+        }
+      ],
+      "load1": 0.78
+    },
+    {
+      "rack": "driven-kick",
+      "background": "drums",
+      "loadPct": 0.09730691586349449,
+      "loadPctWith": 2.6899374518290156,
+      "loadPctBare": 2.5926305359655206,
+      "clockRate": 0.9967403228228873,
+      "msPerSecond": 14.452941176481545,
+      "msPerSecondBare": 136.58823529417242,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 3.329874903658031,
+            "processors": 12,
+            "underruns": 5,
+            "clockRate": 0.9967403228228873,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 2.2988511488511487,
+            "processors": 11,
+            "underruns": 6,
+            "clockRate": 0.9983452228697511,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 2.05,
+            "processors": 12,
+            "underruns": 4,
+            "clockRate": 0.9990268233582188,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 2.886409923079893,
+            "processors": 11,
+            "underruns": 8,
+            "clockRate": 0.9988838036389918,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 167.02352941178663
+          },
+          "bare": {
+            "msPerAudioSecond": 143.97647058832294
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 158.94117647058823
+          },
+          "bare": {
+            "msPerAudioSecond": 129.2000000000219
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 170.07058823525028
+          },
+          "bare": {
+            "msPerAudioSecond": 172.2000000000219
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 160.7529411765144
+          },
+          "bare": {
+            "msPerAudioSecond": 159.22352941180853
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 141.67058823531602
+          },
+          "bare": {
+            "msPerAudioSecond": 128.78823529413955
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 138.15294117644868
+          },
+          "bare": {
+            "msPerAudioSecond": 122.12941176466205
+          }
+        }
+      ],
+      "load1": 1.04
+    },
+    {
+      "rack": "dub-hat",
+      "background": "drums",
+      "loadPct": 1.4699068258474195,
+      "loadPctWith": 4.312976132778113,
+      "loadPctBare": 2.843069306930693,
+      "clockRate": 0.9975270246636639,
+      "msPerSecond": 22.141176470610148,
+      "msPerSecondBare": 135.46470588237486,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 4.5978021978021975,
+            "processors": 13,
+            "underruns": 3,
+            "clockRate": 0.9987773493895437,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 3.0500000000000003,
+            "processors": 11,
+            "underruns": 9,
+            "clockRate": 1.0013928939400047,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 4.028150067754028,
+            "processors": 13,
+            "underruns": 4,
+            "clockRate": 0.9975270246636639,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 2.6361386138613865,
+            "processors": 11,
+            "underruns": 5,
+            "clockRate": 1.0001939732169947,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 188.2000000000219
+          },
+          "bare": {
+            "msPerAudioSecond": 145.87058823533795
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 169.7294117647278
+          },
+          "bare": {
+            "msPerAudioSecond": 152.15294117644868
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 208.22352941180853
+          },
+          "bare": {
+            "msPerAudioSecond": 314.96470588237486
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 148.16470588239676
+          },
+          "bare": {
+            "msPerAudioSecond": 123.41176470588235
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 144.58823529411765
+          },
+          "bare": {
+            "msPerAudioSecond": 125.05882352941177
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 147.2000000000219
+          },
+          "bare": {
+            "msPerAudioSecond": 119.81176470592618
+          }
+        }
+      ],
+      "load1": 1.73
+    },
+    {
+      "rack": "echo-stab",
+      "background": "drums",
+      "loadPct": -0.12051942498897161,
+      "loadPctWith": 3.648101898101898,
+      "loadPctBare": 3.76862132309087,
+      "clockRate": 0.9987773493893888,
+      "msPerSecond": 16.15294117650346,
+      "msPerSecondBare": 150.97058823529412,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 3.5000000000000004,
+            "processors": 11,
+            "underruns": 6,
+            "clockRate": 0.9999776682920221,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 4.237242646181739,
+            "processors": 11,
+            "underruns": 5,
+            "clockRate": 0.9987773493893888,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 3.796203796203796,
+            "processors": 11,
+            "underruns": 2,
+            "clockRate": 1.0010768010586264,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 3.3000000000000003,
+            "processors": 11,
+            "underruns": 9,
+            "clockRate": 1.0000608514211327,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 232.6117647057947
+          },
+          "bare": {
+            "msPerAudioSecond": 237.77647058819147
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 159.4588235294556
+          },
+          "bare": {
+            "msPerAudioSecond": 153.21176470586045
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 163.94117647058823
+          },
+          "bare": {
+            "msPerAudioSecond": 146.22352941169896
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 163.31764705884544
+          },
+          "bare": {
+            "msPerAudioSecond": 148.7294117647278
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 546.7176470587797
+          },
+          "bare": {
+            "msPerAudioSecond": 204.50588235302882
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 163.95294117642675
+          },
+          "bare": {
+            "msPerAudioSecond": 141.01176470594808
+          }
+        }
+      ],
+      "load1": 1.35
+    },
+    {
+      "rack": "phased-arp",
+      "background": "drums",
+      "loadPct": -1.0171620304901343,
+      "loadPctWith": 7.790956676552906,
+      "loadPctBare": 8.80811870704304,
+      "clockRate": 0.9933716787199179,
+      "msPerSecond": 12.494117647135525,
+      "msPerSecondBare": 192.72352941180853,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 8.788706559899017,
+            "processors": 12,
+            "underruns": 14,
+            "clockRate": 1.000876779053144,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 7.527760114926288,
+            "processors": 11,
+            "underruns": 4,
+            "clockRate": 0.9933995838674419,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 6.793206793206793,
+            "processors": 12,
+            "underruns": 6,
+            "clockRate": 0.9970105239914615,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 10.088477299159791,
+            "processors": 11,
+            "underruns": 24,
+            "clockRate": 0.9933716787199179,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 538.9411764705883
+          },
+          "bare": {
+            "msPerAudioSecond": 176.76470588235293
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 191.14117647061016
+          },
+          "bare": {
+            "msPerAudioSecond": 195.2823529412203
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 211.1764705882353
+          },
+          "bare": {
+            "msPerAudioSecond": 578.5294117647059
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 206.24705882359515
+          },
+          "bare": {
+            "msPerAudioSecond": 183.9058823529631
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 206.68235294126413
+          },
+          "bare": {
+            "msPerAudioSecond": 204.03529411762514
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 276.39999999993427
+          },
+          "bare": {
+            "msPerAudioSecond": 190.16470588239676
+          }
+        }
+      ],
+      "load1": 1.93
+    },
+    {
+      "rack": "pumping-pad",
+      "background": "drums",
+      "loadPct": 3.9320330071655936,
+      "loadPctWith": 9.072882562981572,
+      "loadPctBare": 5.140849555815979,
+      "clockRate": 0.9802626935708012,
+      "msPerSecond": 100.68823529412862,
+      "msPerSecondBare": 201.38235294117646,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 10.13986013986014,
+            "processors": 13,
+            "underruns": 50,
+            "clockRate": 0.9996278559341611,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 5.531155537558973,
+            "processors": 11,
+            "underruns": 8,
+            "clockRate": 0.9802626935708012,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 8.005904986103006,
+            "processors": 13,
+            "underruns": 23,
+            "clockRate": 0.993632849552573,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 4.750543574072986,
+            "processors": 11,
+            "underruns": 11,
+            "clockRate": 0.9961999965611447,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 869.1294117646621
+          },
+          "bare": {
+            "msPerAudioSecond": 217.81176470592618
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 313.329411764684
+          },
+          "bare": {
+            "msPerAudioSecond": 209.1647058822872
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 397.4470588235075
+          },
+          "bare": {
+            "msPerAudioSecond": 247.47058823529412
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 248.80000000008766
+          },
+          "bare": {
+            "msPerAudioSecond": 188.8235294117647
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 267.4470588235075
+          },
+          "bare": {
+            "msPerAudioSecond": 179.03529411762514
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 290.8117647059262
+          },
+          "bare": {
+            "msPerAudioSecond": 193.60000000006573
+          }
+        }
+      ],
+      "load1": 1.93
+    },
+    {
+      "rack": "room-clap",
+      "background": "drums",
+      "loadPct": 1.0681139683599281,
+      "loadPctWith": 4.801131680259113,
+      "loadPctBare": 3.733017711899185,
+      "clockRate": 0.982075925300007,
+      "msPerSecond": 44.9705882352941,
+      "msPerSecondBare": 149.9882352941067,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 5.072342199939877,
+            "processors": 12,
+            "underruns": 78,
+            "clockRate": 0.9931351928742423,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 5.05510372465818,
+            "processors": 11,
+            "underruns": 16,
+            "clockRate": 0.9885892995018667,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 4.52992116057835,
+            "processors": 12,
+            "underruns": 10,
+            "clockRate": 0.9938592273450855,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 2.410931699140191,
+            "processors": 11,
+            "underruns": 99,
+            "clockRate": 0.982075925300007,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 707.0235294117866
+          },
+          "bare": {
+            "msPerAudioSecond": 486.43529411766895
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 162.05882352941177
+          },
+          "bare": {
+            "msPerAudioSecond": 137.61176470590428
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 163.31764705884544
+          },
+          "bare": {
+            "msPerAudioSecond": 140.2705882352722
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 184.9176470588016
+          },
+          "bare": {
+            "msPerAudioSecond": 135.23529411764707
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 199.96470588237486
+          },
+          "bare": {
+            "msPerAudioSecond": 159.7058823529412
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 261.7176470587797
+          },
+          "bare": {
+            "msPerAudioSecond": 168.8352941177128
+          }
+        }
+      ],
+      "load1": 1.51
+    },
+    {
+      "rack": "tape-tom",
+      "background": "drums",
+      "loadPct": 8.712461131732475,
+      "loadPctWith": 11.91711641768061,
+      "loadPctBare": 3.204655285948136,
+      "clockRate": 0.9901160333612468,
+      "msPerSecond": 120.03529411762514,
+      "msPerSecondBare": 182.86470588230912,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 12.922465208747516,
+            "processors": 12,
+            "underruns": 16,
+            "clockRate": 0.9901160333612468,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 3.2624574250431255,
+            "processors": 11,
+            "underruns": 86,
+            "clockRate": 0.9946332504899184,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 10.911767626613704,
+            "processors": 12,
+            "underruns": 6,
+            "clockRate": 0.9959912244616896,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 3.1468531468531467,
+            "processors": 11,
+            "underruns": 1,
+            "clockRate": 0.9986609708386058,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 326.9058823529631
+          },
+          "bare": {
+            "msPerAudioSecond": 196.84705882355132
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 234.68235294126413
+          },
+          "bare": {
+            "msPerAudioSecond": 673.1882352941834
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 246.7058823529412
+          },
+          "bare": {
+            "msPerAudioSecond": 134.05882352941177
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 278.5529411764925
+          },
+          "bare": {
+            "msPerAudioSecond": 151.12941176477162
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 279.3647058823091
+          },
+          "bare": {
+            "msPerAudioSecond": 169.2470588234856
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 331.21176470586045
+          },
+          "bare": {
+            "msPerAudioSecond": 196.48235294113263
+          }
+        }
+      ],
+      "load1": 1.53
+    },
+    {
+      "rack": "acid-line",
+      "background": "pads",
+      "loadPct": 12.028218765838353,
+      "loadPctWith": 24.820402298850574,
+      "loadPctBare": 12.79218353301222,
+      "clockRate": 0.991947868591334,
+      "msPerSecond": 138.97647058821337,
+      "msPerSecondBare": 276.5823529411436,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 26.488095238095237,
+            "processors": 10,
+            "underruns": 41,
+            "clockRate": 0.9966721367965629,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 12.91497124445471,
+            "processors": 8,
+            "underruns": 36,
+            "clockRate": 0.991947868591334,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 23.15270935960591,
+            "processors": 10,
+            "underruns": 21,
+            "clockRate": 0.9976630100125281,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 12.669395821569733,
+            "processors": 8,
+            "underruns": 11,
+            "clockRate": 0.9959704310763688,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 379.0117647058385
+          },
+          "bare": {
+            "msPerAudioSecond": 276.96470588237486
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 415.88235294117646
+          },
+          "bare": {
+            "msPerAudioSecond": 251.2705882352722
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 455.5529411764925
+          },
+          "bare": {
+            "msPerAudioSecond": 323.5882352941176
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 376.4823529412422
+          },
+          "bare": {
+            "msPerAudioSecond": 276.19999999991234
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 1192.8235294117646
+          },
+          "bare": {
+            "msPerAudioSecond": 293.05882352941177
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 419.87058823522835
+          },
+          "bare": {
+            "msPerAudioSecond": 273.88235294117646
+          }
+        }
+      ],
+      "load1": 1.38
+    },
+    {
+      "rack": "driven-kick",
+      "background": "pads",
+      "loadPct": 0.3013869161706726,
+      "loadPctWith": 11.514607780861725,
+      "loadPctBare": 11.213220864691053,
+      "clockRate": 0.9942490621899555,
+      "msPerSecond": 8.094117646982127,
+      "msPerSecondBare": 228.21764705883447,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 11.111025163769973,
+            "processors": 9,
+            "underruns": 10,
+            "clockRate": 0.9958783973725454,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 11.641575817641229,
+            "processors": 8,
+            "underruns": 14,
+            "clockRate": 0.9994406417206194,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 11.918190397953477,
+            "processors": 9,
+            "underruns": 13,
+            "clockRate": 0.9942490621899555,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 10.784865911740876,
+            "processors": 8,
+            "underruns": 6,
+            "clockRate": 0.9987440956072793,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 220.77647058819147
+          },
+          "bare": {
+            "msPerAudioSecond": 230.25882352943367
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 251.84705882344176
+          },
+          "bare": {
+            "msPerAudioSecond": 226.1764705882353
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 245.78823529413955
+          },
+          "bare": {
+            "msPerAudioSecond": 262.63529411758134
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 325.77647058830104
+          },
+          "bare": {
+            "msPerAudioSecond": 1491.3647058823092
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 225.1882352941834
+          },
+          "bare": {
+            "msPerAudioSecond": 187.2000000000219
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 244.21176470586045
+          },
+          "bare": {
+            "msPerAudioSecond": 211.69411764699308
+          }
+        }
+      ],
+      "load1": 2.42
+    },
+    {
+      "rack": "dub-hat",
+      "background": "pads",
+      "loadPct": 1.2524752306006555,
+      "loadPctWith": 14.197787630584603,
+      "loadPctBare": 12.945312399983948,
+      "clockRate": 0.9921902643064596,
+      "msPerSecond": 28.723529411808542,
+      "msPerSecondBare": 229.80000000003287,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 13.380158033362598,
+            "processors": 10,
+            "underruns": 15,
+            "clockRate": 0.9937013848763518,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 11.422120862960021,
+            "processors": 8,
+            "underruns": 59,
+            "clockRate": 0.9971080301297484,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 15.015417227806608,
+            "processors": 10,
+            "underruns": 13,
+            "clockRate": 0.9982455544613852,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 14.468503937007874,
+            "processors": 8,
+            "underruns": 22,
+            "clockRate": 0.9921902643064596,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 266.65882352936796
+          },
+          "bare": {
+            "msPerAudioSecond": 244.98823529405192
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 298.54117647065397
+          },
+          "bare": {
+            "msPerAudioSecond": 267.77647058819144
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 281.47058823529414
+          },
+          "bare": {
+            "msPerAudioSecond": 233.8352941177128
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 252.4470588235075
+          },
+          "bare": {
+            "msPerAudioSecond": 225.76470588235293
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 223.50588235291926
+          },
+          "bare": {
+            "msPerAudioSecond": 203.95294117653634
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 279.7647058823529
+          },
+          "bare": {
+            "msPerAudioSecond": 201.63529411769088
+          }
+        }
+      ],
+      "load1": 3.07
+    },
+    {
+      "rack": "echo-stab",
+      "background": "pads",
+      "loadPct": -1.182686148855951,
+      "loadPctWith": 13.53344930931138,
+      "loadPctBare": 14.71613545816733,
+      "clockRate": 0.9918545318951892,
+      "msPerSecond": 10.588235294117652,
+      "msPerSecondBare": 235.89999999998906,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 12.931034482758621,
+            "processors": 8,
+            "underruns": 14,
+            "clockRate": 0.9918545318951892,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 16.93227091633466,
+            "processors": 8,
+            "underruns": 25,
+            "clockRate": 0.9983618362060657,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 14.135864135864136,
+            "processors": 8,
+            "underruns": 19,
+            "clockRate": 0.998877124023965,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 12.5,
+            "processors": 8,
+            "underruns": 5,
+            "clockRate": 0.9991266478446448,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 293.5999999999562
+          },
+          "bare": {
+            "msPerAudioSecond": 287.4117647058824
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 304.6352941176909
+          },
+          "bare": {
+            "msPerAudioSecond": 261.21176470586045
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 302.54117647065397
+          },
+          "bare": {
+            "msPerAudioSecond": 217.52941176470588
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 215.31764705884544
+          },
+          "bare": {
+            "msPerAudioSecond": 211.68235294115456
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 233.56470588233103
+          },
+          "bare": {
+            "msPerAudioSecond": 254.2705882352722
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 225.84705882355132
+          },
+          "bare": {
+            "msPerAudioSecond": 210.85882352938984
+          }
+        }
+      ],
+      "load1": 1.53
+    },
+    {
+      "rack": "phased-arp",
+      "background": "pads",
+      "loadPct": -1.0764093999797995,
+      "loadPctWith": 16.19383094264576,
+      "loadPctBare": 17.27024034262556,
+      "clockRate": 0.994209164508908,
+      "msPerSecond": 32.51176470589331,
+      "msPerSecondBare": 300.8117647058714,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 14.89802371541502,
+            "processors": 9,
+            "underruns": 8,
+            "clockRate": 0.9957272426332184,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 16.231613690177227,
+            "processors": 8,
+            "underruns": 72,
+            "clockRate": 0.994209164508908,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 17.4896381698765,
+            "processors": 9,
+            "underruns": 4,
+            "clockRate": 0.9971670875613604,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 18.308866995073892,
+            "processors": 8,
+            "underruns": 17,
+            "clockRate": 0.9997770404181117,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 441.0705882353599
+          },
+          "bare": {
+            "msPerAudioSecond": 294.47058823529414
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 322.0705882353599
+          },
+          "bare": {
+            "msPerAudioSecond": 308.29411764705884
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 320.70588235294116
+          },
+          "bare": {
+            "msPerAudioSecond": 302.94117647058823
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 396.2823529412203
+          },
+          "bare": {
+            "msPerAudioSecond": 327.4941176470807
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 345.94117647058823
+          },
+          "bare": {
+            "msPerAudioSecond": 298.68235294115453
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 281.14117647061016
+          },
+          "bare": {
+            "msPerAudioSecond": 264.7294117647278
+          }
+        }
+      ],
+      "load1": 1.59
+    },
+    {
+      "rack": "pumping-pad",
+      "background": "pads",
+      "loadPct": 0.8757933776417275,
+      "loadPctWith": 16.632607391427854,
+      "loadPctBare": 15.756814013786125,
+      "clockRate": 0.9863028610000694,
+      "msPerSecond": 64.12941176471682,
+      "msPerSecondBare": 325.2352941176471,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 18.489723320158102,
+            "processors": 10,
+            "underruns": 5,
+            "clockRate": 0.9982430288215928,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 15.079365079365079,
+            "processors": 8,
+            "underruns": 18,
+            "clockRate": 0.9863028610000694,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 14.775491462697602,
+            "processors": 10,
+            "underruns": 25,
+            "clockRate": 0.9942064545408908,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 16.43426294820717,
+            "processors": 8,
+            "underruns": 97,
+            "clockRate": 1.4078329660332354,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 396.94117647058823
+          },
+          "bare": {
+            "msPerAudioSecond": 350.11764705882354
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 381.78823529413955
+          },
+          "bare": {
+            "msPerAudioSecond": 300.3529411764706
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 464.4117647058824
+          },
+          "bare": {
+            "msPerAudioSecond": 242.57647058816954
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 372.5882352941176
+          },
+          "bare": {
+            "msPerAudioSecond": 253.6588235294775
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 371.77647058830104
+          },
+          "bare": {
+            "msPerAudioSecond": 1138.1882352940738
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 367
+          },
+          "bare": {
+            "msPerAudioSecond": 894.329411764684
+          }
+        }
+      ],
+      "load1": 2.93
+    },
+    {
+      "rack": "room-clap",
+      "background": "pads",
+      "loadPct": 1.6911061978002486,
+      "loadPctWith": 12.052829941240772,
+      "loadPctBare": 10.361723743440523,
+      "clockRate": 0.9880749804816223,
+      "msPerSecond": -35.02941176470587,
+      "msPerSecondBare": 293,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 12.434047617397468,
+            "processors": 9,
+            "underruns": 11,
+            "clockRate": 0.9956115737588545,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 9.013191076624636,
+            "processors": 8,
+            "underruns": 54,
+            "clockRate": 0.9880749804816223,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 11.671612265084075,
+            "processors": 9,
+            "underruns": 4,
+            "clockRate": 0.9883175065089552,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 11.71025641025641,
+            "processors": 8,
+            "underruns": 8,
+            "clockRate": 0.9892025381076671,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 253.77647058819147
+          },
+          "bare": {
+            "msPerAudioSecond": 304.94117647058823
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 262.1647058823968
+          },
+          "bare": {
+            "msPerAudioSecond": 281.05882352941177
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 257.8117647058166
+          },
+          "bare": {
+            "msPerAudioSecond": 224.09411764714648
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 267.7529411764049
+          },
+          "bare": {
+            "msPerAudioSecond": 210.87058823533795
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 265.87058823533795
+          },
+          "bare": {
+            "msPerAudioSecond": 1133.8470588235514
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 264.38823529409575
+          },
+          "bare": {
+            "msPerAudioSecond": 778.4588235294556
+          }
+        }
+      ],
+      "load1": 2
+    },
+    {
+      "rack": "tape-tom",
+      "background": "pads",
+      "loadPct": 8.192342245952576,
+      "loadPctWith": 20.137392357733948,
+      "loadPctBare": 11.945050111781372,
+      "clockRate": 0.9858393067599712,
+      "msPerSecond": 123.34705882349652,
+      "msPerSecondBare": 263.97058823529414,
+      "live": [
+        {
+          "chain": {
+            "loadPct": 20.791120163409595,
+            "processors": 9,
+            "underruns": 11,
+            "clockRate": 0.9858393067599712,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 11.02868447082097,
+            "processors": 8,
+            "underruns": 8,
+            "clockRate": 0.9972421075792952,
+            "sampleRate": 44100
+          }
+        },
+        {
+          "chain": {
+            "loadPct": 19.4836645520583,
+            "processors": 9,
+            "underruns": 71,
+            "clockRate": 0.9982630983616976,
+            "sampleRate": 44100
+          },
+          "bare": {
+            "loadPct": 12.861415752741774,
+            "processors": 8,
+            "underruns": 8,
+            "clockRate": 0.9974438697359159,
+            "sampleRate": 44100
+          }
+        }
+      ],
+      "offline": [
+        {
+          "chain": {
+            "msPerAudioSecond": 372.0117647059481
+          },
+          "bare": {
+            "msPerAudioSecond": 282.5882352941176
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 379.0705882352503
+          },
+          "bare": {
+            "msPerAudioSecond": 262.70588235294116
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 382.7411764705663
+          },
+          "bare": {
+            "msPerAudioSecond": 256.56470588233105
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 412.71764705888927
+          },
+          "bare": {
+            "msPerAudioSecond": 262.12941176466205
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 385.7529411764049
+          },
+          "bare": {
+            "msPerAudioSecond": 265.2352941176471
+          }
+        },
+        {
+          "chain": {
+            "msPerAudioSecond": 433.04705882357325
+          },
+          "bare": {
+            "msPerAudioSecond": 272.1882352940738
+          }
+        }
+      ],
+      "load1": 1.16
+    }
+  ]
+}

@@ -1,0 +1,473 @@
+{
+  "format": 1,
+  "kind": "rack",
+  "name": "Phased Arp",
+  "category": "Leads",
+  "tags": ["lead", "sync", "sweep", "original", "phaser", "echo"],
+  "description": "The sync lead arpeggiating the chord upward over two octaves in sixteenths, an accent on the first note of each turn, through Phaser’s Deep color starting point at the kind’s 0.5 mix and Echo at its defaults (dotted eighths, 0.3 feedback, 0.3 mix). The low cut is set by hand to 150 Hz.",
+  "patchFormat": 4,
+  "patch": {
+    "name": "Phased Arp",
+    "algorithm": 7,
+    "volume": 0.55,
+    "tone": 1,
+    "glide": 0,
+    "pitchEnvAmount": 0,
+    "pan": 0,
+    "panRandom": 0,
+    "panKey": 0,
+    "spread": 0,
+    "mono": false,
+    "ops": [
+      {
+        "wave": 1,
+        "userPartials": null,
+        "ratio": 2.5,
+        "fixed": false,
+        "fixedHz": 100,
+        "detune": 0,
+        "level": 0.8,
+        "feedback": 0,
+        "width": 1,
+        "velSens": 0.4,
+        "levelKeyScale": 0,
+        "phase": 0,
+        "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "note",
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.4,
+          "decayCurve": 0.5,
+          "sustainLevel": 0.85,
+          "releaseTime": 0.25,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      {
+        "wave": 0,
+        "userPartials": null,
+        "ratio": 1,
+        "fixed": false,
+        "fixedHz": 100,
+        "detune": 0,
+        "level": 0.35,
+        "feedback": 0,
+        "width": 1,
+        "velSens": 0.4,
+        "levelKeyScale": 0,
+        "phase": 0,
+        "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.4,
+          "decayCurve": 0.5,
+          "sustainLevel": 0.85,
+          "releaseTime": 0.25,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      {
+        "wave": 0,
+        "userPartials": null,
+        "ratio": 1,
+        "fixed": false,
+        "fixedHz": 100,
+        "detune": 0,
+        "level": 0,
+        "feedback": 0,
+        "width": 1,
+        "velSens": 0.4,
+        "levelKeyScale": 0,
+        "phase": 0,
+        "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.002,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.4,
+          "decayCurve": 0.5,
+          "sustainLevel": 0.7,
+          "releaseTime": 0.3,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      {
+        "wave": 0,
+        "userPartials": null,
+        "ratio": 1,
+        "fixed": false,
+        "fixedHz": 100,
+        "detune": 0,
+        "level": 0,
+        "feedback": 0,
+        "width": 1,
+        "velSens": 0.4,
+        "levelKeyScale": 0,
+        "phase": 0,
+        "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.002,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.4,
+          "decayCurve": 0.5,
+          "sustainLevel": 0.7,
+          "releaseTime": 0.3,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      }
+    ],
+    "filter": {
+      "mode": 0,
+      "cutoff": 8000,
+      "resonance": 0.707,
+      "slope24": false,
+      "envAmount": 0,
+      "modWheelDepth": 0,
+      "lfoAmount": 0,
+      "lfo2Amount": 0,
+      "keyTrack": 0,
+      "vowel": 0,
+      "env": {
+        "initLevel": 0,
+        "attackTime": 0.002,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.4,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.3,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      }
+    },
+    "lfo": {
+      "shape": 1,
+      "rate": 0.25,
+      "amount": 1,
+      "delay": 0,
+      "retrigger": true,
+      "oneShot": false,
+      "unipolar": false,
+      "toPitch": 0,
+      "modWheelDepth": 0,
+      "toOp": [0, 0, 0, 0],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [1, 0, 0, 0]
+    },
+    "lfo2": {
+      "shape": 0,
+      "rate": 5,
+      "amount": 0,
+      "delay": 0,
+      "retrigger": false,
+      "oneShot": false,
+      "unipolar": false,
+      "toPitch": 0.2,
+      "modWheelDepth": 1,
+      "toOp": [0, 0, 0, 0],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [0, 0, 0, 0]
+    },
+    "pitchEnv": {
+      "initLevel": 0,
+      "attackTime": 0.002,
+      "attackCurve": 0,
+      "peakLevel": 1,
+      "decayTime": 0.1,
+      "decayCurve": 0.5,
+      "sustainLevel": 0,
+      "releaseTime": 0.3,
+      "releaseCurve": 0.5,
+      "endLevel": 0,
+      "loopMode": 0,
+      "keyScale": 0
+    },
+    "drive": {
+      "gain": 1,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1,
+      "on": false
+    },
+    "macros": []
+  },
+  "patchSource": "lead-sync-sweep",
+  "lowCut": 150,
+  "sequencer": {
+    "kind": "arp",
+    "style": "up",
+    "divisor": 6,
+    "gate": 0.5,
+    "octaves": 2,
+    "voicing": "close",
+    "retrigger": false,
+    "register": {
+      "octave": 4
+    },
+    "steps": [
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": true,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      },
+      {
+        "kind": "note",
+        "octave": 0,
+        "accent": false,
+        "slide": false
+      }
+    ],
+    "lanes": [],
+    "accentVelocity": 0.2,
+    "accentMod": 1,
+    "skipChance": 0
+  },
+  "inserts": [
+    {
+      "kind": "phaser",
+      "rate": 0.2,
+      "center": 420,
+      "depth": 2.4,
+      "feedback": 0.7,
+      "feedbackCut": 500,
+      "stereo": 0,
+      "envelope": 0,
+      "bassKeep": 0,
+      "mix": 0.5,
+      "enabled": true,
+      "id": "qtyzg3mb"
+    },
+    {
+      "kind": "echo",
+      "delayTime": 0.28,
+      "feedback": 0.3,
+      "damp": 3200,
+      "resonance": 1,
+      "sync": true,
+      "division": "1/8D",
+      "mix": 0.3,
+      "enabled": true,
+      "slot": null,
+      "id": "al8y7qhf"
+    }
+  ]
+}
