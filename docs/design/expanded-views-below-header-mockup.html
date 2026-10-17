@@ -2,17 +2,24 @@
 <html lang="en">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- The expanded views below the console header (windsor#851), desktop.
-     Spectre's workbench and the piano roll's expand view stop covering the
-     window and fill the space below the console header, so the transport,
-     undo and redo, the tabs and the part chips stay live. Reproduced from
-     screenshots of today taken on 2026-10-17 at 1440 x 900 in headless
-     Chrome, with Bass (a Roll part, 12 notes, a 1-bar loop in a 4-bar
-     region, C minor) playing at 120 BPM and a Spectre insert on Bass at its
-     Bleep Test starting point. Every value drawn is the one the app showed.
+  <!-- The expanded views below the console header (windsor#851 desktop,
+     approved 2026-10-17; windsor#856 tablet). Spectre's workbench and the
+     piano roll's expand view stop covering the window and fill the space
+     below the console header, so the transport, undo and redo, the tabs and
+     the part chips stay live. Reproduced from screenshots of today taken on
+     2026-10-17 in headless Chrome at 1440 x 900 (desktop) and at the
+     tablet's CSS 1024 x 1366 and 1366 x 1024 with touch, with Bass (a Roll
+     part, 12 notes, a 1-bar loop in a 4-bar region, C minor) playing at
+     120 BPM and a Spectre insert on Bass at its Bleep Test starting point.
+     Kick (a Euclid part, 4 of 16 at 1/16) is the second part, for the chip
+     frame. Every value drawn is the one the app showed, and every knob's
+     pin is the app's own scaleFor(spec).toNorm(value) over -135..135 deg.
      Static and self-contained: open it in a browser. The strip at the very
-     top is the mockup's own switcher, not part of the console. The tablet
-     mockup follows once tacowars approves this one. -->
+     top is the mockup's own switcher, not part of the console. -->
+  <!-- Sizes from the app on the tablet (headless Chrome, touch, 1366 x 1024):
+     header 127 px (the transport wraps to a second line in both
+     orientations), part chip 150 x 38, header controls 28 high, the roll's
+     rail Close 18 x 18, the workbench's Close 44 x 23. -->
   <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
      Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
      Google Fonts (fonts.google.com/specimen/Chakra+Petch,
@@ -112,6 +119,35 @@
       flex-direction: column;
       position: relative;
     }
+    /* Device: a tablet frame is the console at the tablet's CSS size, drawn
+       1:1 below the switcher; the page scrolls when the window is smaller. */
+    body.framed {
+      height: auto;
+      min-height: 100%;
+    }
+    body.framed .console {
+      flex: none;
+      width: var(--frame-w);
+      height: var(--frame-h);
+      outline: 1px dashed var(--return);
+    }
+    /* A mockup-only marker inside a frame (not part of the console). */
+    .mock-tag {
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      color: var(--return);
+      background: #2a2140;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      padding: 2px 6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .under-tag {
+      position: absolute;
+      top: 0;
+      right: 24px;
+    }
     header.head {
       flex: none;
       background: var(--panel);
@@ -119,7 +155,7 @@
       padding: 8px 16px;
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 8px;
     }
     .head-row {
       display: flex;
@@ -127,7 +163,32 @@
       gap: 8px;
       align-items: center;
     }
+    /* The first row, as console.css .head-row: 12px between groups, the
+       transport strip taking the rest and wrapping inside it. */
+    .head-row:first-child {
+      gap: 8px 12px;
+      align-items: flex-start;
+    }
+    .tstrip {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+    }
+    .tgroup {
+      display: flex;
+      gap: 8px;
+      flex: none;
+    }
+    .undo-pair {
+      display: flex;
+      gap: 4px;
+      margin-left: -6px;
+    }
     .tabs {
+      flex: none;
       display: inline-flex;
       gap: 1px;
       background: var(--line);
@@ -155,14 +216,15 @@
       background: var(--carrier);
       color: #111416;
     }
-    .tab .lamp {
-      display: inline-block;
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      margin-left: 6px;
-      vertical-align: 2px;
-      background: var(--return);
+    /* The app's tab widths (Parts 66, Mixer 65, Song 61, Settings 36). */
+    .tab[data-tab='parts'] {
+      width: 66px;
+    }
+    .tab[data-tab='mixer'] {
+      width: 65px;
+    }
+    .tab[data-tab='song'] {
+      width: 61px;
     }
     .box {
       height: 28px;
@@ -215,11 +277,11 @@
       border-radius: 1px;
     }
     .rec-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--line-bright);
-      margin: 0 3px;
+      margin: 9px 0 0 -4px;
     }
     .spacer {
       flex: 1;
@@ -229,25 +291,40 @@
       border-color: var(--modulator);
       color: #111416;
     }
+    /* A part chip (console.css .pchip): the picked one filled with its tone,
+       the others dark with a 3px edge of it. */
     .pchip {
       width: 150px;
       height: 38px;
-      padding: 4px 10px;
+      padding: 4px 12px 3px 7px;
       text-align: left;
-      background: var(--part);
-      color: #10151a;
-      border: 0;
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--tone);
       border-radius: var(--r);
       font: 600 11px var(--f-panel);
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       position: relative;
     }
+    .pchip[aria-pressed='true'] {
+      background: var(--tone);
+      border-color: var(--tone);
+      color: #14181a;
+    }
     .pchip small {
       display: block;
-      font: 500 9px var(--f-ui);
+      font: 500 9.5px var(--f-ui);
       letter-spacing: 0;
       text-transform: none;
+      color: var(--ink-faint);
+    }
+    .pchip[aria-pressed='true'] small {
+      color: #14181a;
+    }
+    .pchip + .pchip {
+      margin-left: -4px;
     }
     .pchip::after {
       content: '';
@@ -913,7 +990,15 @@
   </style>
 
   <div class="mock-bar" aria-label="Mockup controls">
-    <b>Mockup · desktop</b>
+    <b>Mockup</b>
+    <label
+      >Device
+      <select id="mDevice">
+        <option value="window">This window (desktop: 1440 × 900)</option>
+        <option value="portrait">Tablet portrait, 1024 × 1366</option>
+        <option value="landscape">Tablet landscape, 1366 × 1024</option>
+      </select>
+    </label>
     <label
       >Frame
       <select id="mFrame">
@@ -930,20 +1015,16 @@
       </select>
     </label>
     <label
-      >Tab lamp (to decide)
-      <select id="mLamp">
-        <option value="off">off</option>
-        <option value="on">on</option>
-      </select>
-    </label>
-    <label
       >Notes
       <select id="mNotes">
         <option value="hide">hidden</option>
         <option value="show">shown below</option>
       </select>
     </label>
-    <span>Tabs, transport and chips are live: try Mixer, then Song. Esc or Close closes.</span>
+    <span
+      >Tabs, transport and chips are live: try Mixer, then Song, or the Kick chip. Esc or Close
+      closes.</span
+    >
   </div>
 
   <div class="console">
@@ -971,28 +1052,50 @@
         </nav>
         <span class="box cpu" title="CPU 1%, peak 0%, underruns 0"><i></i>1%</span>
         <span class="rec-dot" aria-hidden="true"></span>
-        <button class="box sq" title="Undo Remove Spectre" aria-label="Undo">↶</button>
-        <button class="box sq" title="Nothing to redo" aria-label="Redo" disabled>↷</button>
-        <button class="box btn">Tap</button>
-        <span class="box">120.00 <small>BPM</small></span>
-        <span class="box">4 <small>Bars</small></span>
-        <span class="box">50 <small>%</small></span>
-        <span class="box sel">1/16</span>
-        <span class="box sel">4/4</span>
-        <span class="box sel">C</span>
-        <span class="box sel" style="min-width: 149px; justify-content: space-between">minor</span>
-        <span class="box" id="pos">3.1.2</span>
-        <span class="spacer"></span>
-        <button class="box sq play" id="play" aria-pressed="true" title="Play">▶</button>
-        <button class="box sq" title="Stop">■</button>
-        <button class="box sq" id="pause" title="Pause">‖</button>
-        <button class="box sq" title="Loop">⟲</button>
+        <span class="undo-pair"
+          ><button class="box sq" title="Undo Remove Spectre" aria-label="Undo">↶</button
+          ><button class="box sq" title="Nothing to redo" aria-label="Redo" disabled>
+            ↷
+          </button></span
+        >
+        <!-- The transport takes what the row leaves and wraps a group at a time,
+             as console.css .transport-strip does: one row at 1440 px, two on
+             the tablet in either orientation. Widths are the app's. -->
+        <div class="tstrip">
+          <span class="tgroup"
+            ><button class="box btn" style="width: 48px">Tap</button
+            ><span class="box" style="width: 94px">120.00 <small>BPM</small></span
+            ><span class="box" style="width: 77px">4 <small>Bars</small></span></span
+          >
+          <span class="tgroup"
+            ><span class="box" style="width: 57px">50 <small>%</small></span
+            ><span class="box sel" style="width: 63px">1/16</span
+            ><span class="box sel" style="width: 63px">4/4</span></span
+          >
+          <span class="tgroup"
+            ><span class="box sel" style="width: 53px">C</span
+            ><span class="box sel" style="width: 149px; justify-content: space-between"
+              >minor</span
+            ></span
+          >
+          <span class="tgroup"
+            ><span class="box" id="pos" style="width: 57px; justify-content: center">3.1.2</span
+            ><button class="box sq play" id="play" aria-pressed="true" title="Play" style="width: 36px">▶</button
+            ><button class="box sq" title="Stop" style="width: 37px">■</button
+            ><button class="box sq" id="pause" title="Pause" style="width: 34px">‖</button
+            ><button class="box sq" title="Loop" style="width: 41px">⟲</button></span
+          >
+        </div>
       </div>
       <div class="head-row">
-        <button class="pchip" title="Bass">Bass<small>1 · Roll</small></button>
+        <button class="pchip" data-part="bass" style="--tone: #6ea8e2" title="Bass">
+          Bass<small>1 · Roll</small></button
+        ><button class="pchip" data-part="kick" style="--tone: #ede36e" title="Kick">
+          Kick<small>2 · Euclid</small>
+        </button>
         <span class="spacer"></span>
-        <button class="pm" title="Add a part (1 of 16)">+</button>
-        <button class="pm" title="Remove Bass…">−</button>
+        <button class="pm" title="Add a part (2 of 16)">+</button>
+        <button class="pm" id="removePart" title="Remove Bass…">−</button>
       </div>
     </header>
 
@@ -1023,31 +1126,61 @@
         </li>
         <li>
           <b>Switching tabs does not close a view.</b> Another tab shows its page as it does today,
-          with nothing of the view on it. The view belongs to the tab its card lives on (Song for
-          both examples here; Mixer for a Spectre on the master or a send), and going back to that
-          tab shows it still expanded, as it was left. Only Close (the roll's rail button) and Esc
-          close it.
+          with nothing of the view on it and no mark on the view's tab. The view belongs to the tab
+          its card lives on (Song for both examples here; Mixer for a Spectre on the master or a
+          send), and going back to that tab shows it still expanded, as it was left. Only Close
+          (the roll's rail button) and Esc close it.
+        </li>
+      </ol>
+      <h2>Decided on the desktop mockup (tacowars, 2026-10-17)</h2>
+      <ol>
+        <li><b>No tab lamp.</b> The view's tab gets no mark while another tab is shown.</li>
+        <li>
+          <b>Esc</b> closes an expanded view only while the view is on screen. On another tab it
+          does nothing to the view.
+        </li>
+        <li>
+          <b>Another part chip while a view is expanded</b> (to try): the view stays open on its
+          own part, and the pane under it changes to the picked part. Pick Kick with the roll
+          open: the roll stays on Bass, Kick's chip lights, and closing the view shows Kick's pane.
+          The purple tag in that frame is the mockup's, not the console's.
+        </li>
+        <li><b>One expanded view at a time.</b> Opening a second closes the first.</li>
+      </ol>
+      <h2>On the tablet</h2>
+      <ol>
+        <li>
+          <b>The same layout in both orientations.</b> Today's header is 127 px tall on the
+          tablet: its transport wraps to a second line at 1024 and at 1366 px, a group at a time,
+          and the part chips sit below. The views start 16 px under it.
+        </li>
+        <li>
+          <b>Every control at today's size.</b> Nothing shrinks to fit: the header's controls stay
+          28 px high, the part chips 150 × 38, the workbench's Close 44 × 23 and the roll's rail
+          Close 18 × 18. With more parts than fit, the chip row scrolls sideways as it does today.
+        </li>
+        <li>
+          <b>Where the space is tight: the landscape roll.</b> At 1366 × 1024 it shows 49 rows at
+          15 px/row (57 today), about four octaves. Spectre's lanes lose 39 px each (219 px, 258
+          today), and each lane's knobs still take only 128 px of them.
+        </li>
+        <li>
+          <b>Portrait has room.</b> At 1024 × 1366 the roll shows 71 of its 73 rows (C1 to C7; all
+          73 with blank rows below today), and Spectre's lanes are 333 px (372 today).
+        </li>
+        <li>
+          <b>Spectre's outline and readout</b> follow the pointer, so on the tablet they show while
+          a finger is down and go when it lifts. The frames keep the desktop's readout for
+          comparison.
         </li>
       </ol>
       <h2>To decide</h2>
       <ol>
         <li>
-          <b>A lamp on the view's tab</b> while the view is open and another tab is shown (a small
-          purple dot on Song, behind the switcher's Tab lamp toggle). Proposed: yes, so the open
-          view is not forgotten.
-        </li>
-        <li>
-          <b>Esc on another tab.</b> Proposed: Esc closes the view only while its tab is shown, so
-          Esc in a Mixer dialog never closes a view the user cannot see.
-        </li>
-        <li>
-          <b>Another part chip while the roll is expanded.</b> Today the roll closes when its part
-          leaves the Song pane. With the chips reachable, proposed: the view stays open on its own
-          part and the pane under it changes, since decision 6 has only Close and Esc close it.
-        </li>
-        <li>
-          <b>Two views at once</b> (a roll on Song and a master Spectre on Mixer). Proposed: one at
-          a time; opening a second closes the first.
+          <b>Closing the roll by touch.</b> A tablet without a keyboard has no Esc, so the roll's
+          only way out is its rail button, 18 × 18 px today; the workbench's Close is 44 × 23.
+          Proposed: keep both at today's size here (decision 4) and file a follow-up for a larger
+          Close if it proves hard to hit.
         </li>
       </ol>
     </div>
@@ -1112,7 +1245,19 @@
     const READOUT =
       '2.94k–3.05k Hz · F♯7   Gain −3.0 dB   Delay 250 ms · 0.50 beat   Feedback 35%';
 
-    const state = { frame: 'proposed', view: 'bench', viewTab: 'song', tab: 'song', tick: 198, playing: true, lamp: false };
+    const state = {
+      frame: 'proposed',
+      device: 'window',
+      view: 'bench',
+      viewTab: 'song',
+      tab: 'song',
+      // The picked part chip. Both views here live on Bass's pane.
+      part: 'bass',
+      tick: 198,
+      playing: true,
+    };
+    const DEVICES = { portrait: [1024, 1366], landscape: [1366, 1024] };
+    const PART_NAMES = { bass: 'Bass', kick: 'Kick' };
     const $ = (id) => document.getElementById(id);
 
     /* ---------- small builders ---------- */
@@ -1123,13 +1268,18 @@
     const seg = (items, on, cls = '') =>
       `<span class="seg ${cls}">${items.map((t) => `<button aria-pressed="${t === on}">${t}</button>`).join('')}</span>`;
 
+    // Mockup only: names the pane under an open view when another chip is picked.
+    const underTag = () =>
+      state.part === 'bass'
+        ? ''
+        : `<span class="mock-tag under-tag">Mockup · the pane under this view is now ${PART_NAMES[state.part]}'s</span>`;
     function benchHtml() {
       const cols = LANES.map((l) => {
         const k = l.label[0];
         return `<div class="lane-col"><div class="lane-head"><span class="lane-name" style="color:${l.color}">${l.label}</span>${toggle('Steps', !!l.steps)}${toggle('Link', true)}</div>
         <div class="lane-knobs">${knob('0.00 oct', `${k} shift`)}${knob('0%', `${k} offset`)}${knob('0%', `${k} select`)}</div></div>`;
       }).join('');
-      return `<div class="overlay spectre">
+      return `<div class="overlay spectre">${underTag()}
         <div class="overlay-head bench-head">
           <span class="overlay-title">Spectre — workbench</span>
           <div style="width:135px"><span class="field-label">Starting point</span><span class="field">Bleep Test</span></div>
@@ -1163,7 +1313,7 @@
     const ICON = (d) =>
       `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2">${d}</svg>`;
     function rollHtml() {
-      return `<div class="overlay roll">
+      return `<div class="overlay roll">${underTag()}
         <div class="overlay-head"><span class="overlay-title">Bass — Roll</span><span class="overlay-note">Expanded · Esc closes</span></div>
         <div class="roll-device">
           <div class="roll-rail"><span class="dot"></span><span class="name">Roll</span><span class="grow"></span>
@@ -1220,7 +1370,12 @@
       song: () => `<div class="page"><div class="section-title">Song <span class="abridged">today, abridged</span></div>
         <div class="lane-strip"><span style="font:600 12px var(--f-panel)">HARMONY</span><span class="bar harm">C min</span></div>
         <div class="lane-strip"><span style="font:600 12px var(--f-panel)">1 · Bass</span><span class="bar">∞ roll · 12 notes · 1 bar loop</span></div>
-        <div class="stand-in">The selected region's pane, as today: Bass — Roll (the Roll device, collapsed), then Insert effects with Spectre (Curves, Bleep Test, ⤢ Expand).</div></div>`,
+        <div class="lane-strip"><span style="font:600 12px var(--f-panel)">2 · Kick</span><span class="bar" style="border-color:#ede36e;background:#3a3820">∞ euclid 4/16 · 1/16</span></div>
+        <div class="stand-in">${
+          state.part === 'bass'
+            ? "The selected region's pane, as today: Bass — Roll (the Roll device, collapsed), then Insert effects with Spectre (Curves, Bleep Test, ⤢ Expand)."
+            : "Kick's pane, as today: Kick — Euclid (euclid 4/16 · 1/16 · 1 region, Bounce to roll), its Euclid device, then Insert effects (no inserts)."
+        }</div></div>`,
     };
 
     /* ---------- canvases, sized from their CSS box × devicePixelRatio ---------- */
@@ -1323,8 +1478,10 @@
       const gx0 = keys;
       const gw = w - keys;
       const gh = h - head - vel;
-      const rows = Math.floor(gh / row);
-      const topPitch = 56 + Math.floor(rows / 2);
+      // The roll's range is C1–C7 (24–96): a taller canvas leaves blank rows
+      // below C1, as today's portrait roll does.
+      const rows = Math.min(Math.floor(gh / row), 73);
+      const topPitch = Math.min(96, Math.max(24 + rows - 1, 56 + Math.floor(rows / 2)));
       const bar = gw / 4;
       const tx = (t) => gx0 + (t / 96) * bar;
       const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -1428,16 +1585,18 @@
     }
     function render() {
       document.body.classList.toggle('today', state.frame === 'today');
+      const size = DEVICES[state.device];
+      document.body.classList.toggle('framed', !!size);
+      if (size) {
+        document.body.style.setProperty('--frame-w', `${size[0]}px`);
+        document.body.style.setProperty('--frame-h', `${size[1]}px`);
+      }
+      for (const c of document.querySelectorAll('.pchip'))
+        c.setAttribute('aria-pressed', String(c.dataset.part === state.part));
+      $('removePart').title = `Remove ${PART_NAMES[state.part]}…`;
       const showView = viewOpen() && (state.frame === 'today' || state.tab === state.viewTab);
       for (const t of document.querySelectorAll('.tab')) {
         t.setAttribute('aria-selected', String(t.dataset.tab === state.tab));
-        t.querySelector('.lamp')?.remove();
-        if (state.lamp && viewOpen() && t.dataset.tab === state.viewTab && state.tab !== state.viewTab) {
-          const lamp = document.createElement('span');
-          lamp.className = 'lamp';
-          lamp.title = 'An expanded view is open on this tab';
-          t.append(lamp);
-        }
       }
       $('stage').innerHTML = PAGES[state.tab]();
       const host = state.frame === 'today' ? $('overlayHost') : $('stage');
@@ -1473,10 +1632,17 @@
       if (viewOpen()) state.tab = state.viewTab;
       render();
     };
-    $('mLamp').onchange = (e) => {
-      state.lamp = e.target.value === 'on';
+    $('mDevice').onchange = (e) => {
+      state.device = e.target.value;
       render();
     };
+    // A chip picks its part. An open view stays open on its own part (Bass);
+    // only the pane under it changes (tacowars, windsor#855).
+    for (const c of document.querySelectorAll('.pchip'))
+      c.onclick = () => {
+        state.part = c.dataset.part;
+        render();
+      };
     $('mNotes').onchange = (e) => {
       $('notesHost').hidden = e.target.value !== 'show';
       render();
