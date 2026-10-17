@@ -333,7 +333,7 @@ function noiseOps(mask: number): NonNullable<PartialPatch['ops']> {
 
 const setName = (mask: number): string =>
   [...'ABCD'].filter((_, i) => (mask & (1 << i)) !== 0).join('');
-/** Every algorithm with every set of two or more Noise operators: 11 x 11. */
+/** Every algorithm with every set of two or more Noise operators: 12 x 11. */
 const NOISE_SETS: [string, number, number][] = [];
 for (let algorithm = 0; algorithm < loaded.algorithms.length; algorithm++) {
   for (let mask = 3; mask < 16; mask++) {
@@ -346,8 +346,8 @@ const withOp = (ops: PartialPatch['ops'] & object, i: number, o: object) =>
   ops.map((op, j) => (j === i ? { ...op, ...o } : op));
 
 describe('noise drawn D..A in both loops (windsor#389)', () => {
-  it('covers the 121 sets', () => {
-    expect(NOISE_SETS).toHaveLength(121);
+  it('covers the 132 sets', () => {
+    expect(NOISE_SETS).toHaveLength(132);
   });
 
   it.each(NOISE_SETS)('algorithm %s takes the kernel, bit-identical', (_n, algorithm, mask) => {

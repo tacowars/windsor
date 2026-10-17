@@ -21,9 +21,14 @@ describe('patch normalisation', () => {
   it('clamps the algorithm, the tone and the feedback, which runs −1..10 (windsor#842)', () => {
     const ops = [{ feedback: 12 }, { feedback: -3 }, { feedback: 10 }, { feedback: 2.5 }];
     const p = normalisePatch({ algorithm: 99, tone: 0, ops });
-    expect(p.algorithm).toBe(10);
+    expect(p.algorithm).toBe(11);
     expect(p.tone).toBe(0.02);
     expect(p.ops.map((op) => op.feedback)).toEqual([10, -1, 10, 2.5]);
+  });
+
+  it('keeps algorithm 11, Stack + One, and clamps 12 to it (windsor#895)', () => {
+    expect(normalisePatch({ algorithm: 11 }).algorithm).toBe(11);
+    expect(normalisePatch({ algorithm: 12 }).algorithm).toBe(11);
   });
 
   it("ignores a stray retired key, as a song's format-1 snapshot still carries userKey", () => {

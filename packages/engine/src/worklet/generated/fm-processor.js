@@ -219,7 +219,9 @@ var ALGORITHMS = [
   // 9:  D -> C, C -> B, C -> A                shared modulator, split output
   { name: "Split Branch", label: "D>C>(B,A)", mods: [[C], [C], [D], []], carriers: [A, B] },
   // 10: D,C,B -> A                            three modulators, one carrier
-  { name: "Triple Mod", label: "(D,C,B)>A", mods: [[B, C, D], [], [], []], carriers: [A] }
+  { name: "Triple Mod", label: "(D,C,B)>A", mods: [[B, C, D], [], [], []], carriers: [A] },
+  // 11: D -> C -> B, A free                   a three-deep stack beside a lone carrier
+  { name: "Stack + One", label: "D>C>B | A", mods: [[], [C], [D], []], carriers: [A, B] }
 ];
 function topoOrder(alg) {
   const order = [];
