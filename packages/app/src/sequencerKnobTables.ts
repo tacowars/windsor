@@ -54,9 +54,9 @@ import type { KnobSpec } from './knob';
 type KeysOfUnion<T> = T extends unknown ? keyof T : never;
 /** A field of some sequencer spec, `kind` aside: what a driver knob may address (#618 decision 8). */
 export type SequencerField = Exclude<KeysOfUnion<SequencerSpec>, 'kind'>;
-/** A numeric field of the part itself: what a section knob may address. */
+/** A numeric field of the part itself: what a section knob may address (`-?`: an optional field is never one). */
 export type PartNumberField = {
-  [K in keyof MusicPart]: MusicPart[K] extends number ? K : never;
+  [K in keyof MusicPart]-?: MusicPart[K] extends number ? K : never;
 }[keyof MusicPart];
 
 /** A knob's range, default and readout; the binding is the card's. */

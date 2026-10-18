@@ -66,6 +66,8 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
         // Not captured either: the pulse comes from E(4, 4), authored above.
         pattern: null,
       },
+      // The keyboard fold the normaliser fills (windsor#918): nothing folded.
+      fold: 'off',
     },
   ],
 };
