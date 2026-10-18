@@ -31,8 +31,11 @@ the controls (A), zoom bars (B) and gestures only (C).
 2. **The controls' Zoom item becomes Show: Loop | Region.** Each button
    fits that span to the width, and is lit while the view sits on it. The
    ↔ and ↕ steppers, Fit and their px readouts go.
-3. **The roll opens on its loop.** The loop fills the width, and its
-   repeats carry on under the hatch. Region fits the whole region.
+3. **The roll opens on its loop.** The loop fills the width, or as much
+   of it as the closest zoom (decision 8) allows: a half-bar loop on a
+   pane wider than about 490 px stops at 240 px per beat, with its next
+   repeat beside it. Its repeats carry on under the hatch. Region fits the
+   whole region.
 4. **The ruler zooms as the Song tab's does:** drag up to zoom in and down
    to zoom out, around the tick that was pressed, and drag sideways to
    scroll, with the Song tab's 60 px per doubling and 3 px threshold. A

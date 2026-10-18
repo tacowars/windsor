@@ -736,6 +736,14 @@ function drawVel() {
 }
 
 // ---------- the scroll bars, which are zoom bars in option B ----------
+/** A thumb's length: its share of the track, never under the least (at most half the track), never over the track. */
+const thumbLen = (track, shown, total) =>
+  Math.min(track, Math.max(Math.min(THUMB_MIN_PX[sizeKey()], track / 2), (shown / total) * track));
+/** How far along its travel a thumb sits, 0 to 1: 0 whenever everything is shown. */
+const thumbPos = (start, shown, total) => (total > shown ? clamp(start / (total - shown), 0, 1) : 0);
+/** What one px of thumb travel scrolls: the content the thumb can't show, over the track the thumb can't fill. */
+const perPx = (track, shown, total) =>
+  Math.max(0, total - shown) / Math.max(1, track - thumbLen(track, shown, total));
 function drawBars() {
   const grips = S.opt === 'b';
   const t = BAR_PX[sizeKey()];
@@ -746,11 +754,11 @@ function drawBars() {
   const vb = $('vbar');
   Object.assign(hb.style, { width: `${S.W}px`, height: `${t}px` });
   Object.assign(vb.style, { width: `${t}px`, height: `${S.H}px` });
-  const hw = Math.max(THUMB_MIN_PX[sizeKey()], (visTicks() / S.region) * S.W);
-  const hx = (S.left / S.region) * (S.W - hw) / Math.max(1e-9, 1 - visTicks() / S.region);
+  const hw = thumbLen(S.W, visTicks(), S.region);
+  const hx = thumbPos(S.left, visTicks(), S.region) * (S.W - hw);
   Object.assign(hb.querySelector('.zthumb').style, { left: `${isFinite(hx) ? hx : 0}px`, width: `${hw}px` });
-  const vh = Math.max(Math.min(THUMB_MIN_PX[sizeKey()], S.H / 2), (visRows() / rows()) * S.H);
-  const vy = (S.top / rows()) * (S.H - vh) / Math.max(1e-9, 1 - visRows() / rows());
+  const vh = thumbLen(S.H, visRows(), rows());
+  const vy = thumbPos(S.top, visRows(), rows()) * (S.H - vh);
   Object.assign(vb.querySelector('.zthumb').style, { top: `${isFinite(vy) ? vy : 0}px`, height: `${vh}px` });
   // B's maps: the loop and the notes over the whole region, the pitches over the whole range.
   const hc = sizeCanvas(hb);
@@ -1041,7 +1049,10 @@ function barDrag(barId, horizontal) {
     }
     (grip || thumb).classList.add('drag');
     const edge = grip && S.opt === 'b' ? (grip.classList.contains('a') ? 'a' : 'b') : null;
-    return { edge, left: S.left, vis: visTicks(), top: S.top, visRows: visRows() };
+    return {
+      edge, left: S.left, vis: visTicks(), top: S.top, visRows: visRows(),
+      tickPerPx: perPx(S.W, visTicks(), S.region), rowPerPx: perPx(S.H, visRows(), rows()),
+    };
   }, (st, dx, dy) => {
     if (horizontal) {
       const dt = (dx / S.W) * S.region;
@@ -1053,7 +1064,7 @@ function barDrag(barId, horizontal) {
         S.beatPx = clamp((S.W * PPQ) / Math.max(1, st.vis + dt), minBeatPx(), maxBeatPx());
         S.left = st.left;
       } else {
-        S.left = st.left + dt;
+        S.left = st.left + dx * st.tickPerPx;
       }
       S.fit = null;
       clampView();
@@ -1069,7 +1080,7 @@ function barDrag(barId, horizontal) {
         S.rowPx = clamp(S.H / Math.max(1, st.visRows + dr), rb.min, rb.max);
         S.top = st.top;
       } else {
-        S.top = st.top + dr;
+        S.top = st.top + dy * st.rowPerPx;
       }
       clampView();
       rowBadge(S.H / 2);
