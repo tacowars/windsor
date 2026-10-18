@@ -31,17 +31,17 @@
  * Fold tap, an undo or a part switch, read on the console's one frame loop
  * (`watchPlayhead`). A held note follows its note's keys; a held pointer
  * keeps its key and note through a rename (`keyboardHeld.ts`).
+ *
+ * Folded, the computer keys and MIDI follow the fold too (windsor#921): the
+ * home row plays the folded keys in order and the other note letters play
+ * nothing (`keyboardQwerty.ts`), and a MIDI note-on outside the set (judged
+ * at the tick the recorder stamps it, with the grace window) is ignored, so
+ * the Roll records only notes in the scale or chord.
  */
 import type { AudioPart } from '@windsor/engine';
 import { MIDI_NOTE_MAX, SEMITONES_PER_OCTAVE } from '@windsor/engine';
 import { releaseMousePickedDropdowns } from './keyboardDropdownFocus';
-import {
-  AUDITION_TAB,
-  FIXED_VELOCITY,
-  OCTAVE_DEFAULT,
-  OCTAVE_MIN,
-  QWERTY,
-} from './keyboardConstants';
+import { FIXED_VELOCITY, OCTAVE_DEFAULT, OCTAVE_MIN } from './keyboardConstants';
 import type { KeysPick } from './keyboardConstants';
 import { KeyboardExpression } from './keyboardExpression';
 import type { PartFold } from './keyboardFold';
@@ -53,24 +53,11 @@ import { DEFAULT_SHAPE, chromaticLaid, homeSurface, layKeys, sameShape } from '.
 import type { KeysLaid, KeysSurface } from './keyboardKeys';
 import { isBlackKey, keyAt, strikeVelocity } from './keyboardLayout';
 import type { KeyBox, RowSlots } from './keyboardLayout';
+import { isShortcutPress, pressForFocus, qwertyNote } from './keyboardQwerty';
 import { octaveMaxFor } from './keyboardViewModel';
 import type { PerformerSink } from './midiPerformer';
 import type { NoteTap } from './rollRecorder';
 import { watchPlayhead } from './stepStrip';
-
-/** Whether the QWERTY keys play while `activeTab` is shown: only on the audition tab. */
-export const qwertyPlaysOn = (activeTab: string | null, auditionTab = AUDITION_TAB): boolean =>
-  activeTab === auditionTab;
-
-/**
- * Whether a press is a shortcut rather than a note: anything held with Ctrl,
- * Meta or Alt. ⌘K opening the patch search used to strike the `k` key's C
- * as well (windsor#521), and Ctrl+Z shifted the octave; no chord plays.
- * Shift is left alone: it changes `e.key`, and a shifted letter maps to no key.
- */
-export const isShortcutPress = (
-  e: Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey'>,
-): boolean => e.ctrlKey || e.metaKey || e.altKey;
 
 interface Held {
   id: number;
@@ -299,16 +286,12 @@ export class Keyboard {
    * on, and every later `a` returned early because the map still held it.
    */
   onKeyDown(e: KeyboardEvent): void {
-    if (e.repeat || isShortcutPress(e) || !this.qwertyLive()) return;
-    const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    // A modal's buttons are not keys either (#563): focus is trapped there until it closes.
-    if (e.target instanceof HTMLElement && e.target.closest('dialog[open]')) return;
+    if (e.repeat || isShortcutPress(e) || !this.qwertyLive() || pressForFocus(e.target)) return;
     if (e.key === 'z') return this.shiftOctave(-1);
     if (e.key === 'x') return this.shiftOctave(1);
-    const off = QWERTY[e.key];
-    if (off === undefined || this.held.has(e.code)) return;
-    const note = this.octave * SEMITONES_PER_OCTAVE + off;
+    // Folded, the home row plays the fold's keys (windsor#921, record decision 6).
+    const note = qwertyNote(e.key, this.octave, this.foldHost?.now()?.set ?? null);
+    if (note === null || this.held.has(e.code)) return;
     this.play(e.code, { note, velocity: FIXED_VELOCITY, timeStamp: e.timeStamp });
   }
 
@@ -411,11 +394,18 @@ export class Keyboard {
     this.expression.follow();
   }
 
-  /** One MIDI input's view of this keyboard: real note numbers, real velocity, its own held notes. */
+  /**
+   * One MIDI input's view of this keyboard: real note numbers, real velocity,
+   * its own held notes. Folded, a note-on the fold's judge drops (record
+   * decision 7) never enters `held`, so its release finds nothing to lift and
+   * the tap hears neither; pitches are never remapped.
+   */
   midiSink(inputId: string): PerformerSink {
     return {
-      press: (note, velocity, timeStamp) =>
-        this.play(`midi:${inputId}:${note}`, { note, velocity, timeStamp }),
+      press: (note, velocity, timeStamp) => {
+        if (this.foldHost && !this.foldHost.passes(note, timeStamp)) return;
+        this.play(`midi:${inputId}:${note}`, { note, velocity, timeStamp });
+      },
       release: (note, force, timeStamp) => this.lift(`midi:${inputId}:${note}`, force, timeStamp),
       bend: (semitones) => this.expression.bend(semitones),
       modWheel: (value) => this.expression.modWheel(value),
