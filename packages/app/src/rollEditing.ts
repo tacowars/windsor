@@ -42,6 +42,8 @@ export interface RollEditingHost {
 /** The device's editor, the Loop stepper's step and Quantise's press. */
 export interface RollEditing {
   readonly editor: RollEditor;
+  /** End the notes' press in progress as a cancel: a pinch takes over (windsor#903). */
+  cancelPress(): void;
   stepLoop(dir: number): void;
   /** Quantise the selection, or every note, to the Snap: one undo step, none when nothing moves. */
   quantise(): void;
@@ -72,7 +74,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
   const scene = (): RollScene | null => host.scene();
   const frame = (): RollFrame => rollFrame(host.source(), view);
   const stops = (): number[] => loopStops(host.source().regionTicks, host.source().barTicks);
-  rollNoteGestures({
+  const notes = rollNoteGestures({
     panes,
     editor,
     view,
@@ -83,6 +85,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
   rollLaneGestures({ panes, editor, scene, frame, loopStops: stops, lane: () => view.lane });
   return {
     editor,
+    cancelPress: () => notes.cancel(),
     stepLoop: (dir) => {
       const config = stepLoop(editor.current(), dir, { loop: frame().loop, stops: stops() });
       if (config) editor.commit({ config, selected: editor.selected() });

@@ -46,8 +46,15 @@ export interface SongZoom {
   readonly scrollPx: number;
 }
 
+/**
+ * What the drag maths reads of a scale: its bounds and its px per doubling.
+ * The Roll's ruler and keys drag through the same maths on their own bounds
+ * (windsor#903, `rollZoomGestures.ts`).
+ */
+export type ZoomScale = Pick<SongViewScale, 'minPxPerBar' | 'maxPxPerBar' | 'dragPxPerDoubling'>;
+
 /** A scale inside the table's bounds. */
-export function clampZoom(pxPerBar: number, scale: SongViewScale = SONG_VIEW): number {
+export function clampZoom(pxPerBar: number, scale: ZoomScale = SONG_VIEW): number {
   return Math.min(scale.maxPxPerBar, Math.max(scale.minPxPerBar, pxPerBar));
 }
 
@@ -65,7 +72,7 @@ export function clampScroll(scrollPx: number, bounds: ZoomBounds, pxPerBar: numb
 export function zoomForDrag(
   startPxPerBar: number,
   dy: number,
-  scale: SongViewScale = SONG_VIEW,
+  scale: ZoomScale = SONG_VIEW,
 ): number {
   return clampZoom(startPxPerBar * 2 ** (-dy / scale.dragPxPerDoubling), scale);
 }
@@ -80,7 +87,7 @@ export function dragZoom(
   start: ZoomDragStart,
   move: { readonly dx: number; readonly dy: number },
   bounds: ZoomBounds,
-  scale: SongViewScale = SONG_VIEW,
+  scale: ZoomScale = SONG_VIEW,
 ): SongZoom {
   const pxPerBar = zoomForDrag(start.pxPerBar, move.dy, scale);
   const anchorShift = start.pointerPx * (pxPerBar / start.pxPerBar - 1);
@@ -129,7 +136,7 @@ export interface RulerDrag {
   readonly originY: number;
   readonly start: ZoomDragStart;
   readonly bounds: ZoomBounds;
-  readonly scale: SongViewScale;
+  readonly scale: ZoomScale;
   /** Past the threshold: a press that never gets here changes nothing. */
   readonly moved: boolean;
 }

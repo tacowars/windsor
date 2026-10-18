@@ -86,16 +86,19 @@ export function clampTime(
   return { beatPx, left: clamp(view.left, 0, room) };
 }
 
-/** Zoom by `factor`, keeping the tick `x` px from the left edge where it is. */
+/**
+ * Zoom by `factor`, keeping the tick `x` px from the left edge where it is,
+ * or carrying it to `to` px when the fingers moved (a pinch's midpoint).
+ */
 export function zoomTimeAbout(
   view: TimeView,
   bounds: TimeBounds,
-  zoom: { factor: number; x: number },
+  zoom: { factor: number; x: number; to?: number },
   table: TimeTable = ROLL_TIME_ZOOM,
 ): TimeView {
   const tick = view.left + (zoom.x * PPQ) / view.beatPx;
   const beatPx = clamp(view.beatPx * zoom.factor, regionFitPx(bounds, table), table.maxBeatPx);
-  return clampTime({ beatPx, left: tick - (zoom.x * PPQ) / beatPx }, bounds, table);
+  return clampTime({ beatPx, left: tick - ((zoom.to ?? zoom.x) * PPQ) / beatPx }, bounds, table);
 }
 
 /**
@@ -199,17 +202,21 @@ export function clampRows(
   return { rowPx, top: clamp(view.top, 0, room) };
 }
 
-/** Zoom the rows by `factor`, keeping the row `y` px under the top edge where it is. */
+/**
+ * Zoom the rows by `factor`, keeping the row `y` px under the top edge where
+ * it is, or carrying it to `to` px when the fingers moved.
+ */
 export function zoomRowsAbout(
   view: RowView,
   bounds: RowBounds,
-  zoom: { factor: number; y: number },
+  zoom: { factor: number; y: number; to?: number },
   table: RowTable = ROLL_ROW_ZOOM,
 ): RowView {
   const before = rowsHeight(bounds, view.rowPx);
   const at = before > 0 ? (view.top + zoom.y) / before : 0;
   const rowPx = clamp(view.rowPx * zoom.factor, table.minPx, table.maxPx);
-  return clampRows({ rowPx, top: at * rowsHeight(bounds, rowPx) - zoom.y }, bounds, table);
+  const top = at * rowsHeight(bounds, rowPx) - (zoom.to ?? zoom.y);
+  return clampRows({ rowPx, top }, bounds, table);
 }
 
 /**

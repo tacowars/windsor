@@ -21,7 +21,10 @@
  * windsor#663). A resize refits a view on a fit and Fold, and the pane
  * keeps its spot across a repaint (`rollViewSpot.ts`). The notes pane zooms
  * by its zoom bars and the Show item's fits (`rollZoomControl.ts`,
- * windsor#902), over `rollZoomModel.ts`'s maths. The view settings
+ * windsor#902), and by its ruler, its keys, the wheel and a pinch
+ * (`rollZoomInput.ts`, `rollPinch.ts`, windsor#903), over
+ * `rollZoomModel.ts`'s maths; the summary leads with the bars it shows.
+ * The view settings
  * are the part's for the session (`rollView.ts`), and so is where the
  * Expanded view sat.
  */
@@ -47,6 +50,7 @@ import {
 } from './rollNotesPaint';
 import { markKeys, paintBody, paintHead, paintKeys } from './rollPaint';
 import { type RollPanes, rollPanes } from './rollPanes';
+import { rollPinch } from './rollPinch';
 import { rollMetronome } from './rollMetronome';
 import { type RollRecView, rollRecView } from './rollRecView';
 import { type TickWindow, rollInstances, windowHolds } from './rollRepeats';
@@ -64,6 +68,7 @@ import { ROLL_COLORS, ROLL_DRAW_BUDGET, ROLL_NOTE } from './rollTables';
 import { type RollViewState, rollViewOf, snapOf } from './rollView';
 import { RollViewSpot } from './rollViewSpot';
 import { RollZoomControl } from './rollZoomControl';
+import { rollZoomInput } from './rollZoomInput';
 import { KIND_LABELS } from './sequencerConstants';
 import type { DeviceBody } from './sequencerDevice';
 import { watchPlayhead } from './stepStrip';
@@ -235,7 +240,9 @@ class RollDevice {
       this.updateGuide();
     });
     rollLaneTabs(panes.vcorner, this.view, () => this.previewNotes());
-    panes.root.append(this.zoom.bars.time, this.zoom.bars.rows);
+    panes.root.append(this.zoom.bars.time, this.zoom.bars.rows, this.zoom.readout.root);
+    rollZoomInput({ panes, zoom: this.zoom });
+    rollPinch({ panes, zoom: this.zoom, cancelEdit: () => this.editing.cancelPress() });
     // A fit follows the width and Fold the height; the first layout centres the notes.
     new ResizeObserver(() => this.paint()).observe(panes.body);
     const main = el('div', 'seq-section roll-main');
@@ -277,6 +284,7 @@ class RollDevice {
     this.spot.keep(this.scene);
     this.keepWide();
     this.zoom.scrolled();
+    this.summarize();
     this.controls.refreshShow();
     this.envelopes.scrolled();
     const { scene, painted } = this;
@@ -309,15 +317,21 @@ class RollDevice {
     this.fixedLines = [head.ph, layers.ph];
     this.guideTargets = { keys, chords: head.chords, corner: panes.corner };
     this.guideKey = '';
-    this.rec.summary(sourceSummary(this.source, snapOf(view.snap).label));
     this.spot.restore(this.scene, this.source.notes);
     this.keepWide();
     this.zoom.painted(scene);
+    this.summarize();
     this.paintWindow();
     this.controls.refresh();
     this.envelopes.paint();
     this.updateGuide();
     this.light();
+  }
+
+  /** The summary, led by the bars the notes pane shows (windsor#903 decision 7). */
+  private summarize(): void {
+    const snap = snapOf(this.view.snap).label;
+    this.rec.summary(sourceSummary(this.source, snap, this.zoom.shown()));
   }
 
   /** Tint the keys for the guide's chord, when it moved. */

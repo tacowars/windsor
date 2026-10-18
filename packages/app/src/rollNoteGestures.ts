@@ -279,8 +279,13 @@ class NoteGestures {
 
   /** A drag that ended without a release: its preview dropped. */
   private cancel(e: PointerEvent): void {
+    if (this.drag && e.pointerId === this.drag.pointerId) this.abort();
+  }
+
+  /** End the press in progress, if any, as a cancel: its preview dropped, nothing written. */
+  abort(): void {
     const drag = this.drag;
-    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag) return;
     this.end();
     if (drag.kind === 'box') drag.box.remove();
     else if (drag.kind !== 'tap') this.target.editor.cancel();
@@ -340,7 +345,14 @@ function placeBox(
   box.style.height = `${Math.abs(to.y - from.y)}px`;
 }
 
+/** The notes' gestures, as their device holds them. */
+export interface NoteGesturesHandle {
+  /** End the press in progress as a cancel: a second finger landed for a pinch (windsor#903). */
+  cancel(): void;
+}
+
 /** Wire the notes pane's gestures. */
-export function rollNoteGestures(target: NoteGestureTarget): void {
-  new NoteGestures(target);
+export function rollNoteGestures(target: NoteGestureTarget): NoteGesturesHandle {
+  const gestures = new NoteGestures(target);
+  return { cancel: () => gestures.abort() };
 }

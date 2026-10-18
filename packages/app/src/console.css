@@ -3745,6 +3745,24 @@ body.chord-dragging {
     border-block: 1px solid var(--inset);
   }
 }
+/* The ruler and the keys zoom (windsor#903): a drag on the ruler zooms
+   time, on the keys the rows, and under a finger neither pans the page. */
+.roll-ruler {
+  cursor: ns-resize;
+  touch-action: none;
+}
+.roll-keys {
+  cursor: ew-resize;
+  touch-action: none;
+}
+/* The zoom's readout, the Song tab's .readout at the top of the notes
+   (rollZoomReadout.ts places it); larger whenever any pointer is coarse. */
+@media (any-pointer: coarse) {
+  .roll-grid > .roll-zread {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
 /* The lane switch (windsor#754): Vel · Acc · Rat, three stacked tabs. */
 .roll-vcorner {
   display: flex;
