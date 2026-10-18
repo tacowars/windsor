@@ -4,7 +4,7 @@
  * alone, offline, through the engine, written outside the repository as
  * stereo 48 kHz 16-bit WAVs for tacowars's ear and never committed.
  *
- *   node packages/engine/src/sequencing/metronomeListen.mjs [--out /tmp/windsor-906-metronome]
+ *   node docs/research/2026-10-18-roll-metronome/listen.mjs [--out /tmp/windsor-906-metronome]
  *
  * Each file is four bars of the engine's own `Metronome` on a `TickTransport`
  * at the song's tempo and meter, its clicks played on the shipped
@@ -24,7 +24,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildSync } from 'esbuild';
 
-const ENGINE = new URL('../', import.meta.url);
+const ENGINE = new URL('../../../packages/engine/src/', import.meta.url);
 const BARS = 4;
 const TAIL_S = 0.5;
 const BLOCK = 128;
