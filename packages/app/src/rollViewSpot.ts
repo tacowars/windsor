@@ -4,7 +4,9 @@
  * a resize leaves the view where it was; and the ticks the pane shows,
  * which bound the notes drawn (`rollRepeats.ts`). A roll opened fresh
  * centres its notes, at tick 0. Split from the device (`rollCard.ts`,
- * windsor#708 decision 10).
+ * windsor#708 decision 10). A zoom aims the next restore at the tick and
+ * the top it worked out (`aim`, windsor#902), so a zoom bar's held edge
+ * stays where it was.
  */
 import type { RollNote } from '@windsor/engine';
 import { type RollPanes, syncPanes } from './rollPanes';
@@ -17,6 +19,8 @@ import type { RollSpot } from './rollView';
 /** One device's notes pane: its spot, kept and restored, and the ticks it shows. */
 export class RollViewSpot {
   private spot: RollSpot | null = null;
+  /** Where the next restore puts the pane: a tick at its left edge, and the px of rows above its top. */
+  private aimed: { tick: number | null; top: number | null } | null = null;
 
   constructor(private readonly panes: RollPanes) {}
 
@@ -31,6 +35,14 @@ export class RollViewSpot {
    */
   startFrom(spot: RollSpot | null): void {
     this.spot = spot;
+  }
+
+  /**
+   * Put the pane's left edge on `tick`, or its top `top` px down the rows,
+   * at the next restore; null keeps that axis on the spot.
+   */
+  aim(tick: number | null, top: number | null): void {
+    this.aimed = { tick: tick ?? this.aimed?.tick ?? null, top: top ?? this.aimed?.top ?? null };
   }
 
   /** Remember where the pane sits over `scene`. */
@@ -48,9 +60,11 @@ export class RollViewSpot {
     if (!scene || panes.body.clientHeight === 0) return;
     const pitch = this.spot?.pitch ?? centrePitch(notes, ROLL_EMPTY_CENTRE_PITCH);
     const row = nearestRow(scene.rows.rows, pitch);
-    const tick = this.spot?.tick ?? 0;
-    panes.body.scrollTop = row ? row.top + row.h / 2 - panes.body.clientHeight / 2 : 0;
+    const tick = this.aimed?.tick ?? this.spot?.tick ?? 0;
+    const centred = row ? row.top + row.h / 2 - panes.body.clientHeight / 2 : 0;
+    panes.body.scrollTop = this.aimed?.top ?? centred;
     panes.body.scrollLeft = tick * scene.pxPerTick;
+    this.aimed = null;
     syncPanes(panes);
     this.keep(scene);
   }

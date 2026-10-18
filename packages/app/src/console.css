@@ -3386,7 +3386,6 @@ body.chord-dragging {
   color: var(--ink-faint);
   cursor: default;
 }
-.roll-step.roll-fit,
 .roll-readout {
   flex: 1;
   width: auto;
@@ -3397,9 +3396,6 @@ body.chord-dragging {
   line-height: 18px;
   text-align: center;
   white-space: nowrap;
-}
-.roll-step.roll-fit.on {
-  color: var(--carrier);
 }
 /* Quantise (windsor#661): drawn as the Loop stepper is, a well with a line-bright edge. */
 .roll-qbtn {
@@ -3570,27 +3566,31 @@ body.chord-dragging {
 .seg.roll-seg button[aria-pressed='true'] {
   color: var(--inset);
 }
-.roll-zooms {
-  display: grid;
-  grid-template-columns: 14px 1fr;
-  gap: 3px 4px;
-  align-items: center;
+/* Show (windsor#902): Loop | Region in the accent, each lit while the view
+   sits on it, over the zoom bars' hint. */
+.seg.roll-show {
+  --seg-color: var(--carrier);
 }
-.roll-zooms i {
+.roll-hint {
+  margin-top: 3px;
   color: var(--ink-faint);
-  font-size: 11px;
-  font-style: normal;
-  text-align: center;
+  font-family: var(--f-num);
+  font-size: 9px;
+  line-height: 11px;
 }
 
-/* The roll: four panes; the notes scroll and the others follow. */
+/* The roll: four panes; the notes scroll and the others follow. The zoom
+   bars (windsor#902) take the notes pane's foot and right side, --roll-zbar
+   thick, or --roll-zbar-touch whenever any pointer is coarse. */
 .roll-grid {
+  --roll-zbar-t: var(--roll-zbar);
+  --roll-zgrip-t: var(--roll-zgrip);
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--roll-keys-w) minmax(0, 1fr);
-  grid-template-rows: var(--roll-head-h) minmax(0, 1fr) var(--roll-vel-h);
+  grid-template-columns: var(--roll-keys-w) minmax(0, 1fr) var(--roll-zbar-t);
+  grid-template-rows: var(--roll-head-h) minmax(0, 1fr) var(--roll-zbar-t) var(--roll-vel-h);
   overflow: hidden;
   background: var(--inset);
   border: 1px solid var(--line);
@@ -3642,8 +3642,108 @@ body.chord-dragging {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-bright) var(--inset);
+  scrollbar-width: none;
+}
+.roll-body::-webkit-scrollbar {
+  display: none;
+}
+/* The zoom bars: a track that maps the whole (drawn on its canvas), and a
+   thumb for the view with a grip at each end (rollZoomBars.ts). */
+.roll-zbar {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--line);
+  touch-action: none;
+  user-select: none;
+}
+.roll-zbar.h {
+  grid-area: 3 / 2;
+}
+.roll-zbar.v {
+  grid-area: 2 / 3;
+}
+.roll-zbar canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.roll-zthumb {
+  position: absolute;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ink-faint);
+  border-radius: 3px;
+  cursor: grab;
+}
+.roll-zthumb:hover,
+.roll-zthumb.drag {
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+.roll-zbar.h .roll-zthumb {
+  top: 1px;
+  bottom: 1px;
+}
+.roll-zbar.v .roll-zthumb {
+  left: 1px;
+  right: 1px;
+}
+.roll-zgrip {
+  position: absolute;
+  display: block;
+  background: var(--ink-dim);
+  border-radius: 2px;
+}
+.roll-zgrip:hover,
+.roll-zgrip.drag {
+  background: var(--carrier);
+}
+/* A grip spans the bar's whole thickness, past the thumb's 1 px inset. */
+.roll-zbar.h .roll-zgrip {
+  top: -1px;
+  bottom: -1px;
+  width: var(--roll-zgrip-t);
+  cursor: ew-resize;
+}
+.roll-zbar.h .roll-zgrip.a {
+  left: 0;
+}
+.roll-zbar.h .roll-zgrip.b {
+  right: 0;
+}
+.roll-zbar.v .roll-zgrip {
+  left: -1px;
+  right: -1px;
+  height: var(--roll-zgrip-t);
+  cursor: ns-resize;
+}
+.roll-zbar.v .roll-zgrip.a {
+  top: 0;
+}
+.roll-zbar.v .roll-zgrip.b {
+  bottom: 0;
+}
+/* Finger sizes whenever any pointer is coarse (record
+   2026-10-18-roll-zoom-bars-and-duplicate decision 9): 22 px bars, and
+   26 × 22 px grips, each with two ridges. */
+@media (any-pointer: coarse) {
+  .roll-grid {
+    --roll-zbar-t: var(--roll-zbar-touch);
+    --roll-zgrip-t: var(--roll-zgrip-touch);
+  }
+  .roll-zgrip::after {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-inline: 1px solid var(--inset);
+  }
+  .roll-zbar.v .roll-zgrip::after {
+    border-inline: 0;
+    border-block: 1px solid var(--inset);
+  }
 }
 /* The lane switch (windsor#754): Vel · Acc · Rat, three stacked tabs. */
 .roll-vcorner {
@@ -4302,24 +4402,26 @@ body.chord-dragging {
 .roll-grid {
   position: relative;
 }
-/* The panes by name, so the layer can share the notes' cell. */
+/* The panes by name, so the layer can share the notes' cell. The ruler and
+   the lane run on over the ↕ zoom bar's column, and the keys down beside
+   the ↔ bar's row (windsor#902). */
 .roll-corner {
   grid-area: 1 / 1;
 }
 .roll-head {
-  grid-area: 1 / 2;
+  grid-area: 1 / 2 / 2 / 4;
 }
 .roll-keys {
-  grid-area: 2 / 1;
+  grid-area: 2 / 1 / 4 / 2;
 }
 .roll-body {
   grid-area: 2 / 2;
 }
 .roll-vcorner {
-  grid-area: 3 / 1;
+  grid-area: 4 / 1;
 }
 .roll-vel {
-  grid-area: 3 / 2;
+  grid-area: 4 / 2 / 5 / 4;
 }
 .env-on .roll-notes {
   opacity: 0.3;
