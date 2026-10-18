@@ -190,7 +190,8 @@ export function zoomRowsAbout(
  * at `view`'s row height (0 the top row, 1 the bottom), as near as the
  * bounds allow, with the `hold` edge on the pitch it was on. The row
  * height is the one that lays the span out the pane's height tall, its
- * thin slivers keeping theirs.
+ * thin slivers keeping theirs. A span of zero, or one whose grips have
+ * crossed, is the closest zoom, the held edge still on its pitch.
  */
 export function spanRows(
   view: RowView,
@@ -200,10 +201,13 @@ export function spanRows(
 ): RowView {
   const whole = rowsHeightAt(drawn.rows, view.rowPx);
   const y0 = span.start * whole;
-  const y1 = Math.max(y0, span.end * whole);
+  const y1 = span.end * whole;
+  const [y, to] = span.hold === 'start' ? [y0, 0] : [y1, drawn.heightPx];
+  if (!(y1 > y0)) {
+    return zoomRowsAbout(view, drawn, { rowPx: table.maxPx, y: y - view.top, to }, table);
+  }
   const { fixedPx, scaled } = spanParts(drawn.rows, { y0, y1, from: view.rowPx });
   const rowPx = scaled > 0 ? (drawn.heightPx - fixedPx) / scaled : view.rowPx;
-  const [y, to] = span.hold === 'start' ? [y0, 0] : [y1, drawn.heightPx];
   return zoomRowsAbout(view, drawn, { rowPx, y: y - view.top, to }, table);
 }
 
