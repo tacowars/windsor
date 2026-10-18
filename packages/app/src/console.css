@@ -4422,6 +4422,38 @@ body.chord-dragging {
   stroke: currentColor;
   stroke-width: 1.2;
 }
+/* Folded keys (windsor#919, record 2026-10-18-keyboard-fold decision 4 and
+   Decided 1 and 2; mockup docs/design/keyboard-fold-mockup.html): one equal
+   key per tone, no black keys, each named at its foot. A root key's name
+   carries its octave in full ink under a 2 px rule along its top; on Scale
+   the chord's tones carry a 3 px strip at the foot (the Roll's chord tier);
+   a key past the engine's range is hatched and plays nothing. */
+.keys .kb-name {
+  bottom: 4px;
+  font-size: 10px;
+}
+.key[data-root] {
+  box-shadow: inset 0 2px 0 var(--ink-dim);
+}
+.key[data-root]:not(.down) .kb-name {
+  color: var(--ink);
+}
+.key[data-chord-tone]::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--carrier);
+  opacity: 0.85;
+}
+.key[data-out],
+.key[data-out]:hover {
+  background: repeating-linear-gradient(135deg, #15191b 0 6px, #111416 6px 12px);
+  cursor: not-allowed;
+}
 
 /* The Envelopes tab (windsor#707, epic windsor#699; the approved mockup
    docs/design/roll-envelopes-mockup.html). Its column takes the note
@@ -8324,6 +8356,16 @@ body.env-dragging .env-canvas {
     gap: 0;
     height: var(--touch-row-h);
     min-width: min(calc(var(--whites) * var(--white-key-min)), 100%);
+  }
+  /* Folded: room for the larger of the unfolded row's whites and the fold's
+     keys (--slots, keyboardLayout.ts's rowMinSlots), so a fold whose keys
+     need more than the line's room wraps Enable MIDI (windsor#919). */
+  .keys[data-folded] {
+    min-width: min(calc(var(--slots) * var(--white-key-min)), 100%);
+  }
+  .keys .kb-name {
+    bottom: 8px;
+    font-size: 11px;
   }
   .key[data-black='1'] {
     position: absolute;

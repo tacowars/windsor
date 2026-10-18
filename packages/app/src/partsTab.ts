@@ -19,6 +19,7 @@ import { heldOnPath, knobCcScope } from './knobCc';
 import { knobEnvelopeAt, type KnobEnvelopeQuery } from './knobEnvelope';
 import type { Keyboard } from './keyboard';
 import { keysExpandButton } from './keyboardExpand';
+import { foldControl } from './keyboardFoldControl';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
 import { showTrapped } from './metadataModal';
@@ -281,7 +282,8 @@ export function renderPartsTab(
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);
   startScope($('scope') as HTMLCanvasElement, () => ctx.host.analyser);
-  // Expand ends the button group (windsor#864): the keyboard opened wide below the header.
+  // Fold follows Oct + (windsor#919); Expand ends the button group (windsor#864).
+  $('octUp').after(foldControl((fold) => keyboard.chooseFold(fold)));
   $('keyButtons').append(keysExpandButton({ ctx, keyboard }));
   keyboard.render($('keys'));
   $('octDown').onclick = (): void => keyboard.shiftOctave(-1);

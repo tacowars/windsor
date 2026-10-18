@@ -18,6 +18,8 @@ import {
   whiteKeyPx,
   whyNot,
 } from './keyboardViewModel';
+import { foldSlots } from './keyboardFold';
+import type { RowSlots } from './keyboardLayout';
 
 const LANDSCAPE = 1318;
 const PORTRAIT = 976;
@@ -31,6 +33,21 @@ const allowed = (room: number): string[] =>
   );
 
 const pick = (octaves: number, rows: number): KeysPick => ({ octaves, rows });
+
+const DESKTOP = 1392;
+/** A fold of `count` tones: a row of a pick counted in its slots. */
+const tones =
+  (count: number): RowSlots =>
+  (p) =>
+    foldSlots(count, p);
+/** Every pick a room allows a fold of `count` tones. */
+const allowedFolded = (room: number, count: number): string[] =>
+  VIEW_OCTAVES.flatMap((octaves) =>
+    VIEW_ROWS.filter((rows) => allows(room, { octaves, rows }, tones(count))).map(
+      (rows) => `${octaves}×${rows}`,
+    ),
+  );
+const EVERY_PICK = ['1×1', '2×1', '2×2', '3×1', '4×1', '4×2'];
 
 describe('the expanded keyboard view', () => {
   it('allows every one-row pick in landscape, and 2 rows only for 2 and 4 octaves', () => {
@@ -58,14 +75,14 @@ describe('the expanded keyboard view', () => {
   });
 
   it('gives an Octaves tap the rows it takes, and dims only a count no row count allows', () => {
-    expect(rowsFor(PHONE, 2, 1)).toBe(2);
-    expect(rowsFor(PORTRAIT, 4, 1)).toBe(2);
-    expect(rowsFor(LANDSCAPE, 4, 1)).toBe(1);
-    expect(rowsFor(LANDSCAPE, 3, 2)).toBe(1);
-    expect(rowsFor(PHONE, 3, 1)).toBeNull();
-    expect(octavesWhyNot(PHONE, 3, 1)).toBe(VIEW_HINTS.needsWidth(3));
-    expect(octavesWhyNot(PHONE, 2, 1)).toBe('');
-    expect(octavesWhyNot(SMALL_PHONE, 1, 1)).toBe('');
+    expect(rowsFor(PHONE, pick(2, 1))).toBe(2);
+    expect(rowsFor(PORTRAIT, pick(4, 1))).toBe(2);
+    expect(rowsFor(LANDSCAPE, pick(4, 1))).toBe(1);
+    expect(rowsFor(LANDSCAPE, pick(3, 2))).toBe(1);
+    expect(rowsFor(PHONE, pick(3, 1))).toBeNull();
+    expect(octavesWhyNot(PHONE, pick(3, 1))).toBe(VIEW_HINTS.needsWidth(3));
+    expect(octavesWhyNot(PHONE, pick(2, 1))).toBe('');
+    expect(octavesWhyNot(SMALL_PHONE, pick(1, 1))).toBe('');
   });
 
   it('normalizes a pick the room does not allow: same rows with fewer octaves, then one row', () => {
@@ -74,6 +91,30 @@ describe('the expanded keyboard view', () => {
     expect(normalizePick(PORTRAIT, pick(4, 1))).toEqual(pick(3, 1));
     expect(normalizePick(PHONE, pick(4, 2))).toEqual(pick(2, 2));
     expect(normalizePick(SMALL_PHONE, pick(4, 2))).toEqual(pick(1, 1));
+  });
+
+  it('counts a fold’s slots for its white keys: the record’s table (2026-10-18-keyboard-fold decision 4)', () => {
+    expect(whiteKeyPx(DESKTOP, pick(2, 1), tones(7))).toBeCloseTo(92.8, 1);
+    expect(whiteKeyPx(LANDSCAPE, pick(3, 1), tones(7))).toBeCloseTo(59.9, 1);
+    expect(whiteKeyPx(PORTRAIT, pick(4, 1), tones(7))).toBeCloseTo(33.7, 1);
+    expect(whiteKeyPx(PORTRAIT, pick(4, 1), tones(5))).toBeCloseTo(46.5, 1);
+    expect(whiteKeyPx(PORTRAIT, pick(1, 1), tones(3))).toBeCloseTo(244.0, 1);
+    expect(whiteKeyPx(PORTRAIT, pick(3, 1), tones(4))).toBeCloseTo(75.1, 1);
+    // Folded, every pick is offered on the desktop and in landscape, whatever the set.
+    for (const count of [7, 6, 5, 4, 3]) {
+      expect(allowedFolded(DESKTOP, count)).toEqual(EVERY_PICK);
+      expect(allowedFolded(LANDSCAPE, count)).toEqual(EVERY_PICK);
+    }
+  });
+
+  it('dims 4 × 1 in portrait for a seven- or six-tone scale, and allows it for a pentatonic or a chord', () => {
+    for (const count of [7, 6]) {
+      expect(whyNot(PORTRAIT, pick(4, 1), tones(count))).toBe(VIEW_HINTS.needsTwoRows(4));
+      expect(normalizePick(PORTRAIT, pick(4, 1), tones(count))).toEqual(pick(3, 1));
+    }
+    for (const count of [5, 4, 3]) expect(allowedFolded(PORTRAIT, count)).toEqual(EVERY_PICK);
+    expect(rowsFor(PORTRAIT, pick(4, 1), tones(7))).toBe(2);
+    expect(rowsFor(PORTRAIT, pick(4, 1), tones(5))).toBe(1);
   });
 
   it('splits the room’s height between two rows with the gap', () => {

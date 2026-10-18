@@ -24,9 +24,17 @@
  * Parts row when it closes. The octave label is every `[data-oct-label]`
  * and the Hold buttons every `[data-keys-hold]`, so the row's and the view's
  * show the same keyboard.
+ *
+ * Folded (windsor#919, record `2026-10-18-keyboard-fold`), the keys are the
+ * fold's (`keyboardKeys.ts` over `keyboardFold.ts`), each key carrying its
+ * own note, and the keys rebuild when the set changes: at a chord change, a
+ * Fold tap, an undo or a part switch, read on the console's one frame loop
+ * (`watchPlayhead`). A held note follows its note's keys; a held pointer
+ * keeps its key and note through a rename (`keyboardHeld.ts`).
  */
 import type { AudioPart } from '@windsor/engine';
-import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
+import { MIDI_NOTE_MAX, SEMITONES_PER_OCTAVE } from '@windsor/engine';
+import { releaseMousePickedDropdowns } from './keyboardDropdownFocus';
 import {
   AUDITION_TAB,
   FIXED_VELOCITY,
@@ -34,46 +42,21 @@ import {
   OCTAVE_MIN,
   QWERTY,
 } from './keyboardConstants';
-import { DEFAULT_SHAPE, buildKeys, homeSurface, sameShape } from './keyboardKeys';
-import type { KeysShape, KeysSurface } from './keyboardKeys';
+import type { KeysPick } from './keyboardConstants';
+import { KeyboardExpression } from './keyboardExpression';
+import type { PartFold } from './keyboardFold';
+import { markFolds } from './keyboardFoldControl';
+import type { FoldNow, KeyboardFoldHost } from './keyboardFoldNow';
+import { foldSignature, partFoldOf, rowSlotsOf, setSignature } from './keyboardFoldNow';
+import { followFinger, keysCarrying } from './keyboardHeld';
+import { DEFAULT_SHAPE, chromaticLaid, homeSurface, layKeys, sameShape } from './keyboardKeys';
+import type { KeysLaid, KeysSurface } from './keyboardKeys';
 import { isBlackKey, keyAt, strikeVelocity } from './keyboardLayout';
-import type { KeyBox } from './keyboardLayout';
+import type { KeyBox, RowSlots } from './keyboardLayout';
 import { octaveMaxFor } from './keyboardViewModel';
 import type { PerformerSink } from './midiPerformer';
 import type { NoteTap } from './rollRecorder';
-
-/**
- * A dropdown picked with the mouse keeps focus, and the note keys above are
- * ignored inside a select (a letter there would change its value), so every
- * pick — wave, filter, preset category — cost a click away before auditioning.
- * A mouse pick now hands focus back; a keyboard user arrowing through the
- * options keeps it. Listboxes (`size` > 1) are left to their owners.
- */
-function releaseMousePickedDropdowns(): void {
-  let pickedByMouse = false;
-  addEventListener(
-    'pointerdown',
-    (e) => {
-      pickedByMouse = e.target instanceof HTMLSelectElement;
-    },
-    true,
-  );
-  addEventListener(
-    'keydown',
-    () => {
-      pickedByMouse = false;
-    },
-    true,
-  );
-  addEventListener(
-    'change',
-    (e) => {
-      const t = e.target;
-      if (pickedByMouse && t instanceof HTMLSelectElement && !t.multiple && t.size <= 1) t.blur();
-    },
-    true,
-  );
-}
+import { watchPlayhead } from './stepStrip';
 
 /** Whether the QWERTY keys play while `activeTab` is shown: only on the audition tab. */
 export const qwertyPlaysOn = (activeTab: string | null, auditionTab = AUDITION_TAB): boolean =>
@@ -92,11 +75,10 @@ export const isShortcutPress = (
 interface Held {
   id: number;
   part: AudioPart;
-  /** The MIDI note it plays, for the tap's release. */
+  /** The MIDI note it plays: its identity, which a re-render lights again on every key carrying it. */
   note: number;
-  /** Its key's offset in the row, which a re-render lights again; may lie outside the row. */
-  offset: number;
-  el: HTMLElement | null;
+  /** The shown keys carrying it, lit. */
+  els: HTMLElement[];
 }
 
 /** What a pointer handler reads of its event: which pointer, its kind, where and when. */
@@ -121,12 +103,10 @@ const POINTER_SOURCE_PREFIX = 'pointer:';
 const pointerSource = (pointerId: number, note: number): string =>
   `${POINTER_SOURCE_PREFIX}${pointerId}:${note}`;
 
-/** One note struck: its pitch, velocity, key and input event's `timeStamp`. */
+/** One note struck: its pitch, velocity and input event's `timeStamp`. */
 interface Strike {
   readonly note: number;
   readonly velocity: number;
-  readonly offset: number;
-  readonly keyEl: HTMLElement | null;
   readonly timeStamp: number | undefined;
 }
 
@@ -140,15 +120,23 @@ export class Keyboard {
   /** Hears every note this keyboard starts and stops on a part: the Roll recorder (windsor#663). */
   tap: NoteTap | null = null;
 
+  /** The played part's fold, and where a Fold tap writes it (windsor#919); null plays unfolded. */
+  foldHost: KeyboardFoldHost | null = null;
+
   private readonly held = new Map<string, Held>();
   /** Every pointer down on the keys box, by `pointerId`. */
   private readonly fingers = new Map<number, Finger>();
   /** The row's keys by offset, as last rendered, and their boxes as last read. */
   private keyEls: readonly HTMLElement[] = [];
   private layout: readonly KeyBox[] = [];
+  /** What the last build laid out: the octaves, each folded key's note, the folded label. */
+  private laid: KeysLaid = chromaticLaid(0);
+  /** The fold the keys were built for, and its signature, which the frame watch compares. */
+  private builtFold: FoldNow | null = null;
+  private builtSignature = 0;
   /** The C names of the view's keys, by octave. */
   private names: readonly HTMLElement[] = [];
-  private shape: KeysShape = DEFAULT_SHAPE;
+  private shape: KeysPick = DEFAULT_SHAPE;
   /** The Parts row's box, the expanded view's while it is open, and the one the keys are in. */
   private home: KeysSurface | null = null;
   private view: KeysSurface | null = null;
@@ -166,14 +154,13 @@ export class Keyboard {
   private readonly getPart: () => AudioPart | null;
   /** Whether a QWERTY press plays now; a release always lifts its note. */
   private readonly qwertyLive: () => boolean;
-  /** The part carrying the controller's bend and wheel, and their positions. */
-  private expressionPart: AudioPart | null = null;
-  private bendSemitones = 0;
-  private wheel = 0;
+  /** The controller's bend and wheel, on the part played. */
+  private readonly expression: KeyboardExpression;
 
   constructor(getPart: () => AudioPart | null, qwertyLive: () => boolean = () => true) {
     this.getPart = getPart;
     this.qwertyLive = qwertyLive;
+    this.expression = new KeyboardExpression(getPart);
   }
 
   /** How many notes the keyboard is holding; what Panic must leave at zero. */
@@ -215,10 +202,21 @@ export class Keyboard {
 
   /** Lay the keys out again for their box's room: after a resize, or a pick in the view. */
   relayout(): void {
-    const shape = this.surface?.shape();
+    const shape = this.surface?.shape(this.rowSlots());
     if (!this.surface || !shape) return;
     if (sameShape(shape, this.shape)) this.readLayout();
-    else this.build(this.surface, shape);
+    else this.build(this.surface);
+  }
+
+  /** What a row of a pick is counted in: the slots of the fold the keys show, or white keys. */
+  rowSlots(): RowSlots {
+    return rowSlotsOf(this.builtFold);
+  }
+
+  /** A Fold tap: the played part takes `fold`, one undo step, and the keys follow at once. */
+  chooseFold(fold: PartFold): void {
+    this.foldHost?.write(fold);
+    this.refold();
   }
 
   /** Hold on or off, on every Hold button; turning it off is a Panic. */
@@ -233,37 +231,57 @@ export class Keyboard {
    * (windsor#879 decisions 1 and 2): read their boxes again, light the held
    * notes' keys, and lift a held pointer whose key is gone. A pointer whose
    * key is still shown keeps its note until its next move, which the new
-   * boxes judge.
+   * boxes judge. `laid` says what they are: chromatic from the octave by
+   * default, or a fold's keys with their notes.
    */
-  adoptKeys(keys: readonly HTMLElement[]): void {
-    this.octave = Math.min(this.octave, this.octaveMax(keys.length));
+  adoptKeys(keys: readonly HTMLElement[], laid: KeysLaid = chromaticLaid(keys.length)): void {
+    this.laid = laid;
+    this.octave = Math.min(this.octave, octaveMaxFor(laid.octaves));
     this.keyEls = keys;
-    this.followNotes();
+    this.followNotes(laid.renamed);
     this.readLayout();
   }
 
   /**
-   * Light each held note's key at the octave and keys as they are now: a
+   * Light each held note's keys at the octave and keys as they are now: a
    * note is its holder's identity, not its key (record
-   * `2026-10-17-keyboard-geometry-follows-the-layout`). A pointer's key
-   * becomes the one now carrying its note, so its next move is judged
-   * against that key; a pointer whose note no shown key carries lifts, and
-   * so does one resting on a key past the row.
+   * `2026-10-17-keyboard-geometry-follows-the-layout`). Each pointer goes
+   * where `followFinger` says: to its note's key, or lifted when none shows
+   * it, except through a fold's rename, which keeps its key and its note.
    */
-  private followNotes(): void {
-    const base = this.octave * SEMITONES_PER_OCTAVE;
+  private followNotes(renamed = false): void {
     // Every light goes off before any comes on: one note's new key may be another's old.
-    for (const held of this.held.values()) held.el?.classList.remove('down');
+    for (const held of this.held.values()) for (const key of held.els) key.classList.remove('down');
     for (const held of this.held.values()) {
-      held.offset = held.note - base;
-      held.el = this.keyEls[held.offset] ?? null;
-      held.el?.classList.add('down');
+      held.els = this.keyElsFor(held.note);
+      for (const key of held.els) key.classList.add('down');
     }
     for (const finger of this.fingers.values()) {
       const held = finger.source === null ? undefined : this.held.get(finger.source);
-      if (held?.el) finger.offset = held.offset;
-      else if (held || (finger.offset ?? 0) >= this.keyEls.length) this.leaveKeys(finger);
+      const carriers = held ? this.keysFor(held.note) : null;
+      const count = this.keyEls.length;
+      const after = followFinger({ offset: finger.offset, carriers, count, renamed });
+      if (after === 'lift') this.leaveKeys(finger);
+      else finger.offset = after.offset;
     }
+  }
+
+  /** The note the key at `offset` plays: the fold's, or the octave's C plus the offset. */
+  private noteOf(offset: number): number | null {
+    const { notes } = this.laid;
+    return notes ? (notes[offset] ?? null) : this.octave * SEMITONES_PER_OCTAVE + offset;
+  }
+
+  /** The offsets of the shown keys carrying `note`. */
+  private keysFor(note: number): number[] {
+    if (this.laid.notes) return keysCarrying(note, this.laid.notes);
+    const offset = note - this.octave * SEMITONES_PER_OCTAVE;
+    return offset >= 0 && offset < this.keyEls.length ? [offset] : [];
+  }
+
+  /** The shown keys carrying `note`. */
+  private keyElsFor(note: number): HTMLElement[] {
+    return this.keysFor(note).flatMap((offset) => this.keyEls[offset] ?? []);
   }
 
   /** Global QWERTY handling; call once. */
@@ -291,7 +309,7 @@ export class Keyboard {
     const off = QWERTY[e.key];
     if (off === undefined || this.held.has(e.code)) return;
     const note = this.octave * SEMITONES_PER_OCTAVE + off;
-    this.play(e.code, { note, velocity: FIXED_VELOCITY, ...this.keyOf(off, e) });
+    this.play(e.code, { note, velocity: FIXED_VELOCITY, timeStamp: e.timeStamp });
   }
 
   /** One QWERTY release, by physical key so a Shift change between the two still lifts. */
@@ -314,10 +332,12 @@ export class Keyboard {
 
   /**
    * A pointer down on the keys moved (record decision 5). Onto another key,
-   * it strikes that key and then lifts the one it left, at the velocity it
-   * first struck with; a key another pointer holds takes no second one, so
-   * the arriving pointer only lifts its own. Off every key it lifts, and it
-   * strikes afresh when it is back on a key.
+   * it strikes that key's note and then lifts the one it left, at the
+   * velocity it first struck with; a note another pointer holds takes no
+   * second one, so the arriving pointer only lifts its own, and a key past
+   * the range strikes nothing. Onto another key carrying its own note (two
+   * rows share their closing note) it holds on. Off every key it lifts, and
+   * it strikes afresh when it is back on a key.
    */
   onPointerMove(e: PointerInput): void {
     const finger = this.fingers.get(e.pointerId);
@@ -326,15 +346,16 @@ export class Keyboard {
     const key = keyAt(point, this.layout);
     if (!key) return this.leaveKeys(finger, e.timeStamp);
     if (key.offset === finger.offset) return;
+    const note = this.noteOf(key.offset);
     const left = finger.source;
     finger.offset = key.offset;
+    if (left !== null && this.held.get(left)?.note === note) return;
     finger.source = null;
-    if (!this.pointerHolds(key.offset)) {
+    if (note !== null && note <= MIDI_NOTE_MAX && !this.pointerHolds(note)) {
       // A mouse strikes at `FIXED_VELOCITY`; a touch or pen by where it lands on the key (decision 6).
       finger.velocity ??= e.pointerType === 'mouse' ? FIXED_VELOCITY : strikeVelocity(point, key);
-      const note = this.octave * SEMITONES_PER_OCTAVE + key.offset;
       const source = pointerSource(e.pointerId, note);
-      this.play(source, { note, velocity: finger.velocity, ...this.keyOf(key.offset, e) });
+      this.play(source, { note, velocity: finger.velocity, timeStamp: e.timeStamp });
       finger.source = source;
     }
     if (left !== null && left !== finger.source) this.lift(left, false, e.timeStamp);
@@ -348,10 +369,14 @@ export class Keyboard {
     if (finger.source !== null) this.lift(finger.source, false, e.timeStamp);
   }
 
-  /** Shift the keys by octaves, within the bound of the octaves shown (record decision 8). */
+  /**
+   * Shift the keys by octaves, within the bound of the octaves shown (record
+   * decision 8). Folded keys carry their notes, so they are built again.
+   */
   shiftOctave(by: number): void {
-    const max = this.octaveMax(this.keyEls.length);
+    const max = octaveMaxFor(this.laid.octaves);
     this.octave = Math.min(max, Math.max(OCTAVE_MIN, this.octave + by));
+    if (this.laid.notes && this.surface) return this.build(this.surface);
     this.followNotes();
     this.syncControls();
   }
@@ -371,9 +396,7 @@ export class Keyboard {
     this.sounded.clear();
     this.held.clear();
     document.querySelectorAll('.key.down').forEach((k) => k.classList.remove('down'));
-    this.bendSemitones = 0;
-    this.wheel = 0;
-    this.followPart();
+    this.expression.rest();
     this.onPanic?.();
   }
 
@@ -385,59 +408,29 @@ export class Keyboard {
    * does too.
    */
   followPart(): void {
-    const part = this.getPart();
-    if (this.expressionPart && this.expressionPart !== part) {
-      this.expressionPart.pitchBend.value = 0;
-      this.expressionPart.modWheel.value = 0;
-    }
-    this.expressionPart = part;
-    if (part) {
-      part.pitchBend.value = this.bendSemitones;
-      part.modWheel.value = this.wheel;
-    }
+    this.expression.follow();
   }
 
   /** One MIDI input's view of this keyboard: real note numbers, real velocity, its own held notes. */
   midiSink(inputId: string): PerformerSink {
     return {
-      press: (note, velocity, timeStamp) => {
-        const offset = note - this.octave * SEMITONES_PER_OCTAVE;
-        this.play(`midi:${inputId}:${note}`, {
-          note,
-          velocity,
-          offset,
-          keyEl: this.keyEls[offset] ?? null,
-          timeStamp,
-        });
-      },
+      press: (note, velocity, timeStamp) =>
+        this.play(`midi:${inputId}:${note}`, { note, velocity, timeStamp }),
       release: (note, force, timeStamp) => this.lift(`midi:${inputId}:${note}`, force, timeStamp),
-      bend: (semitones) => {
-        this.bendSemitones = semitones;
-        this.followPart();
-      },
-      modWheel: (value) => {
-        this.wheel = value;
-        this.followPart();
-      },
+      bend: (semitones) => this.expression.bend(semitones),
+      modWheel: (value) => this.expression.modWheel(value),
     };
-  }
-
-  /** The key at `offset`, if the row shows it, and the input event's `timeStamp`. */
-  private keyOf(
-    offset: number,
-    e: { readonly timeStamp: number },
-  ): Pick<Strike, 'offset' | 'keyEl' | 'timeStamp'> {
-    return { offset, keyEl: this.keyEls[offset] ?? null, timeStamp: e.timeStamp };
   }
 
   private play(source: string, strike: Strike): void {
     const part = this.getPart();
     if (!part) return;
-    const { note, velocity, offset, keyEl, timeStamp } = strike;
+    const { note, velocity, timeStamp } = strike;
     const id = part.noteOn(note, velocity);
     this.sounded.add(part);
-    keyEl?.classList.add('down');
-    this.held.set(source, { id, part, note, offset, el: keyEl });
+    const els = this.keyElsFor(note);
+    for (const key of els) key.classList.add('down');
+    this.held.set(source, { id, part, note, els });
     this.tap?.press(part, source, note, velocity, timeStamp);
   }
 
@@ -456,28 +449,24 @@ export class Keyboard {
       held.part.noteOff(held.id);
       this.tap?.release(held.part, source, held.note, timeStamp);
     }
-    held.el?.classList.remove('down');
+    for (const key of held.els) key.classList.remove('down');
     this.held.delete(source);
   }
 
-  /** Whether some pointer is holding the key at `offset` down. */
-  private pointerHolds(offset: number): boolean {
+  /** Whether some pointer is holding `note` down. */
+  private pointerHolds(note: number): boolean {
     for (const [source, held] of this.held)
-      if (held.offset === offset && source.startsWith(POINTER_SOURCE_PREFIX)) return true;
+      if (held.note === note && source.startsWith(POINTER_SOURCE_PREFIX)) return true;
     return false;
   }
 
-  /** Read every key's box: the one place the layout touches the page. */
+  /** Read every key's box: the one place the layout touches the page. Folded keys are all whites. */
   private readLayout(): void {
+    const folded = this.laid.notes !== null;
     this.layout = this.keyEls.map((key, offset) => {
       const { left, top, right, bottom } = key.getBoundingClientRect();
-      return { offset, black: isBlackKey(offset), left, top, right, bottom };
+      return { offset, black: !folded && isBlackKey(offset), left, top, right, bottom };
     });
-  }
-
-  /** The highest octave the keys may start at with `count` keys shown. */
-  private octaveMax(count: number): number {
-    return octaveMaxFor(Math.ceil(count / SEMITONES_PER_OCTAVE));
   }
 
   /**
@@ -485,20 +474,56 @@ export class Keyboard {
    * takes; a box they move out of is left empty.
    */
   private show(surface: KeysSurface): void {
-    if (surface.box !== this.surface?.box) {
+    const moved = surface.box !== this.surface?.box;
+    if (moved) {
       this.surface?.box.replaceChildren();
       this.watch(surface.box);
     }
     this.surface = surface;
-    this.build(surface, surface.shape() ?? DEFAULT_SHAPE);
+    this.build(surface);
+    if (moved) this.watchFold(surface);
   }
 
-  private build(surface: KeysSurface, shape: KeysShape): void {
-    const { keys, names } = buildKeys(surface, shape);
+  /**
+   * Build the keys into `surface` for the played part's fold as it stands:
+   * the shape its room takes for the fold's slots, the octave bounded by the
+   * octaves shown, and the fold's keys or the chromatic ones. A change of
+   * the set since the last build is a rename (`KeysLaid.renamed`).
+   */
+  private build(surface: KeysSurface): void {
+    const now = this.foldHost?.now() ?? null;
+    const renamed = setSignature(now) !== setSignature(this.builtFold);
+    const { keys, names, shape, laid } = layKeys(surface, now, this.octave, renamed);
     this.shape = shape;
     this.names = names;
-    this.adoptKeys(keys);
+    this.builtFold = now;
+    this.builtSignature = foldSignature(now);
+    this.adoptKeys(keys, laid);
     this.syncControls();
+    surface.built?.();
+  }
+
+  /** Build the keys again when the played part's fold no longer shows what they show. */
+  private refold(): void {
+    const now = this.foldHost?.now() ?? null;
+    if (this.surface && foldSignature(now) !== this.builtSignature) this.build(this.surface);
+  }
+
+  /**
+   * Watch the fold while the keys are in `surface` (record decision 5): on
+   * the console's one frame loop, each frame the box is shown, the fold's
+   * signature; a chord change, a Fold tap, an undo or a part switch moves
+   * it, and the keys rename. The watch ends when the keys leave the box.
+   */
+  private watchFold(surface: KeysSurface): void {
+    const host = this.foldHost;
+    if (!host) return;
+    watchPlayhead({
+      attached: () => this.surface === surface && surface.box.isConnected,
+      shown: () => surface.box.closest('[hidden]') === null,
+      playheadAt: () => foldSignature(host.now()),
+      mark: () => this.refold(),
+    });
   }
 
   /**
@@ -537,11 +562,15 @@ export class Keyboard {
     box.addEventListener('pointercancel', up);
   }
 
-  /** The octave on every label and the view's C names, and Hold on every Hold button. */
+  /**
+   * The octave on every label (the first folded key, folded) and the view's
+   * C names, the fold on every Fold control, and Hold on every Hold button.
+   */
   private syncControls(): void {
-    for (const label of document.querySelectorAll('[data-oct-label]'))
-      label.textContent = `C${this.octave}`;
+    const label = this.laid.notes ? this.laid.label : `C${this.octave}`;
+    for (const node of document.querySelectorAll('[data-oct-label]')) node.textContent = label;
     this.names.forEach((name, octave) => (name.textContent = `C${this.octave + octave}`));
+    markFolds(partFoldOf(this.builtFold));
     for (const button of document.querySelectorAll('[data-keys-hold]'))
       button.setAttribute('aria-pressed', String(this.hold));
   }

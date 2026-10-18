@@ -15,9 +15,12 @@ import {
   keyAt,
   keyCountFor,
   octavesFor,
+  rowMinSlots,
   strikeVelocity,
   whiteCount,
 } from './keyboardLayout';
+import type { RowSlots } from './keyboardLayout';
+import { foldSlots } from './keyboardFold';
 import type { KeyBox } from './keyboardLayout';
 
 const white = (offset: number, index: number, top = 0): KeyBox => ({
@@ -99,6 +102,29 @@ describe('the octaves a keys box shows', () => {
     expect(octavesFor(615)).toBe(1);
     expect(octavesFor(292)).toBe(1);
     expect([keyCountFor(2), keyCountFor(1)]).toEqual([24, 12]);
+  });
+
+  it('counts a fold’s keys in place of the white keys (record 2026-10-18-keyboard-fold decision 4)', () => {
+    const tones =
+      (count: number): RowSlots =>
+      (pick) =>
+        foldSlots(count, pick);
+    // Seven tones: 15 keys need 660 px; the landscape (1338) and portrait (996) rows hold them.
+    expect(octavesFor(660, tones(7))).toBe(2);
+    expect(octavesFor(659, tones(7))).toBe(1);
+    expect([1338, 996].map((room) => octavesFor(room, tones(7)))).toEqual([2, 2]);
+    // A triad’s 7 keys fit two octaves where the unfolded row’s 14 whites would not.
+    expect([octavesFor(308, tones(3)), octavesFor(308)]).toEqual([2, 1]);
+  });
+
+  it('keeps a touch row room for the larger of 14 whites and the fold’s keys', () => {
+    const px = (keys: number): number => rowMinSlots(keys) * 44;
+    // A triad (7 keys), a seventh (9), a pentatonic (11), a six-tone scale (13): the unfolded 616 px.
+    expect([7, 9, 11, 13].map(px)).toEqual([616, 616, 616, 616]);
+    // Seven tones, 15 keys: 660 px, past the landscape line’s 647.6, so Enable MIDI wraps.
+    expect(px(15)).toBe(660);
+    // A custom eight-tone scale, 17 keys: 748 px.
+    expect(px(17)).toBe(748);
   });
 
   it('counts the white keys, and places each black key after its white', () => {

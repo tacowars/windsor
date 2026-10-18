@@ -51,6 +51,13 @@ export function row(count: number, left = 0): FakeKey[] {
   });
 }
 
+/** `count` folded keys (windsor#919): equal boxes `width` px wide side by side, no black keys. */
+export function foldedRow(count: number, width = WHITE, top = TOP): FakeKey[] {
+  return Array.from({ length: count }, (_, offset) =>
+    fakeKey({ left: offset * width, top, right: (offset + 1) * width, bottom: top + HEIGHT }),
+  );
+}
+
 /** A part that records what the keyboard asks of it, its velocities apart, and hands out note ids. */
 export function fakePart(name: string, log: string[], velocities: number[] = []): AudioPart {
   let nextId = 0;

@@ -15,7 +15,7 @@ import {
   WHITE_KEY_MIN_PX,
   WHITES_PER_OCTAVE,
 } from './keyboardConstants';
-import type { StrikeVelocityTable } from './keyboardConstants';
+import type { KeysPick, StrikeVelocityTable } from './keyboardConstants';
 
 /** A point in the page's client coordinates. */
 export interface Point {
@@ -81,12 +81,39 @@ export function strikeVelocity(
 }
 
 /**
- * The octaves a touch keys box shows at `boxWidthPx` (record decision 10):
- * all of the row's when their white keys fit at the minimum width, else one.
+ * What a row of a pick is counted in where the geometry counts keys across:
+ * its white keys unfolded, and a fold's slots folded (record
+ * `2026-10-18-keyboard-fold` decision 4, `foldSlots` in `keyboardFold.ts`).
  */
-export function octavesFor(boxWidthPx: number, whiteMinPx = WHITE_KEY_MIN_PX): number {
-  return boxWidthPx >= KEY_OCTAVES * WHITES_PER_OCTAVE * whiteMinPx ? KEY_OCTAVES : 1;
+export type RowSlots = (pick: KeysPick) => number;
+
+/** An unfolded row's slots: its white keys. */
+export const whiteSlots: RowSlots = (pick) => (WHITES_PER_OCTAVE * pick.octaves) / pick.rows;
+
+/** The Parts row's octaves in its one row. */
+const ROW_PICK: KeysPick = { octaves: KEY_OCTAVES, rows: 1 };
+
+/**
+ * The octaves a touch keys box shows at `boxWidthPx` (record decision 10):
+ * all of the row's when their slots (white keys, or a fold's keys) fit at the
+ * minimum width, else one.
+ */
+export function octavesFor(
+  boxWidthPx: number,
+  slots: RowSlots = whiteSlots,
+  whiteMinPx = WHITE_KEY_MIN_PX,
+): number {
+  return boxWidthPx >= slots(ROW_PICK) * whiteMinPx ? KEY_OCTAVES : 1;
 }
+
+/**
+ * The slots a touch keys box keeps room for, its minimum width over the
+ * touch minimum (record `2026-10-18-keyboard-fold` decision 4, Decided 6):
+ * the unfolded row's white keys or the folded row's `keys`, the larger, so
+ * the buttons never come back beside fewer keys, and a fold whose keys need
+ * more than the line's room wraps Enable MIDI. CSS caps it at the row.
+ */
+export const rowMinSlots = (keys: number): number => Math.max(whiteSlots(ROW_PICK), keys);
 
 /** The keys `octaves` octaves hold. */
 export const keyCountFor = (octaves: number): number => octaves * SEMITONES_PER_OCTAVE;
