@@ -80,6 +80,11 @@ export const WORKLETS = [
     entry: 'spectre/spectreProcessor.ts',
     output: 'generated/spectre-processor.js',
   },
+  {
+    name: 'transient',
+    entry: 'transient/transientProcessor.ts',
+    output: 'generated/transient-processor.js',
+  },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */

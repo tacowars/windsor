@@ -1,0 +1,11 @@
+{
+  "about": "sha256 of each Transient scenario's interleaved Float32 render (a kick and hat figure, a held 110 Hz tone, then silence, 2.5 s) through inserts/transientGolden.test.ts. Written only by that test under WINDSOR_REFRESH_TRANSIENT_GOLDEN=1, and only when a render change is intended.",
+  "hashes": {
+    "punch-44100": "6680579a96deb6b5e4b28e152ac12ed8b9e989135c32b2a7afdc9650a9514d17",
+    "punch-48000": "855ebeca7036e3d831c58c40db008a311badc697ad7268aeb9e9a8b5ba75afe8",
+    "lift-44100": "078b533c78958ba889606dc24e461657e40e2d5887d5bcf2d12ca032357ef819",
+    "lift-48000": "281a22185d6a6c661c71474472499a40e85d1312297c1774fbcb1c28f81fe9a8",
+    "ride-44100": "a2a9b9ebec06693d2ea1e9d938a9580cb039cebcc6ae4161d89fb583c437d6e0",
+    "ride-48000": "e092ea5b9eec8cb1587dedb8ed77a9ba1b1c11c0c1ebf0608faede1bbed8b36e"
+  }
+}

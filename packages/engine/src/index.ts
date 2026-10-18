@@ -796,6 +796,11 @@ export {
   spectreGainDb,
 } from './inserts/spectreCurves';
 export { spectreGridMs, spectreTimeMs } from './inserts/spectreParameters';
+// The Transient insert, a transient shaper with no threshold (record `2026-10-18-transient-insert`).
+export { DEFAULT_TRANSIENT } from './inserts/transientSpec';
+export type { TransientSpec } from './inserts/transientSpec';
+export { TRANSIENT_BOUNDS, TRANSIENT_DSP } from './inserts/transientConstants';
+export type { TransientShaping, TransientShapingReading } from './inserts/transientInsert';
 // bloom, the harmonic pad generator (windsor#712).
 export { DEFAULT_BLOOM } from './inserts/bloomSpec';
 export type { BloomKey, BloomScale, BloomSpec } from './inserts/bloomSpec';

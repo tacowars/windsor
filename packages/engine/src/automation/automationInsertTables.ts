@@ -41,15 +41,12 @@ import {
   DRIVE_STAGE_BOUNDS,
 } from '../inserts/advancedDriveConstants';
 import { BLOOM_BOUNDS } from '../inserts/bloomConstants';
-import { COMPRESSOR_BOUNDS } from '../inserts/compressorConstants';
 import { DELAY_BOUNDS } from '../inserts/delayConstants';
 import { ECHO_BOUNDS } from '../inserts/echoConstants';
 import type { EchoSpec } from '../inserts/echoInsert';
 import { ENSEMBLE_BOUNDS } from '../inserts/ensembleConstants';
 import { EQ_BAND_COUNT, EQ_BOUNDS, EQ_FIRST_ORDER_SLOPE } from '../inserts/eqConstants';
 import { FILTER_BOUNDS } from '../inserts/filterConstants';
-import { PUMP_BOUNDS } from '../inserts/pumpConstants';
-import type { PumpSpec } from '../inserts/pumpSpec';
 import { SPECTRE_BOUNDS } from '../inserts/spectreConstants';
 import type { SpectreSpec } from '../inserts/spectreSpec';
 import {
@@ -72,6 +69,7 @@ import type { TapeSpec } from '../inserts/tapeSpec';
 import { PHASER_BOUNDS } from '../inserts/phaserConstants';
 import { RETRO_REVERB_BOUNDS } from '../inserts/retroReverbConstants';
 import { TAPE_BOUNDS } from '../inserts/tapeConstants';
+import { COMPRESSOR_ROWS, PUMP_ROWS, TRANSIENT_ROWS } from './automationDynamicsRows';
 import { row, UNIT, when } from './automationInsertRow';
 import type { InsertFieldRow, InsertSpecOf } from './automationInsertRow';
 
@@ -174,15 +172,6 @@ const CHORUS_ROWS = [
   row('depth', 'Depth', [CHORUS_DEPTH_MIN_MS, CHORUS_DEPTH_MAX_MS], 'linear', 'ms'),
   row('spread', 'Spread', UNIT),
   row('mix', 'Mix', UNIT),
-];
-
-const C = COMPRESSOR_BOUNDS;
-const COMPRESSOR_ROWS = [
-  row('threshold', 'Threshold', C.threshold, 'linear', 'dB'),
-  row('makeup', 'Makeup', C.makeup, 'linear', 'dB'),
-  row('highpass', 'Detector HPF', C.highpass, 'linear', 'Hz'),
-  row('range', 'Range', C.range, 'linear', 'dB'),
-  row('mix', 'Mix', C.mix),
 ];
 
 const R = RETRO_REVERB_BOUNDS;
@@ -352,20 +341,6 @@ const FILTER_ROWS = [
   row('mix', 'Mix', FILTER_BOUNDS.mix),
 ];
 
-const PU = PUMP_BOUNDS;
-/**
- * The Pump's continuous controls (record `2026-10-13-pump-insert`); its
- * length in ms only while it is not synced. The drawn shape, the division
- * and the source are not targets.
- */
-const PUMP_ROWS: InsertFieldRow<PumpSpec>[] = [
-  row('depth', 'Depth', PU.depth),
-  when(row('lengthMs', 'Length', PU.lengthMs, 'log', 'ms'), (spec: PumpSpec) => !spec.sync),
-  row('sensitivity', 'Sensitivity', PU.sensitivity),
-  row('holdMs', 'Hold', PU.holdMs, 'log', 'ms'),
-  row('smoothMs', 'Smooth', PU.smoothMs, 'linear', 'ms'),
-];
-
 const SP = SPECTRE_BOUNDS;
 const spectreModOn = (spec: SpectreSpec): boolean => spec.mod !== 'off';
 /**
@@ -458,6 +433,7 @@ const KIND_ROWS: KindRows = {
   bloom: BLOOM_ROWS,
   pump: PUMP_ROWS,
   spectre: SPECTRE_ROWS,
+  transient: TRANSIENT_ROWS,
 };
 
 /** The prefix a host's slot rows carry (record `2026-10-11-wet-path-slot`). */

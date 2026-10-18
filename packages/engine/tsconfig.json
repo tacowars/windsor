@@ -46,6 +46,7 @@
     "src/worklet/bloom/**",
     "src/worklet/pump/**",
     "src/worklet/spectre/**",
+    "src/worklet/transient/**",
     "src/**/*.test.ts",
     "src/**/__fixtures__/**",
     "src/worklet/fm/**",

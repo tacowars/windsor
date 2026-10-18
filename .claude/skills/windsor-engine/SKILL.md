@@ -165,6 +165,22 @@ the worklet never imports the spec) and `pumpInsert.ts`), with DSP under
 `withSidechain` (`inserts/sidechainSource.ts`). Cost:
 `docs/research/2026-10-13-pump-insert/`.
 
+Transient (windsor#897, record `2026-10-18-transient-insert`) is the kind
+`transient` in the Dynamics group: a transient shaper with no threshold,
+Attack on each hit's front and Sustain on its decay, by the envelope
+difference of followers of one window peak, so a quiet hit is shaped as a
+loud one. It is `inserts/transient*` (`transientSpec.ts`,
+`transientConstants.ts` (the bounds and the sleep floor),
+`transientTables.ts` (the three timing rows and the shipped one),
+`transientParameters.ts` (`TransientParamSource`, so the worklet never
+imports the spec) and `transientInsert.ts` (the `shaping` meter relay)),
+with DSP under `worklet/transient/` (`transientDetector.ts`,
+`transientDsp.ts`, `transientProcessor.ts`), its automation rows in
+`automation/automationDynamicsRows.ts` with the compressor's and Pump's, and
+the card `app/src/transient*` (`transientCard.ts`, the bipolar meter
+`transientMeter.ts` over `transientMeterModel.ts`, and `transientTables.ts`).
+Sweep, cost and listen: `docs/research/2026-10-18-transient-insert/`.
+
 Spectre (records `2026-10-16-spectre-insert` and
 `2026-10-17-spectre-drawn-cells`) is the kind `spectre` in the Time group: a
 spectral delay, each frequency band with its own gain, delay and feedback

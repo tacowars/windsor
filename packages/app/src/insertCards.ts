@@ -29,6 +29,7 @@ import { filterCard } from './filterCard';
 import { bloomCard } from './bloomCard';
 import { pumpCard } from './pumpCard';
 import { spectreCard } from './spectreCard';
+import { transientCard } from './transientCard';
 
 /**
  * One page of an insert: its tab's name, and the body built when it is
@@ -61,4 +62,5 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   bloom: bloomCard,
   pump: pumpCard,
   spectre: spectreCard,
+  transient: transientCard,
 };

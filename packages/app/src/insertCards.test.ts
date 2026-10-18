@@ -92,6 +92,15 @@ describe('INSERT_CARDS', () => {
     ]);
   });
 
+  it('lists Transient under Dynamics, after Pump (record 2026-10-18-transient-insert)', () => {
+    expect(INSERT_GROUPS.find((group) => group.label === 'Dynamics')?.kinds).toEqual([
+      'compressor',
+      'pump',
+      'transient',
+    ]);
+    expect(INSERT_LABELS.transient).toBe('Transient');
+  });
+
   it('lists Parametric EQ first, alone under EQ (windsor#199)', () => {
     expect(INSERT_GROUPS[0]).toEqual({ label: 'EQ', kinds: ['eq'] });
     expect(INSERT_LABELS.eq).toBe('Parametric EQ');

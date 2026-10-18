@@ -9,6 +9,7 @@ import type { StripStage } from '../mixer/channelStrip';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { PumpScope } from './pumpInsert';
 import type { SpectreScope } from './spectreInsert';
+import type { TransientShaping } from './transientInsert';
 
 /**
  * A host's wet path (record `2026-10-11-wet-path-slot`): where its slot's
@@ -36,6 +37,12 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
   /** Present only for a worklet effect; owned and stopped by the stage. */
   readonly processor?: AudioWorkletNode;
   readonly reduction?: { read(): number; setActive(enabled: boolean): void };
+  /**
+   * The Transient's gain meter (record `2026-10-18-transient-insert`
+   * decision 9): each frame window's largest boost and largest cut of its
+   * shaping, in dB, posted only while active.
+   */
+  readonly shaping?: TransientShaping;
   /**
    * The stage's output spectrum (windsor#200, the EQ): `read` fills `into`
    * (half the analyser's FFT size) with each bin's level in dBFS. An analyser
