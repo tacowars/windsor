@@ -7,7 +7,7 @@
   "patch": {
     "name": "Hollow Bows",
     "algorithm": 4,
-    "volume": 0.25,
+    "volume": 0.5578947368421052,
     "tone": 1,
     "glide": 0,
     "pitchEnvAmount": 0,
@@ -26,10 +26,15 @@
         "detune": 0,
         "level": 0.75,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.9,
@@ -54,10 +59,15 @@
         "detune": 0,
         "level": 0.2545584412271571,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 1.26,
@@ -82,10 +92,15 @@
         "detune": -5,
         "level": 0.62,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.9,
@@ -110,10 +125,15 @@
         "detune": 0,
         "level": 0.17819090885900996,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.63,
@@ -130,25 +150,59 @@
         }
       }
     ],
+    "pitchEnv": {
+      "initLevel": 0,
+      "attackTime": 0.002,
+      "attackCurve": 0,
+      "peakLevel": 1,
+      "decayTime": 0.1,
+      "decayCurve": 0.5,
+      "sustainLevel": 0,
+      "releaseTime": 0.3,
+      "releaseCurve": 0.5,
+      "endLevel": 0,
+      "loopMode": 0,
+      "keyScale": 0
+    },
     "lfo": {
       "shape": 6,
       "rate": 0.11,
       "amount": 1,
       "delay": 0,
       "retrigger": false,
+      "oneShot": false,
+      "unipolar": false,
       "toPitch": 0.035,
       "modWheelDepth": 1,
-      "toOp": [0.06, 0.25, 0.06, 0.2]
+      "toOp": [0.06, 0.25, 0.06, 0.2],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [0, 0, 0, 0]
+    },
+    "lfo2": {
+      "shape": 0,
+      "rate": 5,
+      "amount": 0,
+      "delay": 0,
+      "retrigger": false,
+      "oneShot": false,
+      "unipolar": false,
+      "toPitch": 0,
+      "modWheelDepth": 0,
+      "toOp": [0, 0, 0, 0],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [0, 0, 0, 0]
     },
     "filter": {
       "mode": 3,
-      "cutoff": 730,
-      "resonance": 0.85,
+      "cutoff": 398.2259745601301,
+      "resonance": 1.3577458284119313,
       "slope24": true,
-      "envAmount": 0.8,
+      "envAmount": 1.3684210526315788,
       "modWheelDepth": 0,
       "lfoAmount": 0.25,
+      "lfo2Amount": 0,
       "keyTrack": 0.2,
+      "vowel": 0,
       "env": {
         "initLevel": 0,
         "attackTime": 1.35,
@@ -164,25 +218,13 @@
         "keyScale": 0
       }
     },
-    "pitchEnv": {
-      "initLevel": 0,
-      "attackTime": 0.002,
-      "attackCurve": 0,
-      "peakLevel": 1,
-      "decayTime": 0.1,
-      "decayCurve": 0.5,
-      "sustainLevel": 0,
-      "releaseTime": 0.3,
-      "releaseCurve": 0.5,
-      "endLevel": 0,
-      "loopMode": 0,
-      "keyScale": 0
-    },
     "drive": {
       "gain": 1,
       "shape": 0,
       "bias": 0,
-      "tone": 1
-    }
+      "tone": 1,
+      "on": false
+    },
+    "macros": []
   }
 }
