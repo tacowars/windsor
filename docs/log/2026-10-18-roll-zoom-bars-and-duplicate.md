@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-18
 - **Status:** accepted (tacowars chose option B of
-  `docs/design/roll-zoom-mockup.html` and approved the mockup, with its iPad
+  `docs/design/roll-zoom-mockup.html` and approved the mockup, with its tablet
   pass, on 2026-10-18)
 - **Amends:** `2026-10-04-roll-sequencer`: the ↔ and ↕ zoom steppers and
   Fit go; the roll opens on its loop, not fitted to its region
@@ -61,7 +61,11 @@ the controls (A), zoom bars (B) and gestures only (C).
 11. **Duplicate.** A **Dup** button beside the Loop stepper doubles the
     loop and copies everything in it into the new half: the notes with
     their velocity, accents and ratchets, and the envelopes' points. The
-    doubled loop plays exactly as the old loop played twice. Notes and
+    doubled loop plays exactly as the old loop played twice: a note that
+    runs past the old loop's end, which the loop cuts there today, is
+    shortened to end there in both halves, and each envelope gets the
+    points that keep its value over the new half the same as over the
+    first, including the hold past its last point. Notes and
     points parked at or past the old loop's end move later by one loop
     length, so they stay parked. Dup is disabled when the doubled loop
     would pass the region's length or a cap. It is one undo step.

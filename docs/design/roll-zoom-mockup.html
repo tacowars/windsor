@@ -3,12 +3,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- The Roll's zoom, three options for tacowars to choose from. 2026-10-18.
-     Desktop first; the iPad gets its own pass once an option is chosen.
+     Desktop first; the tablet gets its own pass once an option is chosen.
      Today is drawn from tacowars's screenshot of the Roll device on
      2026-10-18: Drums C2 Soft, one 1/16 note on C4 in a 0.5-bar loop, a
      50-bar region, C minor, Snap 1/16, the ↔ zoom at fit and the ↕ zoom at
      7 px/row. The second song (a 2-bar line) is the case tacowars
-     described. The iPad's Today is
+     described. The tablet's Today is
      docs/design/expanded-views-below-header-today-tablet-landscape-roll.jpg,
      taken on 2026-10-17: Bass, twelve notes in a 1-bar loop in a 4-bar
      region, C minor, the Expanded view at fit and 15 px/row; its notes are
@@ -183,11 +183,11 @@ select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding
 .touch .grips .zgrip::after { content: ""; position: absolute; inset: 7px; border-inline: 1px solid var(--inset); }
 .touch .grips .zbar.v .zgrip::after { border-inline: 0; border-block: 1px solid var(--inset); }
 .touch .zbadge { font-size: 12px; padding: 4px 8px; }
-/* The iPad's screen, drawn around the rack (mockup only). */
+/* The tablet's screen, drawn around the rack (mockup only). */
 .frame { position: relative; }
-.frame.ipad { margin: 22px 0 0; padding: 0; outline: 1px dashed var(--line-bright); outline-offset: 6px; }
+.frame.tablet { margin: 22px 0 0; padding: 0; outline: 1px dashed var(--line-bright); outline-offset: 6px; }
 .frame-cap { display: none; position: absolute; top: -22px; left: 0; color: var(--ink-faint); font-family: var(--f-num); font-size: 10px; }
-.frame.ipad .frame-cap { display: block; }
+.frame.tablet .frame-cap { display: block; }
 .expanded .vel-row { margin-top: 6px; }
 .expanded .seq-rack { background: transparent; border: 0; padding: 0; }
 </style>
@@ -209,14 +209,14 @@ select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding
       <div class="seg" id="dataSeg" style="display:inline-flex">
         <button data-data="shot" aria-pressed="true">0.5-bar loop (screenshot)</button>
         <button data-data="two">2-bar loop</button>
-        <button data-data="ipad">1-bar loop (iPad screenshot)</button>
+        <button data-data="tablet">1-bar loop (tablet screenshot)</button>
       </div>
     </div>
     <div><span class="lbl">Screen</span>
       <div class="seg" id="screenSeg" style="display:inline-flex">
         <button data-screen="desktop" aria-pressed="true">Desktop</button>
-        <button data-screen="landscape">iPad landscape</button>
-        <button data-screen="portrait">iPad portrait</button>
+        <button data-screen="landscape">Tablet landscape</button>
+        <button data-screen="portrait">Tablet portrait</button>
       </div>
     </div>
     <div><span class="lbl">View</span>
@@ -312,7 +312,7 @@ select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding
         <li>The scrollbars become zoom handles: drag an <b>end</b> to zoom, the <b>middle</b> to scroll, click the track to jump there.</li>
         <li>The ↔ bar is a map of the whole region: the loop is marked and the notes are ticks, so you always see where you are in 50 bars. The ↕ bar maps the pitches.</li>
         <li>Column 2 keeps only <b>Loop</b> and <b>Region</b>.</li>
-        <li class="pro">+ Visible, direct, and the one design that shows position. Works the same with a finger (the bars grow on the iPad).</li>
+        <li class="pro">+ Visible, direct, and the one design that shows position. Works the same with a finger (the bars grow on the tablet).</li>
         <li class="con">− Takes 4 px more from the notes than today's scrollbars. The ends are small targets on a mouse.</li>
       </ul>
     </div>
@@ -323,7 +323,7 @@ select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding
         <li>Double-click the ruler to switch between the loop and the region.</li>
         <li>Column 2 has room for more.</li>
         <li class="pro">+ Most room, one way to zoom, the same gesture as the Song tab.</li>
-        <li class="con">− Nothing on screen says you can zoom until you try. Tooltips don't exist on the iPad.</li>
+        <li class="con">− Nothing on screen says you can zoom until you try. Tooltips don't exist on the tablet.</li>
       </ul>
     </div>
   </div>
@@ -334,19 +334,19 @@ select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding
       <li><b>The roll opens on the loop.</b> A short loop in a long region fills the width, and its repeats carry on to the right under the hatch. Double-click the ruler, or press Region, for the whole region; press Loop to come back.</li>
       <li><b>The ruler zooms like the Song tab's.</b> Drag up to zoom in, down to zoom out, around the bar you pressed; drag left and right to scroll.</li>
       <li><b>The keys zoom rows.</b> Drag them right for taller rows, left for shorter, up and down to scroll. A tap still plays the key.</li>
-      <li><b>Pinch zooms</b> around your fingers. On a trackpad (or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + wheel) it zooms time. On the iPad, spreading sideways zooms time and spreading up and down zooms rows; one finger on empty space still scrolls and a tap still adds a note (the Roll's record, decision 8).</li>
+      <li><b>Pinch zooms</b> around your fingers. On a trackpad (or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + wheel) it zooms time. On the tablet, spreading sideways zooms time and spreading up and down zooms rows; one finger on empty space still scrolls and a tap still adds a note (the Roll's record, decision 8).</li>
       <li><b>No px anywhere.</b> Time reads in bars or beats, rows in octaves.</li>
     </ol>
   </div>
 
   <div class="section">
-    <h2>On the iPad</h2>
+    <h2>On the tablet</h2>
     <ul>
-      <li>Pick an iPad screen above: the rack takes the iPad Pro 12.9″'s width, and the zoom bars take their touch size, as they will whenever any pointer is coarse.</li>
+      <li>Pick a tablet screen above: the rack takes the tablet's width (1366 px in landscape, 1024 px in portrait), and the zoom bars take their touch size, as they will whenever any pointer is coarse.</li>
       <li><b>The bars</b> grow from 12 to 22 px, and each end is a 26 × 22 px grip with two ridges. The thumb never gets shorter than 84 px, so both grips and a middle to hold stay under a finger even at the region's full width.</li>
       <li><b>The device view</b> gives the notes 10 px less than on the desktop. <b>The Expanded view</b> has the room, and opens on the loop at 15 px rows, as today.</li>
       <li>The readout that floats while you zoom is larger, and it sits at the top of the notes, clear of your fingers.</li>
-      <li>Touch can't be tried in a desktop browser: pinch and one-finger pans need the iPad.</li>
+      <li>Touch can't be tried in a desktop browser: pinch and one-finger pans need the tablet.</li>
     </ul>
   </div>
 
@@ -386,7 +386,7 @@ const SONGS = {
       [132, 39, 12, 0.9], [150, 43, 6, 0.6], [162, 36, 6, 0.75], [174, 34, 12, 0.85],
     ],
   },
-  ipad: {
+  tablet: {
     part: 'Bass',
     loop: BAR,
     bars: 4,
@@ -410,8 +410,8 @@ const BAR_PX = { today: 8, grips: 12, touch: 22 };
 const THUMB_MIN_PX = { today: 16, grips: 30, touch: 84 };
 const SCREENS = {
   desktop: { width: null, height: 760, touch: false, cap: '' },
-  landscape: { width: 1366, height: 1024, touch: true, cap: 'iPad Pro 12.9″ landscape · 1366 × 1024' },
-  portrait: { width: 1024, height: 1366, touch: true, cap: 'iPad Pro 12.9″ portrait · 1024 × 1366' },
+  landscape: { width: 1366, height: 1024, touch: true, cap: 'Tablet landscape · 1366 × 1024' },
+  portrait: { width: 1024, height: 1366, touch: true, cap: 'Tablet portrait · 1024 × 1366' },
 };
 const DEVICE_H_PX = 284;
 const EXPANDED_CHROME_PX = 72;
@@ -458,8 +458,9 @@ function loadSong() {
 }
 
 // ---------- the zoom's maths ----------
+// The floor is the whole region, however long the region and narrow the pane.
 const minBeatPx = () =>
-  isNew() ? Math.max(0.5, (S.W - NEW_TIME.inset) / (S.region / PPQ)) : TODAY_TIME.min;
+  isNew() ? Math.max(1, S.W - NEW_TIME.inset) / (S.region / PPQ) : TODAY_TIME.min;
 const maxBeatPx = () => (isNew() ? NEW_TIME.max : TODAY_TIME.max);
 const fitRegionPx = () =>
   Math.max(minBeatPx(), (S.W - (isNew() ? NEW_TIME.inset : TODAY_TIME.inset)) / (S.region / PPQ));
@@ -899,7 +900,7 @@ document.addEventListener('click', (e) => {
 function frame() {
   const sc = SCREENS[S.screen];
   const f = $('frame');
-  f.classList.toggle('ipad', !!sc.width);
+  f.classList.toggle('tablet', !!sc.width);
   f.style.width = sc.width ? `${sc.width}px` : '';
   $('frameCap').textContent = sc.cap;
   $('rack').classList.toggle('touch', sc.touch);
