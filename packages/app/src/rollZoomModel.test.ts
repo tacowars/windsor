@@ -117,6 +117,20 @@ describe('moving one edge with the other held', () => {
     expect(end.left + shownTicks(800, 240)).toBeCloseTo(10 * BAR);
   });
 
+  it('stays at the ceiling when the moved grip reaches or crosses the held one', () => {
+    for (const end of [10 * BAR, 9 * BAR]) {
+      expect(spanTime(b, { start: 10 * BAR, end, hold: 'start' })).toEqual({
+        beatPx: 240,
+        left: 10 * BAR,
+      });
+    }
+    for (const start of [10 * BAR, 11 * BAR]) {
+      const view = spanTime(b, { start, end: 10 * BAR, hold: 'end' });
+      expect(view.beatPx).toBe(240);
+      expect(view.left + shownTicks(800, 240)).toBeCloseTo(10 * BAR);
+    }
+  });
+
   it('stops at the floor, the whole region from bar 1', () => {
     expect(spanTime(b, { start: 20 * BAR, end: 90 * BAR, hold: 'start' })).toEqual({
       beatPx: regionFitPx(b),
@@ -206,6 +220,29 @@ describe('the rows', () => {
     const view = { rowPx: 8, top: 0 };
     expect(spanRows(view, twelve, { start: 0, end: 1, hold: 'start' }).rowPx).toBe(4);
     expect(spanRows(view, twelve, { start: 0, end: 0.01, hold: 'start' }).rowPx).toBe(24);
+  });
+
+  it('stay at 24 px with the held edge in place when a grip reaches or crosses the other', () => {
+    const scale = { keys: 'scale' as const, used: new Set([57, 58, 61, 66]) };
+    const fold = { fold: true, used: new Set(Array.from({ length: 20 }, (_, i) => 50 + i)) };
+    const view = { rowPx: 8, top: 0 };
+    const layouts = [twelve, ...[scale, fold].map((o) => ({ rows: layout(o), heightPx: 160 }))];
+    for (const drawn of layouts) {
+      // A span just above zero is the closest zoom; an equal or a crossed one lands there too.
+      const bottom = spanRows(view, drawn, { start: 0.6, end: 0.6 + 1e-9, hold: 'start' });
+      const top = spanRows(view, drawn, { start: 0.6 - 1e-9, end: 0.6, hold: 'end' });
+      expect([bottom.rowPx, top.rowPx]).toEqual([24, 24]);
+      for (const end of [0.6, 0.5]) {
+        const next = spanRows(view, drawn, { start: 0.6, end, hold: 'start' });
+        expect(next.rowPx).toBe(24);
+        expect(next.top).toBeCloseTo(bottom.top);
+      }
+      for (const start of [0.6, 0.7]) {
+        const next = spanRows(view, drawn, { start, end: 0.6, hold: 'end' });
+        expect(next.rowPx).toBe(24);
+        expect(next.top).toBeCloseTo(top.top);
+      }
+    }
   });
 
   it('under Keys: Scale, leave thin slivers their height and hold the edge’s pitch', () => {
