@@ -123,7 +123,7 @@ describe('the expanded keyboard view', () => {
     expect(rowPx(1163, 2)).toBe(575.5);
   });
 
-  it('bounds the octave by the octaves shown: 8, 8, 7, 6, the highest key at most B9', () => {
+  it('bounds the octave by the octaves shown: 8, 8, 7, 6, the highest key at most B8', () => {
     expect([1, 2, 3, 4].map((n) => octaveMaxFor(n))).toEqual([8, 8, 7, 6]);
     expect(12 * octaveMaxFor(4) + 12 * 4 - 1).toBe(119);
   });

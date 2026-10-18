@@ -49,7 +49,14 @@ import { markFolds } from './keyboardFoldControl';
 import type { FoldNow, KeyboardFoldHost } from './keyboardFoldNow';
 import { foldSignature, partFoldOf, rowSlotsOf, setSignature } from './keyboardFoldNow';
 import { followFinger, keysCarrying } from './keyboardHeld';
-import { DEFAULT_SHAPE, chromaticLaid, homeSurface, layKeys, sameShape } from './keyboardKeys';
+import {
+  DEFAULT_SHAPE,
+  chromaticLaid,
+  homeSurface,
+  layKeys,
+  octaveLabel,
+  sameShape,
+} from './keyboardKeys';
 import type { KeysLaid, KeysSurface } from './keyboardKeys';
 import { isBlackKey, keyAt, strikeVelocity } from './keyboardLayout';
 import type { KeyBox, RowSlots } from './keyboardLayout';
@@ -557,9 +564,9 @@ export class Keyboard {
    * C names, the fold on every Fold control, and Hold on every Hold button.
    */
   private syncControls(): void {
-    const label = this.laid.notes ? this.laid.label : `C${this.octave}`;
+    const label = this.laid.notes ? this.laid.label : octaveLabel(this.octave);
     for (const node of document.querySelectorAll('[data-oct-label]')) node.textContent = label;
-    this.names.forEach((name, octave) => (name.textContent = `C${this.octave + octave}`));
+    this.names.forEach((name, octave) => (name.textContent = octaveLabel(this.octave + octave)));
     markFolds(partFoldOf(this.builtFold));
     for (const button of document.querySelectorAll('[data-keys-hold]'))
       button.setAttribute('aria-pressed', String(this.hold));

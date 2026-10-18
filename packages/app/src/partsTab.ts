@@ -102,7 +102,7 @@ const GRID_HTML = `
     <div class="keys" id="keys"></div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap" id="keyButtons">
       <button class="btn" id="octDown" type="button">Oct &minus;</button>
-      <span class="status" id="octLabel" data-oct-label>C4</span>
+      <span class="status" id="octLabel" data-oct-label>C3</span>
       <button class="btn" id="octUp" type="button">Oct +</button>
       <button class="btn" id="holdBtn" type="button" aria-pressed="false" data-keys-hold>Hold</button>
       <button class="btn" id="panicBtn" type="button">Panic</button>

@@ -18,7 +18,7 @@
  * strip, and a key past the range is hatched.
  */
 import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
-import { pitchClass } from './consoleFormat';
+import { noteName, pitchClass } from './consoleFormat';
 import { el } from './dom';
 import {
   COARSE_POINTER_QUERY,
@@ -164,9 +164,11 @@ function keyEl(offset: number, perRow: number): HTMLElement {
   return key;
 }
 
+/** The C at `octave` (note 12 × octave), named as the Roll names it: octave 4 is `C3`. */
+export const octaveLabel = (octave: number): string => noteName(SEMITONES_PER_OCTAVE * octave);
+
 /** A folded key's name: its letter, and the root's octave too (Decided 1). */
-export const foldKeyName = (key: FoldKey): string =>
-  key.root ? `${key.name}${Math.floor(key.note / SEMITONES_PER_OCTAVE)}` : key.name;
+export const foldKeyName = (key: FoldKey): string => (key.root ? noteName(key.note) : key.name);
 
 /** One folded key at `offset`: named, the root marked, a chord tone striped, past the range hatched. */
 function foldKeyEl(key: FoldKey, offset: number, strip: ReadonlySet<number>): HTMLElement {

@@ -77,17 +77,17 @@ describe('the audition keyboard folded', () => {
     expect(lit(keys)).toEqual([3]);
   });
 
-  it('keeps a held finger’s note and key through a rename: A4 under A min, then F maj', () => {
+  it('keeps a held finger’s note and key through a rename: A3 under A min, then F maj', () => {
     const before = fold(A_MIN);
     keyboard.onPointerDown(pointer(1, before, 3));
     const after = fold(F_MAJ, true);
-    // The A4 sounds on, the fifth key (A4 now) lights, and the fourth (F4) stays dark under the finger.
+    // The A3 sounds on, the fifth key (A3 now) lights, and the fourth (F3) stays dark under the finger.
     expect(log).toEqual(['p1 on 57']);
     expect(lit(after)).toEqual([4]);
     // A wobble inside the fourth key changes nothing.
     keyboard.onPointerMove({ ...pointer(1, after, 3), clientY: TOP + 0.3 * HEIGHT });
     expect(log).toEqual(['p1 on 57']);
-    // A slide onto the third key strikes C4 and lifts A4.
+    // A slide onto the third key strikes C3 and lifts A3.
     keyboard.onPointerMove(pointer(1, after, 2));
     expect(log).toEqual(['p1 on 57', 'p1 on 48', 'p1 off #1']);
     expect(lit(after)).toEqual([2]);
@@ -95,13 +95,13 @@ describe('the audition keyboard folded', () => {
 
   it('keeps a held finger’s note from a triad to a seventh, and judges its next move by the new boxes', () => {
     const triad = fold(C_MAJ, false, 90);
-    const finger = pointer(1, triad, 2); // G3, the middle of 180 … 270 px.
+    const finger = pointer(1, triad, 2); // G2, the middle of 180 … 270 px.
     keyboard.onPointerDown(finger);
     const seventh = fold(G_7, true, 70);
     expect(log).toEqual(['p1 on 43']);
     expect(lit(seventh)).toEqual([0]);
     expect(keyboard.heldCount).toBe(1);
-    // Unmoved, the finger rests on the fourth key (210 … 280 px), F3: its next move strikes it.
+    // Unmoved, the finger rests on the fourth key (210 … 280 px), F2: its next move strikes it.
     keyboard.onPointerMove({ ...finger, clientY: finger.clientY + 1 });
     expect(log).toEqual(['p1 on 43', 'p1 on 53', 'p1 off #1']);
   });
@@ -109,8 +109,8 @@ describe('the audition keyboard folded', () => {
   it('keeps every held note through a Fold switch, the keys changing at once', () => {
     const chromatic = row(24);
     keyboard.adoptKeys(chromatic.map((k) => k.el));
-    keyboard.onPointerDown(pointer(1, chromatic, 9)); // A3, 45.
-    keyboard.onPointerDown(pointer(2, chromatic, 20)); // G♯4, 56: no A minor key.
+    keyboard.onPointerDown(pointer(1, chromatic, 9)); // A2, 45.
+    keyboard.onPointerDown(pointer(2, chromatic, 20)); // G♯3, 56: no A minor key.
     const scale = fold([45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69], true);
     expect(log).toEqual(['p1 on 45', 'p1 on 56']);
     expect(lit(scale)).toEqual([0]);
@@ -125,7 +125,7 @@ describe('the audition keyboard folded', () => {
   });
 
   it('lights a note on both keys two rows share, holds it across them, and gives a second finger nothing', () => {
-    // Two rows of A min's triad, one octave each: the lower row's A4 and the upper row's are one note.
+    // Two rows of A min's triad, one octave each: the lower row's A3 and the upper row's are one note.
     const keys = fold([45, 48, 52, 57, 57, 60, 64, 69]);
     keyboard.onPointerDown(pointer(1, keys, 3));
     expect(lit(keys)).toEqual([3, 4]);
