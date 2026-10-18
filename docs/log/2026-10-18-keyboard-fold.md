@@ -1,7 +1,8 @@
 # The keyboard fold: a part folded to the song's scale or chord
 
 - **Date:** 2026-10-18
-- **Status:** proposed, accepted when tacowars approves the mockup.
+- **Status:** accepted (tacowars approved the mockup on 2026-10-18,
+  taking the recommended answer to every question under "Decided").
 - **Mockup:** `docs/design/keyboard-fold-mockup.html`, with its frames
   rendered as `docs/design/keyboard-fold-today-*.jpg` (main at 23f0087,
   captured from `npm run dev` in the project's headless Chrome) and
@@ -213,6 +214,9 @@ record's Later list. So A3 below is note 45.
    key lit, as a QWERTY offset past the shown keys does today
    (`2026-10-17-the-keyboard-on-a-tablet` decision 10): A min on two
    octaves is 7 keys, A3 to A5, so `k` plays C6, `l` E6, `;` A6 and `'` C7.
+   A letter whose note is past 127 (`MIDI_NOTE_MAX`) plays nothing, shown
+   or not, as a hatched key does: at octave 8, two octaves of B min run
+   B107 to B131, and `k` to `'` (D134 … D146) play nothing.
 
 7. **MIDI.** While the part is folded, a MIDI note outside the set is
    ignored: it is not sounded, not recorded and not lit, and its release
@@ -328,37 +332,40 @@ recorder as they stand.
   seam; then the keyboard's folded layout, computer keys and MIDI judge;
   then the three controls, the Roll device's after windsor#910.
 
-## To decide
+## Decided
 
-1. **How a root key is marked.** Recommended: its name carries the octave
+tacowars took the recommended answer to each, 2026-10-18.
+
+1. **How a root key is marked.** Its name carries the octave
    (A3, A4, A5) in full ink, with a 2 px rule along its top; the others
    show the letter only. The mockup can turn it off.
-2. **The colors.** Recommended: Scale keeps today's key color, and the
+2. **The colors.** Scale keeps today's key color, and the
    tones of the chord at the playhead carry a 3 px amber strip at the foot,
    the Roll's chord tier (`--carrier`), so the chord shows inside the scale
    and moves with the song. Chord needs no strip, since every key is a
    chord tone. A held key keeps today's amber fill. The Roll's scale tier
    (teal) is not used: every folded key is in the scale.
-3. **Where Fold sits in each bar.** Recommended as drawn: after Oct + on
+3. **Where Fold sits in each bar.** As drawn: after Oct + on
    the Parts row, after Rows in the expanded bar (in portrait the bar wraps
    to two lines and the keys lose 36 px of height), and last in the Roll
    device's second column with the metronome beside Rec.
-4. **Whether the closing root key stays**, and in two rows whether every
-   row ends on its root (recommended; the shared note lights on both keys,
-   and a second finger on a held note's other key strikes nothing, as on a
-   held key), only the top row does (the lower rows keep an empty slot so
-   the columns line up), or no row does (2 octaves of A minor become 14
-   keys). The mockup switches between the three.
-5. **The Roll device's label.** Recommended: Keyboard fold, beside the
+4. **The closing root key stays**, and in two rows every row ends on its
+   root: the shared note lights on both keys, and a second finger on a
+   held note's other key strikes nothing, as on a held key. (The other
+   ways: only the top row ends on its root, the lower rows keeping an empty
+   slot so the columns line up, or no row does, so 2 octaves of A minor
+   become 14 keys.)
+5. **The Roll device's label.** Keyboard fold, beside the
    Roll's own Fold. The other way renames the Roll's Fold.
-6. **The landscape row with a seven-tone Scale.** Recommended: Enable MIDI
+6. **The landscape row with a seven-tone Scale.** Enable MIDI
    wraps while such a fold is on (the row grows 42 px). The other way drops
    the Fold label on the Parts row (136 px), leaving the keys 680.3 px,
    45.4 px a key, on one line.
-7. **The grace window.** Proposed 1/16, 6 ticks, 125 ms at 120 BPM. The
-   hand decides, as the ear does for a sound.
+7. **The grace window.** 1/16, 6 ticks, 125 ms at 120 BPM, as a constant
+   in the fold's table, so the hand can tune it after the build, as the
+   ear does for a sound.
 8. **The chord fold's register.** The first key is the chord's root in the
    label's octave, so under A min the keys start at A3 (45) and under C maj
    at C3 (36): the row moves by up to eleven semitones as the chord
-   changes. Proposed as decision 4 says; the other way starts each chord at
-   its root nearest the key's root.
+   changes. Decided as decision 4 says; the other way would have started
+   each chord at its root nearest the key's root.
