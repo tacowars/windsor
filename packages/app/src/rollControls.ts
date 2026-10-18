@@ -1,13 +1,14 @@
 /**
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
- * columns: Snap, Loop, Keys, Fold and Quantise; then the ↔ and ↕ zooms, the
- * Audition switch, Rec (windsor#663, `rollRecView.ts`) and the metronome
+ * columns: Snap, Loop, Keys, Fold and Quantise; then Show, Loop | Region
+ * (windsor#902; record `2026-10-18-roll-zoom-bars-and-duplicate` decision
+ * 2), with the zoom bars' hint under it, the Audition switch, Rec (windsor#663, `rollRecView.ts`) and the metronome
  * (windsor#906, `rollMetronome.ts`). Under both, the
  * Velocity row (windsor#754; record `2026-10-12-roll-note-accent-and-ratchet`
  * decision 9): Vel, the console's knob on the part's `velocity`, beside Acc
  * vel and Acc mod, the Grid's knobs on the roll's `accentVelocity` and
  * `accentMod`, written as any card's sequencer knob is (`driverKnob`).
- * Snap, Keys, Fold and the zooms are the view's (`rollView.ts`), and
+ * Snap, Keys, Fold and the zoom are the view's (`rollView.ts`), and
  * Audition the console's (`rollAudition.ts`), never the song's. Loop's − and
  * + step the song's loop through whole bars (windsor#603 decision 3).
  */
@@ -19,9 +20,10 @@ import { tableKnob } from './seqFields';
 import { ROLL_ACCENT_KNOBS, ROLL_KNOBS } from './sequencerKnobTables';
 import { barsOf, loopText } from './rollSummary';
 import { quantiseOff } from './rollQuantise';
-import { ROLL_QUANTISE, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
+import { ROLL_QUANTISE, ROLL_SHOW, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
 import type { RollKeys } from './rollRows';
-import { type RollViewState, type RollZoom, rowZoomText, snapOf, timeZoomText } from './rollView';
+import { type RollViewState, snapOf } from './rollView';
+import type { RollFit } from './rollZoomModel';
 
 /** What the controls read and change. */
 export interface RollControlsTarget {
@@ -30,13 +32,10 @@ export interface RollControlsTarget {
   /** The region whose roll the accent knobs write; none is the part's sequencer. */
   readonly region: number | undefined;
   readonly view: RollViewState;
-  /** The zoom of the view on show, device or Expanded. */
-  zoom(): RollZoom;
-  /** One ↔ step (−1 or +1), Fit (0), or one ↕ step. */
-  zoomTime(dir: number): void;
-  zoomRows(dir: number): void;
-  /** The px per beat the roll draws at now. */
-  beatPx(): number;
+  /** Which fits the view on show sits on, device or Expanded: Show lights them. */
+  fits(): Record<RollFit, boolean>;
+  /** Fit the view on show to the loop or the region. */
+  show(fit: RollFit): void;
   /** The loop, the region and a bar, in ticks. */
   ticks(): { loop: number; region: number; bar: number };
   /** Redraw the roll for a changed view setting. */
@@ -63,6 +62,8 @@ export interface RollControls {
   /** Snap's field, which heads whichever tab's column shows. */
   readonly snap: HTMLElement;
   refresh(): void;
+  /** Light Show's fits again, after a scroll or a zoom. */
+  refreshShow(): void;
 }
 
 function item(label: string | HTMLElement, control: HTMLElement): HTMLElement {
@@ -191,42 +192,30 @@ function firstColumn(target: RollControlsTarget): {
   };
 }
 
-function zooms(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
-  const fit = stepButton('fit', 'Fit the region to the width', () => target.zoomTime(0));
-  fit.classList.add('roll-fit');
-  const rows = el('span', 'roll-readout');
-  const grid = el('div', 'roll-zooms');
-  const axis = (glyph: string, title: string): HTMLElement => {
-    const mark = el('i', '', glyph);
-    mark.title = title;
-    return mark;
-  };
-  grid.append(
-    axis('↔', 'Horizontal zoom'),
-    stepper([
-      stepButton('−', 'Zoom out in time', () => target.zoomTime(-1)),
-      fit,
-      stepButton('+', 'Zoom in in time', () => target.zoomTime(1)),
-    ]),
-    axis('↕', 'Vertical zoom'),
-    stepper([
-      stepButton('−', 'Shorter rows', () => target.zoomRows(-1)),
-      rows,
-      stepButton('+', 'Taller rows', () => target.zoomRows(1)),
-    ]),
-  );
+/** Show: Loop | Region, each lit while the view sits on it, and the zoom bars' hint. */
+function showItem(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
+  const S = ROLL_SHOW;
+  const box = el('div', 'seg roll-seg roll-show');
+  const buttons = (['loop', 'region'] as const).map((fit) => {
+    const button = el('button', '', S[fit]) as HTMLButtonElement;
+    button.type = 'button';
+    button.title = fit === 'loop' ? S.loopTitle : S.regionTitle;
+    button.onclick = () => target.show(fit);
+    box.appendChild(button);
+    return { fit, button };
+  });
   const refresh = (): void => {
-    const zoom = target.zoom();
-    fit.textContent = timeZoomText(zoom, target.beatPx(), target.ticks().bar);
-    fit.classList.toggle('on', zoom.beatPx === null);
-    rows.textContent = rowZoomText(zoom);
+    const on = target.fits();
+    for (const { fit, button } of buttons) button.setAttribute('aria-pressed', String(on[fit]));
   };
   refresh();
-  return { node: item('Zoom', grid), refresh };
+  const node = item(S.label, box);
+  node.appendChild(el('span', 'roll-hint', S.hint));
+  return { node, refresh };
 }
 
 function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
-  const zoom = zooms(target);
+  const show = showItem(target);
   const audition = segs(
     [
       { value: 'on', label: 'On' },
@@ -237,8 +226,8 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
   );
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
   const col = el('div', 'roll-ctl');
-  col.append(zoom.node, item('Audition', audition), target.rec, target.metronome);
-  return { node: col, refresh: zoom.refresh };
+  col.append(show.node, item('Audition', audition), target.rec, target.metronome);
+  return { node: col, refresh: show.refresh };
 }
 
 /** The Velocity row: Vel on the part, Acc vel and Acc mod on the roll. */
@@ -272,5 +261,6 @@ export function rollControls(target: RollControlsTarget): RollControls {
       first.refresh();
       second.refresh();
     },
+    refreshShow: second.refresh,
   };
 }

@@ -26,10 +26,11 @@ export interface RollRow {
   readonly thin: boolean;
 }
 
-/** The rows, top down, and their total height. */
+/** The rows, top down, their total height, and the zoom's row height they were laid out at. */
 export interface RowLayout {
   readonly rows: readonly RollRow[];
   readonly height: number;
+  readonly rowPx: number;
 }
 
 /** What the rows are built from. */
@@ -75,14 +76,14 @@ export function pitchSpan(
   return { low, high };
 }
 
-function stack(list: readonly Omit<RollRow, 'top'>[]): RowLayout {
+function stack(list: readonly Omit<RollRow, 'top'>[], rowPx: number): RowLayout {
   let top = 0;
   const rows = list.map((row) => {
     const placed = { ...row, top };
     top += row.h;
     return placed;
   });
-  return { rows, height: top };
+  return { rows, height: top, rowPx };
 }
 
 /** The rows for one view of the roll. */
@@ -92,7 +93,10 @@ export function rollRows(input: RowInput, geometry: RowGeometry = SHIPPED): RowL
     const fill = Math.floor(input.panePx / used.size);
     const h = Math.max(rowPx, Math.min(geometry.foldMaxPx, fill));
     const pitches = [...used].sort((a, b) => b - a);
-    return stack(pitches.map((pitch) => ({ pitch, h, thin: false })));
+    return stack(
+      pitches.map((pitch) => ({ pitch, h, thin: false })),
+      rowPx,
+    );
   }
   const { low, high } = pitchSpan(used, geometry);
   const list: Omit<RollRow, 'top'>[] = [];
@@ -103,7 +107,7 @@ export function rollRows(input: RowInput, geometry: RowGeometry = SHIPPED): RowL
       list.push({ pitch, h: geometry.thinPx, thin: true });
     }
   }
-  return stack(list);
+  return stack(list, rowPx);
 }
 
 /** The index of the row at `y` px from the top; the last row past the bottom. */

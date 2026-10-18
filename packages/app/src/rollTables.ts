@@ -29,11 +29,14 @@ export const ROLL_SNAPS: readonly RollSnap[] = [
 /** The Snap a roll opens on: 1/16. */
 export const ROLL_SNAP_DEFAULT = 3;
 
-/** The ↕ zoom's row heights, in px. */
-export const ROLL_ROW_PX: readonly number[] = [5, 7, 9, 12, 15, 19];
+/**
+ * The ↕ zoom's row heights, in px: continuous between these (record
+ * `2026-10-18-roll-zoom-bars-and-duplicate` decision 8).
+ */
+export const ROLL_ROW_ZOOM = { minPx: 4, maxPx: 24 } as const;
 
-/** The ↕ zoom each view opens on, an index into `ROLL_ROW_PX`: 7 px in the device, 15 px expanded. */
-export const ROLL_ROW_DEFAULT = { device: 1, wide: 4 } as const;
+/** The row height each view opens on: 7 px in the device, 15 px expanded. */
+export const ROLL_ROW_DEFAULT = { device: 7, wide: 15 } as const;
 
 /** The rows' geometry (decision 4). */
 export const ROLL_ROWS = {
@@ -56,8 +59,49 @@ export const ROLL_PITCH_RANGE = { low: 24, high: 96 } as const;
 /** The pitch an empty roll opens centred on, so the C4 octave is in view. */
 export const ROLL_EMPTY_CENTRE_PITCH = 66;
 
-/** The ↔ zoom, in px per beat: its bounds, the factor one − or + moves it by, and Fit's inset. */
-export const ROLL_TIME_ZOOM = { minBeatPx: 6, maxBeatPx: 120, step: 1.4, fitInsetPx: 2 } as const;
+/**
+ * The ↔ zoom, in px per beat (record `2026-10-18-roll-zoom-bars-and-duplicate`
+ * decisions 3 and 8): in to `maxBeatPx`, so a 1/16 is 60 px wide, and out to
+ * the whole region, the floor, which has no fixed number. Region's fit
+ * leaves `fitInsetPx` at the right, and Loop's `loopInsetPx`, so the loop
+ * brace's handle shows.
+ */
+export const ROLL_TIME_ZOOM = { maxBeatPx: 240, fitInsetPx: 2, loopInsetPx: 14 } as const;
+
+/**
+ * How near the view must be to a fit to sit on it: the px per beat within
+ * `relative` of the fit's, and the left edge within `edgePx` of tick 0.
+ */
+export const ROLL_FIT_TOLERANCE = { relative: 1e-6, edgePx: 0.5 } as const;
+
+/**
+ * The zoom bars (decision 9), by pointer: `thickPx` across, a grip `gripPx`
+ * along at each end of the thumb, and a thumb never shorter than `leastPx`,
+ * nor than half its track. `coarse` applies whenever any pointer is coarse
+ * (`COARSE_POINTER_QUERY`), where a grip is 26 × 22 px with two ridges.
+ */
+export const ROLL_ZOOM_BAR = {
+  fine: { thickPx: 12, gripPx: 9, leastPx: 30 },
+  coarse: { thickPx: 22, gripPx: 26, leastPx: 84 },
+  /** The ↔ map's note ticks stand this far in from the bar's long edges, the ↕ map's pitch marks `pitchInsetPx`. */
+  tickInsetPx: 4,
+  pitchInsetPx: 3,
+  /** The loop's tint stands this far in, and is at least `loopMinPx` long. */
+  loopInsetPx: 2,
+  loopMinPx: 2,
+} as const;
+
+/** The Show item (decision 2): its label, its two fits, their titles, and the hint under it. */
+export const ROLL_SHOW = {
+  label: 'Show',
+  loop: 'Loop',
+  region: 'Region',
+  loopTitle: 'Fit the loop to the width',
+  regionTitle: 'Fit the whole region to the width',
+  hint: "drag a bar's ends to zoom",
+  timeBar: 'Time: drag the middle to scroll, an end to zoom',
+  rowBar: 'Rows: drag the middle to scroll, an end to zoom',
+} as const;
 
 /** Snap lines are drawn while one snap is at least this many px wide. */
 export const ROLL_SNAP_LINE_MIN_PX = 4;
@@ -94,8 +138,12 @@ export const ROLL_PANE_PX = {
   head: 32,
   /** The velocity lane's height. */
   vel: 34,
-  /** What the followers scroll past the notes, so they stay level beside the body's scrollbars. */
-  overhang: 24,
+  /**
+   * What the followers scroll past the notes, so they stay level beside the
+   * zoom bars: the ruler and the lane run on over the ↕ bar, and the keys
+   * down beside the ↔ bar, at its touch thickness.
+   */
+  overhang: ROLL_ZOOM_BAR.coarse.thickPx,
 } as const;
 
 /**
@@ -126,6 +174,11 @@ export const ROLL_DEVICE_PX: Readonly<Record<string, number>> = {
   '--roll-vel-h': ROLL_PANE_PX.vel,
   /** The bar ruler's share of the head. */
   '--roll-ruler-h': 17,
+  /** The zoom bars' thickness and a grip's length, and their touch sizes. */
+  '--roll-zbar': ROLL_ZOOM_BAR.fine.thickPx,
+  '--roll-zgrip': ROLL_ZOOM_BAR.fine.gripPx,
+  '--roll-zbar-touch': ROLL_ZOOM_BAR.coarse.thickPx,
+  '--roll-zgrip-touch': ROLL_ZOOM_BAR.coarse.gripPx,
   /** A chord block's height in the strip. */
   '--roll-chord-h': 14,
 };
@@ -159,6 +212,9 @@ export const ROLL_COLORS: Readonly<Record<string, string>> = {
   /** A ghost repeat's opacity, and its stem's. */
   '--roll-ghost': '0.38',
   '--roll-ghost-stem': '0.3',
+  /** The ↔ zoom bar's map: the loop's tint, and a ghost repeat's tick (the first pass is `--carrier`). */
+  '--roll-zbar-loop': 'rgba(224, 164, 78, 0.35)',
+  '--roll-zbar-repeat': 'rgba(220, 227, 227, 0.22)',
 };
 
 /** Bars are counted to a tenth in the summary and the Loop readout. */

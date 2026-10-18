@@ -3,10 +3,12 @@
  * ruler with the chord strip on top, the keyboard on the left, the notes,
  * and the lane under them, with the corner that names the guide's chord
  * and the lane's corner, which holds the Vel · Acc · Rat tabs
- * (`rollLaneTabs.ts`, windsor#754). The notes pane is the one scroller; the
- * other three are clipped and follow it, and a wheel over any of them
- * scrolls the notes. Their content runs `overhang` px past the notes', so
- * they still line up when the notes pane's scrollbars take room from it.
+ * (`rollLaneTabs.ts`, windsor#754). The notes pane is the one scroller, its
+ * own scrollbars hidden under the zoom bars that take their place
+ * (`rollZoomBars.ts`, windsor#902); the other three are clipped and follow
+ * it, and a wheel over any of them scrolls the notes. The ruler and the
+ * lane run on over the ↕ bar and the keys down beside the ↔ bar, so their
+ * content runs `overhang` px past the notes' to stay level with them.
  */
 import { el } from './dom';
 

@@ -18,9 +18,12 @@
  * One playhead loop (`watchPlayhead`) per card: each frame it repaints when
  * the roll, the region or the harmony changed under it, moves the key guide
  * when its chord moved, places the playhead, and reads Rec (`rollRecView.ts`,
- * windsor#663). A resize refits Fit and Fold, and the pane keeps its spot
- * across a repaint (`rollViewSpot.ts`). The view settings are the part's
- * for the session (`rollView.ts`), and so is where the Expanded view sat.
+ * windsor#663). A resize refits a view on a fit and Fold, and the pane
+ * keeps its spot across a repaint (`rollViewSpot.ts`). The notes pane zooms
+ * by its zoom bars and the Show item's fits (`rollZoomControl.ts`,
+ * windsor#902), over `rollZoomModel.ts`'s maths. The view settings
+ * are the part's for the session (`rollView.ts`), and so is where the
+ * Expanded view sat.
  */
 import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -57,20 +60,10 @@ import {
   withDraft,
 } from './rollSource';
 import { sourceSummary } from './rollSummary';
-import { ROLL_COLORS, ROLL_DRAW_BUDGET, ROLL_NOTE, ROLL_UNFIT_BEAT_PX } from './rollTables';
-import {
-  type RollViewState,
-  type RollZoom,
-  beatPxOf,
-  fitBeatPx,
-  fitTime,
-  rollViewOf,
-  rowPxOf,
-  snapOf,
-  zoomRows,
-  zoomTime,
-} from './rollView';
+import { ROLL_COLORS, ROLL_DRAW_BUDGET, ROLL_NOTE } from './rollTables';
+import { type RollViewState, rollViewOf, snapOf } from './rollView';
 import { RollViewSpot } from './rollViewSpot';
+import { RollZoomControl } from './rollZoomControl';
 import { KIND_LABELS } from './sequencerConstants';
 import type { DeviceBody } from './sequencerDevice';
 import { watchPlayhead } from './stepStrip';
@@ -100,6 +93,7 @@ class RollDevice {
   private guideKey = '';
   private hover: number | null = null;
   private readonly spot: RollViewSpot;
+  private readonly zoom: RollZoomControl;
   private playhead = DARK;
 
   constructor(
@@ -114,6 +108,15 @@ class RollDevice {
       this.body.style.setProperty(prop, colour);
     this.panes = rollPanes(() => this.scrolled());
     this.spot = new RollViewSpot(this.panes);
+    this.zoom = new RollZoomControl({
+      panes: this.panes,
+      spot: this.spot,
+      zooms: this.view.zoom,
+      kind: () => (this.expander.isExpanded() ? 'wide' : 'device'),
+      source: () => this.source,
+      scene: () => this.scene,
+      repaint: () => this.paint(),
+    });
     this.editing = rollEditing({
       ctx,
       slot,
@@ -158,11 +161,8 @@ class RollDevice {
       slot: this.slot,
       region: this.region,
       view: this.view,
-      zoom: () => this.zoom(),
-      zoomTime: (dir) =>
-        this.setZoom(dir === 0 ? fitTime(this.zoom()) : zoomTime(this.zoom(), this.fit(), dir)),
-      zoomRows: (dir) => this.setZoom(zoomRows(this.zoom(), dir)),
-      beatPx: () => this.beatPx(),
+      fits: () => this.zoom.fits(),
+      show: (fit) => this.zoom.show(fit),
       ticks: () => ({
         loop: this.source.loopTicks,
         region: this.source.regionTicks,
@@ -213,24 +213,6 @@ class RollDevice {
     return [this.expander.button];
   }
 
-  private zoom(): RollZoom {
-    return this.view.zoom[this.expander.isExpanded() ? 'wide' : 'device'];
-  }
-
-  private setZoom(zoom: RollZoom): void {
-    this.view.zoom[this.expander.isExpanded() ? 'wide' : 'device'] = zoom;
-    this.paint();
-  }
-
-  private fit(): number {
-    const width = this.panes.body.clientWidth;
-    return width > 0 ? fitBeatPx(width, this.source.regionTicks) : ROLL_UNFIT_BEAT_PX;
-  }
-
-  private beatPx(): number {
-    return beatPxOf(this.zoom(), this.fit());
-  }
-
   /** Redraw the notes from the edit in progress or a new selection, on the rows already drawn. */
   private previewNotes(): void {
     if (!this.scene) return;
@@ -253,7 +235,8 @@ class RollDevice {
       this.updateGuide();
     });
     rollLaneTabs(panes.vcorner, this.view, () => this.previewNotes());
-    // Fit follows the width and Fold the height; the first layout centres the notes.
+    panes.root.append(this.zoom.bars.time, this.zoom.bars.rows);
+    // A fit follows the width and Fold the height; the first layout centres the notes.
     new ResizeObserver(() => this.paint()).observe(panes.body);
     const main = el('div', 'seq-section roll-main');
     main.appendChild(panes.root);
@@ -293,6 +276,8 @@ class RollDevice {
   private scrolled(): void {
     this.spot.keep(this.scene);
     this.keepWide();
+    this.zoom.scrolled();
+    this.controls.refreshShow();
     this.envelopes.scrolled();
     const { scene, painted } = this;
     if (!scene || !painted || windowHolds(painted, this.spot.ticks(scene, 0))) return;
@@ -311,9 +296,9 @@ class RollDevice {
       snapTicks: snapOf(view.snap).ticks,
       keys: view.keys,
       fold: view.fold,
-      rowPx: rowPxOf(this.zoom()),
+      rowPx: this.zoom.rowPx(),
       panePx: panes.body.clientHeight,
-      beatPx: this.beatPx(),
+      beatPx: this.zoom.beatPx(),
       held: this.rec.heldPitches(),
     });
     this.scene = scene;
@@ -327,6 +312,7 @@ class RollDevice {
     this.rec.summary(sourceSummary(this.source, snapOf(view.snap).label));
     this.spot.restore(this.scene, this.source.notes);
     this.keepWide();
+    this.zoom.painted(scene);
     this.paintWindow();
     this.controls.refresh();
     this.envelopes.paint();
