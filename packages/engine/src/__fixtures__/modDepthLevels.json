@@ -1,5 +1,5 @@
 {
-  "note": "Pre-#543 operator levels, rendered from main at db39e78b, where MOD_INDEX_SCALE was 8. Roles come from ALGORITHMS.",
+  "note": "Operator levels of the bank after the windsor#916 cull (windsor#920). modIndexScale is the pre-#543 MOD_INDEX_SCALE the bank was first authored against. Roles come from ALGORITHMS.",
   "modIndexScale": 8,
   "algorithms": [
     {
@@ -45,24 +45,84 @@
     {
       "mods": [[1, 2, 3], [], [], []],
       "carriers": [0]
+    },
+    {
+      "mods": [[], [2], [3], []],
+      "carriers": [0, 1]
     }
   ],
   "presets": {
-    "ai-voice": {
-      "algorithm": 10,
-      "levels": [0.85, 0.28, 0.22, 0.14]
+    "acid-accent": {
+      "algorithm": 0,
+      "levels": [1, 0, 0, 0]
     },
-    "bass-digital": {
-      "algorithm": 3,
-      "levels": [1, 0.45, 0.4, 0.3]
+    "acid-saw": {
+      "algorithm": 0,
+      "levels": [1, 0, 0, 0]
+    },
+    "acid-square": {
+      "algorithm": 0,
+      "levels": [1, 0, 0, 0]
     },
     "build-thunk": {
       "algorithm": 2,
-      "levels": [1, 0.5, 0.5, 0]
+      "levels": [1, 0.7071067811865476, 0.7071067811865476, 0]
     },
     "drone-sqr": {
       "algorithm": 4,
-      "levels": [1, 0.08947368421052632, 0.4, 0.3]
+      "levels": [1, 0.12653489768601378, 0.4, 0.4242640687119285]
+    },
+    "efm-bell-perc": {
+      "algorithm": 0,
+      "levels": [0.9, 0.42, 0, 0]
+    },
+    "efm-clap": {
+      "algorithm": 9,
+      "levels": [0.75, 0.7447368421052631, 0.7, 0.5]
+    },
+    "efm-cowbell": {
+      "algorithm": 4,
+      "levels": [0.8, 0.4, 0.6, 0.32]
+    },
+    "efm-crash": {
+      "algorithm": 0,
+      "levels": [0.8, 0.6605263157894737, 0.49736842105263157, 0.668421052631579]
+    },
+    "efm-hat-closed": {
+      "algorithm": 0,
+      "levels": [0.7, 0.62, 0.5, 0]
+    },
+    "efm-hat-open": {
+      "algorithm": 0,
+      "levels": [0.62, 0.62, 0.5, 0]
+    },
+    "efm-kick": {
+      "algorithm": 0,
+      "levels": [1, 0.55, 0.3, 0]
+    },
+    "efm-rim": {
+      "algorithm": 4,
+      "levels": [0.75, 0.45, 0.6, 0.3]
+    },
+    "efm-snare": {
+      "algorithm": 4,
+      "levels": [0.9, 0.5, 0.55, 0]
+    },
+    "efm-tom": {
+      "algorithm": 0,
+      "levels": [1, 0.42, 0.25, 0]
+    },
+    "efm-zap": {
+      "algorithm": 0,
+      "levels": [0.9, 0.6, 0, 0]
+    },
+    "fm-hat-closed": {
+      "algorithm": 7,
+      "levels": [0.999972, 0.524375, 0.911427, 0.890347]
+    },
+    "fm-hat-open": {
+      "algorithm": 7,
+      "levels": [0.999972, 0.524375, 0.911427, 0.890347]
     },
     "hat": {
       "algorithm": 7,
@@ -70,439 +130,423 @@
     },
     "horde-horn": {
       "algorithm": 1,
-      "levels": [1, 0.5, 0.4, 0]
+      "levels": [1, 0.7071067811865476, 0.5656854249492381, 0]
     },
     "kick": {
       "algorithm": 0,
-      "levels": [1, 0.25, 0, 0]
+      "levels": [1, 0, 0, 0]
     },
-    "lead-bell": {
+    "lead-sync-detune": {
+      "algorithm": 7,
+      "levels": [0.75, 0.3, 0, 0]
+    },
+    "lead-sync-sweep": {
+      "algorithm": 7,
+      "levels": [0.8, 0.35, 0, 0]
+    },
+    "lead-width-sweep": {
+      "algorithm": 7,
+      "levels": [0.8, 0.3, 0, 0]
+    },
+    "metronome-click": {
       "algorithm": 0,
-      "levels": [1, 0.55, 0.2, 0]
+      "levels": [1, 0, 0, 0]
     },
     "pad-drift": {
       "algorithm": 4,
-      "levels": [0.9, 0.35, 0.7, 0.25]
+      "levels": [0.9, 0.4949747468305833, 0.7, 0.3535533905932738]
     },
     "pickup-blip": {
       "algorithm": 0,
-      "levels": [1, 0.35, 0, 0]
+      "levels": [1, 0.4949747468305833, 0, 0]
     },
     "saw-arp": {
       "algorithm": 4,
-      "levels": [1, 0, 0.4, 0.3]
+      "levels": [1, 0, 0.4, 0.4242640687119285]
     },
     "score-afterimage-quartet": {
       "algorithm": 4,
-      "levels": [0.75, 0.19, 0.62, 0.13299999999999998]
+      "levels": [0.75, 0.2687005768508881, 0.62, 0.18809040379562167]
     },
     "score-amber-ceiling": {
       "algorithm": 4,
-      "levels": [0.75, 0.16, 0.62, 0.11199999999999999]
+      "levels": [0.75, 0.22627416997969524, 0.62, 0.15839191898578667]
     },
     "score-amber-stab": {
       "algorithm": 4,
-      "levels": [0.85, 0.22, 0.6, 0.044000000000000004]
+      "levels": [0.85, 0.3111269837220809, 0.6, 0.062225396744416184]
     },
     "score-ash-cathedral": {
       "algorithm": 4,
-      "levels": [0.75, 0.45, 0.62, 0.315]
+      "levels": [0.75, 0.6363961030678928, 0.62, 0.44547727214752497]
     },
     "score-black-ice-strings": {
       "algorithm": 4,
-      "levels": [0.75, 0.48, 0.62, 0.33599999999999997]
-    },
-    "score-black-resonator": {
-      "algorithm": 0,
-      "levels": [0.8, 0.9, 0.54, 0.18000000000000002]
+      "levels": [0.75, 0.6788225099390857, 0.62, 0.4751757569573599]
     },
     "score-blue-vapour": {
       "algorithm": 4,
-      "levels": [0.75, 0.18, 0.62, 0.126]
+      "levels": [0.75, 0.2545584412271571, 0.62, 0.17819090885900996]
     },
     "score-breathing-rosin": {
       "algorithm": 4,
-      "levels": [0.75, 0.42, 0.62, 0.294]
+      "levels": [0.75, 0.5939696961966999, 0.62, 0.4157787873376899]
     },
     "score-bright-air-riser": {
       "algorithm": 0,
-      "levels": [0.8, 0.35, 0.21, 0.06999999999999999]
+      "levels": [0.8, 0.4949747468305833, 0.29698484809834996, 0.09899494936611666]
     },
     "score-broken-relay": {
       "algorithm": 0,
-      "levels": [0.8, 0.7, 0.42, 0.13999999999999999]
-    },
-    "score-bronze-rain": {
-      "algorithm": 0,
-      "levels": [0.85, 0.72, 0.324, 0.144]
-    },
-    "score-buffer-drift": {
-      "algorithm": 0,
-      "levels": [0.8, 0.45, 0.27, 0.09000000000000001]
+      "levels": [0.8, 0.9899494936611666, 0.5939696961966999, 0.19798989873223333]
     },
     "score-buried-voices": {
       "algorithm": 4,
-      "levels": [0.75, 0.4, 0.62, 0.27999999999999997]
-    },
-    "score-carbon-reed": {
-      "algorithm": 0,
-      "levels": [0.85, 0.36, 0.162, 0.072]
-    },
-    "score-concrete-chord": {
-      "algorithm": 4,
-      "levels": [0.85, 0.28, 0.6, 0.05600000000000001]
-    },
-    "score-copper-step": {
-      "algorithm": 0,
-      "levels": [0.85, 0.28, 0.12600000000000003, 0.05600000000000001]
-    },
-    "score-corrupt-clock": {
-      "algorithm": 0,
-      "levels": [0.8, 0.8, 0.48, 0.16000000000000003]
-    },
-    "score-data-fragments": {
-      "algorithm": 0,
-      "levels": [0.8, 0.55, 0.33, 0.11000000000000001]
+      "levels": [0.75, 0.5656854249492381, 0.62, 0.39597979746446665]
     },
     "score-deep-current": {
       "algorithm": 4,
-      "levels": [0.75, 0.2, 0.62, 0.13999999999999999]
-    },
-    "score-deep-static": {
-      "algorithm": 0,
-      "levels": [0.8, 0.5, 0.3, 0.1]
+      "levels": [0.75, 0.28284271247461906, 0.62, 0.19798989873223333]
     },
     "score-distant-gantry": {
       "algorithm": 0,
-      "levels": [0.8, 0.65, 0.39, 0.13]
-    },
-    "score-dockside-bass": {
-      "algorithm": 0,
-      "levels": [0.85, 0.24, 0.108, 0.048]
+      "levels": [0.8, 0.3560809208056698, 0.3515432893255071, 0.18384776310850237]
     },
     "score-drowned-cellos": {
       "algorithm": 4,
-      "levels": [0.75, 0.16, 0.62, 0.11199999999999999]
+      "levels": [0.75, 0.22627416997969524, 0.62, 0.15839191898578667]
     },
     "score-dry-relay": {
       "algorithm": 4,
-      "levels": [0.85, 0.4, 0.6, 0.08000000000000002]
-    },
-    "score-dry-ticker": {
-      "algorithm": 0,
-      "levels": [0.8, 0.55, 0.33, 0.11000000000000001]
+      "levels": [0.85, 0.1867380565281855, 0.6, 0.12366340077932132]
     },
     "score-empty-station": {
       "algorithm": 4,
-      "levels": [0.75, 0.26, 0.62, 0.182]
-    },
-    "score-engine-pulser": {
-      "algorithm": 0,
-      "levels": [0.8, 0.65, 0.39, 0.13]
+      "levels": [0.75, 0.36769552621700474, 0.62, 0.25738686835190333]
     },
     "score-estuary-violas": {
       "algorithm": 4,
-      "levels": [0.75, 0.2, 0.62, 0.13999999999999999]
+      "levels": [0.75, 0.28284271247461906, 0.62, 0.19798989873223333]
     },
     "score-faded-neon": {
       "algorithm": 4,
-      "levels": [0.75, 0.27, 0.62, 0.189]
+      "levels": [0.75, 0.3818376618407357, 0.62, 0.26728636328851496]
     },
     "score-felt-circuit": {
       "algorithm": 0,
-      "levels": [0.85, 0.18, 0.081, 0.036]
+      "levels": [0.85, 0.2545584412271571, 0.1145512985522207, 0.05091168824543142]
     },
     "score-felt-sub": {
       "algorithm": 0,
-      "levels": [0.85, 0.2, 0.09000000000000001, 0.04000000000000001]
+      "levels": [0.85, 0.28284271247461906, 0.12727922061357858, 0.05656854249492382]
     },
     "score-frozen-bow": {
       "algorithm": 4,
-      "levels": [0.75, 0.35, 0.62, 0.24499999999999997]
+      "levels": [0.75, 0.4949747468305833, 0.62, 0.3464823227814083]
     },
     "score-ghost-formants": {
       "algorithm": 4,
-      "levels": [0.75, 0.38, 0.62, 0.26599999999999996]
+      "levels": [0.75, 0.5374011537017762, 0.62, 0.37618080759124334]
     },
     "score-glass-horizon": {
       "algorithm": 4,
-      "levels": [0.75, 0.3, 0.62, 0.21]
+      "levels": [0.75, 0.4242640687119285, 0.62, 0.29698484809834996]
     },
     "score-glass-pebble": {
       "algorithm": 0,
-      "levels": [0.85, 0.25, 0.1125, 0.05]
-    },
-    "score-granular-hiss": {
-      "algorithm": 0,
-      "levels": [0.8, 0.6, 0.36, 0.12]
-    },
-    "score-graphite-bass": {
-      "algorithm": 0,
-      "levels": [0.85, 0.5, 0.225, 0.1]
+      "levels": [0.85, 0.3061849695406422, 0.1801516573459206, 0.1601843623291811]
     },
     "score-harbour-fog": {
       "algorithm": 4,
-      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
+      "levels": [0.75, 0.16970562748477142, 0.62, 0.11879393923933998]
     },
     "score-high-tremolo": {
       "algorithm": 4,
-      "levels": [0.75, 0.28, 0.62, 0.196]
+      "levels": [0.75, 0.39597979746446665, 0.62, 0.27718585822512665]
     },
     "score-hollow-anchor": {
       "algorithm": 0,
-      "levels": [0.85, 0.4, 0.18000000000000002, 0.08000000000000002]
+      "levels": [0.85, 0.31305384600186975, 0.1966637043850519, 0.2868212955161634]
     },
     "score-hollow-bows": {
       "algorithm": 4,
-      "levels": [0.75, 0.18, 0.62, 0.126]
-    },
-    "score-hollow-droplet": {
-      "algorithm": 0,
-      "levels": [0.85, 0.58, 0.261, 0.11599999999999999]
-    },
-    "score-hollow-ticker": {
-      "algorithm": 0,
-      "levels": [0.8, 0.4, 0.24, 0.08000000000000002]
+      "levels": [0.75, 0.2545584412271571, 0.62, 0.17819090885900996]
     },
     "score-ice-needle": {
       "algorithm": 0,
-      "levels": [0.85, 0.34, 0.15300000000000002, 0.068]
-    },
-    "score-iron-root": {
-      "algorithm": 0,
-      "levels": [0.85, 0.58, 0.261, 0.11599999999999999]
+      "levels": [0.85, 0.28609576910158924, 0.269006253990452, 0.30669283803084413]
     },
     "score-last-light-bell": {
       "algorithm": 0,
-      "levels": [0.85, 0.2, 0.09000000000000001, 0.04000000000000001]
+      "levels": [0.85, 0.28284271247461906, 0.12727922061357858, 0.05656854249492382]
     },
     "score-long-downwash": {
       "algorithm": 0,
-      "levels": [0.8, 0.15, 0.09, 0.03]
+      "levels": [0.8, 0.21213203435596426, 0.12727922061357855, 0.042426406871192854]
     },
     "score-long-dusk": {
       "algorithm": 4,
-      "levels": [0.75, 0.14, 0.62, 0.098]
-    },
-    "score-low-transformer": {
-      "algorithm": 0,
-      "levels": [0.85, 0.46, 0.20700000000000002, 0.09200000000000001]
+      "levels": [0.75, 0.19798989873223333, 0.62, 0.13859292911256332]
     },
     "score-low-tremolo": {
       "algorithm": 4,
-      "levels": [0.75, 0.3, 0.62, 0.21]
+      "levels": [0.75, 0.4242640687119285, 0.62, 0.29698484809834996]
     },
     "score-low-weather": {
       "algorithm": 4,
-      "levels": [0.75, 0.32, 0.62, 0.22399999999999998]
+      "levels": [0.75, 0.4525483399593905, 0.62, 0.31678383797157333]
     },
     "score-magnetic-veil": {
       "algorithm": 4,
-      "levels": [0.75, 0.25, 0.62, 0.175]
+      "levels": [0.75, 0.3535533905932738, 0.62, 0.24748737341529164]
     },
     "score-moss-stab": {
       "algorithm": 4,
-      "levels": [0.85, 0.36, 0.6, 0.072]
+      "levels": [0.85, 0.5091168824543142, 0.6, 0.10182337649086284]
     },
     "score-muted-cable": {
       "algorithm": 0,
-      "levels": [0.85, 0.3, 0.135, 0.06]
+      "levels": [0.85, 0.4242640687119285, 0.19618198881510465, 0.14274755058449096]
     },
     "score-muted-chamber": {
       "algorithm": 4,
-      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
-    },
-    "score-narrow-riser": {
-      "algorithm": 0,
-      "levels": [0.8, 0.3, 0.18, 0.06]
-    },
-    "score-night-choir": {
-      "algorithm": 4,
-      "levels": [0.75, 0.24, 0.62, 0.16799999999999998]
-    },
-    "score-night-rubber": {
-      "algorithm": 0,
-      "levels": [0.85, 0.6, 0.27, 0.12]
+      "levels": [0.75, 0.16970562748477142, 0.62, 0.11879393923933998]
     },
     "score-open-sea": {
       "algorithm": 4,
-      "levels": [0.75, 0.22, 0.62, 0.154]
+      "levels": [0.75, 0.3111269837220809, 0.62, 0.21778888860545664]
     },
     "score-pale-monolith": {
       "algorithm": 4,
-      "levels": [0.75, 0.5, 0.62, 0.35]
-    },
-    "score-passing-vapour": {
-      "algorithm": 0,
-      "levels": [0.8, 0.22, 0.132, 0.044000000000000004]
+      "levels": [0.75, 0.7071067811865476, 0.62, 0.4949747468305833]
     },
     "score-polar-bloom": {
       "algorithm": 4,
-      "levels": [0.75, 0.55, 0.62, 0.385]
-    },
-    "score-porcelain-drop": {
-      "algorithm": 0,
-      "levels": [0.85, 0.42, 0.189, 0.084]
-    },
-    "score-quick-downwash": {
-      "algorithm": 0,
-      "levels": [0.8, 0.25, 0.15, 0.05]
-    },
-    "score-quiet-reactor": {
-      "algorithm": 4,
-      "levels": [0.75, 0.36, 0.62, 0.252]
-    },
-    "score-radio-dust": {
-      "algorithm": 0,
-      "levels": [0.8, 0.45, 0.27, 0.09000000000000001]
+      "levels": [0.75, 0.7778174593052024, 0.62, 0.5444722215136416]
     },
     "score-remote-orchestra": {
       "algorithm": 4,
-      "levels": [0.75, 0.1, 0.62, 0.06999999999999999]
+      "levels": [0.75, 0.14142135623730953, 0.62, 0.09899494936611666]
     },
     "score-round-foundation": {
       "algorithm": 0,
-      "levels": [0.85, 0.12, 0.054, 0.024]
-    },
-    "score-rubber-key": {
-      "algorithm": 4,
-      "levels": [0.85, 0.48, 0.6, 0.096]
-    },
-    "score-rust-ensemble": {
-      "algorithm": 4,
-      "levels": [0.75, 0.38, 0.62, 0.26599999999999996]
-    },
-    "score-rusted-tine": {
-      "algorithm": 0,
-      "levels": [0.85, 0.65, 0.29250000000000004, 0.13]
+      "levels": [0.85, 0.16970562748477142, 0.07636753236814714, 0.033941125496954286]
     },
     "score-salt-violins": {
       "algorithm": 4,
-      "levels": [0.75, 0.13, 0.62, 0.091]
-    },
-    "score-shortwave-chord": {
-      "algorithm": 4,
-      "levels": [0.85, 0.52, 0.6, 0.10400000000000001]
-    },
-    "score-silk-swish": {
-      "algorithm": 0,
-      "levels": [0.8, 0.16, 0.096, 0.032]
+      "levels": [0.75, 0.18384776310850237, 0.62, 0.12869343417595167]
     },
     "score-silt-contrabass": {
       "algorithm": 4,
-      "levels": [0.75, 0.21, 0.62, 0.147]
+      "levels": [0.75, 0.29698484809834996, 0.62, 0.20788939366884496]
     },
     "score-silt-pulse-bass": {
       "algorithm": 0,
-      "levels": [0.85, 0.26, 0.117, 0.052000000000000005]
-    },
-    "score-silver-dust": {
-      "algorithm": 4,
-      "levels": [0.75, 0.22, 0.62, 0.154]
-    },
-    "score-sine-weight": {
-      "algorithm": 0,
-      "levels": [0.85, 0.04, 0.018000000000000002, 0.008]
+      "levels": [0.85, 0.36769552621700474, 0.16546298679765215, 0.07353910524340095]
     },
     "score-slow-air-riser": {
       "algorithm": 0,
-      "levels": [0.8, 0.2, 0.12, 0.04000000000000001]
-    },
-    "score-slow-beacon": {
-      "algorithm": 0,
-      "levels": [0.8, 0.3, 0.18, 0.06]
+      "levels": [0.8, 0.28284271247461906, 0.16970562748477144, 0.05656854249492382]
     },
     "score-soft-machinery": {
       "algorithm": 4,
-      "levels": [0.75, 0.42, 0.62, 0.294]
-    },
-    "score-soft-undertow": {
-      "algorithm": 0,
-      "levels": [0.85, 0.18, 0.081, 0.036]
+      "levels": [0.75, 0.5939696961966999, 0.62, 0.4157787873376899]
     },
     "score-stone-marimba": {
       "algorithm": 0,
-      "levels": [0.85, 0.32, 0.14400000000000002, 0.064]
-    },
-    "score-submerged-keys": {
-      "algorithm": 4,
-      "levels": [0.85, 0.44, 0.6, 0.08800000000000001]
-    },
-    "score-suspended-steel": {
-      "algorithm": 0,
-      "levels": [0.8, 0.8, 0.48, 0.16000000000000003]
+      "levels": [0.85, 0.35254833995939044, 0.12469938456067309, 0.22208861536029914]
     },
     "score-tape-halo": {
       "algorithm": 4,
-      "levels": [0.75, 0.32, 0.62, 0.22399999999999998]
+      "levels": [0.75, 0.4525483399593905, 0.62, 0.31678383797157333]
     },
     "score-tidal-memory": {
       "algorithm": 4,
-      "levels": [0.75, 0.46, 0.62, 0.322]
+      "levels": [0.75, 0.6505382386916237, 0.62, 0.4553767670841366]
     },
     "score-tin-kalimba": {
       "algorithm": 0,
-      "levels": [0.85, 0.5, 0.225, 0.1]
-    },
-    "score-tunnel-growl": {
-      "algorithm": 0,
-      "levels": [0.85, 0.68, 0.30600000000000005, 0.136]
+      "levels": [0.85, 0.2860541496076002, 0.25504015679710434, 0.125631882553099]
     },
     "score-underwater-room": {
       "algorithm": 4,
-      "levels": [0.75, 0.4, 0.62, 0.27999999999999997]
-    },
-    "score-uneasy-scale": {
-      "algorithm": 0,
-      "levels": [0.8, 0.5, 0.3, 0.1]
-    },
-    "score-velvet-airlock": {
-      "algorithm": 4,
-      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
+      "levels": [0.75, 0.5656854249492381, 0.62, 0.39597979746446665]
     },
     "score-velvet-offbeat": {
       "algorithm": 4,
-      "levels": [0.85, 0.16, 0.6, 0.032]
-    },
-    "score-vent-breath": {
-      "algorithm": 0,
-      "levels": [0.8, 0.12, 0.072, 0.024]
-    },
-    "score-violet-section": {
-      "algorithm": 4,
-      "levels": [0.75, 0.25, 0.62, 0.175]
-    },
-    "score-warm-pressure": {
-      "algorithm": 0,
-      "levels": [0.85, 0.18, 0.081, 0.036]
+      "levels": [0.85, 0.22627416997969524, 0.6, 0.04525483399593905]
     },
     "score-wire-harmonics": {
       "algorithm": 4,
-      "levels": [0.75, 0.24, 0.62, 0.16799999999999998]
-    },
-    "score-wire-harp": {
-      "algorithm": 0,
-      "levels": [0.85, 0.48, 0.216, 0.096]
-    },
-    "score-wire-stress": {
-      "algorithm": 0,
-      "levels": [0.8, 0.95, 0.57, 0.19]
+      "levels": [0.75, 0.33941125496954283, 0.62, 0.23758787847867996]
     },
     "score-wooden-pin": {
       "algorithm": 0,
-      "levels": [0.85, 0.28, 0.12600000000000003, 0.05600000000000001]
+      "levels": [0.8236842105263158, 0.39597979746446665, 0.1624014351747995, 0.12656438054552488]
     },
     "snare": {
       "algorithm": 4,
-      "levels": [0.7, 0.5, 0.9, 0]
+      "levels": [0.7, 0.7071067811865476, 0.8210526315789474, 0]
+    },
+    "str-ambient-evolve": {
+      "algorithm": 4,
+      "levels": [0.7, 0.3, 0.62, 0.2]
+    },
+    "str-d50-glass": {
+      "algorithm": 4,
+      "levels": [0.72, 0.22, 0.5, 0.42]
+    },
+    "str-edm-stab": {
+      "algorithm": 7,
+      "levels": [0.72, 0.62, 0.5, 0.4]
+    },
+    "str-jp8-strings": {
+      "algorithm": 6,
+      "levels": [0.7, 0.58, 0.6, 0.14]
+    },
+    "str-juno-strings": {
+      "algorithm": 7,
+      "levels": [0.68, 0.48, 0.34, 0.42]
+    },
+    "str-ob-strings": {
+      "algorithm": 7,
+      "levels": [0.7, 0.66, 0.5, 0.28]
+    },
+    "str-solina-ensemble": {
+      "algorithm": 7,
+      "levels": [0.62, 0.5, 0.4, 0.3]
+    },
+    "str-supersaw-trance": {
+      "algorithm": 7,
+      "levels": [0.62, 0.62, 0.5, 0.5]
     },
     "sub-drone": {
       "algorithm": 6,
-      "levels": [1, 0.3, 0.12, 0.06]
+      "levels": [1, 0.3, 0.12, 0.08485281374238571]
+    },
+    "tr808-clap": {
+      "algorithm": 5,
+      "levels": [0.825764, 0.977199, 0.614611, 0.353553]
+    },
+    "tr808-clave": {
+      "algorithm": 0,
+      "levels": [0.8, 0, 0, 0]
+    },
+    "tr808-conga": {
+      "algorithm": 0,
+      "levels": [1, 0.28, 0, 0]
+    },
+    "tr808-cowbell": {
+      "algorithm": 7,
+      "levels": [0.349999, 0.705207, 0, 0]
+    },
+    "tr808-cymbal": {
+      "algorithm": 7,
+      "levels": [0.66, 0.66, 0.66, 0.66]
+    },
+    "tr808-hat-closed": {
+      "algorithm": 7,
+      "levels": [0.68, 0.68, 0.68, 0.68]
+    },
+    "tr808-hat-open": {
+      "algorithm": 7,
+      "levels": [0.68, 0.68, 0.68, 0.68]
+    },
+    "tr808-kick": {
+      "algorithm": 4,
+      "levels": [1, 0.0609008, 0.741458, 0]
+    },
+    "tr808-kick-long": {
+      "algorithm": 4,
+      "levels": [1, 0.26221, 0, 0]
+    },
+    "tr808-kick-short": {
+      "algorithm": 4,
+      "levels": [1, 0.00154047, 0.235031, 0]
+    },
+    "tr808-maracas": {
+      "algorithm": 7,
+      "levels": [0.75, 0, 0, 0]
+    },
+    "tr808-rimshot": {
+      "algorithm": 6,
+      "levels": [0.996582, 0.742034, 0.927484, 0.204964]
+    },
+    "tr808-snare": {
+      "algorithm": 7,
+      "levels": [0.664438, 0.710859, 0.843978, 0]
+    },
+    "tr808-tom-high": {
+      "algorithm": 6,
+      "levels": [1, 0.156489, 0.959733, 0]
+    },
+    "tr808-tom-low": {
+      "algorithm": 6,
+      "levels": [1, 0.135361, 0.855294, 0]
+    },
+    "tr808-tom-mid": {
+      "algorithm": 6,
+      "levels": [1, 0.008709, 0.666535, 0]
+    },
+    "tr909-clap": {
+      "algorithm": 5,
+      "levels": [0.995973, 0.464274, 0.827267, 0.353553]
+    },
+    "tr909-crash": {
+      "algorithm": 5,
+      "levels": [0.7, 0.6, 0.55, 0.5]
+    },
+    "tr909-hat-closed": {
+      "algorithm": 5,
+      "levels": [0.7, 0.6, 0.5, 0.45]
+    },
+    "tr909-hat-open": {
+      "algorithm": 5,
+      "levels": [0.7, 0.6, 0.5, 0.45]
+    },
+    "tr909-kick": {
+      "algorithm": 6,
+      "levels": [1, 0.905261, 0, 0]
+    },
+    "tr909-kick-hard": {
+      "algorithm": 6,
+      "levels": [1, 0.956924, 0, 0]
+    },
+    "tr909-kick-long": {
+      "algorithm": 6,
+      "levels": [1, 0.963182, 0, 0]
+    },
+    "tr909-kick-short": {
+      "algorithm": 6,
+      "levels": [1, 0.999748, 0, 0]
+    },
+    "tr909-ride": {
+      "algorithm": 4,
+      "levels": [0.7, 0.35, 0.6, 0.42]
+    },
+    "tr909-rimshot": {
+      "algorithm": 6,
+      "levels": [0.7, 0.6, 0.35, 0]
+    },
+    "tr909-snare": {
+      "algorithm": 7,
+      "levels": [0.856427, 0.383947, 0.533327, 0]
+    },
+    "tr909-tom-high": {
+      "algorithm": 6,
+      "levels": [1, 0.991897, 0.718961, 0.540245]
+    },
+    "tr909-tom-low": {
+      "algorithm": 6,
+      "levels": [1, 0.991897, 0.718961, 0.540245]
+    },
+    "tr909-tom-mid": {
+      "algorithm": 6,
+      "levels": [1, 0.991897, 0.718961, 0.540245]
     },
     "weapon-zap": {
       "algorithm": 1,
-      "levels": [1, 0.6, 0.35, 0]
+      "levels": [1, 0.848528137423857, 0.4949747468305833, 0]
     }
   }
 }

@@ -22,7 +22,7 @@
  *   held while notes come and go over it and an arpeggio runs, in a pool of
  *   eight voices, two voices a note, so the pool fills and steals, first
  *   the oldest held voices, then released ones.
- * - A pluck (`lead-bell`, its decay shortened, a squeezed saw, a noise
+ * - A pluck (`score-last-light-bell`, its decay shortened, a squeezed saw, a noise
  *   operator through its own highpass (windsor#362), a biased diode drive, the filter at 24 dB, a triangle LFO and a drift
  *   LFO 2) in the generic loop (`specialise: false`), whose carrier sustains
  *   at 0: four voices fall dormant, new notes take a full pool's dormant
@@ -373,13 +373,13 @@ const acidPad = (): Patch => ({ ...pad(), filter: { ...pad().filter, ...ACID_FIL
 const VOWEL_SWEEP = [0.5, 1.75, 3.25, 4, 2.5, 0, 1.125];
 
 /**
- * `lead-bell` that falls dormant quickly, with a squeezed saw through its
+ * `score-last-light-bell` that falls dormant quickly, with a squeezed saw through its
  * own tracked lowpass (windsor#590) and a noise operator through its own
  * highpass (windsor#362), through a biased diode
  * drive and a 24 dB filter and two LFOs.
  */
 function pluck(): Patch {
-  const patch = structuredClone(PRESETS['lead-bell']!);
+  const patch = structuredClone(PRESETS['score-last-light-bell']!);
   for (const op of patch.ops) op.env.decayTime = 0.1;
   patch.ops[2]!.wave = WAVE.SAW;
   patch.ops[2]!.width = 0.6;

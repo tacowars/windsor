@@ -59,8 +59,8 @@ export interface AlgorithmTable {
  * The processor draws free-running operator phase, per-voice noise seeds and
  * pan jitter from `Math.random` in live playback. Left alone, that makes every
  * render here a different signal, and a test that asserts a level is then a
- * coin toss on the tail of the distribution — which is exactly how the
- * `bass-digital` clip assertion failed once and passed on re-run (#78). Every
+ * coin toss on the tail of the distribution — which is exactly how a bass
+ * patch's clip assertion failed once and passed on re-run (#78). Every
  * render through this harness is therefore seeded by default. Coverage of the
  * random space belongs in an explicit sweep (`sweepPeaks`), not in one
  * unrepeatable draw per CI run.

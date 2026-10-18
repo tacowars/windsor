@@ -86,7 +86,7 @@ function context(): AppCtx {
   return ctx;
 }
 
-async function folderScope(ids = ['kick', 'hat', 'lead-bell']) {
+async function folderScope(ids = ['kick', 'hat', 'score-last-light-bell']) {
   const folder = fakeFolder(ids);
   const library: LibraryModel = pageLibrary();
   await connectLibrary(library, folder);

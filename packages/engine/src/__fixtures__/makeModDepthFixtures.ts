@@ -5,12 +5,14 @@
  *     npx tsx packages/engine/src/__fixtures__/makeModDepthFixtures.ts
  *     npx prettier --write packages/engine/src/__fixtures__/modDepth*.json
  *
- * Both outputs are a snapshot of main at the commit named in
- * `modDepthLevels.json`, taken before the migration landed, and
- * `modDepth.test.ts` measures the migration against them. Re-running this
- * after the change would overwrite the "before" with the "after" and make
- * that test assert nothing: only run it to move the reference point on
- * purpose, and say so in the ticket that does.
+ * Both outputs were first a snapshot of Aotearoa204's main before the
+ * migration landed, which the retired `modDepth.test.ts` measured the
+ * migration against. windsor#920 moved the reference point on purpose
+ * after the stock cull (windsor#916) deleted three of its patches: the
+ * files now hold this build's levels and renders, and only
+ * `modIndexScale`, the pre-#543 scale, is still read
+ * (`synth/fmProcessorKernel.test.ts`). Only run this to move the reference
+ * point again, and say so in the ticket that does.
  *
  * Node-only, like everything in `__fixtures__/`: outside the engine's tsc
  * build so browser code cannot reach it.
@@ -25,7 +27,7 @@ import { DEFAULT_SEED, loadProcessor, render } from './workletHarness';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** Pre-change level of every operator of every factory preset, with its routing. */
+/** The level of every operator of every factory preset, with its routing. */
 function levelsFixture(): unknown {
   const presets: Record<string, { algorithm: number; levels: number[] }> = {};
   for (const name of Object.keys(PRESETS).sort()) {
@@ -34,20 +36,20 @@ function levelsFixture(): unknown {
     presets[name] = { algorithm: patch.algorithm, levels: patch.ops.map((op) => op.level) };
   }
   return {
-    note: 'Pre-#543 operator levels, rendered from main at db39e78b, where MOD_INDEX_SCALE was 8. Roles come from ALGORITHMS.',
+    note: 'Operator levels of the bank after the windsor#916 cull (windsor#920). modIndexScale is the pre-#543 MOD_INDEX_SCALE the bank was first authored against. Roles come from ALGORITHMS.',
     modIndexScale: 8,
     algorithms: ALGORITHMS.map((a) => ({ mods: a.mods, carriers: a.carriers })),
     presets,
   };
 }
 
-/** Three renders that must survive the migration unchanged to within -40 dB. */
+/** Three renders: a bell, a slow pad and a bass. */
 const RENDERS = [
-  { preset: 'lead-bell', note: 72, skipBlocks: 0 },
+  { preset: 'score-last-light-bell', note: 72, skipBlocks: 0 },
   // A slow pad: skip the first second so the window holds its sustain, not
   // the near-silence of its attack.
   { preset: 'score-polar-bloom', note: 60, skipBlocks: 376 },
-  { preset: 'bass-digital', note: 36, skipBlocks: 0 },
+  { preset: 'sub-drone', note: 36, skipBlocks: 0 },
 ] as const;
 const VELOCITY = 0.9;
 const BLOCK = 128;
@@ -74,7 +76,7 @@ function rendersFixture(): unknown {
     clips[preset] = { peak: result.peak, pcm: pcm.toString('base64') };
   }
   return {
-    note: 'Pre-#543 renders from main at db39e78b (MOD_INDEX_SCALE 8). Interleaved stereo int16 LE, base64, normalised to `peak`.',
+    note: 'Renders after the windsor#916 cull (windsor#920), at MOD_INDEX_SCALE 4. Interleaved stereo int16 LE, base64, normalised to `peak`.',
     sampleRate: loaded.sampleRate,
     seed: DEFAULT_SEED,
     velocity: VELOCITY,

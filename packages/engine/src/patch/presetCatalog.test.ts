@@ -47,13 +47,13 @@ describe('patch library catalogue', () => {
     const entries = listed();
     const matches = filterPresets(entries, {
       ...empty,
-      query: '  CONCRETE dub ',
+      query: '  MARIMBA wood ',
       category: 'Plucks',
       tag: 'muted',
     });
-    expect(matches.map((entry) => entry.id)).toEqual(['score-concrete-chord']);
+    expect(matches.map((entry) => entry.id)).toEqual(['score-stone-marimba']);
     expect(filterPresets(entries, { ...empty, query: 'zzzzzz' })).toEqual([]);
-    expect(filterPresets(entries, { ...empty, query: 'concrete', tag: 'airy' })).toEqual([]);
+    expect(filterPresets(entries, { ...empty, query: 'marimba', tag: 'airy' })).toEqual([]);
   });
   it('hides the legacy sounds by default but retains explicit access', () => {
     expect(filterPresets(listed(), empty).some((entry) => entry.id === 'weapon-zap')).toBe(false);

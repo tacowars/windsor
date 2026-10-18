@@ -29,7 +29,7 @@ function context(): AppCtx {
 describe('browser selection', () => {
   it('copies a selected factory patch into the song before any knob edit', () => {
     const ctx = context();
-    const id = 'score-concrete-chord';
+    const id = 'score-moss-stab';
     const original = PRESETS[id]!;
     expect(choosePreset(ctx, FULL_SLOT.arp, id)).toBe(true);
     expect(partAt(ctx.model.doc, FULL_SLOT.arp)?.preset).toBe(id);
@@ -62,7 +62,7 @@ describe('choosing a preset as an undo step (windsor#130)', () => {
     const ctx = openGestureConsole();
     const before = ctx.model.doc;
     const init = partAt(before, 0)?.preset ?? '';
-    const id = 'score-concrete-chord';
+    const id = 'score-moss-stab';
     expect(pickPreset(ctx, 0, id, () => dropInit(ctx))).toBe(true);
     // Two edits: the part switched to the preset, and the Init no part plays dropped.
     expect(partAt(ctx.model.doc, 0)?.preset).toBe(id);
@@ -81,7 +81,7 @@ describe('choosing a preset as an undo step (windsor#130)', () => {
 });
 
 describe('each part owns its patch (windsor#669)', () => {
-  const ID = 'score-concrete-chord';
+  const ID = 'score-moss-stab';
 
   /** A console over a new song with Init parts on slots 0, 1 and 2. */
   function threeParts() {

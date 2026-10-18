@@ -26,10 +26,15 @@
         "detune": 0,
         "level": 0.85,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.018,
@@ -54,10 +59,15 @@
         "detune": 0,
         "level": 0.22627416997969524,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.018,
@@ -82,10 +92,15 @@
         "detune": 0,
         "level": 0.6,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.018,
@@ -110,10 +125,15 @@
         "detune": 0,
         "level": 0.04525483399593905,
         "feedback": 0,
+        "width": 1,
         "velSens": 0.4,
         "levelKeyScale": 0,
         "phase": 0,
         "phaseFree": true,
+        "opLp": 0,
+        "opHp": 0,
+        "opTrack": 0,
+        "sync": "off",
         "env": {
           "initLevel": 0,
           "attackTime": 0.018,
@@ -130,40 +150,6 @@
         }
       }
     ],
-    "lfo": {
-      "shape": 0,
-      "rate": 0.1,
-      "amount": 1,
-      "delay": 0,
-      "retrigger": false,
-      "toPitch": 0,
-      "modWheelDepth": 1,
-      "toOp": [0, 0.12, 0, 0]
-    },
-    "filter": {
-      "mode": 1,
-      "cutoff": 820,
-      "resonance": 0.8,
-      "slope24": true,
-      "envAmount": 2,
-      "modWheelDepth": 0,
-      "lfoAmount": 0,
-      "keyTrack": 0.3,
-      "env": {
-        "initLevel": 0,
-        "attackTime": 0.018,
-        "attackCurve": 0,
-        "peakLevel": 1,
-        "decayTime": 0.6050000000000001,
-        "decayCurve": 0.5,
-        "sustainLevel": 0,
-        "releaseTime": 0.6,
-        "releaseCurve": 0.5,
-        "endLevel": 0,
-        "loopMode": 0,
-        "keyScale": 0
-      }
-    },
     "pitchEnv": {
       "initLevel": 0,
       "attackTime": 0.002,
@@ -178,11 +164,67 @@
       "loopMode": 0,
       "keyScale": 0
     },
+    "lfo": {
+      "shape": 0,
+      "rate": 0.1,
+      "amount": 1,
+      "delay": 0,
+      "retrigger": false,
+      "oneShot": false,
+      "unipolar": false,
+      "toPitch": 0,
+      "modWheelDepth": 1,
+      "toOp": [0, 0.12, 0, 0],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [0, 0, 0, 0]
+    },
+    "lfo2": {
+      "shape": 0,
+      "rate": 5,
+      "amount": 0,
+      "delay": 0,
+      "retrigger": false,
+      "oneShot": false,
+      "unipolar": false,
+      "toPitch": 0,
+      "modWheelDepth": 0,
+      "toOp": [0, 0, 0, 0],
+      "toWidth": [0, 0, 0, 0],
+      "toRatio": [0, 0, 0, 0]
+    },
+    "filter": {
+      "mode": 1,
+      "cutoff": 820,
+      "resonance": 0.8,
+      "slope24": true,
+      "envAmount": 2.6315789473684212,
+      "modWheelDepth": 0,
+      "lfoAmount": 0,
+      "lfo2Amount": 0,
+      "keyTrack": 0.3,
+      "vowel": 0,
+      "env": {
+        "initLevel": 0,
+        "attackTime": 0.036398833714025136,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.6050000000000001,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.6,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      }
+    },
     "drive": {
       "gain": 1,
       "shape": 0,
       "bias": 0,
-      "tone": 1
-    }
+      "tone": 1,
+      "on": false
+    },
+    "macros": []
   }
 }

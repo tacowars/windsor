@@ -9,7 +9,7 @@ import { loadPatchFile } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { buildPatchFile, patchFileBlob, patchFileName, patchFileText } from './patchFileWriter';
 
-const entry = PATCH_LIBRARY['lead-bell']!;
+const entry = PATCH_LIBRARY['score-last-light-bell']!;
 const meta = {
   name: entry.name,
   category: entry.category,
@@ -55,6 +55,6 @@ describe('the download', () => {
     expect(blob.type).toBe('application/json');
     expect(await blob.text()).toBe(text);
     expect(blob.size).toBe(new TextEncoder().encode(text).byteLength);
-    expect(patchFileName(entry.id)).toBe('lead-bell.json');
+    expect(patchFileName(entry.id)).toBe('score-last-light-bell.json');
   });
 });

@@ -11,12 +11,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { KICK, song } from '../__fixtures__/documentCases';
+import { PATCH_FILES } from '../patches';
 import { makeArrangement } from '../song/arrangementDocument';
 import { WAVE, makePatch, mergePatch } from './patch';
 import type { PartialPatch } from './patch';
 import { PATCH_FILE_FORMAT, loadPatchFile } from './patchLibrary';
 import { serialisePatchFile } from './patchFileSerialise';
 import { PRESETS } from './presets';
+
+type FilterFields = Record<'opLp' | 'opHp' | 'opTrack', number>;
 
 /** The two-pole fit's cutoffs for the 808 snare's noise (windsor#361, optimizer seed 1), tracked. */
 const COLOUR = { opLp: 10089.029530313479, opHp: 2370.0400654924615, opTrack: 0.5 };
@@ -32,15 +35,24 @@ const colouredPatch = (): PartialPatch => ({
 });
 
 describe("an operator's own filter fields (windsor#362, windsor#590)", () => {
-  it('fills 0 on every operator of a patch that omits them, and in every library patch', () => {
+  it('fills 0 on every operator of a patch that omits them, library patches included', () => {
     expect(makePatch().ops.map((op) => [op.opLp, op.opHp, op.opTrack])).toEqual([
       [0, 0, 0],
       [0, 0, 0],
       [0, 0, 0],
       [0, 0, 0],
     ]);
+    // A library file saved from the editor names its own values (windsor#920).
     for (const [id, patch] of Object.entries(PRESETS)) {
-      for (const op of patch.ops) expect([op.opLp, op.opHp, op.opTrack], id).toEqual([0, 0, 0]);
+      const fileOps = (PATCH_FILES[id] as { patch: { ops: Partial<FilterFields>[] } }).patch.ops;
+      patch.ops.forEach((op, i) => {
+        const file = fileOps[i] ?? {};
+        expect([op.opLp, op.opHp, op.opTrack], id).toEqual([
+          file.opLp ?? 0,
+          file.opHp ?? 0,
+          file.opTrack ?? 0,
+        ]);
+      });
     }
   });
 
