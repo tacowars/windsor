@@ -2,7 +2,9 @@
  * Duplicate (windsor#904; record `2026-10-18-roll-zoom-bars-and-duplicate`
  * decision 11): the doubled loop's second half is the first, the notes the
  * old loop cut stay cut, the envelopes read the same over both halves as
- * over the old loop, parked notes and points stay parked, Dup is refused
+ * over the old loop, holding the closing value up to the old end as the
+ * wrap does (the player across it: `rollDuplicateSeam.test.ts`), parked
+ * notes and points stay parked, Dup is refused
  * past the region and the caps, and the write is one undo step.
  */
 import { describe, expect, it } from 'vitest';
@@ -28,6 +30,7 @@ import { withGesture } from './gestureHooks';
 import type { EngineHost } from './host';
 import { patternOf, regionPatternChange, sequencerKindChange } from './partEdits';
 import { duplicateLoop, duplicateRefusal, duplicatedSelection } from './rollDuplicate';
+import { ROLL_DUPLICATE_SEAM_TICKS as SEAM } from './rollDuplicateTables';
 import { newSong } from './songParts';
 
 const BAR = TICKS_PER_BAR;
@@ -88,37 +91,88 @@ describe('duplicateLoop', () => {
     );
   });
 
-  it('reads each envelope the same at t and t + 2 bars as the old loop did at t', () => {
+  it('reads each envelope at t and t + 2 bars as the old loop did at t, the seam aside', () => {
     const next = doubled(ROLL);
     next.envelopes?.forEach((envelope, e) => {
       const old = ENVELOPES[e]!;
       for (let t = 0; t < LOOP; t++) {
         const was = envelopeValueAt(old, t, LOOP);
         expect(envelopeValueAt(envelope, t, 2 * LOOP)).toBe(was);
-        expect(envelopeValueAt(envelope, t + LOOP, 2 * LOOP)).toBe(was);
+        // Tick 0 of the new half is the seam's hold; Cutoff's first segment opens a seam late.
+        if (t > 0) expect(envelopeValueAt(envelope, t + LOOP, 2 * LOOP)).toBeCloseTo(was, 4);
       }
     });
   });
 
-  it('adds a seam point only where the hold or the opening would differ, and none where a point sits', () => {
+  it('holds the closing value right up to the old end, then opens the new half after it', () => {
+    const next = doubled(ROLL);
+    next.envelopes?.forEach((envelope, e) => {
+      const old = ENVELOPES[e]!;
+      const closing = old.points.at(-1)!.value;
+      const opening = old.points[0]!.value;
+      for (const before of [0.5, 0.01, 1e-6]) {
+        // The old loop played twice reads its last tick's hold up to the wrap.
+        expect(envelopeValueAt(old, LOOP - before, LOOP)).toBe(closing);
+        expect(envelopeValueAt(envelope, LOOP - before, 2 * LOOP)).toBe(closing);
+      }
+      expect(envelopeValueAt(envelope, LOOP, 2 * LOOP)).toBe(closing);
+      expect(envelopeValueAt(envelope, LOOP + SEAM, 2 * LOOP)).toBe(opening);
+      expect(envelopeValueAt(envelope, LOOP + 0.01, 2 * LOOP)).toBeCloseTo(
+        envelopeValueAt(old, 0.01, LOOP),
+        3,
+      );
+    });
+  });
+
+  it('adds a seam point only where the hold or the opening would differ', () => {
     const [cutoff, resonance] = doubled(ROLL).envelopes!;
-    // Cutoff opens on tick 0, so its copy opens the new half: the hold's point alone.
-    expect(cutoff!.points.map((p) => p.tick)).toEqual([
-      0,
-      BAR,
-      BAR + 2 * BEAT,
-      LOOP - 1,
-      LOOP,
-      LOOP + BAR,
-      LOOP + BAR + 2 * BEAT,
+    // Cutoff opens on tick 0: the hold's point, then the first point's copy a seam later.
+    expect(cutoff!.points).toEqual([
+      ...ENVELOPES[0]!.points,
+      { tick: LOOP, value: 0.2, bend: 0 },
+      { tick: LOOP + SEAM, value: -0.5, bend: 0.25 },
+      ...ENVELOPES[0]!.points.slice(1).map((p) => ({ ...p, tick: p.tick + LOOP })),
     ]);
-    expect(cutoff!.points[3]).toEqual({ tick: LOOP - 1, value: 0.2, bend: 0 });
-    // Resonance opens late: the hold's point and the opening's, on the old loop's end.
+    // Resonance opens late: the hold's point on the old loop's end, the opening's a seam later.
     expect(resonance!.points).toEqual([
       ...ENVELOPES[1]!.points,
-      { tick: LOOP - 1, value: -0.4, bend: 0 },
-      { tick: LOOP, value: 0.8, bend: 0 },
+      { tick: LOOP, value: -0.4, bend: 0 },
+      { tick: LOOP + SEAM, value: 0.8, bend: 0 },
       ...ENVELOPES[1]!.points.map((p) => ({ ...p, tick: p.tick + LOOP })),
+    ]);
+    // A first point inside the seam opens the new half itself; one on tick 0 moves halfway to a closer next.
+    const tight: RollEnvelope = {
+      target: 'filter.cutoff',
+      on: true,
+      points: [
+        { tick: SEAM / 2, value: 1, bend: 0 },
+        { tick: BAR, value: -1, bend: 0 },
+      ],
+    };
+    expect(
+      doubled({ loopTicks: LOOP, notes: [], envelopes: [tight] }).envelopes![0]!.points,
+    ).toEqual([
+      ...tight.points,
+      { tick: LOOP, value: -1, bend: 0 },
+      ...tight.points.map((p) => ({ ...p, tick: p.tick + LOOP })),
+    ]);
+    const close: RollEnvelope = {
+      ...tight,
+      points: [
+        { tick: 0, value: 1, bend: 0 },
+        { tick: SEAM / 2, value: 0, bend: 0 },
+        { tick: BAR, value: -1, bend: 0 },
+      ],
+    };
+    const ticks = doubled({ loopTicks: LOOP, notes: [], envelopes: [close] }).envelopes![0]!.points;
+    expect(ticks.map((p) => p.tick)).toEqual([
+      0,
+      SEAM / 2,
+      BAR,
+      LOOP,
+      LOOP + SEAM / 4,
+      LOOP + SEAM / 2,
+      LOOP + BAR,
     ]);
     // An envelope that closes on the value it opens on needs no seam, and an off one is copied too.
     const flat: RollEnvelope = {

@@ -11,13 +11,16 @@
  * - **Envelopes.** The points inside the old loop get copies one loop
  *   later. Past its last point inside the loop an envelope holds that
  *   point's value, and before its first it reads the first's
- *   (`rollEnvelopeValue.ts`); the wrap then jumps from one to the other. A
- *   point can't step, so where the two values differ the seam gets two
- *   points: one on the old loop's last tick with the last point's value, so
- *   the hold lasts through it, and one on the old loop's end with the first
- *   point's, so the new half opens as the loop did. Either is left out when
- *   a point already sits there. Every tick then reads in both halves what it
- *   read in the old loop.
+ *   (`rollEnvelopeValue.ts`). The player turns the wrap from one to the
+ *   other into a step at the boundary: the closing value up to it, then a
+ *   ramp over its de-click to the opening value (`clipEnvelopeTracks.ts`).
+ *   Points can't step (their ticks strictly increase), so where the two
+ *   values differ the seam holds the closing value with a point on the old
+ *   loop's end and reaches the opening value `ROLL_DUPLICATE_SEAM_TICKS`
+ *   after it, sooner if the next point is closer: a new point with the
+ *   first's value, or, when the first sits on tick 0, its copy moved there.
+ *   The doubled loop then holds the closing value right up to the old end,
+ *   as the wrap does, and opens the new half from the boundary on.
  * - **Parked.** Notes and points at or past the old loop's end move one loop
  *   later, so they stay parked past the new end.
  *
@@ -33,27 +36,36 @@ import type {
   RollSequencerConfig,
 } from '@windsor/engine';
 import { ROLL_ENVELOPE_POINTS_MAX, ROLL_LOOP_TICKS_MAX, ROLL_NOTES_MAX } from '@windsor/engine';
+import { ROLL_DUPLICATE_SEAM_TICKS } from './rollDuplicateTables';
 
 /** Why Dup is off: the longest loop, the region, a parked item, the note cap or the point cap. */
 export type DuplicateRefusal = 'longest' | 'region' | 'parked' | 'notes' | 'points';
 
 const inside = (tick: number, loop: number): boolean => tick < loop;
 
-/** The points the seam needs between the old loop's points and their copies (above). */
-function seamPoints(heard: readonly RollEnvelopePoint[], loop: number): RollEnvelopePoint[] {
+/** The new half's points: the copies one loop later, opened by the seam (above). */
+function newHalf(heard: readonly RollEnvelopePoint[], loop: number): RollEnvelopePoint[] {
+  const copies = heard.map((point) => ({ ...point, tick: point.tick + loop }));
+  const [opening, ...rest] = copies;
   const first = heard[0];
   const last = heard[heard.length - 1];
-  if (!first || !last || first.value === last.value) return [];
-  const seam: RollEnvelopePoint[] = [];
-  if (last.tick < loop - 1) seam.push({ tick: loop - 1, value: last.value, bend: 0 });
-  if (first.tick > 0) seam.push({ tick: loop, value: first.value, bend: 0 });
-  return seam;
+  if (!opening || !first || !last || first.value === last.value) return copies;
+  const hold: RollEnvelopePoint = { tick: loop, value: last.value, bend: 0 };
+  if (first.tick === 0) {
+    // The first point's copy is the opening, moved off the hold's tick and before the next copy.
+    const next = heard[1]?.tick ?? ROLL_DUPLICATE_SEAM_TICKS;
+    const tick = loop + Math.min(ROLL_DUPLICATE_SEAM_TICKS, next / 2);
+    return [hold, { ...opening, tick }, ...rest];
+  }
+  if (first.tick <= ROLL_DUPLICATE_SEAM_TICKS) return [hold, ...copies];
+  const opens = { tick: loop + ROLL_DUPLICATE_SEAM_TICKS, value: first.value, bend: 0 };
+  return [hold, opens, ...copies];
 }
 
 /** How many points `envelope` holds once doubled over a loop of `loop`. */
 function doubledPointCount(envelope: RollEnvelope, loop: number): number {
   const heard = envelope.points.filter((point) => inside(point.tick, loop));
-  return envelope.points.length + heard.length + seamPoints(heard, loop).length;
+  return envelope.points.length + newHalf(heard, loop).length;
 }
 
 /** Whether something at `tick`, parked at or past `loop`, would move past the longest loop. */
@@ -81,18 +93,16 @@ export function duplicateRefusal(
   return null;
 }
 
-/** One envelope's points doubled over a loop of `loop`: the old, the seam, the copies, the parked. */
+/** One envelope's points doubled over a loop of `loop`: the old, the new half, the parked. */
 function doubledPoints(
   points: readonly RollEnvelopePoint[],
   loop: number,
 ): readonly RollEnvelopePoint[] {
   const heard = points.filter((point) => inside(point.tick, loop));
-  const later = (point: RollEnvelopePoint): RollEnvelopePoint => ({
-    ...point,
-    tick: point.tick + loop,
-  });
-  const parked = points.filter((point) => !inside(point.tick, loop)).map(later);
-  return [...heard, ...seamPoints(heard, loop), ...heard.map(later), ...parked];
+  const parked = points
+    .filter((point) => !inside(point.tick, loop))
+    .map((point) => ({ ...point, tick: point.tick + loop }));
+  return [...heard, ...newHalf(heard, loop), ...parked];
 }
 
 /**

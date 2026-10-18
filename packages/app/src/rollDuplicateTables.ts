@@ -1,10 +1,20 @@
 /**
  * Dup's words (windsor#904; record `2026-10-18-roll-zoom-bars-and-duplicate`
  * decision 11, the mockup's title): the button, its undo step, and the
- * title that says why it is off, one per refusal (`rollDuplicate.ts`).
+ * title that says why it is off, one per refusal (`rollDuplicate.ts`); and
+ * how long its seam takes to reach an envelope's opening value.
  */
 import { ROLL_ENVELOPE_POINTS_MAX, ROLL_NOTES_MAX } from '@windsor/engine';
 import type { DuplicateRefusal } from './rollDuplicate';
+
+/**
+ * How far past the old loop's end the seam reaches an envelope's opening
+ * value, in ticks: 1/1024, about one sample at 48 kHz and 120 BPM (0.02 ms),
+ * so the change is a step to the voice, which reads its slots once a
+ * quantum (`rollDuplicate.ts`). A power of two, so a later copy one loop on
+ * adds it exactly and the points stay strictly in order.
+ */
+export const ROLL_DUPLICATE_SEAM_TICKS = 2 ** -10;
 
 export const ROLL_DUPLICATE = {
   label: 'Dup',
