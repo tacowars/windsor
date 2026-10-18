@@ -3465,8 +3465,9 @@ body.chord-dragging {
   font-size: 9px;
   line-height: 10px;
 }
+/* The hint's line is kept while it is hidden, so Keyboard fold under it never moves. */
 .rec-item:not(.disabled):not(.paused) .rec-hint {
-  display: none;
+  visibility: hidden;
 }
 .rec-item.disabled .rec-seg {
   opacity: 0.45;
@@ -3560,6 +3561,30 @@ body.chord-dragging {
   background: var(--carrier);
   border-color: var(--carrier);
   color: #111416;
+}
+/* Rec's row (windsor#922): the switch keeps 89 px for Off and Rec, the
+   metronome beside it, so Keyboard fold fits under Rec in the column. */
+.rec-row {
+  display: flex;
+  gap: 3px;
+}
+.rec-row .rec-seg {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.rec-row .roll-metronome {
+  flex: none;
+}
+/* Keyboard fold (windsor#922): the keyboard's Fold as a Roll switch, in the
+   keyboard's colour; dimmed on a device whose part the keyboard doesn't play. */
+.roll-kfold .seg {
+  --seg-color: var(--modulator);
+}
+.roll-kfold.disabled .roll-seg {
+  opacity: 0.45;
+}
+.roll-kfold.disabled .roll-seg button {
+  cursor: not-allowed;
 }
 .seg.roll-seg {
   flex-wrap: nowrap;

@@ -393,7 +393,7 @@ export const ROLL_REC = {
     recording: 'recording',
     full: 'region full',
   },
-  hint: 'No region under the playhead',
+  hint: 'No region here',
   titles: {
     'no-region':
       "No region under the playhead: move the playhead into one of this part's regions to record",

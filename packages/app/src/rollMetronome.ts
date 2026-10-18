@@ -1,6 +1,6 @@
 /**
  * The metronome button on the Roll device (windsor#906 decision 5): one
- * square button after Rec holding a metronome glyph, lit in the console's
+ * square button beside Rec's switch (windsor#922) holding a metronome glyph, lit in the console's
  * accent while on, with no label and no menu. Every Roll device on screen
  * shows the one switch, which the host holds (`EngineHost.metronomeOn`) and
  * `rollMetronomePrefs.ts` keeps across reloads; a press flips it, stores it
@@ -9,7 +9,7 @@
  * exists, and the engine clicks while the transport runs.
  */
 import type { AppCtx } from './context';
-import { el, html } from './dom';
+import { html } from './dom';
 import { writeMetronomeOn } from './rollMetronomePrefs';
 import { ROLL_METRONOME } from './rollTables';
 
@@ -20,7 +20,7 @@ function paint(button: HTMLElement, on: boolean): void {
   button.setAttribute('aria-pressed', String(on));
 }
 
-/** The metronome's item for the Roll controls, under Rec. */
+/** The metronome's button for the Roll controls, which place it beside Rec's switch. */
 export function rollMetronome(ctx: AppCtx): HTMLElement {
   const button = html('button', BUTTON_CLASS, ROLL_METRONOME.glyph) as HTMLButtonElement;
   button.type = 'button';
@@ -33,7 +33,5 @@ export function rollMetronome(ctx: AppCtx): HTMLElement {
     writeMetronomeOn(on);
     for (const each of document.querySelectorAll<HTMLElement>(`.${BUTTON_CLASS}`)) paint(each, on);
   };
-  const item = el('div', 'roll-item metronome-item');
-  item.appendChild(button);
-  return item;
+  return button;
 }
