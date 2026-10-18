@@ -10,7 +10,7 @@
  * Every render here is seeded (workletHarness.DEFAULT_SEED). The processor
  * draws free-running operator phase from `Math.random` in the game, so an
  * unseeded assertion about a level is a fresh coin toss every run -- which is
- * how the `bass-digital` clip assertion failed once and passed on re-run
+ * how a bass patch's clip assertion failed once and passed on re-run
  * (#78). Seeding alone would trade that rare true failure for a permanent
  * false pass, so no test here puts a preset's level on trial. The bank's
  * seeded clip sweep retired with its headroom record (record
@@ -108,7 +108,7 @@ function monoRun(over: PartialPatch): { processor: ProcessorLike; result: Render
 }
 
 describe('the seed', () => {
-  const bass = PRESETS['bass-digital'] as Patch;
+  const bass = PRESETS['sub-drone'] as Patch;
 
   it('makes a render reproducible, and different seeds differ', () => {
     const a = render(loaded, loaded.create(bass, 16, 7), 40, held(60, 12000));
@@ -195,7 +195,7 @@ describe('algorithms', () => {
 
 describe('voice lifecycle', () => {
   it('emits exact silence with no notes', () => {
-    const bell = PRESETS['lead-bell'];
+    const bell = PRESETS['score-last-light-bell'];
     expect(bell).toBeDefined();
     if (!bell) return;
     expect(render(loaded, loaded.create(bell), 50, []).peak).toBe(0);

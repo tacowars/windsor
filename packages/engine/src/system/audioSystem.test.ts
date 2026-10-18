@@ -226,7 +226,7 @@ describe('returns', () => {
     const { system, context } = await rig();
     expect(plates(context)).toBe(1);
     system.createMusicPart('drone', PRESETS['pad-drift']!);
-    system.createMusicPart('arp', PRESETS['lead-bell']!);
+    system.createMusicPart('arp', PRESETS['score-last-light-bell']!);
     system.createAuxPart('ui', PRESETS['pickup-blip']!);
     expect(plates(context)).toBe(1);
     expect(system.returnBus('a')?.spec).toEqual(RETURNS.a);
@@ -256,7 +256,10 @@ describe('returns', () => {
 
   it('echoes through Send B a dotted eighth later, quieter each repeat', async () => {
     const { system, context } = await rig({ mix: { h: strip({ b: 0.5 }) } });
-    sourceOf(system.createMusicPart('h', PRESETS['lead-bell']!)).feed = burst(MONO, 0.05);
+    sourceOf(system.createMusicPart('h', PRESETS['score-last-light-bell']!)).feed = burst(
+      MONO,
+      0.05,
+    );
     const [echo] = renderGraph(context, 1, [returnOutput(system, 'b')]);
     if (!echo) throw new Error('render produced no captures');
 

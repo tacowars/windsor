@@ -94,12 +94,12 @@ describe('the real library files', () => {
 });
 
 describe('the loader fills', () => {
-  const real = fileOf('lead-bell');
+  const real = fileOf('score-last-light-bell');
   const patch = real['patch'] as Patch;
-  const expected = loadPatchFile('lead-bell', real);
+  const expected = loadPatchFile('score-last-light-bell', real);
 
   it('a missing patch section with its defaults, returning the completed patch', () => {
-    const entry = loadPatchFile('lead-bell', { ...real, patch: without(patch, 'lfo') });
+    const entry = loadPatchFile('score-last-light-bell', { ...real, patch: without(patch, 'lfo') });
     expect(entry.patch.lfo).toEqual(makePatch().lfo);
     expect(entry.patch).toEqual(makePatch(without(patch, 'lfo')));
     expect(entry.patch.ops).toEqual(expected.patch.ops);
@@ -107,7 +107,7 @@ describe('the loader fills', () => {
 
   it("one operator's missing field, and nothing else", () => {
     const ops = patch.ops.map((op, i) => (i === 2 ? without(op, 'velSens') : op));
-    const entry = loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops } });
+    const entry = loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, ops } });
     const filled = structuredClone(expected);
     filled.patch.ops[2]!.velSens = makePatch().ops[2]!.velSens;
     expect(entry).toEqual(filled);
@@ -115,7 +115,7 @@ describe('the loader fills', () => {
 
   it('a missing envelope field, and a missing envelope', () => {
     const filter = { ...patch.filter, env: without(patch.filter.env, 'keyScale') };
-    const entry = loadPatchFile('lead-bell', {
+    const entry = loadPatchFile('score-last-light-bell', {
       ...real,
       patch: { ...without(patch, 'pitchEnv'), filter },
     });
@@ -124,29 +124,29 @@ describe('the loader fills', () => {
   });
 
   it('nothing for a missing format: the file is format 1 and upgrades', () => {
-    expect(loadPatchFile('lead-bell', without(real, 'format'))).toEqual(expected);
+    expect(loadPatchFile('score-last-light-bell', without(real, 'format'))).toEqual(expected);
   });
 });
 
 describe('the loader rejects', () => {
-  const real = fileOf('lead-bell');
+  const real = fileOf('score-last-light-bell');
   const patch = real['patch'] as Patch;
 
   it('an unknown field at the top level, in the patch and in an operator', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, author: 'tacowars' })).toThrow(
+    expect(() => loadPatchFile('score-last-light-bell', { ...real, author: 'tacowars' })).toThrow(
       /unknown field author/,
     );
-    expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, sparkle: 1 } })).toThrow(
-      /patch: unknown field sparkle/,
-    );
     expect(() =>
-      loadPatchFile('lead-bell', {
+      loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, sparkle: 1 } }),
+    ).toThrow(/patch: unknown field sparkle/);
+    expect(() =>
+      loadPatchFile('score-last-light-bell', {
         ...real,
         patch: { ...patch, ops: [{ ...patch.ops[0], gain: 1 }, ...patch.ops.slice(1)] },
       }),
     ).toThrow(/patch\.ops\[0\]: unknown field gain/);
     expect(() =>
-      loadPatchFile('lead-bell', {
+      loadPatchFile('score-last-light-bell', {
         ...real,
         patch: { ...patch, filter: { ...patch.filter, env: { ...patch.filter.env, hold: 1 } } },
       }),
@@ -155,42 +155,47 @@ describe('the loader rejects', () => {
 
   it('a key format 2 retired, when the file says it is format 2', () => {
     expect(() =>
-      loadPatchFile('lead-bell', { ...real, headroom: { worstSeed: 0, peak: 0.5 } }),
+      loadPatchFile('score-last-light-bell', { ...real, headroom: { worstSeed: 0, peak: 0.5 } }),
     ).toThrow(/unknown field headroom/);
     const ops = patch.ops.map((op) => ({ ...op, userKey: '' }));
-    expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops } })).toThrow(
-      /patch\.ops\[0\]: unknown field userKey/,
-    );
+    expect(() =>
+      loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, ops } }),
+    ).toThrow(/patch\.ops\[0\]: unknown field userKey/);
   });
 
   it('a leaf of the wrong type, and an array of the wrong length', () => {
     expect(() =>
-      loadPatchFile('lead-bell', { ...real, patch: { ...patch, volume: '0.5' } }),
+      loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, volume: '0.5' } }),
     ).toThrow(/patch\.volume: expected a number/);
     expect(() =>
-      loadPatchFile('lead-bell', { ...real, patch: { ...patch, volume: Infinity } }),
+      loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, volume: Infinity } }),
     ).toThrow(/patch\.volume: expected a finite number/);
-    expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, lfo: 'slow' } })).toThrow(
-      /patch\.lfo: expected an object/,
-    );
     expect(() =>
-      loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops: patch.ops.slice(0, 3) } }),
+      loadPatchFile('score-last-light-bell', { ...real, patch: { ...patch, lfo: 'slow' } }),
+    ).toThrow(/patch\.lfo: expected an object/);
+    expect(() =>
+      loadPatchFile('score-last-light-bell', {
+        ...real,
+        patch: { ...patch, ops: patch.ops.slice(0, 3) },
+      }),
     ).toThrow(/patch\.ops: length 3, expected 4/);
   });
 
   it('a missing file field: only the patch is filled', () => {
-    expect(() => loadPatchFile('lead-bell', without(real, 'category'))).toThrow(
+    expect(() => loadPatchFile('score-last-light-bell', without(real, 'category'))).toThrow(
       /missing field category/,
     );
-    expect(() => loadPatchFile('lead-bell', without(real, 'patch'))).toThrow(/missing field patch/);
+    expect(() => loadPatchFile('score-last-light-bell', without(real, 'patch'))).toThrow(
+      /missing field patch/,
+    );
   });
 
   it('a name that is not the patch name, and an empty one', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, name: 'Lead Bell' })).toThrow(
-      /name "Lead Bell" ≠ patch\.name "Bell Lead"/,
+    expect(() => loadPatchFile('score-last-light-bell', { ...real, name: 'Lead Bell' })).toThrow(
+      /name "Lead Bell" ≠ patch\.name "Last Light Bell"/,
     );
     expect(() =>
-      loadPatchFile('lead-bell', { ...real, name: '', patch: { ...patch, name: '' } }),
+      loadPatchFile('score-last-light-bell', { ...real, name: '', patch: { ...patch, name: '' } }),
     ).toThrow(/name: empty/);
   });
 
@@ -201,11 +206,13 @@ describe('the loader rejects', () => {
   });
 
   it('a format it does not know, as a PatchFormatError naming both formats', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 5 })).toThrow(PatchFormatError);
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 5 })).toThrow(
-      'patches/lead-bell.json: saved with patch format 5, this build reads 4',
+    expect(() => loadPatchFile('score-last-light-bell', { ...real, format: 5 })).toThrow(
+      PatchFormatError,
     );
-    expect(() => loadPatchFile('lead-bell', { ...real, format: '4' })).toThrow(
+    expect(() => loadPatchFile('score-last-light-bell', { ...real, format: 5 })).toThrow(
+      'patches/score-last-light-bell.json: saved with patch format 5, this build reads 4',
+    );
+    expect(() => loadPatchFile('score-last-light-bell', { ...real, format: '4' })).toThrow(
       /format: expected 4, got 4/,
     );
   });

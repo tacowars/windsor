@@ -21,11 +21,11 @@ beforeAll(() => loadPageLibrary(library));
 const ICE = 'score-ice-needle';
 const COPY = `${ICE}-2`;
 const STEPS = [
-  'score-concrete-chord',
+  'score-moss-stab',
   'score-amber-stab',
   'score-harbour-fog',
   'score-ash-cathedral',
-  'score-copper-step',
+  'score-silt-pulse-bass',
 ];
 
 /** A console over a new song with Init parts on slots 0 and 1; part 0 plays `ICE`. */

@@ -29,7 +29,7 @@ import {
 const PATCHES = join(dirname(fileURLToPath(import.meta.url)), '../patches');
 /** A library file at this build's format: the LP filter at drive 1.6 before format 3. */
 const real = (
-  upgradePatchFile(JSON.parse(readFileSync(join(PATCHES, 'bass-digital.json'), 'utf8'))) as {
+  upgradePatchFile(JSON.parse(readFileSync(join(PATCHES, 'saw-arp.json'), 'utf8'))) as {
     value: Record<string, unknown>;
   }
 ).value;
@@ -94,7 +94,7 @@ describe('patch format upgrades', () => {
 
   it('loads a format-2 file to the same entry, the drive moved out of the filter', () => {
     const old = formatTwo();
-    expect(loadPatchFile('bass-digital', old)).toEqual(loadPatchFile('bass-digital', real));
+    expect(loadPatchFile('saw-arp', old)).toEqual(loadPatchFile('saw-arp', real));
     const upgraded = upgradePatchFile(old);
     expect(upgraded).toEqual({ value: real });
     // Key order kept, so the rewrite through the serialiser moves no byte.
@@ -165,7 +165,7 @@ describe('patch format upgrades', () => {
 
   it('loads a format-1 file with a headroom record and userKey to the same entry', () => {
     const old = formatOne();
-    expect(loadPatchFile('bass-digital', old)).toEqual(loadPatchFile('bass-digital', real));
+    expect(loadPatchFile('saw-arp', old)).toEqual(loadPatchFile('saw-arp', real));
     const upgraded = upgradePatchFile(old);
     expect(upgraded).toEqual({ value: real });
     // Key order kept, so the rewrite through the serialiser moves no byte.
@@ -173,8 +173,8 @@ describe('patch format upgrades', () => {
   });
 
   it('loads a format-1 file with neither, and one with no format at all', () => {
-    expect(loadPatchFile('bass-digital', { ...formatTwo(), format: 1 })).toEqual(
-      loadPatchFile('bass-digital', real),
+    expect(loadPatchFile('saw-arp', { ...formatTwo(), format: 1 })).toEqual(
+      loadPatchFile('saw-arp', real),
     );
     const unversioned = formatOne();
     delete unversioned['format'];
@@ -182,7 +182,7 @@ describe('patch format upgrades', () => {
   });
 
   it('still refuses an unknown key in a format-1 file, naming it', () => {
-    expect(() => loadPatchFile('bass-digital', { ...formatOne(), colour: 'red' })).toThrow(
+    expect(() => loadPatchFile('saw-arp', { ...formatOne(), colour: 'red' })).toThrow(
       /unknown field colour/,
     );
   });
@@ -204,7 +204,7 @@ describe('patch format upgrades', () => {
         message: 'saved with patch format 5, this build reads 4',
       },
     });
-    expect(() => loadPatchFile('bass-digital', { ...real, format: 5 })).toThrow(PatchFormatError);
+    expect(() => loadPatchFile('saw-arp', { ...real, format: 5 })).toThrow(PatchFormatError);
   });
 
   it('refuses an older format no upgrade reaches', () => {
@@ -228,6 +228,6 @@ describe('patch format upgrades', () => {
   it('leaves a format that is not an integer for the validator to report', () => {
     const junk = { ...real, format: 'one' };
     expect(upgradePatchFile(junk)).toEqual({ value: junk });
-    expect(() => loadPatchFile('bass-digital', junk)).toThrow(/format: expected 4, got one/);
+    expect(() => loadPatchFile('saw-arp', junk)).toThrow(/format: expected 4, got one/);
   });
 });

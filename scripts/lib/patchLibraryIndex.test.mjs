@@ -35,9 +35,9 @@ describe('the patch library index', () => {
     expect(identifierFor('kick', 'rack')).toBe('rack_kick');
     expect(identifierFor('a1')).not.toBe(identifierFor('a-1'));
     expect(identifierFor('1st')).toMatch(/^[A-Za-z_$][\w$]*$/);
-    const index = renderIndex(['lead-bell', 'kick', '1st']);
-    expect(index).toContain("import patch_lead_bell from './lead-bell.json';");
-    expect(index).toContain("  'lead-bell': patch_lead_bell,");
+    const index = renderIndex(['saw-arp', 'kick', '1st']);
+    expect(index).toContain("import patch_saw_arp from './saw-arp.json';");
+    expect(index).toContain("  'saw-arp': patch_saw_arp,");
     expect(index).toContain('  kick: patch_kick,');
     expect(index).toContain("  '1st': patch_1st,");
   });

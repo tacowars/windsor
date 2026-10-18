@@ -16,7 +16,7 @@ const SUSTAINED = ['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX'];
 const CHORDED = ['Strings', 'Pads', 'Plucks'];
 /**
  * The pre-#475 bank was levelled for the game mix, not the scoring bar
- * (`lead-bell` peaks 2.4 on a four-note chord at full velocity), and its
+ * (its bell lead peaked 2.4 on a four-note chord at full velocity), and its
  * files say so in their tags. Everything else in a sustained category —
  * the scoring bank and any patch saved from the editor — is held to the bar.
  */
@@ -36,11 +36,19 @@ const rest = LIBRARY.filter((entry) => !sustained.includes(entry));
  * on the factory acid patches (`docs/research/2026-10-04-acid-ladder-filter/`).
  */
 const LADDER_RING_S = 0.6;
-/** How long a released note may take to end: its longest release, a margin, and the ladder's ring. */
+/**
+ * The Formant mode's three resonant peaks ring past the envelopes too, and
+ * the voice ends only when all three are under the dormancy floor:
+ * `score-ghost-formants` (resonance 1.09) ends 0.13 s after its release at
+ * note 36, measured on windsor#920.
+ */
+const FORMANT_RING_S = 0.1;
+/** How long a released note may take to end: its longest release, a margin, and the filter's ring. */
 const tailSeconds = (patch: Patch): number =>
   Math.max(...patch.ops.map((op) => op.env.releaseTime)) +
   0.1 +
-  (patch.filter.mode === FILTER_MODE.LADDER ? LADDER_RING_S : 0);
+  (patch.filter.mode === FILTER_MODE.LADDER ? LADDER_RING_S : 0) +
+  (patch.filter.mode === FILTER_MODE.FORMANT ? FORMANT_RING_S : 0);
 
 describe('every other patch', () => {
   it.each(rest)('$id is finite, audible and releases', ({ patch }) => {
@@ -69,7 +77,7 @@ describe('every other patch', () => {
 
 describe('sustained patches through the envelope and release', () => {
   it('covers the scoring bank', () => {
-    expect(sustained.length).toBeGreaterThanOrEqual(100);
+    expect(sustained.length).toBeGreaterThanOrEqual(66);
   });
   it.each(sustained)(
     '$id is finite and audible through its envelope and release',

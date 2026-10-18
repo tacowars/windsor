@@ -98,13 +98,18 @@ const PAIRS: ReadonlyArray<readonly [string, ArrangementDocument, ArrangementDoc
     'a patch swapped for one the song did not carry',
     FULL,
     after(FULL, {
-      parts: { [ARP]: { preset: 'lead-bell' } },
-      patches: { 'saw-arp': null, 'lead-bell': clonePatch(PRESETS['lead-bell']!) },
+      parts: { [ARP]: { preset: 'score-last-light-bell' } },
+      patches: {
+        'saw-arp': null,
+        'score-last-light-bell': clonePatch(PRESETS['score-last-light-bell']!),
+      },
     }),
   ],
   [
     'an unplayed patch removed',
-    after(FULL, { patches: { 'lead-bell': clonePatch(PRESETS['lead-bell']!) } }),
+    after(FULL, {
+      patches: { 'score-last-light-bell': clonePatch(PRESETS['score-last-light-bell']!) },
+    }),
     FULL,
   ],
   [

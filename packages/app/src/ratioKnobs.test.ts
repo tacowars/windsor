@@ -36,17 +36,17 @@ import {
   RATIO_MIN,
 } from './ratioSplit';
 
-/** A song whose arp slot plays the library's `lead-bell` — tacowars's own check. */
+/** A song whose arp slot plays the library's `score-last-light-bell` — tacowars's own check. */
 const SONG = {
   seed: 204,
   bpm: 96,
   key: { root: 50, scale: 'dorian' },
-  arp: { part: 'arp', preset: 'lead-bell', velocity: 0.7 },
+  arp: { part: 'arp', preset: 'score-last-light-bell', velocity: 0.7 },
 };
 
 /** A fresh editor over the engine's default patch, committing nowhere. */
 const freshEditor = (): PatchEditor => ({
-  patch: clonePatch(PATCH_LIBRARY['lead-bell']!.patch),
+  patch: clonePatch(PATCH_LIBRARY['score-last-light-bell']!.patch),
   push: () => undefined,
   refresh: () => undefined,
 });
@@ -96,7 +96,7 @@ describe('the Coarse and Fine specs', () => {
   });
 
   it('reads the working patch as two halves of one field', () => {
-    withConsole('lead-bell', (c) => {
+    withConsole('score-last-light-bell', (c) => {
       c.editor.patch.ops[1]!.ratio = 3.5;
       const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
       expect(coarse.get()).toBe(3);
@@ -109,10 +109,10 @@ describe('the Coarse and Fine specs', () => {
 
 describe('a turn of either knob', () => {
   it('commits the joined ratio to the document, and the export carries it', () => {
-    withConsole('lead-bell', (c) => {
+    withConsole('score-last-light-bell', (c) => {
       // The non-mutation baseline is built here rather than pinned to today's
       // bank: what matters is that the factory entry is what it was.
-      const factoryRatio = PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio;
+      const factoryRatio = PATCH_LIBRARY['score-last-light-bell']!.patch.ops[1]!.ratio;
       c.editor.patch.ops[1]!.ratio = 1;
       const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
 
@@ -126,15 +126,15 @@ describe('a turn of either knob', () => {
       const exported = JSON.parse(c.model.toJson()) as unknown;
       const reread = makeArrangement(exported);
       expect(reread.usable).toBe(true);
-      const roundTripped = reread.document.patches?.['lead-bell']?.ops?.[1]?.ratio;
+      const roundTripped = reread.document.patches?.['score-last-light-bell']?.ops?.[1]?.ratio;
       expect(roundTripped).toBe(2.5);
       // The library's own copy is untouched: the console edits a clone.
-      expect(PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio).toBe(factoryRatio);
+      expect(PATCH_LIBRARY['score-last-light-bell']!.patch.ops[1]!.ratio).toBe(factoryRatio);
     });
   });
 
   it('leaves the other half where it was', () => {
-    withConsole('lead-bell', (c) => {
+    withConsole('score-last-light-bell', (c) => {
       c.editor.patch.ops[2]!.ratio = 2.5;
       const { coarse, fine } = ratioKnobSpecs(c.editor, 2);
       coarse.set(1);
@@ -146,7 +146,7 @@ describe('a turn of either knob', () => {
   });
 
   it('clamps at the floor rather than writing a ratio the field cannot hold', () => {
-    withConsole('lead-bell', (c) => {
+    withConsole('score-last-light-bell', (c) => {
       c.editor.patch.ops[1]!.ratio = 0.5;
       const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
       expect(coarse.get()).toBe(0);
@@ -160,7 +160,7 @@ describe('a turn of either knob', () => {
   });
 
   it('runs the pair through the callback that re-reads both displays', () => {
-    withConsole('lead-bell', () => {
+    withConsole('score-last-light-bell', () => {
       let commits = 0;
       const { coarse, fine } = ratioKnobSpecs(freshEditor(), 1, () => (commits += 1));
       expect(coarse.onChange).toBe(fine.onChange);
@@ -171,7 +171,7 @@ describe('a turn of either knob', () => {
   });
 
   it('reads a default for an operator index the patch does not have', () => {
-    withConsole('lead-bell', (c) => {
+    withConsole('score-last-light-bell', (c) => {
       expect(readRatio(c.editor, 99)).toBe(COARSE_DEF);
       // And writing one is a no-op rather than a thrown bay.
       expect(() => ratioKnobSpecs(c.editor, 99).coarse.set(3)).not.toThrow();
@@ -190,7 +190,7 @@ describe('the pair under a lane or a macro on the ratio', () => {
   /** An editor that answers locks the way the Parts tab's does (`partsTab.ts`). */
   const automatedEditor = (part: DocumentPart | undefined): PatchEditor => {
     const editor: PatchEditor = {
-      patch: clonePatch(PATCH_LIBRARY['lead-bell']!.patch),
+      patch: clonePatch(PATCH_LIBRARY['score-last-light-bell']!.patch),
       push: () => undefined,
       refresh: () => undefined,
       automation: (path) => patchKnobAutomation(part, editor.patch.macros, path, 0),

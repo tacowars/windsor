@@ -41,7 +41,7 @@ describe('importIdFromName', () => {
   it('reads the id and drops a download suffix, and ignores other files', () => {
     expect(importIdFromName('kick.json')).toBe('kick');
     expect(importIdFromName('kick (1).json')).toBe('kick');
-    expect(importIdFromName('lead-bell (12).json')).toBe('lead-bell');
+    expect(importIdFromName('score-last-light-bell (12).json')).toBe('score-last-light-bell');
     expect(importIdFromName('notes.txt')).toBeNull();
     expect(importIdFromName('song.arrangement')).toBeNull();
   });
