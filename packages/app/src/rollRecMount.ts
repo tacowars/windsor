@@ -41,6 +41,20 @@ function heardAt(system: AudioSystem, timeStamp: number): number {
   });
 }
 
+/**
+ * The tick heard at an input event's `timeStamp` (now, without one) on the
+ * console's live system; null with none. The recorder's stamp, and the one
+ * the keyboard fold's MIDI judge reads (windsor#921), so both hear a note at
+ * one tick.
+ */
+export function consoleStamp(ctx: AppContext): RecorderHost['stamp'] {
+  return (timeStamp) => {
+    const live = ctx.host.system;
+    if (!live) return null;
+    return live.scheduler.audibleTick(heardAt(live, timeStamp ?? performance.now()));
+  };
+}
+
 /** The recorder's host over the console. */
 function consoleHost(ctx: AppContext): RecorderHost {
   const system = (): AudioSystem | null => ctx.host.system;
@@ -56,11 +70,7 @@ function consoleHost(ctx: AppContext): RecorderHost {
       const time = heardAt(live, performance.now());
       return { tick: live.scheduler.audibleTick(time), time };
     },
-    stamp: (timeStamp) => {
-      const live = system();
-      if (!live) return null;
-      return live.scheduler.audibleTick(heardAt(live, timeStamp ?? performance.now()));
-    },
+    stamp: consoleStamp(ctx),
     secondsPerTick: () => system()?.scheduler.transport.secondsPerTick ?? 0,
     editOpen: () => ctx.gestureOpen,
     write: (partial) => {

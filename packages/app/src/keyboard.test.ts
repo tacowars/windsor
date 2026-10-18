@@ -19,7 +19,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AudioPart } from '@windsor/engine';
 import { AUDITION_TAB, FIXED_VELOCITY } from './keyboardConstants';
-import { Keyboard, isShortcutPress, qwertyPlaysOn } from './keyboard';
+import { Keyboard } from './keyboard';
+import { isShortcutPress, qwertyPlaysOn } from './keyboardQwerty';
 import { MidiPerformer } from './midiPerformer';
 import {
   WHITE,

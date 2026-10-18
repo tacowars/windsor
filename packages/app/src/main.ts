@@ -19,15 +19,16 @@ import { $ } from './dom';
 import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
 import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
-import { Keyboard, qwertyPlaysOn } from './keyboard';
+import { Keyboard } from './keyboard';
 import { consoleFoldHost } from './keyboardFoldNow';
+import { qwertyPlaysOn } from './keyboardQwerty';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { installPageZoomLock } from './pageZoomLock';
 import { mountPartStrip } from './partStrip';
 import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
-import { mountRollRecorder } from './rollRecMount';
+import { consoleStamp, mountRollRecorder } from './rollRecMount';
 import { newSong } from './songParts';
 import { songTab } from './songTab';
 import { GEAR_ICON, mountTabShell } from './tabShell';
@@ -48,8 +49,9 @@ const keyboard = new Keyboard(
   () => ctx.livePart(),
   () => qwertyPlaysOn(ctx.activeTab),
 );
-// Folded, it plays the played part's scale or chord (windsor#919).
-keyboard.foldHost = consoleFoldHost(ctx);
+// Folded, it plays the played part's scale or chord (windsor#919), and judges
+// a MIDI note at the tick the recorder stamps it (windsor#921).
+keyboard.foldHost = consoleFoldHost(ctx, consoleStamp(ctx));
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
