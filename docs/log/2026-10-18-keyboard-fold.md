@@ -147,9 +147,9 @@ record's Later list. So A3 below is note 45.
 
    In landscape, 15 keys in 647.6 px would be 43.2 px, under 44, so the
    660 px minimum sends Enable MIDI to a second line: the row grows from 138
-   to 180 px and the keys take 763.3 px. Only a six- or seven-tone Scale
-   fold does this (13 keys need 572 px, which fits); a pentatonic, a chord
-   and Off keep today's line. The desktop has no minimum, as today.
+   to 180 px and the keys take 763.3 px. Only a seven-tone Scale fold does
+   this: a six-tone fold's 13 keys need 572 px, under 616 px, so it keeps
+   today's line, as a pentatonic, a chord and Off do. The desktop has no minimum, as today.
 
    **The expanded view.** Octaves and Rows keep their rules
    (`keyboardViewModel.ts`), with the slots of a row standing in for its
@@ -235,7 +235,9 @@ record's Later list. So A3 below is note 45.
    - An F heard 15 ms before the change is stamped tick 95, which sounds
      from 20.8 ms before the change. A min (A C E) does not hold F, but
      the window's ticks are 96 to 101, F maj starts at 96 and holds it: the F is **kept**,
-     sounded, lit and recorded, where the recorder writes any note.
+     sounded and recorded, where the recorder writes any note. It lights
+     at tick 96, when F maj's keys show an F (decision 5); until then no
+     shown key carries it.
    - A B heard at the same moment is in neither A min nor F maj: it is
      **dropped**.
    - An F heard 150 ms early (stamped tick 88) is dropped: the
