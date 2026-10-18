@@ -216,18 +216,42 @@ record's Later list. So A3 below is note 45.
 
    At 120 BPM a tick is 500 ms ÷ 24 = 20.8 ms, so the window is 125 ms.
    A min plays bar 1 and F maj starts at bar 2, tick 96:
-   - An F heard 15 ms before the change is at tick 96 − 15 ÷ 20.8 = 95.28.
-     A min (A C E) does not hold F, but F maj starts at 96, within
-     95.28 + 6 = 101.28, and holds it: the F is **kept**, sounded, lit and
-     recorded, where the recorder writes any note.
+   - An F heard 15 ms before the change is at tick 96 − 15 ÷ 20.8 = 95.28,
+     in tick 95. A min (A C E) does not hold F, but the window's ticks are
+     96 to 101, F maj starts at 96 and holds it: the F is **kept**,
+     sounded, lit and recorded, where the recorder writes any note.
    - A B heard at the same moment is in neither A min nor F maj: it is
      **dropped**.
-   - An F heard 150 ms early (tick 88.8) is dropped: the window ends at
-     94.8, before the change.
+   - An F heard 150 ms early (tick 88.8, in tick 88) is dropped: the
+     window's ticks are 89 to 94, before the change.
 
-   The window reads the timeline as the transport plays it: past the
-   song's end, or a transport loop's end, the next chord is the one the
-   transport plays next (`chordAt` is cyclic over `songTicks`).
+   The window walks the ticks the transport will play, not the song's
+   timeline. From the heard tick's whole tick `n` (the stamp rounded
+   down), its six ticks are `n₁ = followingTick(n, loop)`,
+   `n₂ = followingTick(n₁, loop)`, and so on to `n₆`, with
+   `loop = tickLoopOf(transport)` (`sequencing/scheduler.ts`,
+   `song/songLoop.ts`, both on the engine's index). The note passes when
+   `chordAt(harmony, songTicks, t)` holds it at `n` or at any of the six.
+   `followingTick` is the clock's own step: one on, or the loop's start in
+   place of its end, so a note near an active loop's end is judged
+   against the chord the loop plays next. `chordAt` alone knows no loop:
+   it only folds a tick modulo `songTicks`, which is right past the song's
+   end (with no loop, or a loop covering the whole song, `tickLoopOf`
+   gives null, `followingTick` is `n + 1`, and the fold is the song's own
+   wrap) and wrong across a loop's jump.
+
+   A 4-bar song (`songTicks` 384) loops bars 1 and 2 (`start` 0, `end`
+   192) over A min in bar 1, F maj in bar 2 and C maj from bar 3, tick 192,
+   so the loop ends on a chord change. A note heard 15 ms before the
+   loop's end is at tick 192 − 15 ÷ 20.8 = 191.28, in tick 191, under
+   F maj (F A C). `followingTick(191, loop)` is 0, the loop's start, and
+   the window's ticks are 0 to 5, all A min (A C E):
+   - An E is **kept**: F maj does not hold it, A min at the loop's start
+     does.
+   - A G is **dropped**: neither F maj nor A min holds it. C maj at tick
+     192 does, but the transport never plays tick 192 while the loop is
+     on, so a read of the timeline past the loop's end would keep a note
+     the next bar never fits.
 
 8. **The recorder is unchanged.** It records what the keyboard plays
    (`2026-10-09-roll-recording` decision 2), so the fold is its filter. The
