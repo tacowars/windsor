@@ -109,21 +109,32 @@ describe('the ruler', () => {
   });
 });
 
+/** A minor's pitch classes: A B C D E F G. */
+const A_MINOR = new Set([9, 11, 0, 2, 4, 5, 7]);
+/** The rows `rollRows` lays out in a pane 168 px tall, 12 at 7 px unless `over` says otherwise. */
+const layout = (over: Partial<RowInput>): RowLayout =>
+  rollRows({
+    keys: '12',
+    fold: false,
+    rowPx: 7,
+    used: new Set(),
+    scalePcs: A_MINOR,
+    panePx: 168,
+    ...over,
+  });
+type View = { rowPx: number; top: number };
+/** The pitch `y` px under the pane's top in `view`, and how far down its row, as the next paint lays the rows out. */
+const pressed = (input: Partial<RowInput>, view: View, y: number) => {
+  const { rows } = layout({ ...input, rowPx: view.rowPx });
+  const row = rows[rowIndexAt(rows, view.top + y)] as RollRow;
+  return { pitch: row.pitch, share: (view.top + y - row.top) / row.h };
+};
+const expectSameRow = (a: ReturnType<typeof pressed>, b: ReturnType<typeof pressed>): void => {
+  expect(a.pitch).toBe(b.pitch);
+  expect(a.share).toBeCloseTo(b.share);
+};
+
 describe('the keys', () => {
-  /** A minor's pitch classes: A B C D E F G. */
-  const A_MINOR = new Set([9, 11, 0, 2, 4, 5, 7]);
-  /** The rows `rollRows` lays out in a pane 168 px tall, 12 at 7 px unless `over` says otherwise. */
-  const layout = (over: Partial<RowInput>): RowLayout =>
-    rollRows({
-      keys: '12',
-      fold: false,
-      rowPx: 7,
-      used: new Set(),
-      scalePcs: A_MINOR,
-      panePx: 168,
-      ...over,
-    });
-  type View = { rowPx: number; top: number };
   const start = { rowPx: 7, top: 100 };
   const drag = keysDrag(press(20, 50), start, { rows: layout({}), heightPx: 168 });
   const keysMove = (dx: number, dy: number, y = 50): RulerDragEvent => ({
@@ -133,17 +144,6 @@ describe('the keys', () => {
     clientX: 40 + 20 + dx,
     clientY: 20 + y + dy,
   });
-  /** The pitch `y` px under the pane's top in `view`, and how far down its row, as the next paint lays the rows out. */
-  const pressed = (input: Partial<RowInput>, view: View, y: number) => {
-    const { rows } = layout({ ...input, rowPx: view.rowPx });
-    const row = rows[rowIndexAt(rows, view.top + y)] as RollRow;
-    return { pitch: row.pitch, share: (view.top + y - row.top) / row.h };
-  };
-  const expectSameRow = (a: ReturnType<typeof pressed>, b: ReturnType<typeof pressed>): void => {
-    expect(a.pitch).toBe(b.pitch);
-    expect(a.share).toBeCloseTo(b.share);
-  };
-
   /**
    * A press `y` px down `input`'s rows at `view`: a drag right of 60 px
    * doubles the rows with the pressed row under the pointer, and a second
@@ -208,7 +208,7 @@ describe('the pinch', () => {
     time: { beatPx: 100, left: BAR },
     rows: { rowPx: 7, top: 100 },
     timeBounds: TIME,
-    rowBounds: { heightPx: 168, scaled: 73, fixedPx: 0 },
+    rowsDrawn: { rows: layout({}), heightPx: 168 },
   };
   const pair = (a: PanePoint, b: PanePoint): [PanePoint, PanePoint] => [a, b];
 
@@ -235,9 +235,49 @@ describe('the pinch', () => {
     expect(apart.rows.rowPx).toBe(7);
     expect(apart.zooms.rows).toBe(true);
     const wider = stepPinch(apart.pinch, pair({ x: 200, y: 5 }, { x: 210, y: 105 }));
-    const about = { factor: 2, y: 50, to: 55 };
-    expect(wider.rows).toEqual(zoomRowsAbout(views.rows, views.rowBounds, about));
+    const about = { rowPx: 14, y: 50, to: 55 };
+    expect(wider.rows).toEqual(zoomRowsAbout(views.rows, views.rowsDrawn, about));
     expect(wider.time.beatPx).toBe(100);
+  });
+
+  /**
+   * Two fingers 40 px apart up and down, their midpoint `y` px down
+   * `input`'s rows at `view`: spread to 80 px they double the rows with the
+   * pitch under the midpoint still under it, as the next paint lays the rows
+   * out; a move to 66 px apart with the midpoint 3 px lower carries it
+   * there; and that move then the 80 px one, with no paint between, lands
+   * where the 80 px move alone lands.
+   */
+  const holdsMidRow = (input: Partial<RowInput>, view: View, y: number): void => {
+    const rows = layout({ ...input, rowPx: view.rowPx });
+    const from = { ...views, rows: view, rowsDrawn: { rows, heightPx: 168 } };
+    const pinch = startPinch(pair({ x: 200, y: y - 20 }, { x: 210, y: y + 20 }), from);
+    const before = pressed(input, view, y);
+    const spread = pair({ x: 200, y: y - 40 }, { x: 210, y: y + 40 });
+    const once = stepPinch(pinch, spread);
+    expect(once.rows.rowPx).toBeCloseTo(2 * view.rowPx);
+    expectSameRow(pressed(input, once.rows, y), before);
+    const between = stepPinch(pinch, pair({ x: 200, y: y - 30 }, { x: 210, y: y + 36 }));
+    expect(between.rows.rowPx).toBeCloseTo(1.65 * view.rowPx);
+    expectSameRow(pressed(input, between.rows, y + 3), before);
+    expect(stepPinch(between.pinch, spread).rows).toEqual(once.rows);
+  };
+
+  it('holds the row under the midpoint on 12 rows', () => {
+    holdsMidRow({}, { rowPx: 7, top: 100 }, 50);
+  });
+
+  it('holds the row under the midpoint under Keys: Scale, past thin slivers that keep their height', () => {
+    const scale = { keys: 'scale' as const, used: new Set([57, 58, 61, 66]) };
+    expect(layout(scale).rows.filter((row) => row.thin)).toHaveLength(3);
+    holdsMidRow(scale, { rowPx: 7, top: 100 }, 90);
+  });
+
+  it('holds the row under the midpoint under Fold, its rows filled taller than the zoom', () => {
+    // 20 rows fill 168 px at 8 px each over the zoom's 7: the eleventh starts at y = 80.
+    const fold = { fold: true, used: new Set(Array.from({ length: 20 }, (_, i) => 50 + i)) };
+    expect(layout(fold).rows[10]).toMatchObject({ top: 80, h: 8 });
+    holdsMidRow(fold, { rowPx: 7, top: 0 }, 84);
   });
 
   it('the tick under the starting midpoint follows the midpoint', () => {

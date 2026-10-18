@@ -82,11 +82,11 @@ class RollPinch {
     const time = zoom.timeView();
     const rows = zoom.rowView();
     const timeBounds = zoom.timeBounds();
-    const rowBounds = zoom.rowBounds();
+    const rowsDrawn = zoom.rowsDrawn();
     const at = this.fingers(ids);
-    if (!time || !rows || !rowBounds || !at || !(timeBounds.widthPx > 0)) return false;
+    if (!time || !rows || !rowsDrawn || !at || !(timeBounds.widthPx > 0)) return false;
     this.host.cancelEdit();
-    this.live = { ids, pinch: startPinch(at, { time, rows, timeBounds, rowBounds }) };
+    this.live = { ids, pinch: startPinch(at, { time, rows, timeBounds, rowsDrawn }) };
     for (const id of ids) {
       try {
         panes.body.setPointerCapture(id);

@@ -6,10 +6,10 @@
  * bars' thumbs.
  */
 import { describe, expect, it } from 'vitest';
-import { rollRows } from './rollRows';
+import { type RollRow, type RowInput, type RowLayout, rollRows, rowIndexAt } from './rollRows';
 import {
+  type RowView,
   type TimeBounds,
-  clampRows,
   clampTime,
   fitView,
   fitsOf,
@@ -17,8 +17,6 @@ import {
   leastThumb,
   loopFitPx,
   regionFitPx,
-  rowBoundsOf,
-  rowsHeight,
   settleFit,
   shownTicks,
   spanRows,
@@ -160,16 +158,36 @@ describe('which fit a view sits on', () => {
 });
 
 describe('the rows', () => {
-  const rows = { heightPx: 160, scaled: 73, fixedPx: 0 };
+  /** A minor's pitch classes: A B C D E F G. */
+  const A_MINOR = new Set([9, 11, 0, 2, 4, 5, 7]);
+  /** The rows in a pane 160 px tall: 12's 73 rows at 8 px unless `over` says otherwise. */
+  const layout = (over: Partial<RowInput>): RowLayout =>
+    rollRows({
+      keys: '12',
+      fold: false,
+      rowPx: 8,
+      used: new Set(),
+      scalePcs: A_MINOR,
+      panePx: 160,
+      ...over,
+    });
+  const twelve = { rows: layout({}), heightPx: 160 };
+  /** The pitch at the top edge of `view` (laid out as the next paint lays it out), and how far down its row. */
+  const topRow = (input: Partial<RowInput>, view: RowView) => {
+    const { rows } = layout({ ...input, rowPx: view.rowPx });
+    const row = rows[rowIndexAt(rows, view.top)] as RollRow;
+    return { pitch: row.pitch, share: (view.top - row.top) / row.h };
+  };
 
   it('clamp to 4 to 24 px, the top within the rows', () => {
-    expect(clampRows({ rowPx: 30, top: -3 }, rows)).toEqual({ rowPx: 24, top: 0 });
-    expect(clampRows({ rowPx: 2, top: 1e6 }, rows)).toEqual({ rowPx: 4, top: 73 * 4 - 160 });
+    const view = { rowPx: 8, top: 0 };
+    expect(zoomRowsAbout(view, twelve, { rowPx: 30, y: 0, to: 3 })).toEqual({ rowPx: 24, top: 0 });
+    const low = zoomRowsAbout(view, twelve, { rowPx: 2, y: 0, to: -1e6 });
+    expect(low).toEqual({ rowPx: 4, top: 73 * 4 - 160 });
   });
 
   it('zoom about a row, keeping it where it is', () => {
-    const view = { rowPx: 8, top: 200 };
-    const next = zoomRowsAbout(view, rows, { factor: 1.5, y: 80 });
+    const next = zoomRowsAbout({ rowPx: 8, top: 200 }, twelve, { rowPx: 12, y: 80 });
     expect(next.rowPx).toBe(12);
     expect((next.top + 80) / 12).toBeCloseTo((200 + 80) / 8);
   });
@@ -177,57 +195,63 @@ describe('the rows', () => {
   it('move the bottom edge with the top held, and the top with the bottom held', () => {
     const view = { rowPx: 8, top: 0 };
     // 20 rows of 73 shown → 8 px rows; 10 rows → 16 px.
-    const bottom = spanRows(view, rows, { start: 0.5, end: 0.5 + 10 / 73, hold: 'start' });
+    const bottom = spanRows(view, twelve, { start: 0.5, end: 0.5 + 10 / 73, hold: 'start' });
     expect(bottom.rowPx).toBeCloseTo(16);
     expect(bottom.top).toBeCloseTo(0.5 * 73 * 16);
-    const top = spanRows(view, rows, { start: 0.5, end: 0.5 + 10 / 73, hold: 'end' });
+    const top = spanRows(view, twelve, { start: 0.5, end: 0.5 + 10 / 73, hold: 'end' });
     expect(top.top + 160).toBeCloseTo((0.5 + 10 / 73) * 73 * 16);
   });
 
-  it('count the rows that never scale', () => {
-    const thin = { heightPx: 100, scaled: 10, fixedPx: 6 };
-    expect(rowsHeight(thin, 10)).toBe(106);
-    const view = spanRows({ rowPx: 10, top: 0 }, thin, { start: 0, end: 1, hold: 'start' });
-    expect(view.rowPx).toBeCloseTo(9.4);
+  it('stop at 4 and 24 px', () => {
+    const view = { rowPx: 8, top: 0 };
+    expect(spanRows(view, twelve, { start: 0, end: 1, hold: 'start' }).rowPx).toBe(4);
+    expect(spanRows(view, twelve, { start: 0, end: 0.01, hold: 'start' }).rowPx).toBe(24);
   });
 
-  it('stop at 4 and 24 px, and leave rows that never scale as they are', () => {
-    const wide = spanRows({ rowPx: 8, top: 0 }, rows, { start: 0, end: 1, hold: 'start' });
-    expect(wide.rowPx).toBe(4);
-    const tall = spanRows({ rowPx: 8, top: 0 }, rows, { start: 0, end: 0.01, hold: 'start' });
-    expect(tall.rowPx).toBe(24);
-    const fold = { heightPx: 160, scaled: 0, fixedPx: 48 };
-    expect(spanRows({ rowPx: 8, top: 0 }, fold, { start: 0, end: 0.2, hold: 'start' })).toEqual({
-      rowPx: 8,
-      top: 0,
-    });
-  });
-});
-
-describe('a row grip moved several times before the repaint', () => {
-  // A minor's rows at 8 px, with C#4 a thin sliver outside the scale.
-  const layout = rollRows({
-    keys: 'scale',
-    fold: false,
-    rowPx: 8,
-    used: new Set([61]),
-    scalePcs: new Set([9, 11, 0, 2, 4, 5, 7]),
-    panePx: 160,
+  it('under Keys: Scale, leave thin slivers their height and hold the edge’s pitch', () => {
+    // Bb3, C#4 and F#4 lie outside A minor and hold notes: three 3 px slivers.
+    const scale = { keys: 'scale' as const, used: new Set([57, 58, 61, 66]) };
+    const drawn = { rows: layout(scale), heightPx: 160 };
+    const thin = drawn.rows.rows.filter((row) => row.thin);
+    expect(thin).toHaveLength(3);
+    const view = { rowPx: 8, top: 0 };
+    const all = spanRows(view, drawn, { start: 0, end: 1, hold: 'start' });
+    const scaled = drawn.rows.rows.length - thin.length;
+    expect(all.rowPx).toBeCloseTo(Math.max(4, (160 - 3 * 3) / scaled));
+    // The bottom edge from 60% to 80% of the rows, the top held at 60%, past the slivers.
+    const held = { rowPx: 8, top: 0.6 * drawn.rows.height };
+    const span = spanRows(view, drawn, { start: 0.6, end: 0.8, hold: 'start' });
+    expect(span.rowPx).not.toBeCloseTo(8);
+    const before = topRow(scale, held);
+    const after = topRow(scale, span);
+    expect(after.pitch).toBe(before.pitch);
+    expect(after.share).toBeCloseTo(before.share);
   });
 
-  it('lands where one move straight to the last pointer lands', () => {
-    const drawn = { rowPx: layout.rowPx, top: 0 };
-    const bounds = rowBoundsOf(layout, 160);
-    expect(bounds.scaled).toBeGreaterThan(0);
-    expect(bounds.fixedPx).toBe(layout.height - bounds.scaled * 8);
+  it('under Fold, zoom rows the pane’s fill holds taller than the zoom', () => {
+    // 20 rows fill 160 px at 8 px each over the zoom's 7; 10 rows to the pane → 16 px.
+    const fold = {
+      fold: true,
+      rowPx: 7,
+      used: new Set(Array.from({ length: 20 }, (_, i) => 50 + i)),
+    };
+    const drawn = { rows: layout(fold), heightPx: 160 };
+    const view = { rowPx: 7, top: 0 };
+    const span = spanRows(view, drawn, { start: 0.25, end: 0.75, hold: 'start' });
+    expect(span).toEqual({ rowPx: 16, top: 5 * 16 });
+  });
+
+  it('a grip moved several times before the repaint lands where one move to the last pointer lands', () => {
+    const scale = { keys: 'scale' as const, used: new Set([61]) };
+    const drawn = { rows: layout(scale), heightPx: 160 };
+    const view = { rowPx: 8, top: 0 };
     // Each move writes the zoom; the rows drawn stay the ones laid out at 8 px.
-    let zoom = drawn;
+    let zoom = view;
     for (const end of [0.62, 0.68, 0.75]) {
-      zoom = spanRows(drawn, rowBoundsOf(layout, 160), { start: 0.4, end, hold: 'start' });
+      zoom = spanRows(view, drawn, { start: 0.4, end, hold: 'start' });
     }
-    const once = spanRows(drawn, bounds, { start: 0.4, end: 0.75, hold: 'start' });
-    expect(zoom).toEqual(once);
-    expect(once.rowPx).not.toBe(8);
+    expect(zoom).toEqual(spanRows(view, drawn, { start: 0.4, end: 0.75, hold: 'start' }));
+    expect(zoom.rowPx).not.toBe(8);
   });
 });
 

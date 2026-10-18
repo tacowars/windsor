@@ -20,7 +20,6 @@
  */
 import { PPQ } from '@windsor/engine';
 import type { RollPanes } from './rollPanes';
-import type { RowLayout } from './rollRows';
 import type { RollScene } from './rollScene';
 import { type ShownBars, shownBars, slackTicks } from './rollSummary';
 import { ROLL_ZOOM_TEXT } from './rollTables';
@@ -30,13 +29,12 @@ import { type BarAxis, type RollZoomBars, rollZoomBars } from './rollZoomBars';
 import {
   type AxisShare,
   type RollFit,
-  type RowBounds,
   type RowView,
+  type RowsDrawn,
   type TimeBounds,
   type TimeView,
   type ViewEdge,
   fitsOf,
-  rowBoundsOf,
   settleFit,
   spanRows,
   spanTime,
@@ -76,12 +74,15 @@ export class RollZoomControl {
   /** The views a move set that no paint has drawn yet. */
   private pending: { time: TimeView | null; rows: RowView | null } = { time: null, rows: null };
   private said: Said | null = null;
+  /** What a ↕ grip's drag works from: the rows view and the rows drawn at its press. */
+  private grip: { view: RowView; drawn: RowsDrawn } | null = null;
 
   constructor(private readonly host: ZoomControlHost) {
     this.bars = rollZoomBars({
       body: host.panes.body,
       share: (axis) => this.share(axis),
       scrollTo: (axis, start) => this.scrollTo(axis, start),
+      grab: (axis) => this.grab(axis),
       span: (axis, edge, moved, held) => this.span(axis, edge, { moved, held }),
     });
     this.readout = new RollZoomReadout(host.panes);
@@ -101,14 +102,8 @@ export class RollZoomControl {
     return { widthPx: this.host.panes.body.clientWidth, loopTicks, regionTicks };
   }
 
-  /** What bounds the row zoom: the rows drawn, in the notes pane's height; null before a paint. */
-  rowBounds(): RowBounds | null {
-    const scene = this.host.scene();
-    return scene ? rowBoundsOf(scene.rows, this.host.panes.body.clientHeight) : null;
-  }
-
-  /** The rows drawn and the notes pane's height, which the keys' drag lays out again; null before a paint. */
-  rowsDrawn(): { rows: RowLayout; heightPx: number } | null {
+  /** The rows drawn and the notes pane's height, which a row zoom lays out again; null before a paint. */
+  rowsDrawn(): RowsDrawn | null {
     const scene = this.host.scene();
     return scene && { rows: scene.rows, heightPx: this.host.panes.body.clientHeight };
   }
@@ -285,12 +280,28 @@ export class RollZoomControl {
       const ticks = bounds.regionTicks;
       this.setTime(spanTime(bounds, { start: start * ticks, end: end * ticks, hold }));
     } else {
-      const { body } = this.host.panes;
-      // The scene drawn, never the zoom: a move before the repaint has changed the zoom.
-      const drawn = { rowPx: scene.rows.rowPx, top: body.scrollTop };
-      const bounds = rowBoundsOf(scene.rows, body.clientHeight);
-      this.setRows(spanRows(drawn, bounds, { start, end, hold }));
+      const grip = this.grip ?? this.drawnRows(scene);
+      this.setRows(spanRows(grip.view, grip.drawn, { start, end, hold }));
     }
+  }
+
+  /**
+   * The rows view and the rows drawn now, never the zoom's: a move before
+   * the repaint has changed the zoom, and a repaint during a drag lays the
+   * rows out again, so a grip works from what was drawn at its press.
+   */
+  private drawnRows(scene: RollScene): { view: RowView; drawn: RowsDrawn } {
+    const { body } = this.host.panes;
+    return {
+      view: { rowPx: scene.rows.rowPx, top: body.scrollTop },
+      drawn: { rows: scene.rows, heightPx: body.clientHeight },
+    };
+  }
+
+  /** A press on a bar: the ↕ bar's drag works from the rows drawn now. */
+  private grab(axis: BarAxis): void {
+    const scene = this.host.scene();
+    this.grip = axis === 'rows' && scene ? this.drawnRows(scene) : null;
   }
 
   /** One repaint on the next frame, however many moves come before it. */

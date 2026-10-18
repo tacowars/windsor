@@ -35,6 +35,8 @@ export interface ZoomBarsTarget {
   share(axis: BarAxis): AxisShare;
   /** Scroll so the view starts at the share `start`. */
   scrollTo(axis: BarAxis, start: number): void;
+  /** A press on `axis`'s bar: its drag's edges move from the view drawn now. */
+  grab(axis: BarAxis): void;
   /** Move the view's `edge` to the share `moved`, its other edge held at `held`. */
   span(axis: BarAxis, edge: ViewEdge, moved: number, held: number): void;
 }
@@ -178,6 +180,7 @@ function wireDrag(bar: Bar, target: ZoomBarsTarget): void {
       target.scrollTo(bar.axis, fracAt(from - thumb.length / 2, track, least));
     }
     const edge: ViewEdge | null = grip ? (grip.classList.contains('a') ? 'start' : 'end') : null;
+    target.grab(bar.axis);
     const share = target.share(bar.axis);
     const lit = grip ?? bar.thumb;
     lit.classList.add('drag');

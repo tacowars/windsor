@@ -150,6 +150,31 @@ export function relaidY(layout: RowLayout, at: { y: number; from: number; to: nu
   return toTop + (at.y - fromTop);
 }
 
+/**
+ * What the px from `y0` to `y1` in the rows laid out at `from` are made of:
+ * `fixedPx` that keep their height (thin slivers, and px past either end)
+ * and a count of rows, `scaled`, that take the zoom's; laid out again at
+ * `rowPx` the span is `fixedPx + scaled * max(rowPx, floorPx)` px.
+ */
+export function spanParts(
+  layout: RowLayout,
+  at: { y0: number; y1: number; from: number },
+): { fixedPx: number; scaled: number } {
+  const over = (top: number, bottom: number): number =>
+    Math.max(0, Math.min(at.y1, bottom) - Math.max(at.y0, top));
+  let fixedPx = over(-Infinity, 0);
+  let scaled = 0;
+  let top = 0;
+  for (const row of layout.rows) {
+    const h = rowHeightAt(row, layout.floorPx, at.from);
+    const px = over(top, top + h);
+    if (row.thin) fixedPx += px;
+    else scaled += px / h;
+    top += h;
+  }
+  return { fixedPx: fixedPx + over(top, Infinity), scaled };
+}
+
 /** The index of the row at `y` px from the top; the last row past the bottom. */
 export function rowIndexAt(rows: readonly RollRow[], y: number): number {
   for (let i = 0; i < rows.length; i++) {

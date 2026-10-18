@@ -19,10 +19,9 @@
  */
 import { PPQ } from '@windsor/engine';
 import { ROLL_ROW_ZOOM, ROLL_TIME_ZOOM, ROLL_ZOOM_GESTURE } from './rollTables';
-import { type RowLayout, relaidY, rowsHeightAt } from './rollRows';
 import {
-  type RowBounds,
   type RowView,
+  type RowsDrawn,
   type TimeBounds,
   type TimeView,
   regionFitPx,
@@ -91,18 +90,16 @@ export function stepRuler(drag: RulerDrag | null, event: RulerDragEvent): ZoomSt
  * row height, and the rows drawn at the press for where the pressed row
  * sits at each height.
  */
-export interface KeysDrag {
+export interface KeysDrag extends RowsDrawn {
   readonly pointerId: number;
   readonly ruler: RulerDrag;
-  readonly rows: RowLayout;
-  readonly heightPx: number;
 }
 
 /** The keys' drag from `press`, over the rows view at the press and the rows drawn in a pane `heightPx` tall. */
 export function keysDrag(
   press: ZoomPress,
   view: RowView,
-  drawn: { readonly rows: RowLayout; readonly heightPx: number },
+  drawn: RowsDrawn,
   table: typeof ROLL_ROW_ZOOM = ROLL_ROW_ZOOM,
 ): KeysDrag {
   const ruler: RulerDrag = {
@@ -128,10 +125,10 @@ const turned = (event: RulerDragEvent): RulerDragEvent =>
 
 /**
  * One event of the keys' drag; a release in place is a tap, which does what
- * a tap on a key does. The pressed point stays under the pointer: laid out
- * again at the new row height by `rollRows`'s own maths (thin slivers and
- * Fold's filled rows keep their height), less the press's place in the
- * pane, less how far the pointer moved along the keys.
+ * a tap on a key does. The pressed point stays under the pointer, carried
+ * along the keys with it: the rows drawn at the press laid out again at the
+ * new row height (`zoomRowsAbout`), so thin slivers and Fold's filled rows
+ * keep their height.
  */
 export function stepKeys(
   drag: KeysDrag | null,
@@ -142,12 +139,11 @@ export function stepKeys(
   const tap = step.clickPx !== null;
   if (!drag || !step.view || event.type !== 'move') return { drag: next, view: null, tap };
   const { start, originX } = drag.ruler;
-  const rowPx = step.view.pxPerBar;
-  const at = relaidY(drag.rows, { y: start.pointerPx, from: start.pxPerBar, to: rowPx });
-  // The pressed point's px under the pane's top, carried by the move along the keys.
-  const under = start.pointerPx - start.scrollPx + (event.clientY - originX);
-  const room = Math.max(0, rowsHeightAt(drag.rows, rowPx) - drag.heightPx);
-  return { drag: next, view: { rowPx, top: Math.min(room, Math.max(0, at - under)) }, tap };
+  const view = { rowPx: start.pxPerBar, top: start.scrollPx };
+  const y = start.pointerPx - start.scrollPx;
+  // The pressed point, carried by the move along the keys.
+  const to = y + (event.clientY - originX);
+  return { drag: next, view: zoomRowsAbout(view, drag, { rowPx: step.view.pxPerBar, y, to }), tap };
 }
 
 /** One axis of a pinch: the spread its zoom counts from (null until the fingers were apart enough), and the zoom. */
@@ -171,19 +167,22 @@ export function pinchAxis(
   return { from, factor: Math.max(spread, table.pinchMinPx) / from };
 }
 
-/** What a pinch works from: the fingers' midpoint and the views at its start, and each axis's spread. */
+/**
+ * What a pinch works from: the fingers' midpoint, the views at its start,
+ * the time bounds and the rows drawn then, and each axis's spread.
+ */
 export interface Pinch {
   readonly mid: PanePoint;
   readonly time: TimeView;
   readonly rows: RowView;
   readonly timeBounds: TimeBounds;
-  readonly rowBounds: RowBounds;
+  readonly rowsDrawn: RowsDrawn;
   readonly fromX: number | null;
   readonly fromY: number | null;
 }
 
-/** The views a pinch starts from, and their bounds. */
-export type PinchViews = Pick<Pinch, 'time' | 'rows' | 'timeBounds' | 'rowBounds'>;
+/** The views a pinch starts from, the time bounds and the rows drawn. */
+export type PinchViews = Pick<Pinch, 'time' | 'rows' | 'timeBounds' | 'rowsDrawn'>;
 
 const midpoint = (a: PanePoint, b: PanePoint): PanePoint => ({
   x: (a.x + b.x) / 2,
@@ -213,7 +212,9 @@ export interface PinchStep {
 /**
  * The views with the fingers at `a` and `b`: the horizontal spread zooms
  * time and the vertical spread the rows, each by its axis rule, and the
- * tick and the row under the starting midpoint follow the midpoint.
+ * tick and the pitch under the starting midpoint follow the midpoint. The
+ * rows drawn at the start are laid out again at each row height, so thin
+ * slivers and Fold's filled rows keep theirs (`zoomRowsAbout`).
  */
 export function stepPinch(
   pinch: Pinch,
@@ -229,8 +230,8 @@ export function stepPinch(
     x: pinch.mid.x,
     to: mid.x,
   });
-  const rows = zoomRowsAbout(pinch.rows, pinch.rowBounds, {
-    factor: y.factor,
+  const rows = zoomRowsAbout(pinch.rows, pinch.rowsDrawn, {
+    rowPx: pinch.rows.rowPx * y.factor,
     y: pinch.mid.y,
     to: mid.y,
   });
