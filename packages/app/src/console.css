@@ -3397,6 +3397,20 @@ body.chord-dragging {
   text-align: center;
   white-space: nowrap;
 }
+/* The Loop row (windsor#904, the zoom mockup's rule): the stepper narrows
+   to fit Dup, drawn as Quantise is, at its right. */
+.roll-loop-row {
+  display: flex;
+  gap: 3px;
+}
+.roll-loop-row .roll-stepper {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.roll-dup {
+  flex: none;
+  width: 30px;
+}
 /* Quantise (windsor#661): drawn as the Loop stepper is, a well with a line-bright edge. */
 .roll-qbtn {
   height: var(--roll-ctl-h);

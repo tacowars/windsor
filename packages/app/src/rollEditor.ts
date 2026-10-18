@@ -106,14 +106,19 @@ export class RollEditor {
     this.target.repaint();
   }
 
-  /** Write `edit`, settled, as one undo step; false when the song refused it. */
+  /**
+   * Write `edit`, settled, as one undo step; false when the song refused it.
+   * Its envelopes are written with it when it carries them (Duplicate,
+   * windsor#904); the other edits leave the document's as they are.
+   */
   commit(edit: RollEdit): boolean {
     const settled = settle(edit);
     this.draft = null;
     keepSelected(this.place, settled.config.notes, settled.selected);
     const { ctx, slot, region } = this.target;
-    const { loopTicks, notes } = settled.config;
-    const partial = regionPatternChange(ctx.model.doc, slot, region, { loopTicks, notes });
+    const { loopTicks, notes, envelopes } = settled.config;
+    const fields = envelopes ? { loopTicks, notes, envelopes } : { loopTicks, notes };
+    const partial = regionPatternChange(ctx.model.doc, slot, region, fields);
     const ok = partial !== null && ctx.change(partial).ok;
     this.target.repaint();
     return ok;

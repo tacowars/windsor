@@ -14,7 +14,8 @@
  * exactly the invisible musical stand-in the record's §4 rejects). An absent
  * sequencer, by contrast, is `none` — inert, never a musical guess (#597).
  */
-import type { Harmony, SequencerKind, Swing, Transport } from './arrangement';
+import type { Harmony, PartFold, SequencerKind, Swing, Transport } from './arrangement';
+import { PART_FOLDS } from './arrangement';
 import type { DocumentPart } from './arrangementDocument';
 import { FieldNormaliser, show } from './arrangementFields';
 import {
@@ -67,6 +68,7 @@ const PART_KEYS = [
   'ccMappings',
   'patchSource',
   'rackSource',
+  'fold',
 ];
 
 export class ArrangementNormaliser extends FieldNormaliser {
@@ -241,6 +243,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
         n: this,
       }),
       sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
+      fold: this.fold(o.fold, `${path}.fold`),
       // Absent stays absent: a song without lanes reads and exports as before (decision 15).
       ...(automation && { automation }),
       // Absent stays absent too: a song without mappings exports as before (windsor#782).
@@ -311,6 +314,18 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (typeof raw === 'string' && raw !== '') return { [key]: raw } as Partial<Record<K, string>>;
     this.correction(`${path}.${key}: ${show(raw)} is not a library id — dropped`);
     return {};
+  }
+
+  /**
+   * The keyboard fold (windsor#918): one of `PART_FOLDS`, else `off`, the
+   * reading a song written before the fold plays as. Always present, so a
+   * live partial setting it finds a field to merge into.
+   */
+  private fold(raw: unknown, path: string): PartFold {
+    const found = PART_FOLDS.find((fold) => fold === raw);
+    if (found) return found;
+    if (raw !== undefined) this.correction(`${path}: ${show(raw)} is not a fold — using "off"`);
+    return 'off';
   }
 
   /** A part's identity has no default: a missing or out-of-range slot drops the part. */

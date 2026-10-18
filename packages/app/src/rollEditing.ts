@@ -1,17 +1,26 @@
 /**
  * The Roll device's editing (windsor#603), wired to one device: its editor
  * (`rollEditor.ts`), the gestures on its notes (`rollNoteGestures.ts`), its
- * velocity lane and loop brace (`rollLaneGestures.ts`), the Loop stepper,
- * Quantise (`rollQuantise.ts`, windsor#661) and Audition on its part
+ * velocity lane and loop brace (`rollLaneGestures.ts`), the Loop stepper
+ * and Dup beside it (`rollDuplicate.ts`, windsor#904), Quantise (`rollQuantise.ts`, windsor#661) and Audition on its part
  * (`rollAudition.ts`). The device draws; this hands each gesture the frame
  * it edits in. The lane's Acc and Rat clicks (windsor#754) go through the
  * same editor.
  */
+import type { RollSequencerConfig } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { withGesture } from './gestureHooks';
 import { auditionNote } from './rollAudition';
+import {
+  type DuplicateRefusal,
+  duplicateLoop,
+  duplicateRefusal,
+  duplicatedSelection,
+} from './rollDuplicate';
+import { ROLL_DUPLICATE } from './rollDuplicateTables';
 import { type RollFrame, loopStops, stepLoop } from './rollEdits';
 import { RollEditor } from './rollEditor';
+import { envelopesOf } from './rollEnvelopeWrite';
 import { rollLaneGestures } from './rollLaneGestures';
 import { rollNoteGestures } from './rollNoteGestures';
 import type { RollPanes } from './rollPanes';
@@ -39,12 +48,16 @@ export interface RollEditingHost {
   repaint(): void;
 }
 
-/** The device's editor, the Loop stepper's step and Quantise's press. */
+/** The device's editor, the Loop stepper's step, Dup's press and Quantise's press. */
 export interface RollEditing {
   readonly editor: RollEditor;
   /** End the notes' press in progress as a cancel: a pinch takes over (windsor#903). */
   cancelPress(): void;
   stepLoop(dir: number): void;
+  /** Why Dup is off, or null when it can double the loop. */
+  duplicateRefusal(): DuplicateRefusal | null;
+  /** Double the loop and copy what is in it into the new half: one undo step. */
+  duplicate(): void;
   /** Quantise the selection, or every note, to the Snap: one undo step, none when nothing moves. */
   quantise(): void;
 }
@@ -83,12 +96,25 @@ export function rollEditing(host: RollEditingHost): RollEditing {
     audition: (pitch, velocity) => auditionNote(ctx, slot, pitch, velocity),
   });
   rollLaneGestures({ panes, editor, scene, frame, loopStops: stops, lane: () => view.lane });
+  /** The roll as drawn, with the envelopes the document holds: what Dup doubles. */
+  const whole = (): RollSequencerConfig => ({
+    ...editor.current(),
+    envelopes: envelopesOf(ctx.model.doc, slot, host.region),
+  });
   return {
     editor,
     cancelPress: () => notes.cancel(),
     stepLoop: (dir) => {
       const config = stepLoop(editor.current(), dir, { loop: frame().loop, stops: stops() });
       if (config) editor.commit({ config, selected: editor.selected() });
+    },
+    duplicateRefusal: () => duplicateRefusal(whole(), host.source().regionTicks),
+    duplicate: () => {
+      const roll = whole();
+      const config = duplicateLoop(roll, host.source().regionTicks);
+      if (!config) return;
+      const selected = duplicatedSelection(roll.notes, roll.loopTicks, editor.selected());
+      withGesture(ROLL_DUPLICATE.undo, () => editor.commit({ config, selected }));
     },
     quantise: () => {
       const edit = quantiseNotes(editor.current(), editor.selected(), frame());

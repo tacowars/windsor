@@ -44,6 +44,9 @@ const insertTarget = (insertId: string, field: string): AutomationTargetId =>
 const hatOf = (document: ArrangementDocument): DocumentPart =>
   document.parts.find((part) => part.slot === hat)!;
 
+/** The hat as the normaliser returns it: every part gains `fold: 'off'` (windsor#918). */
+const NORMALISED_HAT: DocumentPart = { ...AUTOMATION_PART, fold: 'off' };
+
 /** `AUTOMATION_DOCUMENT` with the hat's lanes replaced by `raw`, normalised. */
 function withLanes(raw: unknown): { lanes: unknown; corrections: string[] } {
   const document = {
@@ -69,7 +72,7 @@ describe('a song with lanes', () => {
   it('keeps strip, insert and voice lanes, on and off, steps and bends, through normalise', () => {
     const result = makeArrangement(AUTOMATION_DOCUMENT);
     expect(result.corrections).toEqual([]);
-    expect(hatOf(result.document)).toEqual(AUTOMATION_PART);
+    expect(hatOf(result.document)).toEqual(NORMALISED_HAT);
   });
 
   it('round-trips through export and import unchanged', () => {
@@ -83,7 +86,11 @@ describe('a song with lanes', () => {
   it('normalises a song without lanes exactly as before: no part gains the key', () => {
     const result = makeArrangement(FULL_DOCUMENT);
     expect(result.corrections).toEqual([]);
-    expect(result.document).toEqual(FULL_DOCUMENT);
+    // Every part gains only the normaliser's `fold: 'off'` (windsor#918).
+    expect(result.document).toEqual({
+      ...FULL_DOCUMENT,
+      parts: FULL_DOCUMENT.parts.map((part) => ({ ...part, fold: 'off' })),
+    });
     for (const part of result.document.parts) expect(part).not.toHaveProperty('automation');
   });
 
@@ -348,7 +355,7 @@ describe('edits through a partial', () => {
     // Undo replaces the document with its snapshot: the insert and its lanes are both back.
     const undone = makeArrangement(opened);
     expect(undone.corrections).toEqual([]);
-    expect(hatOf(undone.document)).toEqual(AUTOMATION_PART);
+    expect(hatOf(undone.document)).toEqual(NORMALISED_HAT);
   });
 
   it('replaces the whole list', () => {
