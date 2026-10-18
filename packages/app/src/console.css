@@ -34,6 +34,14 @@
   box-sizing: border-box;
 }
 
+/* Touch never zooms the page (record 2026-10-18-the-page-never-zooms): pinch
+   and double-tap zoom are left out, one-finger scrolling of the panes stays.
+   The controls' own touch-action: none rules still hold, since the effective
+   value is the intersection along the ancestor chain. */
+html {
+  touch-action: pan-x pan-y;
+}
+
 body {
   background: var(--ground);
   color: var(--ink);

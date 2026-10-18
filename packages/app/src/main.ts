@@ -22,6 +22,7 @@ import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard, qwertyPlaysOn } from './keyboard';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
+import { installPageZoomLock } from './pageZoomLock';
 import { mountPartStrip } from './partStrip';
 import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
@@ -35,6 +36,7 @@ import { mountUndoControls } from './undoControls';
 import { bootUserState } from './userSession';
 import './console.css';
 
+installPageZoomLock(document);
 mountToasts($('toasts'));
 const model = new DocumentModel(newSong());
 const host = new EngineHost((message) => notify(message, 'error'));
