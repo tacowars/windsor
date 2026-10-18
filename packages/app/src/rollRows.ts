@@ -26,11 +26,16 @@ export interface RollRow {
   readonly thin: boolean;
 }
 
-/** The rows, top down, their total height, and the zoom's row height they were laid out at. */
+/**
+ * The rows, top down, their total height, the zoom's row height they were
+ * laid out at, and the least height a row that is not thin holds at any
+ * zoom: Fold's fill, 0 otherwise.
+ */
 export interface RowLayout {
   readonly rows: readonly RollRow[];
   readonly height: number;
   readonly rowPx: number;
+  readonly floorPx: number;
 }
 
 /** What the rows are built from. */
@@ -76,26 +81,36 @@ export function pitchSpan(
   return { low, high };
 }
 
-function stack(list: readonly Omit<RollRow, 'top'>[], rowPx: number): RowLayout {
+/** A row's height at the zoom's `rowPx`: a thin sliver keeps its own, any other row the zoom's, held up to `floorPx`. */
+export const rowHeightAt = (
+  row: Pick<RollRow, 'h' | 'thin'>,
+  floorPx: number,
+  rowPx: number,
+): number => (row.thin ? row.h : Math.max(rowPx, floorPx));
+
+function stack(
+  list: readonly Omit<RollRow, 'top'>[],
+  sizing: { rowPx: number; floorPx: number },
+): RowLayout {
   let top = 0;
   const rows = list.map((row) => {
     const placed = { ...row, top };
     top += row.h;
     return placed;
   });
-  return { rows, height: top, rowPx };
+  return { rows, height: top, ...sizing };
 }
 
 /** The rows for one view of the roll. */
 export function rollRows(input: RowInput, geometry: RowGeometry = SHIPPED): RowLayout {
   const { used, rowPx } = input;
   if (input.fold && used.size > 0) {
-    const fill = Math.floor(input.panePx / used.size);
-    const h = Math.max(rowPx, Math.min(geometry.foldMaxPx, fill));
+    const floorPx = Math.min(geometry.foldMaxPx, Math.floor(input.panePx / used.size));
+    const h = rowHeightAt({ h: rowPx, thin: false }, floorPx, rowPx);
     const pitches = [...used].sort((a, b) => b - a);
     return stack(
       pitches.map((pitch) => ({ pitch, h, thin: false })),
-      rowPx,
+      { rowPx, floorPx },
     );
   }
   const { low, high } = pitchSpan(used, geometry);
@@ -107,7 +122,57 @@ export function rollRows(input: RowInput, geometry: RowGeometry = SHIPPED): RowL
       list.push({ pitch, h: geometry.thinPx, thin: true });
     }
   }
-  return stack(list, rowPx);
+  return stack(list, { rowPx, floorPx: 0 });
+}
+
+/** The rows' whole height laid out again at `rowPx`. */
+export function rowsHeightAt(layout: RowLayout, rowPx: number): number {
+  let height = 0;
+  for (const row of layout.rows) height += rowHeightAt(row, layout.floorPx, rowPx);
+  return height;
+}
+
+/**
+ * Where the point `y` px into the rows laid out at `from` sits when they are
+ * laid out at `to`: the same share of the same row, each row as tall as
+ * `rowHeightAt` makes it; past the last row, the same px past it.
+ */
+export function relaidY(layout: RowLayout, at: { y: number; from: number; to: number }): number {
+  let fromTop = 0;
+  let toTop = 0;
+  for (const row of layout.rows) {
+    const fromH = rowHeightAt(row, layout.floorPx, at.from);
+    const toH = rowHeightAt(row, layout.floorPx, at.to);
+    if (at.y < fromTop + fromH) return toTop + (Math.max(0, at.y - fromTop) / fromH) * toH;
+    fromTop += fromH;
+    toTop += toH;
+  }
+  return toTop + (at.y - fromTop);
+}
+
+/**
+ * What the px from `y0` to `y1` in the rows laid out at `from` are made of:
+ * `fixedPx` that keep their height (thin slivers, and px past either end)
+ * and a count of rows, `scaled`, that take the zoom's; laid out again at
+ * `rowPx` the span is `fixedPx + scaled * max(rowPx, floorPx)` px.
+ */
+export function spanParts(
+  layout: RowLayout,
+  at: { y0: number; y1: number; from: number },
+): { fixedPx: number; scaled: number } {
+  const over = (top: number, bottom: number): number =>
+    Math.max(0, Math.min(at.y1, bottom) - Math.max(at.y0, top));
+  let fixedPx = over(-Infinity, 0);
+  let scaled = 0;
+  let top = 0;
+  for (const row of layout.rows) {
+    const h = rowHeightAt(row, layout.floorPx, at.from);
+    const px = over(top, top + h);
+    if (row.thin) fixedPx += px;
+    else scaled += px / h;
+    top += h;
+  }
+  return { fixedPx: fixedPx + over(top, Infinity), scaled };
 }
 
 /** The index of the row at `y` px from the top; the last row past the bottom. */

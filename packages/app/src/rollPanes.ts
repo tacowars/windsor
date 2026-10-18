@@ -6,7 +6,8 @@
  * (`rollLaneTabs.ts`, windsor#754). The notes pane is the one scroller, its
  * own scrollbars hidden under the zoom bars that take their place
  * (`rollZoomBars.ts`, windsor#902); the other three are clipped and follow
- * it, and a wheel over any of them scrolls the notes. The ruler and the
+ * it, and a wheel over any of them scrolls the notes; with Ctrl or ⌘ it is
+ * a pinch, which zooms (`rollZoomInput.ts`, windsor#903). The ruler and the
  * lane run on over the ↕ bar and the keys down beside the ↔ bar, so their
  * content runs `overhang` px past the notes' to stay level with them.
  */
@@ -45,9 +46,14 @@ export function syncPanes(panes: RollPanes): void {
   panes.keys.scrollTop = panes.body.scrollTop;
 }
 
-/** A wheel over a follower (or the Envelopes tab's layer) scrolls the notes; with Shift, sideways. */
+/**
+ * A wheel over a follower (or the Envelopes tab's layer) scrolls the notes;
+ * with Shift, sideways. With Ctrl or ⌘ it scrolls nothing: it is a pinch,
+ * which the grid's own listener zooms, and the page never zooms under it.
+ */
 export function forwardWheel(body: HTMLElement, e: WheelEvent): void {
   e.preventDefault();
+  if (e.ctrlKey || e.metaKey) return;
   body.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
   if (!e.shiftKey) body.scrollTop += e.deltaY;
 }

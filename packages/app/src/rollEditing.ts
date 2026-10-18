@@ -51,6 +51,8 @@ export interface RollEditingHost {
 /** The device's editor, the Loop stepper's step, Dup's press and Quantise's press. */
 export interface RollEditing {
   readonly editor: RollEditor;
+  /** End the notes' press in progress as a cancel: a pinch takes over (windsor#903). */
+  cancelPress(): void;
   stepLoop(dir: number): void;
   /** Why Dup is off, or null when it can double the loop. */
   duplicateRefusal(): DuplicateRefusal | null;
@@ -85,7 +87,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
   const scene = (): RollScene | null => host.scene();
   const frame = (): RollFrame => rollFrame(host.source(), view);
   const stops = (): number[] => loopStops(host.source().regionTicks, host.source().barTicks);
-  rollNoteGestures({
+  const notes = rollNoteGestures({
     panes,
     editor,
     view,
@@ -101,6 +103,7 @@ export function rollEditing(host: RollEditingHost): RollEditing {
   });
   return {
     editor,
+    cancelPress: () => notes.cancel(),
     stepLoop: (dir) => {
       const config = stepLoop(editor.current(), dir, { loop: frame().loop, stops: stops() });
       if (config) editor.commit({ config, selected: editor.selected() });

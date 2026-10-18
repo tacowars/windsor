@@ -5,31 +5,41 @@
  * view's zoom (`rollView.ts`) and `rollZoomModel.ts`'s maths. The bars read
  * and write the notes pane's scroll and the zoom of the view on show; a
  * zoom aims the pane's next restore at the edge it held (`rollViewSpot.ts`)
- * and repaints once a frame.
+ * and repaints once a frame. The ruler, the keys, the wheel and the pinch
+ * (`rollZoomInput.ts`, windsor#903) write their views through `setTime`
+ * and `setRows`, and read the view they start from with `timeView` and
+ * `rowView`: the view a move set and no paint has drawn yet, else the one
+ * drawn.
  *
  * Which fit Show lights is read from the view drawn and the pane's scroll
  * (`fitsOf`), never from the last button pressed. A fit stays while the
  * view sits on it, so a paint after a resize or a loop change refits it,
- * and goes once a scroll or a zoom leaves it (`settleFit`).
+ * and goes once a scroll or a zoom leaves it (`settleFit`). Every change
+ * a gesture, a bar or a fit makes shows the readout (`rollZoomReadout.ts`)
+ * once it is drawn.
  */
 import { PPQ } from '@windsor/engine';
 import type { RollPanes } from './rollPanes';
 import type { RollScene } from './rollScene';
+import { type ShownBars, shownBars, slackTicks } from './rollSummary';
+import { ROLL_ZOOM_TEXT } from './rollTables';
 import { type RollViewKind, type RollZoom, beatPxOf } from './rollView';
 import type { RollViewSpot } from './rollViewSpot';
 import { type BarAxis, type RollZoomBars, rollZoomBars } from './rollZoomBars';
 import {
   type AxisShare,
   type RollFit,
+  type RowView,
+  type RowsDrawn,
   type TimeBounds,
   type TimeView,
   type ViewEdge,
   fitsOf,
-  rowBoundsOf,
   settleFit,
   spanRows,
   spanTime,
 } from './rollZoomModel';
+import { RollZoomReadout, octaveText, octavesShown, spanText, timeText } from './rollZoomReadout';
 
 /** What the control reads and writes on its card. */
 export interface ZoomControlHost {
@@ -39,24 +49,43 @@ export interface ZoomControlHost {
   readonly zooms: Record<RollViewKind, RollZoom>;
   /** The view on show. */
   kind(): RollViewKind;
-  source(): { readonly loopTicks: number; readonly regionTicks: number };
+  source(): {
+    readonly loopTicks: number;
+    readonly regionTicks: number;
+    readonly barTicks: number;
+  };
   /** The scene last drawn. */
   scene(): RollScene | null;
   repaint(): void;
 }
 
+/** What the readout says next, once the change is drawn: the axes it names, and where. */
+interface Said {
+  readonly time: boolean;
+  readonly rows: boolean;
+  readonly x: number | null;
+}
+
 /** One card's zoom: its bars, its Show fits, and the zoom they write. */
 export class RollZoomControl {
   readonly bars: RollZoomBars;
+  readonly readout: RollZoomReadout;
   private frame = 0;
+  /** The views a move set that no paint has drawn yet. */
+  private pending: { time: TimeView | null; rows: RowView | null } = { time: null, rows: null };
+  private said: Said | null = null;
+  /** What a ↕ grip's drag works from: the rows view and the rows drawn at its press. */
+  private grip: { view: RowView; drawn: RowsDrawn } | null = null;
 
   constructor(private readonly host: ZoomControlHost) {
     this.bars = rollZoomBars({
       body: host.panes.body,
       share: (axis) => this.share(axis),
       scrollTo: (axis, start) => this.scrollTo(axis, start),
+      grab: (axis) => this.grab(axis),
       span: (axis, edge, moved, held) => this.span(axis, edge, { moved, held }),
     });
+    this.readout = new RollZoomReadout(host.panes);
   }
 
   private get zoom(): RollZoom {
@@ -67,14 +96,21 @@ export class RollZoomControl {
     this.host.zooms[this.host.kind()] = zoom;
   }
 
-  private bounds(): TimeBounds {
+  /** What bounds the time zoom now: the notes pane's width, the region and the loop. */
+  timeBounds(): TimeBounds {
     const { loopTicks, regionTicks } = this.host.source();
     return { widthPx: this.host.panes.body.clientWidth, loopTicks, regionTicks };
   }
 
+  /** The rows drawn and the notes pane's height, which a row zoom lays out again; null before a paint. */
+  rowsDrawn(): RowsDrawn | null {
+    const scene = this.host.scene();
+    return scene && { rows: scene.rows, heightPx: this.host.panes.body.clientHeight };
+  }
+
   /** The px per beat the next paint draws at. */
   beatPx(): number {
-    return beatPxOf(this.zoom, this.bounds());
+    return beatPxOf(this.zoom, this.timeBounds());
   }
 
   /** The row height the next paint draws at. */
@@ -88,10 +124,23 @@ export class RollZoomControl {
     return { beatPx: scene.pxPerTick * PPQ, left };
   }
 
+  /** The time view a gesture starts from: the one set and not yet drawn, else the one drawn. */
+  timeView(): TimeView | null {
+    const scene = this.host.scene();
+    return scene && (this.pending.time ?? this.drawn(scene));
+  }
+
+  /** The rows a gesture starts from: as `timeView`. */
+  rowView(): RowView | null {
+    const scene = this.host.scene();
+    const top = this.host.panes.body.scrollTop;
+    return scene && (this.pending.rows ?? { rowPx: scene.rows.rowPx, top });
+  }
+
   /** Which fits the view drawn sits on, which Show lights. */
   fits(): Record<RollFit, boolean> {
     const scene = this.host.scene();
-    const bounds = this.bounds();
+    const bounds = this.timeBounds();
     if (!scene || !(bounds.widthPx > 0)) {
       return { loop: this.zoom.fit === 'loop', region: this.zoom.fit === 'region' };
     }
@@ -102,7 +151,30 @@ export class RollZoomControl {
   show(fit: RollFit): void {
     this.zoom = { ...this.zoom, fit };
     this.host.spot.aim(0, null);
+    this.announce('time', null);
     this.host.repaint();
+  }
+
+  /**
+   * Put the time view at `view`, drawn on the next frame, with the readout
+   * at `x` px into the pane, or, `quiet`, without naming time in it.
+   */
+  setTime(view: TimeView, say: { x?: number | null; quiet?: boolean } = {}): void {
+    const fit = settleFit(this.zoom.fit, view, this.timeBounds());
+    this.zoom = { ...this.zoom, fit, beatPx: view.beatPx };
+    this.host.spot.aim(view.left, null);
+    this.pending.time = view;
+    if (!say.quiet) this.announce('time', say.x ?? null);
+    this.schedule();
+  }
+
+  /** Put the rows at `view`, drawn on the next frame; `quiet`, without naming rows in the readout. */
+  setRows(view: RowView, quiet = false): void {
+    this.zoom = { ...this.zoom, rowPx: view.rowPx };
+    this.host.spot.aim(null, view.top);
+    this.pending.rows = view;
+    if (!quiet) this.announce('rows', null);
+    this.schedule();
   }
 
   /**
@@ -112,23 +184,68 @@ export class RollZoomControl {
    */
   private settle(): void {
     const scene = this.host.scene();
-    const bounds = this.bounds();
+    const bounds = this.timeBounds();
     if (!scene || !(bounds.widthPx > 0)) return;
     const view = this.drawn(scene);
     const fit = settleFit(this.zoom.fit, view, bounds);
     if (fit !== this.zoom.fit) this.zoom = { ...this.zoom, fit, beatPx: view.beatPx };
   }
 
-  /** After a whole paint: settle the fit, draw the maps and place the thumbs. */
+  /** After a whole paint: settle the fit, draw the maps, place the thumbs and say what changed. */
   painted(scene: RollScene): void {
+    this.pending = { time: null, rows: null };
     this.settle();
     this.bars.paint(scene);
+    this.speak();
   }
 
   /** After a scroll: settle the fit and move the thumbs. */
   scrolled(): void {
     this.settle();
     this.bars.place();
+  }
+
+  /** The bars the view drawn shows; null before the pane has a width. */
+  shown(): ShownBars | null {
+    const scene = this.host.scene();
+    const { body } = this.host.panes;
+    if (!scene || !(body.clientWidth > 0)) return null;
+    const { barTicks, regionTicks } = this.host.source();
+    const view = {
+      left: body.scrollLeft / scene.pxPerTick,
+      ticks: body.clientWidth / scene.pxPerTick,
+      slack: slackTicks(scene.pxPerTick, barTicks),
+    };
+    return shownBars(view, barTicks, regionTicks);
+  }
+
+  /** Name `axis` in the readout once the change is drawn. */
+  private announce(axis: BarAxis, x: number | null): void {
+    const was = this.said;
+    const time = axis === 'time' || (was?.time ?? false);
+    const rows = axis === 'rows' || (was?.rows ?? false);
+    this.said = { time, rows, x: x ?? was?.x ?? null };
+  }
+
+  /** Show what the view drawn shows, for the axes announced since the last time. */
+  private speak(): void {
+    const said = this.said;
+    const scene = this.host.scene();
+    const shown = this.shown();
+    if (!said || !scene || !shown) return;
+    this.said = null;
+    const { body } = this.host.panes;
+    const words: string[] = [];
+    if (said.time) {
+      const ticks =
+        body.clientWidth / scene.pxPerTick - slackTicks(scene.pxPerTick, scene.barTicks);
+      words.push(timeText(spanText(ticks, scene.barTicks), shown));
+    }
+    if (said.rows) {
+      const view = { top: body.scrollTop, heightPx: body.clientHeight };
+      words.push(octaveText(octavesShown(scene.rows.rows, view)));
+    }
+    this.readout.show(words.join(ROLL_ZOOM_TEXT.join), said.x);
   }
 
   /** Where the view sits along `axis`, as shares of the region or of the rows. */
@@ -148,6 +265,8 @@ export class RollZoomControl {
     const { body } = this.host.panes;
     if (axis === 'time') body.scrollLeft = start * scene.width;
     else body.scrollTop = start * scene.rows.height;
+    this.announce(axis, null);
+    this.speak();
   }
 
   /** Move one edge of the view to the share `moved` with the other held at `held`. */
@@ -157,22 +276,32 @@ export class RollZoomControl {
     const [start, end] = edge === 'start' ? [at.moved, at.held] : [at.held, at.moved];
     const hold: ViewEdge = edge === 'start' ? 'end' : 'start';
     if (axis === 'time') {
-      const bounds = this.bounds();
+      const bounds = this.timeBounds();
       const ticks = bounds.regionTicks;
-      const view = spanTime(bounds, { start: start * ticks, end: end * ticks, hold });
-      const fit = settleFit(this.zoom.fit, view, bounds);
-      this.zoom = { ...this.zoom, fit, beatPx: view.beatPx };
-      this.host.spot.aim(view.left, null);
+      this.setTime(spanTime(bounds, { start: start * ticks, end: end * ticks, hold }));
     } else {
-      const { body } = this.host.panes;
-      // The scene drawn, never the zoom: a move before the repaint has changed the zoom.
-      const drawn = { rowPx: scene.rows.rowPx, top: body.scrollTop };
-      const bounds = rowBoundsOf(scene.rows, body.clientHeight);
-      const view = spanRows(drawn, bounds, { start, end, hold });
-      this.zoom = { ...this.zoom, rowPx: view.rowPx };
-      this.host.spot.aim(null, view.top);
+      const grip = this.grip ?? this.drawnRows(scene);
+      this.setRows(spanRows(grip.view, grip.drawn, { start, end, hold }));
     }
-    this.schedule();
+  }
+
+  /**
+   * The rows view and the rows drawn now, never the zoom's: a move before
+   * the repaint has changed the zoom, and a repaint during a drag lays the
+   * rows out again, so a grip works from what was drawn at its press.
+   */
+  private drawnRows(scene: RollScene): { view: RowView; drawn: RowsDrawn } {
+    const { body } = this.host.panes;
+    return {
+      view: { rowPx: scene.rows.rowPx, top: body.scrollTop },
+      drawn: { rows: scene.rows, heightPx: body.clientHeight },
+    };
+  }
+
+  /** A press on a bar: the ↕ bar's drag works from the rows drawn now. */
+  private grab(axis: BarAxis): void {
+    const scene = this.host.scene();
+    this.grip = axis === 'rows' && scene ? this.drawnRows(scene) : null;
   }
 
   /** One repaint on the next frame, however many moves come before it. */

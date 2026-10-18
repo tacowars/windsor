@@ -124,6 +124,63 @@ export const ROLL_NOTE = {
   minWPx: 3,
 } as const;
 
+/**
+ * The zoom gestures (windsor#903; record
+ * `2026-10-18-roll-zoom-bars-and-duplicate` decisions 4 to 6). A press on
+ * the ruler or the keys becomes a drag past the Song tab's threshold
+ * (`SONG_DRAG_THRESHOLD_PX`), at its px per doubling
+ * (`SONG_VIEW.dragPxPerDoubling`). A pinch zooms an axis once
+ * the fingers are `pinchMinPx` apart on it. A Ctrl or ⌘ wheel zooms by e
+ * for every `wheelPxPerE` px of wheel, at most `wheelMaxPx` an event, a
+ * line of wheel counting `wheelLinePx` and a page `wheelPagePx`.
+ */
+export const ROLL_ZOOM_GESTURE = {
+  pinchMinPx: 40,
+  wheelPxPerE: 100,
+  wheelMaxPx: 50,
+  wheelLinePx: 16,
+  wheelPagePx: 400,
+} as const;
+
+/**
+ * The readout that shows while the zoom changes (windsor#903 decision 6),
+ * and the bars a view counts as shown, which it and the summary name.
+ */
+export const ROLL_ZOOM_READOUT = {
+  /** It hides this long after the last change. */
+  hideMs: 900,
+  /** It stands this far under the notes pane's top, its middle at least `edgePx` in from a side. */
+  topPx: 4,
+  edgePx: 44,
+  /**
+   * A view's last `slackPx` (at most `slackShare` of a bar) is not counted:
+   * the room a fit leaves for the loop brace's handle never reads as a bar.
+   */
+  slackPx: 16,
+  slackShare: 0.25,
+  /** A span reads in bars from one bar, to a tenth under `wholeBars` and whole from it. */
+  wholeBars: 10,
+  tenths: 10,
+  /** Rows read in octaves to the nearest half. */
+  halves: 2,
+  semitones: 12,
+} as const;
+
+/** The readout's and the summary's words, and the ruler's and the keys' titles. */
+export const ROLL_ZOOM_TEXT = {
+  bars: (n: number): string => `${n} bar${n === 1 ? '' : 's'}`,
+  beats: (n: number): string => `${n} beat${n === 1 ? '' : 's'}`,
+  shown: (first: number, last: number): string =>
+    first === last ? `bar ${first}` : `bars ${first}–${last}`,
+  of: (shown: string, region: number): string => `${shown} of ${region}`,
+  octaves: (whole: number, half: boolean): string =>
+    `${whole > 0 ? whole : half ? '' : '0'}${half ? '½' : ''} oct`,
+  join: ' · ',
+  ruler:
+    'Drag up or down to zoom, sideways to scroll · double-click for the loop or the whole region',
+  keys: 'Drag sideways for taller or shorter rows, up or down to scroll',
+} as const;
+
 /** A key label's font size: the row less `inset`, between `min` and `max` px. */
 export const ROLL_KEY_FONT = { min: 7, max: 9.5, inset: 3 } as const;
 

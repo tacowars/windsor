@@ -17,7 +17,7 @@
  * (`thumbOf`, `fracAt`).
  */
 import { PPQ } from '@windsor/engine';
-import type { RowLayout } from './rollRows';
+import { type RowLayout, relaidY, rowsHeightAt, spanParts } from './rollRows';
 import { ROLL_FIT_TOLERANCE, ROLL_ROW_ZOOM, ROLL_TIME_ZOOM } from './rollTables';
 
 /** The two spans a view can be fitted to. */
@@ -86,16 +86,19 @@ export function clampTime(
   return { beatPx, left: clamp(view.left, 0, room) };
 }
 
-/** Zoom by `factor`, keeping the tick `x` px from the left edge where it is. */
+/**
+ * Zoom by `factor`, keeping the tick `x` px from the left edge where it is,
+ * or carrying it to `to` px when the fingers moved (a pinch's midpoint).
+ */
 export function zoomTimeAbout(
   view: TimeView,
   bounds: TimeBounds,
-  zoom: { factor: number; x: number },
+  zoom: { factor: number; x: number; to?: number },
   table: TimeTable = ROLL_TIME_ZOOM,
 ): TimeView {
   const tick = view.left + (zoom.x * PPQ) / view.beatPx;
   const beatPx = clamp(view.beatPx * zoom.factor, regionFitPx(bounds, table), table.maxBeatPx);
-  return clampTime({ beatPx, left: tick - (zoom.x * PPQ) / beatPx }, bounds, table);
+  return clampTime({ beatPx, left: tick - ((zoom.to ?? zoom.x) * PPQ) / beatPx }, bounds, table);
 }
 
 /**
@@ -148,32 +151,10 @@ export function settleFit(
   return on.loop ? 'loop' : on.region ? 'region' : null;
 }
 
-/**
- * What bounds the row zoom: the notes pane's height, and the rows' height
- * as `scaled` rows of the zoom's height plus `fixedPx` that never scale (a
- * thin sliver, a folded row the pane's fill holds taller).
- */
-export interface RowBounds {
+/** The rows drawn, which a row zoom lays out again, and the notes pane's height. */
+export interface RowsDrawn {
+  readonly rows: RowLayout;
   readonly heightPx: number;
-  readonly scaled: number;
-  readonly fixedPx: number;
-}
-
-/**
- * The row bounds of the rows drawn, in a pane `heightPx` tall: a row at the
- * height they were laid out at scales with the zoom; a thin sliver, or a
- * folded row the pane's fill holds taller, does not. Read from the layout's
- * own row height, never the zoom's, which a move may have changed before the
- * repaint lays the rows out again.
- */
-export function rowBoundsOf(layout: RowLayout, heightPx: number): RowBounds {
-  let scaled = 0;
-  let fixedPx = 0;
-  for (const row of layout.rows) {
-    if (!row.thin && row.h === layout.rowPx) scaled++;
-    else fixedPx += row.h;
-  }
-  return { heightPx, scaled, fixedPx };
 }
 
 /** A vertical view: the row height, and the px of the rows above its top edge. */
@@ -184,52 +165,46 @@ export interface RowView {
 
 type RowTable = typeof ROLL_ROW_ZOOM;
 
-/** The rows' whole height at `rowPx`. */
-export const rowsHeight = (bounds: RowBounds, rowPx: number): number =>
-  bounds.scaled * rowPx + bounds.fixedPx;
-
-/** `view` within the row bounds, its top within the rows. */
-export function clampRows(
-  view: RowView,
-  bounds: RowBounds,
-  table: RowTable = ROLL_ROW_ZOOM,
-): RowView {
-  const rowPx = clamp(view.rowPx, table.minPx, table.maxPx);
-  const room = Math.max(0, rowsHeight(bounds, rowPx) - bounds.heightPx);
-  return { rowPx, top: clamp(view.top, 0, room) };
-}
-
-/** Zoom the rows by `factor`, keeping the row `y` px under the top edge where it is. */
+/**
+ * The rows at `rowPx` (within the bounds), with the point `y` px under the
+ * top edge of `view` where it is, or carried to `to` px. The rows drawn are
+ * laid out again with `rollRows`'s own maths (`relaidY`), so a thin sliver
+ * or a folded row the pane's fill holds taller keeps its height and the
+ * pitch under the point stays under it. `view` may be at a row height the
+ * rows were not drawn at: a move the paint has not caught up with.
+ */
 export function zoomRowsAbout(
   view: RowView,
-  bounds: RowBounds,
-  zoom: { factor: number; y: number },
+  drawn: RowsDrawn,
+  zoom: { rowPx: number; y: number; to?: number },
   table: RowTable = ROLL_ROW_ZOOM,
 ): RowView {
-  const before = rowsHeight(bounds, view.rowPx);
-  const at = before > 0 ? (view.top + zoom.y) / before : 0;
-  const rowPx = clamp(view.rowPx * zoom.factor, table.minPx, table.maxPx);
-  return clampRows({ rowPx, top: at * rowsHeight(bounds, rowPx) - zoom.y }, bounds, table);
+  const rowPx = clamp(zoom.rowPx, table.minPx, table.maxPx);
+  const at = relaidY(drawn.rows, { y: view.top + zoom.y, from: view.rowPx, to: rowPx });
+  const room = Math.max(0, rowsHeightAt(drawn.rows, rowPx) - drawn.heightPx);
+  return { rowPx, top: clamp(at - (zoom.to ?? zoom.y), 0, room) };
 }
 
 /**
- * The view from `start` to `end`, each a share of the rows' height (0 the
- * top row, 1 the bottom), as near as the bounds allow, with the `hold`
- * edge on the row it was on.
+ * The view from `start` to `end`, each a share of the height of the rows
+ * at `view`'s row height (0 the top row, 1 the bottom), as near as the
+ * bounds allow, with the `hold` edge on the pitch it was on. The row
+ * height is the one that lays the span out the pane's height tall, its
+ * thin slivers keeping theirs.
  */
 export function spanRows(
   view: RowView,
-  bounds: RowBounds,
+  drawn: RowsDrawn,
   span: { start: number; end: number; hold: ViewEdge },
   table: RowTable = ROLL_ROW_ZOOM,
 ): RowView {
-  if (bounds.scaled <= 0) return clampRows(view, bounds, table);
-  const share = Math.max(Number.EPSILON, span.end - span.start);
-  const wanted = bounds.heightPx / share;
-  const rowPx = clamp((wanted - bounds.fixedPx) / bounds.scaled, table.minPx, table.maxPx);
-  const height = rowsHeight(bounds, rowPx);
-  const top = span.hold === 'start' ? span.start * height : span.end * height - bounds.heightPx;
-  return clampRows({ rowPx, top }, bounds, table);
+  const whole = rowsHeightAt(drawn.rows, view.rowPx);
+  const y0 = span.start * whole;
+  const y1 = Math.max(y0, span.end * whole);
+  const { fixedPx, scaled } = spanParts(drawn.rows, { y0, y1, from: view.rowPx });
+  const rowPx = scaled > 0 ? (drawn.heightPx - fixedPx) / scaled : view.rowPx;
+  const [y, to] = span.hold === 'start' ? [y0, 0] : [y1, drawn.heightPx];
+  return zoomRowsAbout(view, drawn, { rowPx, y: y - view.top, to }, table);
 }
 
 /** A view along one bar: its start and end, each a share of the whole (0 to 1). */
