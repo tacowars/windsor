@@ -128,6 +128,14 @@ export type RegionPattern = WithoutSeed<SequencerSpec>;
  */
 export type PartRegion = Region & { readonly pattern?: RegionPattern };
 
+/**
+ * What the audition keyboard plays for a part (windsor#918, record
+ * `2026-10-18-keyboard-fold` decision 1): every key (`off`), only the song's
+ * scale (`scale`), or only the chord the song is on (`chord`).
+ */
+export const PART_FOLDS = ['off', 'scale', 'chord'] as const;
+export type PartFold = (typeof PART_FOLDS)[number];
+
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
   /** 0 to `MUSIC_SLOT_MAX`, unique in the song: the part's identity. */
@@ -145,6 +153,13 @@ export interface MusicPart {
    */
   readonly regions: readonly PartRegion[];
   readonly sequencer: SequencerSpec;
+  /**
+   * The audition keyboard's fold for this part (windsor#918, record
+   * `2026-10-18-keyboard-fold` decision 1). Nothing that plays reads it. The
+   * normaliser always fills it, `off` when absent or invalid, so a live
+   * partial reaches it on every normalised part.
+   */
+  readonly fold?: PartFold;
 }
 
 /** A song's loop (windsor#15): a tick range `[start, end)` and whether playback wraps it. */
