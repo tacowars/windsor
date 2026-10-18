@@ -3574,12 +3574,6 @@ body.chord-dragging {
 .rec-row .roll-metronome {
   flex: none;
 }
-/* Rec's hint takes two lines (20 px), not the record's one, so while it
-   shows the second column closes its 3 px gaps and stays inside 177 px;
-   the Velocity row under it never moves. */
-.roll-ctl-stack .roll-ctl:has(.rec-item.paused, .rec-item.disabled) {
-  gap: 0;
-}
 /* Keyboard fold (windsor#922): the keyboard's Fold as a Roll switch, in the
    keyboard's colour; dimmed on a device whose part the keyboard doesn't play. */
 .roll-kfold .seg {
