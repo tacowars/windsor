@@ -44,6 +44,7 @@ import {
 } from './rollNotesPaint';
 import { markKeys, paintBody, paintHead, paintKeys } from './rollPaint';
 import { type RollPanes, rollPanes } from './rollPanes';
+import { rollMetronome } from './rollMetronome';
 import { type RollRecView, rollRecView } from './rollRecView';
 import { type TickWindow, rollInstances, windowHolds } from './rollRepeats';
 import { type RollScene, rollScene } from './rollScene';
@@ -172,6 +173,7 @@ class RollDevice {
       selectedCount: () => this.editing.editor.selected().length,
       quantise: () => this.editing.quantise(),
       rec: this.rec.control,
+      metronome: rollMetronome(this.ctx),
     });
   }
 

@@ -60,9 +60,9 @@ import type { ReturnBus } from '../mixer/returnBus';
 import { SidechainDesk } from '../mixer/sidechainDesk';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
-import { songTicks } from '../sequencing/meter';
+import { Metronome } from '../sequencing/metronome';
+import { METRONOME_PART_NAME, METRONOME_TABLE } from '../sequencing/metronomeTables';
 import { Scheduler } from '../sequencing/scheduler';
-import type { Arrangement } from '../song/arrangement';
 import type { ArrangementPartial } from '../song/arrangement';
 import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
 import type { ApplyResult, MusicEventHandler, RegionStep } from '../song/arrangementPlayer';
@@ -80,6 +80,7 @@ import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
 import { MusicRoster } from './musicRoster';
 import { PartStrips } from './partStrips';
+import { replanChords, songLength } from './songChordPlan';
 import type { PerformanceDropped, PerformanceResult } from './songAutomation';
 import { SongAutomation } from './songAutomation';
 import { StandingGraph } from './standingGraph';
@@ -122,35 +123,6 @@ export interface MusicReadout extends PlaybackReadout {
   load: AudioLoadReadout;
 }
 
-/** The song's length in ticks, by its bars and meter. */
-const songLength = ({ transport }: Pick<Arrangement, 'transport'>): number =>
-  songTicks(transport.bars, transport.meter);
-
-/**
- * Re-plan Song chord after a live edit, by what it touched (windsor#729): a
- * harmony or transport edit rebuilds the timeline from one read of the
- * arrangement (a clone, so never on other edits); a part, group, master or
- * return edit may have switched a bloom to Song chord, which needs the
- * changes already issued, and clones nothing.
- */
-function replanChords(
-  chords: BloomChordFollower,
-  partial: DocumentPartial,
-  arrangement: () => Arrangement,
-): void {
-  if (partial.harmony !== undefined || partial.transport !== undefined) {
-    const song = arrangement();
-    chords.setSong(song.harmony, songLength(song));
-  } else if (
-    partial.parts !== undefined ||
-    partial.groups !== undefined ||
-    partial.master !== undefined ||
-    partial.returns !== undefined
-  ) {
-    chords.replan();
-  }
-}
-
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -171,6 +143,8 @@ export class AudioSystem {
   private readonly playback: MusicPlayback;
   private readonly automation: SongAutomation;
   private chords: BloomChordFollower | null = null;
+  /** The metronome (windsor#906), built the first time it is turned on. */
+  private metronome: Metronome | null = null;
   private started = false;
 
   /**
@@ -395,6 +369,7 @@ export class AudioSystem {
    */
   setMuted(muted: boolean): void {
     this.playback.setMuted(muted);
+    if (muted) this.metronome?.halt();
   }
 
   /**
@@ -403,6 +378,25 @@ export class AudioSystem {
    */
   stopMusic(): void {
     this.playback.stop();
+    this.metronome?.halt();
+  }
+
+  /**
+   * The metronome (windsor#906): a patch turns it on, null turns it off. On,
+   * it clicks every counted beat of the song's meter while the transport
+   * runs, the bar line's the accent (`sequencing/metronome.ts`), whatever
+   * the song plays or whether it has one; ‖, ■ and off drop the clicks
+   * queued. The first patch builds one aux part, `metronome`, dry into the
+   * aux fader, so the song's master, mixer, mute and solo never reach it,
+   * and it is kept for this system: a later patch is not read. The patch is
+   * the caller's (#562). Nothing renders it: an offline render's system
+   * never turns it on. Throws before `init()`, as `createAuxPart` does.
+   */
+  setMetronome(patch: Patch | null): void {
+    const part = (p: Patch): AudioPart =>
+      this.createAuxPart(METRONOME_PART_NAME, p, METRONOME_TABLE.voices);
+    if (patch) this.metronome ??= new Metronome(this.scheduler, part(patch));
+    this.metronome?.setOn(patch !== null);
   }
 
   /**
@@ -606,6 +600,8 @@ export class AudioSystem {
     this.automation.dispose();
     this.chords?.dispose();
     this.chords = null;
+    this.metronome?.setOn(false);
+    this.metronome = null;
     this.sidechains.dispose();
     // Before the strips, whose rotation outputs the bank's edges leave from.
     this.partMeters.dispose();

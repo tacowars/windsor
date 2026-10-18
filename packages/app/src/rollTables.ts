@@ -234,6 +234,21 @@ export const ROLL_EDGE_SCROLL = { zonePx: 24, maxPx: 14 } as const;
 /** Audition (decision 5): how long a note sounds, and where its switch is kept. */
 export const ROLL_AUDITION = { ms: 180, storageKey: 'windsor.roll.audition' } as const;
 
+/**
+ * The metronome (windsor#906 decision 5): the button's words, where its
+ * on/off is kept, the built-in patch the engine plays it on, and its glyph,
+ * a tapered body with a slanted pendulum arm and its weight.
+ */
+export const ROLL_METRONOME = {
+  title: 'Metronome',
+  storageKey: 'windsor.roll.metronome',
+  patch: 'metronome-click',
+  glyph:
+    '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+    '<path d="M6.2 2.5h3.6L12 14H4z"/><path d="M3.5 14h9"/>' +
+    '<path d="M8 11.5 11.8 3.2"/><path d="M9.2 7.4h2.2"/></svg>',
+} as const;
+
 /** Quantise (record `2026-10-09-roll-recording` decision 10): its label, undo step and the button's words. */
 export const ROLL_QUANTISE = {
   label: 'Quantize',

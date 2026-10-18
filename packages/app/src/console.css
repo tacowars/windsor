@@ -3522,6 +3522,35 @@ body.chord-dragging {
 .roll-summary.full {
   color: var(--hot);
 }
+/* The metronome (windsor#906): one square button after Rec, as tall as
+   Rec's switch, its glyph dim while off and the accent's pressed fill while on. */
+.roll-metronome {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--roll-ctl-h);
+  height: var(--roll-ctl-h);
+  padding: 0;
+  background: var(--inset);
+  color: var(--ink-faint);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.roll-metronome svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.roll-metronome[aria-pressed='true'] {
+  background: var(--carrier);
+  border-color: var(--carrier);
+  color: #111416;
+}
 .seg.roll-seg {
   flex-wrap: nowrap;
   height: var(--roll-ctl-h);
