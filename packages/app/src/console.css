@@ -1635,6 +1635,69 @@ input {
   min-width: 6.4em;
   text-align: center;
 }
+/* The Transient's bipolar gain meter (record 2026-10-18-transient-insert):
+   the compressor meter's bar, a center line at 0 dB, a --carrier boost
+   rising from it and a --modulator cut hanging from it, with the held
+   boost above and the held cut below. */
+.insert-col:has(> .transient-meter) {
+  align-self: stretch;
+}
+.transient-meter {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0 0;
+}
+.tr-meter {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-height: 118px;
+  width: 12px;
+  overflow: hidden;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.tr-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  opacity: 0.8;
+}
+.tr-boost {
+  bottom: 50%;
+  background: var(--carrier);
+  transform-origin: bottom;
+}
+.tr-cut {
+  top: 50%;
+  background: var(--modulator);
+  transform-origin: top;
+}
+.tr-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--ink-faint);
+}
+.transient-meter .readout {
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  /* Hold the widest reading ("+00.0 dB") so the rack beside it stays still. */
+  min-width: 5.6em;
+  text-align: center;
+}
 /* A send bus (windsor#172; the mockup's .rack-line and .bus-head): its head
    (name, Level, who sends to it) beside its rack. */
 .bus-line {

@@ -38,6 +38,8 @@ import { PUMP_INSERT } from './pumpInsert';
 import type { PumpSpec } from './pumpSpec';
 import { SPECTRE_INSERT } from './spectreInsert';
 import type { SpectreSpec } from './spectreSpec';
+import { TRANSIENT_INSERT } from './transientInsert';
+import type { TransientSpec } from './transientSpec';
 import { isKeyedSpec } from './sidechainSource';
 import type { BloomSpec } from './bloomSpec';
 import type { InsertKind, InsertStage, WetPath } from './insertKind';
@@ -71,6 +73,7 @@ export type InsertSpec = (
   | BloomSpec
   | PumpSpec
   | SpectreSpec
+  | TransientSpec
 ) &
   InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
@@ -95,6 +98,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   bloom: BLOOM_INSERT,
   pump: PUMP_INSERT,
   spectre: SPECTRE_INSERT,
+  transient: TRANSIENT_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];

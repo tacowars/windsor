@@ -300,3 +300,9 @@ export const SPECTRE_WORKLET_URL = new URL(
   '../worklet/generated/spectre-processor.js',
   import.meta.url,
 );
+
+/** The Transient insert, a transient shaper with no threshold (record `2026-10-18-transient-insert`). */
+export const TRANSIENT_WORKLET_URL = new URL(
+  '../worklet/generated/transient-processor.js',
+  import.meta.url,
+);

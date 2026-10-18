@@ -1,7 +1,7 @@
 /**
  * Every worklet insert's on/off switch is click-free (windsor#630): the
  * shipped bundles of Filter, the compressor, Phaser, Delay, Tape, Advanced
- * Drive, Retro Reverb, EQ, bloom, Pump and Spectre, each switched off and back on under a steady
+ * Drive, Retro Reverb, EQ, bloom, Pump, Spectre and Transient, each switched off and back on under a steady
  * sine, crossfade dry and wet linearly over `INSERT_SWITCH_FADE_S`.
  *
  * - **No click:** no sample-to-sample step across either switch is larger
@@ -38,6 +38,7 @@ import { loadPhaser, phaserParams } from '../__fixtures__/phaserHarness';
 import { loadRetro, retroParams } from '../__fixtures__/retroReverbHarness';
 import { loadSpectre, spectreParams } from '../__fixtures__/spectreHarness';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
+import { loadTransient, transientParams } from '../__fixtures__/transientHarness';
 import { DEFAULT_EQ } from './eqSpec';
 import { INSERT_SWITCH_FADE_S } from './insertConstants';
 import { TAPE_MAGNETIC } from './tapeMagneticConstants';
@@ -181,6 +182,16 @@ const KINDS: Kind[] = [
     },
     latency: 2 * 512 - 1,
     rings: true,
+  },
+  {
+    // A steady tone has no onset or decay to shape, so the Output is the gain to fade.
+    name: 'transient',
+    load: () => {
+      const params = transientParams({ attack: 9, sustain: -12, output: -12 });
+      return { processor: loadTransient(RATE, params), params };
+    },
+    latency: 0,
+    rings: false,
   },
   {
     name: 'bloom',
