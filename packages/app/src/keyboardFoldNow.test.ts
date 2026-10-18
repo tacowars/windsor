@@ -55,16 +55,16 @@ describe('the keyboard’s fold as it stands', () => {
     expect(rowSlotsOf(null)).toBe(whiteSlots);
   });
 
-  it('shows 15 keys from A3 to A5 on Scale, the roots named with their octave', () => {
-    expect(names('scale', 0)).toEqual('A3 B C D E F G A4 B C D E F G A5'.split(' '));
+  it('shows 15 keys from A2 to A4 on Scale, the roots named with their octave', () => {
+    expect(names('scale', 0)).toEqual('A2 B C D E F G A3 B C D E F G A4'.split(' '));
     expect(rowSlotsOf(foldNowOf(demo('scale'), 0, 0))({ octaves: 2, rows: 1 })).toBe(15);
   });
 
   it('shows 7 keys under A min and F maj and 9 under G 7 on Chord, renamed at each change', () => {
-    expect(names('chord', 0)).toEqual('A3 C E A4 C E A5'.split(' '));
-    expect(names('chord', BAR)).toEqual('F3 A C F4 A C F5'.split(' '));
-    expect(names('chord', 2 * BAR)).toEqual('C3 E G C4 E G C5'.split(' '));
-    expect(names('chord', 3 * BAR)).toEqual('G3 B D F G4 B D F G5'.split(' '));
+    expect(names('chord', 0)).toEqual('A2 C E A3 C E A4'.split(' '));
+    expect(names('chord', BAR)).toEqual('F2 A C F3 A C F4'.split(' '));
+    expect(names('chord', 2 * BAR)).toEqual('C2 E G C3 E G C4'.split(' '));
+    expect(names('chord', 3 * BAR)).toEqual('G2 B D F G3 B D F G4'.split(' '));
   });
 
   it('strips the chord’s tones on Scale only', () => {

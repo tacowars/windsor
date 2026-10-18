@@ -36,12 +36,12 @@ const MS_PER_TICK = 500 / 24;
 /** The `timeStamp` heard `early` ms before tick `tick`. */
 const before = (tick: number, early: number): number => tick * MS_PER_TICK - early;
 
-const A3 = 45;
-const B_FLAT3 = 46;
-const E4 = 52;
-const F4 = 53;
-const G4 = 55;
-const B4 = 59;
+const A2 = 45;
+const B_FLAT2 = 46;
+const E3 = 52;
+const F3 = 53;
+const G3 = 55;
+const B3 = 59;
 
 const event = (bar: number, degree: number, size: ChordSize = CHORD_SIZE_TRIAD): HarmonyEvent => ({
   start: bar * BAR,
@@ -135,18 +135,18 @@ describe('the computer keys and MIDI on a folded part', () => {
     return struck;
   }
 
-  it("plays A minor's folded keys on the home row at A3, and nothing on w e t y u o p", () => {
+  it("plays A minor's folded keys on the home row at A2, and nothing on w e t y u o p", () => {
     doc = demo('scale');
     expect(type(HOME_ROW)).toEqual([45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62]);
     expect(type(['w', 'e', 't', 'y', 'u', 'o', 'p'])).toEqual([]);
   });
 
-  it('plays past a 7-key Chord row unlit: k is C6 on A min from A3 to A5', () => {
+  it('plays past a 7-key Chord row unlit: k is C5 on A min from A2 to A4', () => {
     doc = demo('chord');
     const keys = foldedRow(7);
     keyboard.adoptKeys(
       keys.map((k) => k.el),
-      { octaves: 2, notes: [45, 48, 52, 57, 60, 64, 69], label: 'A3', renamed: false },
+      { octaves: 2, notes: [45, 48, 52, 57, 60, 64, 69], label: 'A2', renamed: false },
     );
     keyboard.onKeyDown(key('k'));
     expect(log).toEqual(['p1 on 72']);
@@ -171,8 +171,8 @@ describe('the computer keys and MIDI on a folded part', () => {
   it('drops a B♭ and passes an A on A minor Scale', () => {
     doc = demo('scale');
     const sink = keyboard.midiSink('in');
-    sink.press(B_FLAT3, 0.8, 0);
-    sink.press(A3, 0.8, 0);
+    sink.press(B_FLAT2, 0.8, 0);
+    sink.press(A2, 0.8, 0);
     expect(log).toEqual(['p1 on 45']);
     expect(taps).toEqual(['on midi:in:45 45']);
   });
@@ -182,9 +182,9 @@ describe('the computer keys and MIDI on a folded part', () => {
     running = true;
     position = 300; // Where the playhead is drawn; the stamp decides.
     const sink = keyboard.midiSink('in');
-    sink.press(F4, 0.8, before(BAR, 15)); // Tick 95: F maj at 96 holds F. Kept.
-    sink.press(B4, 0.8, before(BAR, 15)); // Tick 95: neither A min nor F maj. Dropped.
-    sink.press(F4, 0.8, before(BAR, 150)); // Tick 88: the window is 89 to 94. Dropped.
+    sink.press(F3, 0.8, before(BAR, 15)); // Tick 95: F maj at 96 holds F. Kept.
+    sink.press(B3, 0.8, before(BAR, 15)); // Tick 95: neither A min nor F maj. Dropped.
+    sink.press(F3, 0.8, before(BAR, 150)); // Tick 88: the window is 89 to 94. Dropped.
     expect(log).toEqual(['p1 on 53']);
   });
 
@@ -192,8 +192,8 @@ describe('the computer keys and MIDI on a folded part', () => {
     doc = demo('chord', true);
     running = true;
     const sink = keyboard.midiSink('in');
-    sink.press(E4, 0.8, before(2 * BAR, 15));
-    sink.press(G4, 0.8, before(2 * BAR, 15));
+    sink.press(E3, 0.8, before(2 * BAR, 15));
+    sink.press(G3, 0.8, before(2 * BAR, 15));
     expect(log).toEqual(['p1 on 52']);
   });
 
@@ -201,19 +201,19 @@ describe('the computer keys and MIDI on a folded part', () => {
     doc = demo('chord');
     position = BAR;
     const sink = keyboard.midiSink('in');
-    sink.press(E4, 0.8, before(BAR, 15)); // A min would hold E; F maj stands. Dropped.
-    sink.press(F4, 0.8, before(BAR, 15));
+    sink.press(E3, 0.8, before(BAR, 15)); // A min would hold E; F maj stands. Dropped.
+    sink.press(F3, 0.8, before(BAR, 15));
     expect(log).toEqual(['p1 on 53']);
   });
 
   it('lifts nothing for a dropped note, by its release or a pedal-up, and tells the tap nothing', () => {
     doc = demo('scale');
     const midi = new MidiPerformer(keyboard.midiSink('in'));
-    midi.handle({ type: 'noteOn', note: B_FLAT3, velocity: 0.8 }, 1);
-    midi.handle({ type: 'noteOff', note: B_FLAT3 }, 2);
+    midi.handle({ type: 'noteOn', note: B_FLAT2, velocity: 0.8 }, 1);
+    midi.handle({ type: 'noteOff', note: B_FLAT2 }, 2);
     midi.handle({ type: 'sustain', down: true }, 3);
-    midi.handle({ type: 'noteOn', note: B_FLAT3, velocity: 0.8 }, 4);
-    midi.handle({ type: 'noteOff', note: B_FLAT3 }, 5);
+    midi.handle({ type: 'noteOn', note: B_FLAT2, velocity: 0.8 }, 4);
+    midi.handle({ type: 'noteOff', note: B_FLAT2 }, 5);
     midi.handle({ type: 'sustain', down: false }, 6);
     midi.releaseAll();
     expect(log).toEqual([]);
@@ -224,11 +224,11 @@ describe('the computer keys and MIDI on a folded part', () => {
   it('releases a passed note held through a chord change, and keeps a dropped one silent', () => {
     doc = demo('chord');
     const midi = new MidiPerformer(keyboard.midiSink('in'));
-    midi.handle({ type: 'noteOn', note: E4, velocity: 0.8 }, 1); // A min holds E.
-    midi.handle({ type: 'noteOn', note: B4, velocity: 0.8 }, 1); // A min does not hold B.
+    midi.handle({ type: 'noteOn', note: E3, velocity: 0.8 }, 1); // A min holds E.
+    midi.handle({ type: 'noteOn', note: B3, velocity: 0.8 }, 1); // A min does not hold B.
     position = 3 * BAR; // G 7 now: no E, but a B.
-    midi.handle({ type: 'noteOff', note: E4 }, 2);
-    midi.handle({ type: 'noteOff', note: B4 }, 2);
+    midi.handle({ type: 'noteOff', note: E3 }, 2);
+    midi.handle({ type: 'noteOff', note: B3 }, 2);
     expect(log).toEqual(['p1 on 52', 'p1 off #1']);
     expect(taps).toEqual(['on midi:in:52 52', 'off midi:in:52 52']);
   });
@@ -237,8 +237,8 @@ describe('the computer keys and MIDI on a folded part', () => {
     expect(type(['a', 'w', 'k', 'p'])).toEqual([36, 37, 48, 51]);
     running = true;
     const sink = keyboard.midiSink('in');
-    sink.press(B_FLAT3, 0.8, before(BAR, 15));
-    sink.press(B4, 0.8, before(BAR, 15));
+    sink.press(B_FLAT2, 0.8, before(BAR, 15));
+    sink.press(B3, 0.8, before(BAR, 15));
     expect(log.filter((line) => line.includes(' on ')).slice(-2)).toEqual(['p1 on 46', 'p1 on 59']);
   });
 });

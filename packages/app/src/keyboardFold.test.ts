@@ -78,11 +78,11 @@ describe('the set at a tick', () => {
 });
 
 describe('the folded keys: the record’s table at octave 3, two octaves', () => {
-  it('A minor: 15 keys, 45 to 69, labelled A3', () => {
+  it('A minor: 15 keys, 45 to 69, labelled A2', () => {
     const set = foldSetAt('scale', DEMO, SONG, 0);
     expect(notes(set)).toEqual([[45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69]]);
     const keys = foldedKeys(set, { octave: 3, octaves: 2, rows: 1 });
-    expect(keys.label).toBe('A3');
+    expect(keys.label).toBe('A2');
     expect(keys.rows[0]?.map((key) => key.name).join(' ')).toBe('A B C D E F G A B C D E F G A');
     expect(keys.rows[0]?.filter((key) => key.root).map((key) => key.note)).toEqual([45, 57, 69]);
     expect(keys.rows[0]?.some((key) => key.outOfRange)).toBe(false);
@@ -97,10 +97,10 @@ describe('the folded keys: the record’s table at octave 3, two octaves', () =>
     expect(notes(foldSetAt('chord', DEMO, SONG, 0))).toEqual([[45, 48, 52, 57, 60, 64, 69]]);
   });
 
-  it('F maj: 7 keys, 41 to 65, labelled F3', () => {
+  it('F maj: 7 keys, 41 to 65, labelled F2', () => {
     const set = foldSetAt('chord', DEMO, SONG, BAR);
     expect(notes(set)).toEqual([[41, 45, 48, 53, 57, 60, 65]]);
-    expect(foldedKeys(set, { octave: 3, octaves: 2, rows: 1 }).label).toBe('F3');
+    expect(foldedKeys(set, { octave: 3, octaves: 2, rows: 1 }).label).toBe('F2');
   });
 
   it('G 7: 9 keys, 43 to 67', () => {
@@ -109,14 +109,14 @@ describe('the folded keys: the record’s table at octave 3, two octaves', () =>
     ]);
   });
 
-  it('labels root C with [2, 5, 9] D3, and root B with it C#4', () => {
+  it('labels root C with [2, 5, 9] D2, and root B with it C#3', () => {
     const atC = foldSetAt('scale', { root: 0, scale: [2, 5, 9], events: [] }, SONG, 0);
     const keys = foldedKeys(atC, { octave: 3, octaves: 2, rows: 1 });
-    expect(keys.label).toBe('D3');
+    expect(keys.label).toBe('D2');
     expect(keys.rows[0]?.map((key) => key.note)).toEqual([38, 41, 45, 50, 53, 57, 62]);
     expect(keys.rows[0]?.some((key) => key.root)).toBe(false);
     const atB = foldSetAt('scale', { root: B, scale: [2, 5, 9], events: [] }, SONG, 0);
-    expect(foldedKeys(atB, { octave: 3, octaves: 2, rows: 1 }).label).toBe('C#4');
+    expect(foldedKeys(atB, { octave: 3, octaves: 2, rows: 1 }).label).toBe('C#3');
   });
 });
 
@@ -171,14 +171,14 @@ describe('the range’s top, at octave 8', () => {
 });
 
 describe('the home row', () => {
-  it("plays A minor at A3 from a to '", () => {
+  it("plays A minor at A2 from a to '", () => {
     const set = foldSetAt('scale', DEMO, SONG, 0);
     expect(HOME_ROW.map((letter) => homeRowNote(letter, set, 3))).toEqual([
       45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62,
     ]);
   });
 
-  it("runs on past the shown keys: A min on two octaves, k is C6 and ' C7", () => {
+  it("runs on past the shown keys: A min on two octaves, k is C5 and ' C6", () => {
     const set = foldSetAt('chord', DEMO, SONG, 0);
     expect(['k', 'l', ';', "'"].map((letter) => homeRowNote(letter, set, 3))).toEqual([
       72, 76, 81, 84,
@@ -195,7 +195,7 @@ describe('the home row', () => {
 
 describe('the MIDI judge', () => {
   const F = 53;
-  const B4 = 59;
+  const B3 = 59;
   const E = 64;
   const G = 55;
   const chord: FoldSong = { fold: 'chord', harmony: DEMO, songTicks: SONG };
@@ -206,7 +206,7 @@ describe('the MIDI judge', () => {
   });
 
   it('drops a B stamped at tick 95: in neither A min nor F maj', () => {
-    expect(passes(B4, 95, chord, running)).toBe(false);
+    expect(passes(B3, 95, chord, running)).toBe(false);
   });
 
   it('drops an F stamped at tick 88: the window is 89 to 94, before the change', () => {
@@ -237,7 +237,7 @@ describe('the MIDI judge', () => {
     const scale: FoldSong = { fold: 'scale', harmony: DEMO, songTicks: SONG };
     const bare: FoldSong = { fold: 'chord', harmony: NO_CHORDS, songTicks: SONG };
     for (const song of [scale, bare]) {
-      expect(passes(B4, 95, song, running)).toBe(true);
+      expect(passes(B3, 95, song, running)).toBe(true);
       expect(passes(61, 95, song, running)).toBe(false);
     }
   });

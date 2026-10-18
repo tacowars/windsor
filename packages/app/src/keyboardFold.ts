@@ -18,7 +18,7 @@
  */
 import type { Harmony, HarmonyChord, MusicPart, TickLoop } from '@windsor/engine';
 import { SEMITONES_PER_OCTAVE, chordAt, followingTick, scaleOffsets } from '@windsor/engine';
-import { pitchClass } from './consoleFormat';
+import { noteName, pitchClass } from './consoleFormat';
 import type { KeysPick } from './keyboardConstants';
 import { KEYBOARD_FOLD_TABLE, type KeyboardFoldTable } from './keyboardFoldTables';
 import { scalePitchClasses, tonesOf } from './rollHarmony';
@@ -58,7 +58,7 @@ export interface FoldView extends KeysPick {
 export interface FoldedKeys {
   /** The rows, the lowest first; each ends on its first key's note. */
   readonly rows: readonly (readonly FoldKey[])[];
-  /** The first key named with its own octave (`A3`, `D3`). */
+  /** The first key named with its own octave (`A2`, `D2`), as the Roll names it. */
   readonly label: string;
 }
 
@@ -132,8 +132,7 @@ export function foldedKeys(
     }
     rows.push(keys);
   }
-  const label = `${table.names[set.firstPc] ?? ''}${Math.floor(first / SEMITONES_PER_OCTAVE)}`;
-  return { rows, label };
+  return { rows, label: noteName(first) };
 }
 
 /**
