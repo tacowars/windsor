@@ -66,6 +66,11 @@ export class CcPanel {
     document.addEventListener('keydown', (e) => this.key(e));
     document.addEventListener('pointerdown', (e) => this.outside(e), true);
     window.addEventListener('resize', () => this.place());
+    // The page scrolls in the console, not the document: the panel is placed
+    // in the window, so it follows the part bar as the console scrolls.
+    document
+      .getElementById('console')
+      ?.addEventListener('scroll', () => this.place(), { passive: true });
   }
 
   /** A MIDI CC button for the part bar, with the selected part's mapping count. */
@@ -126,15 +131,20 @@ export class CcPanel {
       count.textContent = String(ccMappingCount(this.ctx.model.doc, this.ctx.parts.selected));
   }
 
-  /** Under the part bar when it shows, else under the top of the tabs. */
+  /**
+   * Under the part bar when it shows, else under the top of the tabs, and no
+   * taller than the window below that, the same gap short of its foot: a
+   * longer list scrolls inside the panel.
+   */
   private place(): void {
     if (!this.shown) return;
     const bar = this.anchor?.isConnected ? this.anchor.closest('.patch-bar') : null;
     const shownBar = bar && bar.closest('[hidden]') === null ? bar : null;
     const over = shownBar ?? document.getElementById('tabRoot');
     const rect = over?.getBoundingClientRect();
-    const top = rect ? (shownBar ? rect.bottom : rect.top) : 0;
-    this.root.style.top = `${top + window.scrollY + CC_POP_GAP_PX}px`;
+    const top = (rect ? (shownBar ? rect.bottom : rect.top) : 0) + CC_POP_GAP_PX;
+    this.root.style.top = `${top}px`;
+    this.root.style.maxHeight = `calc(100dvh - ${top + CC_POP_GAP_PX}px)`;
   }
 
   /** Something the rows are drawn from changed: the button now, the panel when nothing holds it. */

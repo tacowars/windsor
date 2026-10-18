@@ -8,13 +8,15 @@
  *
  * While a view is on screen the console stops at the window's foot, so the
  * page cannot scroll under it; its close puts the page back where it was.
+ * The page's scroll is the console's (`#console`), since the document itself
+ * never scrolls (record `2026-10-18-the-page-never-zooms`).
  */
 import type { AppCtx } from './context';
 import { type ExpandedView, ExpandedViews } from './expandedViews';
 
 /** A mounted view, with the page's scroll from before it expanded. */
 interface FrameView extends ExpandedView {
-  scrollY: number;
+  scrollTop: number;
 }
 
 /** The console's expanded views: one open at a time. */
@@ -43,11 +45,12 @@ export interface ExpandedMount {
 export function mountExpandedView(mount: ExpandedMount): ExpandedFrame {
   const { overlay } = mount;
   const tab = mount.from.closest<HTMLElement>('.tab-panel')?.dataset.tab;
-  const view: FrameView = { close: () => mount.close(), scrollY: 0 };
+  const view: FrameView = { close: () => mount.close(), scrollTop: 0 };
+  const scroller = document.getElementById('console');
   // A view this one takes over on screen (an undo repainting the pane under
   // it) hands on the page's scroll from before the first expand; the page's
   // own now would be the one clamped under that view.
-  view.scrollY = VIEWS.opened(view)?.scrollY ?? window.scrollY;
+  view.scrollTop = VIEWS.opened(view)?.scrollTop ?? scroller?.scrollTop ?? 0;
   (document.getElementById('tabRoot') ?? document.body).appendChild(overlay);
   const stop =
     tab === undefined
@@ -64,7 +67,7 @@ export function mountExpandedView(mount: ExpandedMount): ExpandedFrame {
       VIEWS.closed(view);
       overlay.remove();
       // Closed on another tab (another view opened there): that tab's page keeps its own scroll.
-      if (shown) window.scrollTo({ top: view.scrollY });
+      if (shown) scroller?.scrollTo({ top: view.scrollTop });
     },
   };
 }
