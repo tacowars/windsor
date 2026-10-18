@@ -10,7 +10,9 @@
  * `accentMod`, written as any card's sequencer knob is (`driverKnob`).
  * Snap, Keys, Fold and the zoom are the view's (`rollView.ts`), and
  * Audition the console's (`rollAudition.ts`), never the song's. Loop's − and
- * + step the song's loop through whole bars (windsor#603 decision 3).
+ * + step the song's loop through whole bars (windsor#603 decision 3), and
+ * Dup beside them doubles it with everything in it (windsor#904,
+ * `rollDuplicate.ts`), its title saying why when it is off.
  */
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
@@ -18,6 +20,8 @@ import { el, seg, select } from './dom';
 import { auditionOn, setAudition } from './rollAudition';
 import { tableKnob } from './seqFields';
 import { ROLL_ACCENT_KNOBS, ROLL_KNOBS } from './sequencerKnobTables';
+import type { DuplicateRefusal } from './rollDuplicate';
+import { ROLL_DUPLICATE, ROLL_DUPLICATE_REFUSED } from './rollDuplicateTables';
 import { barsOf, loopText } from './rollSummary';
 import { quantiseOff } from './rollQuantise';
 import { ROLL_QUANTISE, ROLL_SHOW, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
@@ -42,6 +46,10 @@ export interface RollControlsTarget {
   repaint(): void;
   /** One − (−1) or + (+1) of the loop, written to the song. */
   stepLoop(dir: number): void;
+  /** Why Dup is off, or null when it can double the loop. */
+  duplicateRefusal(): DuplicateRefusal | null;
+  /** Dup's press: the loop doubled with what is in it, written to the song. */
+  duplicate(): void;
   /** How many notes are selected, which Quantise names. */
   selectedCount(): number;
   /** One press of Quantise, written to the song. */
@@ -97,7 +105,20 @@ const segs = (
   return box;
 };
 
-/** Loop: its readout between − and +. */
+/** Dup (windsor#904): off, its title saying why, when the loop can't double. */
+function dupButton(target: RollControlsTarget): { node: HTMLButtonElement; refresh: () => void } {
+  const button = el('button', 'roll-qbtn roll-dup', ROLL_DUPLICATE.label) as HTMLButtonElement;
+  button.type = 'button';
+  button.onclick = () => target.duplicate();
+  const refresh = (): void => {
+    const refusal = target.duplicateRefusal();
+    button.disabled = refusal !== null;
+    button.title = refusal === null ? ROLL_DUPLICATE.title : ROLL_DUPLICATE_REFUSED[refusal];
+  };
+  return { node: button, refresh };
+}
+
+/** Loop: its readout between − and +, and Dup beside them. */
 function loopItem(target: RollControlsTarget): { node: HTMLElement; refresh: () => void } {
   const label = el('span', 'field-label roll-loop-label', 'Loop');
   const most = el('em');
@@ -105,13 +126,17 @@ function loopItem(target: RollControlsTarget): { node: HTMLElement; refresh: () 
   const text = el('span', 'roll-readout');
   const less = stepButton('−', 'Shorter loop', () => target.stepLoop(-1));
   const more = stepButton('+', 'Longer loop', () => target.stepLoop(1));
+  const dup = dupButton(target);
+  const row = el('div', 'roll-loop-row');
+  row.append(stepper([less, text, more]), dup.node);
   const refresh = (): void => {
     const { loop, region, bar } = target.ticks();
     most.textContent = `≤ ${barsOf(region, bar)} bars`;
     text.textContent = loopText(Math.min(loop, region), bar);
+    dup.refresh();
   };
   refresh();
-  return { node: item(label, stepper([less, text, more])), refresh };
+  return { node: item(label, row), refresh };
 }
 
 /**
