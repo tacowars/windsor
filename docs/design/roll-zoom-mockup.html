@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Roll's zoom, three options for tacowars to choose from. 2026-10-18.
+     Desktop first; the tablet gets its own pass once an option is chosen.
+     Today is drawn from tacowars's screenshot of the Roll device on
+     2026-10-18: Drums C2 Soft, one 1/16 note on C4 in a 0.5-bar loop, a
+     50-bar region, C minor, Snap 1/16, the ↔ zoom at fit and the ↕ zoom at
+     7 px/row. The second song (a 2-bar line) is the case tacowars
+     described. The tablet's Today is
+     docs/design/expanded-views-below-header-today-tablet-landscape-roll.jpg,
+     taken on 2026-10-17: Bass, twelve notes in a 1-bar loop in a 4-bar
+     region, C minor, the Expanded view at fit and 15 px/row; its notes are
+     read off that screenshot. The device's frame and controls copy the rules of
+     docs/design/roll-envelopes-mockup.html, which copied console.css; the
+     panes are painted here by simplified versions of rollPaint.ts and
+     rollNotesPaint.ts (rows, bar, beat and 1/16 lines, the repeats' hatch,
+     ghost repeats at 0.38, velocity stems), not by the app's code. Today's
+     zoom numbers are rollTables.ts's (ROLL_TIME_ZOOM, ROLL_ROW_PX); the
+     ruler drag's 60 px per doubling and 3 px threshold are the Song tab's
+     (SONG_VIEW.dragPxPerDoubling, SONG_DRAG_THRESHOLD_PX).
+     What works: the option and song pickers, every zoom control, the ruler
+     drag and double-click, the keys drag, ctrl-wheel and trackpad pinch,
+     touch pan and pinch, the scroll and zoom bars, and Duplicate. Snap,
+     Loop, Keys, Fold, Quantize, Audition, Rec and the knobs are inert
+     copies. Nothing edits a note and nothing makes sound. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Windsor Roll Zoom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ---------- tokens and base, copied from console.css (dark only) ---------- */
+:root {
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10;
+  --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 13px; margin: 0; -webkit-font-smoothing: antialiased; }
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+
+/* ---------- the page around the device (mockup only) ---------- */
+.page { max-width: 1440px; margin: 0 auto; padding: 18px 16px 40px; }
+.page h1 { margin: 0 0 4px; font-family: var(--f-panel); font-size: 18px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.page h2 { margin: 0 0 8px; font-family: var(--f-panel); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--carrier); }
+.page p, .page li { color: var(--ink-dim); line-height: 1.5; }
+.page p { margin: 0 0 10px; max-width: 900px; }
+.page ul, .page ol { margin: 0; padding-left: 18px; }
+.page li { margin-bottom: 4px; }
+.page b { color: var(--ink); font-weight: 600; }
+.page kbd { padding: 0 4px; border: 1px solid var(--line-bright); border-radius: var(--r); font-family: var(--f-num); font-size: 11px; }
+.pickers { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 14px 0 12px; }
+.pickers .seg button { min-width: 0; padding: 7px 12px; }
+.pickers .lbl { color: var(--ink-faint); font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-right: 6px; }
+.pickers label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-dim); font-size: 12px; cursor: pointer; }
+.try { margin: 10px 0 0; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--carrier); border-radius: var(--r); color: var(--ink-dim); font-size: 12px; line-height: 1.5; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 16px; }
+.card { padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+.card.on { border-color: var(--carrier); }
+.card h3 { margin: 0 0 6px; font-family: var(--f-panel); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.card .pro { color: var(--modulator); }
+.card .con { color: var(--hot); }
+.section { margin-top: 22px; }
+
+/* ---------- the sequencer device and the Roll, copied from console.css ---------- */
+.seq-rack { display: flex; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior: none; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; }
+.part-head { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 6px; margin-bottom: 6px; }
+.part-head .sq { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink-dim); font-size: 9px; }
+.part-head .t { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.part-head .s { color: var(--ink-faint); font-family: var(--f-num); font-size: 10px; }
+.part-head .x { margin-left: auto; }
+.seq-device { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seq-device.fixed { flex: 1 1 auto; height: var(--seq-h); }
+.seq-device-body { flex: 1 1 0%; min-width: 0px; }
+.seq-rail { width: var(--seq-rail); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0px; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.seq-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 3px; border-radius: 50%; background: var(--modulator); }
+.seq-name { flex: 0 1 auto; writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px 0px; color: var(--ink); font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.seq-rail-spacer { flex: 1 1 0%; }
+.seq-icon { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; color: var(--ink-faint); font-size: 10px; line-height: 1; }
+.seq-icon.roll-expand { color: var(--carrier); }
+.seq-region { flex: 0 0 auto; writing-mode: vertical-rl; transform: rotate(180deg); color: var(--ink-faint); font-family: var(--f-num); font-size: 8.5px; white-space: nowrap; }
+.seq-section { flex: 0 0 auto; min-width: 0px; min-height: 0px; display: flex; flex-direction: column; padding: 4px 8px 6px; }
+.seq-section + .seq-section { border-left: 1px solid var(--line); }
+.roll-device-body { display: flex; flex-direction: column; min-height: 0px; }
+.roll-tabs { flex: 0 0 auto; height: 22px; display: flex; align-items: flex-end; gap: 2px; padding: 0px 8px; border-bottom: 1px solid var(--line); }
+.roll-tab { height: 17px; padding: 2px 8px; border-radius: var(--r) var(--r) 0 0; background: var(--carrier); color: var(--inset); font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; line-height: 1.4; text-transform: uppercase; }
+.roll-tab.off { background: transparent; color: var(--ink-dim); }
+.roll-summary { margin-left: auto; align-self: center; min-width: 0px; padding-left: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-faint); font-family: var(--f-num); font-size: 10px; }
+.roll-summary b { color: var(--ink-dim); font-weight: 500; }
+.roll-page { flex: 1 1 0%; min-height: 0px; display: flex; }
+.seq-section.roll-main { flex: 1 1 0%; min-width: 0px; padding: 6px 8px 6px; }
+.roll-ctl-sec { gap: 4px; }
+.roll-ctl-cols { display: flex; gap: var(--roll-ctl-gap); }
+.roll-ctl { width: var(--roll-ctl-w); display: flex; flex-direction: column; gap: 4px; }
+.roll-item { display: flex; flex-direction: column; }
+.field-label { display: flex; justify-content: space-between; margin: 0px 0px 2px; font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; line-height: 11px; text-transform: uppercase; color: var(--ink-faint); }
+.field-label em { color: var(--ink-faint); font-family: var(--f-num); font-size: 9px; font-style: normal; letter-spacing: 0px; text-transform: none; }
+select.field { appearance: none; width: 100%; height: var(--roll-ctl-h); padding: 0px 16px 0px 6px; background: var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E") no-repeat right 6px center; border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink); font-family: var(--f-num); font-size: 11px; }
+.roll-stepper { display: flex; height: var(--roll-ctl-h); overflow: hidden; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); }
+.roll-step { flex: 0 0 auto; width: 20px; padding: 0px; background: transparent; border: 0px; color: var(--ink-dim); font-family: var(--f-num); font-size: 12px; cursor: pointer; }
+.roll-step:hover:not(:disabled) { background: var(--panel-hi); color: var(--ink); }
+.roll-step:disabled { color: var(--line-bright); cursor: default; }
+.roll-step.roll-fit, .roll-readout { flex: 1 1 0%; width: auto; border-inline: 1px solid var(--line); color: var(--ink); font-family: var(--f-num); font-size: 10.5px; line-height: 18px; text-align: center; white-space: nowrap; }
+.roll-step.roll-fit.on { color: var(--carrier); }
+.roll-qbtn { height: var(--roll-ctl-h); padding: 0px; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink); font-family: var(--f-panel); font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+.roll-qbtn:hover:not(:disabled) { background: var(--panel-hi); }
+.roll-qbtn:disabled { color: var(--ink-faint); cursor: default; }
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1 1 0%; min-width: 44px; background: var(--inset); border: 0px; padding: 5px 4px; cursor: pointer; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--seg-color, var(--carrier)); color: rgb(17, 20, 22); }
+.seg.roll-seg { flex-wrap: nowrap; height: var(--roll-ctl-h); gap: 0px; background: var(--line-bright); border: 1px solid var(--line-bright); }
+.seg.roll-seg button { min-width: 0px; padding: 0px; font-size: 9.5px; letter-spacing: 0.06em; }
+.seg.roll-seg button + button { border-left: 1px solid var(--line-bright); }
+.seg.roll-seg button[aria-pressed="true"] { color: var(--inset); }
+.seg.teal { --seg-color: var(--modulator); }
+.rec-dot { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--ink-faint); }
+.roll-zooms { display: grid; grid-template-columns: 14px 1fr; gap: 3px 4px; align-items: center; }
+.roll-zooms i { color: var(--ink-faint); font-size: 11px; font-style: normal; text-align: center; }
+.loop-row { display: flex; gap: 3px; }
+.loop-row .roll-stepper { flex: 1 1 0%; min-width: 0; }
+.roll-qbtn.dup { flex: 0 0 auto; width: 30px; }
+.roll-qbtn.dup[hidden] { display: none; }
+.roll-hint { color: var(--ink-faint); font-family: var(--f-num); font-size: 9px; line-height: 11px; }
+.vel-row { display: flex; flex-direction: column; margin-top: auto; padding-top: 3px; border-top: 1px solid var(--line); }
+.vel-knobs { display: flex; justify-content: space-around; }
+.knob { width: 54px; display: flex; flex-direction: column; align-items: center; }
+.knob svg { display: block; }
+.knob .v { font-family: var(--f-num); font-size: 10px; line-height: 12px; }
+.knob .l { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; line-height: 11px; text-transform: uppercase; color: var(--ink-faint); }
+
+.roll-grid { position: relative; height: 100%; display: grid; grid-template-columns: var(--roll-keys-w) minmax(0, 1fr); grid-template-rows: var(--roll-head-h) minmax(0, 1fr) var(--roll-vel-h); overflow: hidden; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.roll-pane { position: relative; min-width: 0px; min-height: 0px; overflow: hidden; }
+.roll-pane canvas { position: absolute; left: 0; top: 0; display: block; }
+.roll-corner { display: flex; flex-direction: column; justify-content: flex-end; padding: 0px 4px 1px; background: var(--panel-hi); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--ink-faint); font-family: var(--f-num); font-size: 9px; white-space: nowrap; }
+.roll-guide { color: var(--carrier); font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; line-height: 13px; }
+.roll-head { border-bottom: 1px solid var(--line); touch-action: none; }
+.roll-keys { border-right: 1px solid var(--line); touch-action: none; }
+.roll-body { touch-action: none; }
+.roll-vcorner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: var(--panel-hi); border-top: 1px solid var(--line); border-right: 1px solid var(--line); color: var(--ink-faint); font-family: var(--f-panel); font-size: 7.5px; font-weight: 600; letter-spacing: 0.1em; }
+.roll-vcorner span.on { padding: 0 4px; background: var(--modulator); border-radius: 2px; color: var(--inset); }
+.roll-vel { border-top: 1px solid var(--line); }
+
+/* ---------- what is new: the ruler and keys gestures, the readout, the zoom bars ---------- */
+.zoomable .roll-head { cursor: ns-resize; }
+.zoomable .roll-keys { cursor: ew-resize; }
+.zbar { position: absolute; background: var(--inset); }
+.zbar.h { left: 0; bottom: 0; }
+.zbar.v { right: 0; top: 0; }
+.zbar canvas { position: absolute; inset: 0; pointer-events: none; }
+.zthumb { position: absolute; background: var(--line-bright); border-radius: 4px; cursor: grab; touch-action: none; }
+.zthumb:hover, .zthumb.drag { background: #4d5b63; }
+.plain .zthumb { opacity: 0.85; }
+.plain .zbar.h .zthumb { top: 2px; bottom: 2px; }
+.plain .zbar.v .zthumb { left: 2px; right: 2px; }
+.zgrip { display: none; position: absolute; touch-action: none; }
+.grips .zbar { background: var(--well); box-shadow: inset 0 0 0 1px var(--line); }
+.grips .zthumb { background: color-mix(in srgb, var(--ink) 9%, transparent); box-shadow: inset 0 0 0 1px var(--ink-faint); border-radius: 3px; }
+.grips .zthumb:hover, .grips .zthumb.drag { background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.grips .zbar.h .zthumb { top: 1px; bottom: 1px; }
+.grips .zbar.v .zthumb { left: 1px; right: 1px; }
+.grips .zgrip { display: block; background: var(--ink-dim); border-radius: 2px; }
+.grips .zgrip:hover, .grips .zgrip.drag { background: var(--carrier); }
+.grips .zbar.h .zgrip { top: 0; bottom: 0; width: 9px; cursor: ew-resize; }
+.grips .zbar.h .zgrip.a { left: 0; } .grips .zbar.h .zgrip.b { right: 0; }
+.grips .zbar.v .zgrip { left: 0; right: 0; height: 9px; cursor: ns-resize; }
+.grips .zbar.v .zgrip.a { top: 0; } .grips .zbar.v .zgrip.b { bottom: 0; }
+.zbadge { position: absolute; z-index: 6; display: none; transform: translateX(-50%); pointer-events: none; white-space: nowrap; font-family: var(--f-num); font-size: 10px; color: var(--ink); background: var(--well); border: 1px solid var(--carrier); border-radius: var(--r); padding: 2px 6px; }
+.zbadge.on { display: block; }
+/* Touch sizes (any-pointer: coarse): the bars' ends and thumb sized for a finger. */
+.touch .grips .zbar.h .zgrip { width: 26px; }
+.touch .grips .zbar.v .zgrip { height: 26px; }
+.touch .grips .zgrip::after { content: ""; position: absolute; inset: 7px; border-inline: 1px solid var(--inset); }
+.touch .grips .zbar.v .zgrip::after { border-inline: 0; border-block: 1px solid var(--inset); }
+.touch .zbadge { font-size: 12px; padding: 4px 8px; }
+/* The tablet's screen, drawn around the rack (mockup only). */
+.frame { position: relative; }
+.frame.tablet { margin: 22px 0 0; padding: 0; outline: 1px dashed var(--line-bright); outline-offset: 6px; }
+.frame-cap { display: none; position: absolute; top: -22px; left: 0; color: var(--ink-faint); font-family: var(--f-num); font-size: 10px; }
+.frame.tablet .frame-cap { display: block; }
+.expanded .vel-row { margin-top: 6px; }
+.expanded .seq-rack { background: transparent; border: 0; padding: 0; }
+</style>
+<body>
+<div class="page">
+  <h1>Roll zoom</h1>
+  <p>Three ways to make the Roll's zoom read in music, open on the loop, and zoom from the ruler like the Song tab. tacowars chose <b>B, the zoom bars</b>, on 2026-10-18 (Decided, below); A and C stay here for the record. Pick an option, a song, a screen and a view, then try it on the roll below.</p>
+
+  <div class="pickers">
+    <div><span class="lbl">Option</span>
+      <div class="seg" id="optSeg" style="display:inline-flex">
+        <button data-opt="today">Today</button>
+        <button data-opt="a">A · Musical steppers</button>
+        <button data-opt="b" aria-pressed="true">B · Zoom bars (chosen)</button>
+        <button data-opt="c">C · Gestures only</button>
+      </div>
+    </div>
+    <div><span class="lbl">Song</span>
+      <div class="seg" id="dataSeg" style="display:inline-flex">
+        <button data-data="shot" aria-pressed="true">0.5-bar loop (screenshot)</button>
+        <button data-data="two">2-bar loop</button>
+        <button data-data="tablet">1-bar loop (tablet screenshot)</button>
+      </div>
+    </div>
+    <div><span class="lbl">Screen</span>
+      <div class="seg" id="screenSeg" style="display:inline-flex">
+        <button data-screen="desktop" aria-pressed="true">Desktop</button>
+        <button data-screen="landscape">Tablet landscape</button>
+        <button data-screen="portrait">Tablet portrait</button>
+      </div>
+    </div>
+    <div><span class="lbl">View</span>
+      <div class="seg" id="viewSeg" style="display:inline-flex">
+        <button data-view="device" aria-pressed="true">Device</button>
+        <button data-view="expanded">Expanded</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="dupBox" checked> Duplicate button</label>
+  </div>
+
+  <div class="frame" id="frame"><span class="frame-cap" id="frameCap"></span>
+  <div class="seq-rack" id="rack">
+    <div style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column">
+      <div class="part-head"><span class="sq">▾</span><span class="t" id="partTitle"></span><span class="s" id="partSub"></span><span class="sq x">✕</span></div>
+      <div class="seq-device fixed roll-device" id="device" style="--seq-h:284px; --seq-rail:24px; --roll-ctl-w:112px; --roll-ctl-gap:10px; --roll-ctl-h:20px; --roll-keys-w:44px; --roll-head-h:32px; --roll-vel-h:34px; min-width:620px">
+        <div class="seq-rail">
+          <span class="seq-dot"></span>
+          <span class="seq-name">Roll</span>
+          <span class="seq-rail-spacer"></span>
+          <span class="seq-icon roll-expand">⤢</span>
+          <span class="seq-region">1/1</span>
+          <span class="seq-icon">⧉</span>
+          <span class="seq-icon">🗑</span>
+        </div>
+        <div class="seq-device-body roll-device-body">
+          <div class="roll-tabs">
+            <span class="roll-tab">Notes</span><span class="roll-tab off">Envelopes</span>
+            <span class="roll-summary" id="summary"></span>
+          </div>
+          <div class="roll-page">
+            <div class="seq-section roll-ctl-sec">
+              <div class="roll-ctl-cols">
+                <div class="roll-ctl">
+                  <div class="roll-item"><span class="field-label">Snap</span><select class="field"><option>1/16</option></select></div>
+                  <div class="roll-item"><span class="field-label">Loop <em id="loopMax"></em></span>
+                    <div class="loop-row"><div class="roll-stepper"><button class="roll-step">−</button><span class="roll-readout" id="loopRead"></span><button class="roll-step">+</button></div><button class="roll-qbtn dup" data-act="dup" id="dupBtn" title="Duplicate: double the loop and copy its notes, accents, ratchets and envelopes into the new half">Dup</button></div></div>
+                  <div class="roll-item"><span class="field-label">Keys</span><div class="seg roll-seg teal"><button aria-pressed="true">12</button><button>Scale</button></div></div>
+                  <div class="roll-item"><span class="field-label">Fold</span><div class="seg roll-seg teal"><button aria-pressed="true">All</button><button>Fold</button></div></div>
+                  <div class="roll-item"><span class="field-label">Quantize <em>to 1/16</em></span><button class="roll-qbtn" id="qBtn">1 selected</button></div>
+                </div>
+                <div class="roll-ctl" id="col2"></div>
+              </div>
+              <div class="vel-row">
+                <span class="field-label">Velocity</span>
+                <div class="vel-knobs" id="knobs"></div>
+              </div>
+            </div>
+            <div class="seq-section roll-main">
+              <div class="roll-grid" id="grid">
+                <div class="roll-corner"><span class="roll-guide">C min</span><span id="cornerBar">bar 1</span></div>
+                <div class="roll-pane roll-head" id="head"><canvas></canvas></div>
+                <div class="roll-pane roll-keys" id="keys"><canvas></canvas></div>
+                <div class="roll-pane roll-body" id="body"><canvas></canvas>
+                  <div class="zbar h" id="hbar"><canvas></canvas><div class="zthumb"><i class="zgrip a"></i><i class="zgrip b"></i></div></div>
+                  <div class="zbar v" id="vbar"><canvas></canvas><div class="zthumb"><i class="zgrip a"></i><i class="zgrip b"></i></div></div>
+                </div>
+                <div class="roll-vcorner"><span class="on">VEL</span><span>ACC</span><span>RAT</span></div>
+                <div class="roll-pane roll-vel" id="vel"><canvas></canvas></div>
+                <div class="zbadge" id="badge"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="try" id="tryLine"></div>
+
+  <div class="cards" id="cards">
+    <div class="card" data-card="today">
+      <h3>Today</h3>
+      <ul>
+        <li>Opens fitted to the region: a short loop in a long region is a row of slivers.</li>
+        <li>↔ reads <b>fit</b> or <b>px/bar</b>; ↕ reads <b>px/row</b>. Neither says what you see.</li>
+        <li><b>fit</b> sits between − and +, so a near miss on either jumps back out to the whole region.</li>
+        <li>The ruler does nothing on a drag, though the Song tab's ruler zooms.</li>
+      </ul>
+    </div>
+    <div class="card" data-card="a">
+      <h3>A · Musical steppers <span style="color:var(--ink-faint)">· not chosen</span></h3>
+      <ul>
+        <li>The Zoom item stays, rebuilt: <b>Loop</b> and <b>Region</b> fit buttons on their own row, then ↔ and ↕ steppers whose middles are readouts, not buttons.</li>
+        <li>↔ halves or doubles what is shown, so it lands on round values: 2 bars, 1 bar, 2 beats. ↕ reads octaves shown.</li>
+        <li class="pro">+ Every action has a visible button; nearest to today; nothing to misclick.</li>
+        <li class="con">− Uses three rows of column 2. Doesn't show where you are in a 50-bar region.</li>
+      </ul>
+    </div>
+    <div class="card" data-card="b">
+      <h3>B · Zoom bars <span style="color:var(--carrier)">· chosen</span></h3>
+      <ul>
+        <li>The scrollbars become zoom handles: drag an <b>end</b> to zoom, the <b>middle</b> to scroll, click the track to jump there.</li>
+        <li>The ↔ bar is a map of the whole region: the loop is marked and the notes are ticks, so you always see where you are in 50 bars. The ↕ bar maps the pitches.</li>
+        <li>Column 2 keeps only <b>Loop</b> and <b>Region</b>.</li>
+        <li class="pro">+ Visible, direct, and the one design that shows position. Works the same with a finger (the bars grow on the tablet).</li>
+        <li class="con">− Takes 4 px more from the notes than today's scrollbars. The ends are small targets on a mouse.</li>
+      </ul>
+    </div>
+    <div class="card" data-card="c">
+      <h3>C · Gestures only <span style="color:var(--ink-faint)">· not chosen</span></h3>
+      <ul>
+        <li>Zoom leaves the controls. The ruler and the keys do it all, a readout floats while you drag, and the summary names the bars shown.</li>
+        <li>Double-click the ruler to switch between the loop and the region.</li>
+        <li>Column 2 has room for more.</li>
+        <li class="pro">+ Most room, one way to zoom, the same gesture as the Song tab.</li>
+        <li class="con">− Nothing on screen says you can zoom until you try. Tooltips don't exist on the tablet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>In A, B and C</h2>
+    <ol>
+      <li><b>The roll opens on the loop.</b> A short loop in a long region fills the width, and its repeats carry on to the right under the hatch. Double-click the ruler, or press Region, for the whole region; press Loop to come back.</li>
+      <li><b>The ruler zooms like the Song tab's.</b> Drag up to zoom in, down to zoom out, around the bar you pressed; drag left and right to scroll.</li>
+      <li><b>The keys zoom rows.</b> Drag them right for taller rows, left for shorter, up and down to scroll. A tap still plays the key.</li>
+      <li><b>Pinch zooms</b> around your fingers. On a trackpad (or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + wheel) it zooms time. On the tablet, spreading sideways zooms time and spreading up and down zooms rows; one finger on empty space still scrolls and a tap still adds a note (the Roll's record, decision 8).</li>
+      <li><b>No px anywhere.</b> Time reads in bars or beats, rows in octaves.</li>
+    </ol>
+  </div>
+
+  <div class="section">
+    <h2>On the tablet</h2>
+    <ul>
+      <li>Pick a tablet screen above: the rack takes the tablet's width (1366 px in landscape, 1024 px in portrait), and the zoom bars take their touch size, as they will whenever any pointer is coarse.</li>
+      <li><b>The bars</b> grow from 12 to 22 px, and each end is a 26 × 22 px grip with two ridges. The thumb never gets shorter than 84 px, so both grips and a middle to hold stay under a finger even at the region's full width.</li>
+      <li><b>The device view</b> gives the notes 10 px less than on the desktop. <b>The Expanded view</b> has the room, and opens on the loop at 15 px rows, as today.</li>
+      <li>The readout that floats while you zoom is larger, and it sits at the top of the notes, clear of your fingers.</li>
+      <li>Touch can't be tried in a desktop browser: pinch and one-finger pans need the tablet.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Decided (tacowars, 2026-10-18)</h2>
+    <ul>
+      <li><b>Option B</b>, the zoom bars, with everything under "In A, B and C".</li>
+      <li><b>Duplicate</b> (<b>Dup</b> beside the Loop stepper) doubles the loop and copies everything in it into the new half: the notes with their velocity, accents and ratchets, and the loop's envelopes. It stops at the region's length.</li>
+      <li><b>The closest zoom</b> rises from 120 to 240 px per beat (a 1/16 is 60 px wide).</li>
+      <li><b>Double-click on the ruler</b> switches between the loop and the region.</li>
+      <li><b>The Expanded view</b> gets option B too, and keeps its own zoom, separate from the device's, as today.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ---------- the songs: ticks on the 24 PPQ grid ----------
+const PPQ = 24;
+const BAR = 4 * PPQ;
+const SNAP = 6;
+const CHORD_PCS = [0, 3, 7];
+const SCALE_PCS = [0, 2, 3, 5, 7, 8, 10];
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SONGS = {
+  shot: { part: 'Drums C2 Soft', loop: BAR / 2, bars: 50, knobs: ['1.00', '1.00', '0.64'], quantize: '1 selected', notes: [[0, 60, 6, 1]] },
+  two: {
+    part: 'Bass Line',
+    loop: 2 * BAR,
+    bars: 50,
+    knobs: ['1.00', '1.00', '0.64'],
+    quantize: 'all notes',
+    notes: [
+      [0, 36, 6, 1], [12, 36, 6, 0.55], [18, 48, 6, 0.8], [30, 39, 6, 0.7],
+      [36, 36, 6, 0.9], [48, 43, 12, 0.75], [66, 46, 6, 0.6], [78, 48, 6, 0.85],
+      [96, 36, 6, 1], [108, 36, 6, 0.5], [114, 48, 6, 0.8], [126, 41, 6, 0.7],
+      [132, 39, 12, 0.9], [150, 43, 6, 0.6], [162, 36, 6, 0.75], [174, 34, 12, 0.85],
+    ],
+  },
+  tablet: {
+    part: 'Bass',
+    loop: BAR,
+    bars: 4,
+    knobs: ['0.80', '0.20', '1.00'],
+    quantize: 'all notes',
+    notes: [
+      [0, 48, 6, 0.8], [12, 48, 6, 0.3], [18, 60, 6, 0.45], [24, 51, 6, 0.5],
+      [36, 51, 6, 0.3], [42, 63, 6, 0.55], [48, 55, 6, 0.75], [60, 53, 6, 0.55],
+      [66, 58, 6, 0.65], [72, 58, 6, 0.75], [84, 60, 6, 0.6], [90, 55, 6, 0.4],
+    ],
+  },
+};
+
+// ---------- the zoom's numbers ----------
+const TODAY_TIME = { min: 6, max: 120, step: 1.4, inset: 2 };
+const TODAY_ROWS = [5, 7, 9, 12, 15, 19];
+const NEW_TIME = { max: 240, inset: 2, loopInset: 14 };
+const NEW_ROWS = { min: 4, max: 24 };
+const DRAG = { perDoubling: 60, threshold: 3 };
+const BAR_PX = { today: 8, grips: 12, touch: 22 };
+const THUMB_MIN_PX = { today: 16, grips: 30, touch: 84 };
+const SCREENS = {
+  desktop: { width: null, height: 760, touch: false, cap: '' },
+  landscape: { width: 1366, height: 1024, touch: true, cap: 'Tablet landscape · 1366 × 1024' },
+  portrait: { width: 1024, height: 1366, touch: true, cap: 'Tablet portrait · 1024 × 1366' },
+};
+const DEVICE_H_PX = 284;
+const EXPANDED_CHROME_PX = 72;
+const ROW_START = { device: 1, expanded: 4 };
+
+const C = {
+  panelHi: '#262d32', inset: '#121618', well: '#0c0f10', line: '#2c3439', lineBright: '#3d4950',
+  ink: '#dce3e3', inkDim: '#8b9a9e', inkFaint: '#5e6b70', carrier: '#e0a44e', modulator: '#5fa8a0',
+  keyW: '#1b2023', keyB: '#0f1214', rowW: '#15191b', rowB: '#101315', sep: '#0c0f10', cSep: '#2a3236',
+  beat: '#262d31', snap: '#1b2124', out: '#7d7590', chordLit: 'rgba(224, 164, 78, 0.16)',
+};
+const FONT_NUM = "'IBM Plex Mono', ui-monospace, Menlo, monospace";
+const FONT_PANEL = "'Chakra Petch', system-ui, sans-serif";
+
+// ---------- state ----------
+const S = {
+  opt: 'b', song: 'shot', dup: true, screen: 'desktop', view: 'device', region: 50 * BAR,
+  loop: 0, notes: [], lo: 24, hi: 96,
+  beatPx: 20, left: 0, rowPx: 7, rowIdx: 1, top: 0,
+  fit: 'region', // 'loop' | 'region' | null
+  W: 0, H: 0,
+};
+const $ = (id) => document.getElementById(id);
+const isNew = () => S.opt !== 'today';
+const rows = () => S.hi - S.lo + 1;
+const visTicks = () => (S.W * PPQ) / S.beatPx;
+const visRows = () => S.H / S.rowPx;
+const X = (t) => ((t - S.left) * S.beatPx) / PPQ;
+const tickAt = (x) => S.left + (x * PPQ) / S.beatPx;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const round1 = (v) => Math.round(v * 10) / 10;
+const regionBars = () => S.region / BAR;
+const touch = () => SCREENS[S.screen].touch;
+const sizeKey = () => (S.opt !== 'b' ? 'today' : touch() ? 'touch' : 'grips');
+
+function loadSong() {
+  const song = SONGS[S.song];
+  S.loop = song.loop;
+  S.region = song.bars * BAR;
+  S.notes = song.notes.map(([s, p, l, v]) => ({ s, p, l, v }));
+  const ps = S.notes.map((n) => n.p);
+  S.lo = Math.min(24, ...ps);
+  S.hi = Math.max(96, ...ps);
+}
+
+// ---------- the zoom's maths ----------
+// The floor is the whole region, however long the region and narrow the pane.
+const minBeatPx = () =>
+  isNew() ? Math.max(1, S.W - NEW_TIME.inset) / (S.region / PPQ) : TODAY_TIME.min;
+const maxBeatPx = () => (isNew() ? NEW_TIME.max : TODAY_TIME.max);
+const fitRegionPx = () =>
+  Math.max(minBeatPx(), (S.W - (isNew() ? NEW_TIME.inset : TODAY_TIME.inset)) / (S.region / PPQ));
+const fitLoopPx = () => clamp((S.W - NEW_TIME.loopInset) / (S.loop / PPQ), minBeatPx(), maxBeatPx());
+const rowBounds = () => (isNew() ? NEW_ROWS : { min: TODAY_ROWS[0], max: TODAY_ROWS.at(-1) });
+
+function clampView() {
+  S.beatPx = clamp(S.beatPx, minBeatPx(), maxBeatPx());
+  S.left = clamp(S.left, 0, Math.max(0, S.region - visTicks()));
+  const rb = rowBounds();
+  S.rowPx = clamp(S.rowPx, rb.min, rb.max);
+  S.top = clamp(S.top, 0, Math.max(0, rows() - visRows()));
+}
+function applyFit() {
+  if (S.fit === 'loop') S.beatPx = fitLoopPx();
+  if (S.fit === 'region') S.beatPx = fitRegionPx();
+  if (S.fit) S.left = 0;
+}
+function fitTo(kind) {
+  S.fit = kind;
+  applyFit();
+  clampView();
+  paint();
+}
+/** Zoom time by `factor` keeping the tick under `x` there. */
+function zoomTimeAt(factor, x) {
+  const t = tickAt(x);
+  S.beatPx = clamp(S.beatPx * factor, minBeatPx(), maxBeatPx());
+  S.left = t - (x * PPQ) / S.beatPx;
+  S.fit = null;
+  clampView();
+}
+/** Zoom rows to `px` keeping the row under `y` there. */
+function zoomRowsAt(px, y) {
+  const r = S.top + y / S.rowPx;
+  const rb = rowBounds();
+  S.rowPx = clamp(px, rb.min, rb.max);
+  S.top = r - y / S.rowPx;
+  clampView();
+}
+function centreRows() {
+  const ps = S.notes.map((n) => n.p);
+  const mid = (Math.min(...ps) + Math.max(...ps)) / 2;
+  S.top = S.hi - mid - visRows() / 2 + 0.5;
+}
+
+function spanText(ticks) {
+  const bars = ticks / BAR;
+  if (bars >= 0.95) {
+    const b = bars >= 10 ? Math.round(bars) : round1(bars);
+    return `${b} bar${b === 1 ? '' : 's'}`;
+  }
+  const beats = round1(ticks / PPQ);
+  return `${beats} beat${beats === 1 ? '' : 's'}`;
+}
+function octText() {
+  const o = Math.round((visRows() / 12) * 2) / 2;
+  const whole = Math.floor(o);
+  const half = o - whole ? '½' : '';
+  return `${whole || ''}${half || (whole ? '' : '0')} oct`;
+}
+const loopText = () => `${round1(S.loop / BAR)} bar${S.loop === BAR ? '' : 's'}`;
+function shownBars() {
+  const a = Math.floor(S.left / BAR) + 1;
+  const b = Math.min(regionBars(), Math.ceil((S.left + visTicks()) / BAR - 0.1));
+  return a === b ? `bar ${a}` : `bars ${a}–${b}`;
+}
+
+// ---------- painting ----------
+let raf = 0;
+function paint() {
+  if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); });
+}
+function sizeCanvas(pane) {
+  const cv = pane.querySelector(':scope > canvas');
+  const w = pane.clientWidth;
+  const h = pane.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.width = `${w}px`;
+    cv.style.height = `${h}px`;
+  }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+function mix(hex, pct) {
+  const a = parseInt(hex.slice(1), 16);
+  const b = parseInt(C.inset.slice(1), 16);
+  const ch = (s) => Math.round(((a >> s) & 255) * pct + ((b >> s) & 255) * (1 - pct));
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+}
+function noteColour(p) {
+  const pc = p % 12;
+  if (CHORD_PCS.includes(pc)) return C.carrier;
+  if (SCALE_PCS.includes(pc)) return C.modulator;
+  return C.out;
+}
+/** Every drawn note in the view: the note itself on pass 0, its ghost repeats after. */
+function instances() {
+  const out = [];
+  const from = S.left - BAR;
+  const to = S.left + visTicks();
+  const first = Math.max(0, Math.floor(from / S.loop));
+  for (let pass = first; pass * S.loop < Math.min(S.region, to); pass++) {
+    for (const n of S.notes) {
+      const s = n.s + pass * S.loop;
+      if (s >= S.region || s >= to) continue;
+      const len = Math.min(n.l, S.loop - n.s, S.region - s);
+      out.push({ n, s, len, ghost: pass > 0 });
+    }
+  }
+  return out;
+}
+let hatch = null;
+function hatchPattern(ctx) {
+  if (hatch) return hatch;
+  const t = document.createElement('canvas');
+  t.width = 12; t.height = 12;
+  const c = t.getContext('2d');
+  c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(0, 0, 12, 12);
+  c.strokeStyle = 'rgba(0,0,0,0.22)'; c.lineWidth = 4.2;
+  for (const o of [-12, 0, 12]) { c.beginPath(); c.moveTo(o, 12); c.lineTo(o + 12, 0); c.stroke(); }
+  hatch = ctx.createPattern(t, 'repeat');
+  return hatch;
+}
+function vline(ctx, x, y0, y1, colour, width = 1) {
+  ctx.fillStyle = colour;
+  ctx.fillRect(Math.round(x), y0, width, y1 - y0);
+}
+
+function drawBody() {
+  const { ctx, w, h } = sizeCanvas($('body'));
+  ctx.clearRect(0, 0, w, h);
+  const r0 = Math.floor(S.top);
+  for (let r = r0; (r - S.top) * S.rowPx < S.H && r < rows(); r++) {
+    const p = S.hi - r;
+    const y = (r - S.top) * S.rowPx;
+    const black = [1, 3, 6, 8, 10].includes(p % 12);
+    ctx.fillStyle = black ? C.rowB : C.rowW;
+    ctx.fillRect(0, y, S.W, S.rowPx);
+    ctx.fillStyle = p % 12 === 0 ? C.cSep : C.sep;
+    ctx.fillRect(0, y + S.rowPx - 1, S.W, 1);
+  }
+  const t0 = S.left;
+  const t1 = S.left + visTicks();
+  const snapPx = (SNAP * S.beatPx) / PPQ;
+  const step = snapPx >= 4 ? SNAP : S.beatPx >= 3 ? PPQ : BAR;
+  for (let t = Math.ceil(t0 / step) * step; t <= Math.min(t1, S.region); t += step) {
+    const colour = t % BAR === 0 ? C.lineBright : t % PPQ === 0 ? C.beat : C.snap;
+    if (t % BAR !== 0 && S.beatPx * 4 < 6) continue;
+    vline(ctx, X(t), 0, S.H, colour);
+  }
+  const lx = X(S.loop);
+  const rx = X(S.region);
+  if (lx < S.W && rx > 0) {
+    ctx.fillStyle = hatchPattern(ctx);
+    ctx.save();
+    ctx.translate(-(S.left * S.beatPx / PPQ) % 12, 0);
+    ctx.fillRect(Math.max(lx, 0) + (S.left * S.beatPx / PPQ) % 12, 0, Math.min(rx, S.W) - Math.max(lx, 0), S.H);
+    ctx.restore();
+    if (lx >= 0) vline(ctx, lx, 0, S.H, C.carrier, 2);
+  }
+  if (rx < S.W) { ctx.fillStyle = C.well; ctx.fillRect(rx, 0, S.W - rx, S.H); }
+  for (const { n, s, len, ghost } of instances()) {
+    const x = X(s);
+    const nw = Math.max(3, (len * S.beatPx) / PPQ - 1);
+    const y = (S.hi - n.p - S.top) * S.rowPx;
+    if (x > S.W || x + nw < 0 || y > S.H || y + S.rowPx < 0) continue;
+    const colour = noteColour(n.p);
+    ctx.globalAlpha = ghost ? 0.38 : 1;
+    ctx.fillStyle = mix(colour, 0.45 + 0.55 * n.v);
+    ctx.fillRect(x, y + 0.5, nw, S.rowPx - 1);
+    ctx.strokeStyle = mix(colour, 0.6);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 1, nw - 1, S.rowPx - 2);
+    if (!ghost && S.rowPx >= 11 && nw >= 26) {
+      ctx.fillStyle = C.inset;
+      ctx.font = `500 8.5px ${FONT_NUM}`;
+      ctx.fillText(`${NOTE_NAMES[n.p % 12]}${Math.floor(n.p / 12) - 1}`, x + 3, y + S.rowPx / 2 + 3);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawHead() {
+  const { ctx, w, h } = sizeCanvas($('head'));
+  ctx.fillStyle = C.panelHi;
+  ctx.fillRect(0, 0, w, h);
+  const barPx = S.beatPx * 4;
+  const every = [1, 2, 4, 5, 10, 25, 50].find((k) => k * barPx >= 26) || 50;
+  const last = regionBars();
+  const firstBar = Math.max(0, Math.floor(S.left / BAR));
+  ctx.font = `9px ${FONT_NUM}`;
+  ctx.textBaseline = 'alphabetic';
+  for (let b = firstBar; b <= last; b++) {
+    const x = X(b * BAR);
+    if (x > w) break;
+    const labelled = b % every === 0 && b < last;
+    vline(ctx, x, labelled ? 1 : 6, 11, C.lineBright);
+    if (labelled) { ctx.fillStyle = C.inkDim; ctx.fillText(String(b + 1), x + 3, 10); }
+    if (S.beatPx >= 34 && b < last) {
+      for (let k = 1; k < 4; k++) {
+        const bx = X(b * BAR + k * PPQ);
+        vline(ctx, bx, 6, 11, C.line);
+        ctx.fillStyle = C.inkFaint;
+        ctx.fillText(`${b + 1}.${k + 1}`, bx + 3, 10);
+      }
+    }
+  }
+  const lx = X(S.loop);
+  ctx.fillStyle = C.carrier;
+  ctx.fillRect(Math.max(X(0), -4), 12, lx - Math.max(X(0), -4), 4);
+  ctx.fillRect(lx - 5, 8, 9, 9);
+  const reps = Math.round(S.region / S.loop);
+  if (reps > 1 && lx + 6 < w) {
+    ctx.fillStyle = C.inkFaint;
+    ctx.font = `8px ${FONT_NUM}`;
+    ctx.fillText(`repeats ×${reps}`, lx + 8, 16);
+  }
+  const cy = 17;
+  const cx0 = Math.max(X(0), 0);
+  const cx1 = Math.min(X(S.region), w);
+  ctx.fillStyle = C.chordLit;
+  ctx.fillRect(cx0, cy, cx1 - cx0, 14);
+  ctx.fillStyle = C.carrier;
+  ctx.font = `600 9.5px ${FONT_PANEL}`;
+  ctx.fillText('C min', cx0 + 4, cy + 10.5);
+}
+
+function drawKeys() {
+  const { ctx, w, h } = sizeCanvas($('keys'));
+  ctx.clearRect(0, 0, w, h);
+  const fs = clamp(S.rowPx - 3, 7, 9.5);
+  ctx.font = `${fs}px ${FONT_NUM}`;
+  for (let r = Math.floor(S.top); (r - S.top) * S.rowPx < S.H && r < rows(); r++) {
+    const p = S.hi - r;
+    const y = (r - S.top) * S.rowPx;
+    const pc = p % 12;
+    const black = [1, 3, 6, 8, 10].includes(pc);
+    ctx.fillStyle = black ? C.keyB : C.keyW;
+    ctx.fillRect(0, y, w, S.rowPx);
+    if (CHORD_PCS.includes(pc)) {
+      ctx.fillStyle = pc === 0 ? 'rgba(224,164,78,0.88)' : 'rgba(224,164,78,0.42)';
+      ctx.fillRect(0, y, w, S.rowPx);
+    }
+    if (pc === 0) { ctx.fillStyle = C.lineBright; ctx.fillRect(0, y + S.rowPx - 1, w, 1); }
+    const label = pc === 0 ? S.rowPx >= 5 : S.rowPx >= 9;
+    if (label) {
+      ctx.fillStyle = pc === 0 ? C.inset : CHORD_PCS.includes(pc) ? C.ink : C.inkFaint;
+      ctx.fillText(`${NOTE_NAMES[pc]}${Math.floor(p / 12) - 1}`, 4, y + S.rowPx / 2 + fs / 2 - 1);
+    }
+  }
+}
+
+function drawVel() {
+  const { ctx, w, h } = sizeCanvas($('vel'));
+  ctx.clearRect(0, 0, w, h);
+  for (const { n, s, ghost } of instances()) {
+    const x = X(s);
+    if (x < -4 || x > S.W) continue;
+    const sh = Math.max(2, n.v * (h - 8));
+    ctx.globalAlpha = ghost ? 0.3 : 1;
+    ctx.fillStyle = noteColour(n.p);
+    ctx.fillRect(Math.round(x), h - sh, 2, sh);
+    ctx.beginPath();
+    ctx.arc(Math.round(x) + 1, h - sh, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- the scroll bars, which are zoom bars in option B ----------
+/** A thumb's length: its share of the track, never under the least (at most half the track), never over the track. */
+const thumbLen = (track, shown, total) =>
+  Math.min(track, Math.max(Math.min(THUMB_MIN_PX[sizeKey()], track / 2), (shown / total) * track));
+/** How far along its travel a thumb sits, 0 to 1: 0 whenever everything is shown. */
+const thumbPos = (start, shown, total) => (total > shown ? clamp(start / (total - shown), 0, 1) : 0);
+/** What one px of thumb travel scrolls: the content the thumb can't show, over the track the thumb can't fill. */
+const perPx = (track, shown, total) =>
+  Math.max(0, total - shown) / Math.max(1, track - thumbLen(track, shown, total));
+function drawBars() {
+  const grips = S.opt === 'b';
+  const t = BAR_PX[sizeKey()];
+  const body = $('body');
+  body.classList.toggle('grips', grips);
+  body.classList.toggle('plain', !grips);
+  const hb = $('hbar');
+  const vb = $('vbar');
+  Object.assign(hb.style, { width: `${S.W}px`, height: `${t}px` });
+  Object.assign(vb.style, { width: `${t}px`, height: `${S.H}px` });
+  const hw = thumbLen(S.W, visTicks(), S.region);
+  const hx = thumbPos(S.left, visTicks(), S.region) * (S.W - hw);
+  Object.assign(hb.querySelector('.zthumb').style, { left: `${isFinite(hx) ? hx : 0}px`, width: `${hw}px` });
+  const vh = thumbLen(S.H, visRows(), rows());
+  const vy = thumbPos(S.top, visRows(), rows()) * (S.H - vh);
+  Object.assign(vb.querySelector('.zthumb').style, { top: `${isFinite(vy) ? vy : 0}px`, height: `${vh}px` });
+  // B's maps: the loop and the notes over the whole region, the pitches over the whole range.
+  const hc = sizeCanvas(hb);
+  hc.ctx.clearRect(0, 0, hc.w, hc.h);
+  const vc = sizeCanvas(vb);
+  vc.ctx.clearRect(0, 0, vc.w, vc.h);
+  if (!grips) return;
+  const px = (tk) => (tk / S.region) * hc.w;
+  hc.ctx.fillStyle = 'rgba(224,164,78,0.35)';
+  hc.ctx.fillRect(0, 2, Math.max(2, px(S.loop)), hc.h - 4);
+  for (let pass = 0; pass * S.loop < S.region; pass++) {
+    for (const n of S.notes) {
+      hc.ctx.fillStyle = pass ? 'rgba(220,227,227,0.22)' : C.carrier;
+      hc.ctx.fillRect(Math.floor(px(n.s + pass * S.loop)), 4, 1, hc.h - 8);
+    }
+  }
+  for (const n of S.notes) {
+    vc.ctx.fillStyle = noteColour(n.p);
+    vc.ctx.fillRect(3, ((S.hi - n.p + 0.5) / rows()) * vc.h, vc.w - 6, 1);
+  }
+}
+
+function draw() {
+  const body = $('body');
+  const t = BAR_PX[sizeKey()];
+  S.W = body.clientWidth - t;
+  S.H = body.clientHeight - t;
+  applyFit();
+  clampView();
+  drawBody();
+  drawHead();
+  drawKeys();
+  drawVel();
+  drawBars();
+  refreshControls();
+}
+
+// ---------- the controls column, per option ----------
+function stepper(minus, read, plus, readId, readTitle) {
+  const mid = readId === 'fit'
+    ? `<button class="roll-step roll-fit" data-act="fit" title="Fit the region to the width">fit</button>`
+    : `<span class="roll-readout" id="${readId}" title="${readTitle}"></span>`;
+  return `<div class="roll-stepper"><button class="roll-step" data-act="${minus}">−</button>${mid}<button class="roll-step" data-act="${plus}">+</button></div>`;
+}
+function zoomItem() {
+  if (S.opt === 'today') {
+    return `<div class="roll-item"><span class="field-label">Zoom</span><div class="roll-zooms">
+      <i title="Horizontal zoom">↔</i>${stepper('t-', '', 't+', 'fit')}
+      <i title="Vertical zoom">↕</i>${stepper('r-', '', 'r+', 'rowRead', '')}</div></div>`;
+  }
+  const fits = `<div class="seg roll-seg" id="fitSeg"><button data-act="loop">Loop</button><button data-act="region">Region</button></div>`;
+  if (S.opt === 'a') {
+    return `<div class="roll-item"><span class="field-label">Zoom</span><div class="roll-zooms">
+      <i></i>${fits}
+      <i title="Time">↔</i>${stepper('t-', '', 't+', 'spanRead', 'what the notes pane shows')}
+      <i title="Rows">↕</i>${stepper('r-', '', 'r+', 'octRead', 'octaves the notes pane shows')}</div></div>`;
+  }
+  if (S.opt === 'b') {
+    return `<div class="roll-item"><span class="field-label">Show</span>${fits}
+      <span class="roll-hint" style="margin-top:3px">drag a bar's ends to zoom</span></div>`;
+  }
+  return '';
+}
+function buildCol2() {
+  const audition = `<div class="roll-item"><span class="field-label">Audition</span><div class="seg roll-seg teal"><button aria-pressed="true">On</button><button>Off</button></div></div>`;
+  const rec = `<div class="roll-item"><span class="field-label">Rec</span><div class="seg roll-seg"><button aria-pressed="true">Off</button><button><span class="rec-dot"></span>Rec</button></div></div>`;
+  const hint = S.opt === 'c'
+    ? `<span class="roll-hint">drag the ruler to zoom, the keys for rows</span>`
+    : '';
+  $('col2').innerHTML = zoomItem() + audition + rec + hint;
+  $('dupBtn').hidden = !S.dup;
+}
+function refreshControls() {
+  $('loopRead').textContent = loopText();
+  $('loopMax').textContent = `≤ ${regionBars()} bars`;
+  $('qBtn').textContent = SONGS[S.song].quantize;
+  const song = SONGS[S.song];
+  $('partTitle').textContent = `${song.part} — Roll`;
+  $('partSub').textContent = S.view === 'expanded' ? 'Expanded · Esc closes' : `roll · ${S.notes.length} note${S.notes.length === 1 ? '' : 's'} · ${round1(S.loop / BAR)} bar loop · 1 region`;
+  let summary = `${round1(S.loop / BAR)}-bar loop in a ${regionBars()}-bar region · ${S.notes.length} note${S.notes.length === 1 ? '' : 's'} · C minor · snap 1/16`;
+  if (isNew()) summary = `<b>${shownBars()} of ${regionBars()}</b> · ${summary}`;
+  $('summary').innerHTML = summary;
+  $('cornerBar').textContent = `bar ${Math.floor(S.left / BAR) + 1}`;
+  const fit = document.querySelector('[data-act="fit"]');
+  if (fit) {
+    fit.textContent = S.fit ? 'fit' : `${Math.round((S.beatPx * BAR) / PPQ)} px/bar`;
+    fit.classList.toggle('on', !!S.fit);
+  }
+  if ($('rowRead')) $('rowRead').textContent = `${S.rowPx} px/row`;
+  if ($('spanRead')) $('spanRead').textContent = spanText(visTicks());
+  if ($('octRead')) $('octRead').textContent = octText();
+  const seg = $('fitSeg');
+  if (seg) for (const b of seg.children) b.setAttribute('aria-pressed', String(S.fit === b.dataset.act));
+  const set = (act, off) => { const b = document.querySelector(`[data-act="${act}"]`); if (b) b.disabled = off; };
+  if (isNew()) {
+    set('t-', S.beatPx <= minBeatPx() + 1e-6);
+    set('t+', S.beatPx >= maxBeatPx() - 1e-6);
+    set('r-', S.rowPx <= NEW_ROWS.min);
+    set('r+', S.rowPx >= NEW_ROWS.max);
+  }
+  if ($('dupBtn')) $('dupBtn').disabled = S.loop * 2 > S.region;
+  $('grid').classList.toggle('zoomable', isNew());
+  for (const card of document.querySelectorAll('.card')) card.classList.toggle('on', card.dataset.card === S.opt);
+}
+const TRY = {
+  today: 'Try: press − or + to zoom in on the loop, then aim for − and catch fit by mistake. Drag the ruler: nothing happens.',
+  a: 'Try: Loop and Region, then ↔ − and +, which halve and double what is shown. Drag the ruler up and down, or the keys sideways.',
+  b: 'Try: drag either end of the bar under the notes to zoom, its middle to scroll. The bar is the whole region with the loop marked. The bar at the right does the same for rows. Drag the ruler up and down; double-click it.',
+  c: 'Try: drag the ruler up and down to zoom, left and right to scroll; double-click it for the region and again for the loop. Drag the keys sideways for taller rows.',
+};
+
+// ---------- actions ----------
+function act(name) {
+  if (name === 'loop' || name === 'region') return fitTo(name);
+  if (name === 'fit') return fitTo('region');
+  if (name === 't-' || name === 't+') {
+    const dir = name === 't+' ? 1 : -1;
+    // A's steps land on the next power-of-two span in beats: 2 bars, 1 bar, 2 beats.
+    const beats = Math.log2(visTicks() / PPQ);
+    const target = dir > 0 ? 2 ** (Math.ceil(beats - 0.05) - 1) : 2 ** (Math.floor(beats + 0.05) + 1);
+    const factor = isNew() ? (S.W * PPQ) / (target * PPQ) / S.beatPx : TODAY_TIME.step ** dir;
+    zoomTimeAt(factor, 0);
+  }
+  if (name === 'r-' || name === 'r+') {
+    const dir = name === 'r+' ? 1 : -1;
+    if (isNew()) {
+      const i = TODAY_ROWS.findIndex((v) => v >= S.rowPx - 0.01);
+      const next = TODAY_ROWS[clamp((i < 0 ? TODAY_ROWS.length - 1 : TODAY_ROWS[i] > S.rowPx + 0.01 && dir < 0 ? i : i) + dir, 0, TODAY_ROWS.length - 1)];
+      zoomRowsAt(next, S.H / 2);
+    } else {
+      S.rowIdx = clamp(S.rowIdx + dir, 0, TODAY_ROWS.length - 1);
+      zoomRowsAt(TODAY_ROWS[S.rowIdx], 0);
+    }
+  }
+  if (name === 'dup' && S.loop * 2 <= S.region) {
+    S.notes = S.notes.concat(S.notes.map((n) => ({ ...n, s: n.s + S.loop })));
+    S.loop *= 2;
+    if (S.fit === 'loop') applyFit();
+  }
+  paint();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (b && !b.disabled) act(b.dataset.act);
+});
+
+function frame() {
+  const sc = SCREENS[S.screen];
+  const f = $('frame');
+  f.classList.toggle('tablet', !!sc.width);
+  f.style.width = sc.width ? `${sc.width}px` : '';
+  $('frameCap').textContent = sc.cap;
+  $('rack').classList.toggle('touch', sc.touch);
+  document.body.classList.toggle('expanded', S.view === 'expanded');
+  const h = S.view === 'expanded' ? sc.height - EXPANDED_CHROME_PX : DEVICE_H_PX;
+  $('device').style.setProperty('--seq-h', `${h}px`);
+  for (const sq of document.querySelectorAll('.part-head .sq')) sq.hidden = S.view === 'expanded';
+}
+function reset() {
+  frame();
+  loadSong();
+  const [vel, accVel, accMod] = SONGS[S.song].knobs;
+  $('knobs').innerHTML = knob(vel, 'Vel', Math.min(0.999, +vel)) + knob(accVel, 'Acc vel', Math.min(0.999, +accVel)) + knob(accMod, 'Acc mod', Math.min(0.999, +accMod));
+  buildCol2();
+  const t = BAR_PX[sizeKey()];
+  S.W = $('body').clientWidth - t;
+  S.H = $('body').clientHeight - t;
+  S.rowIdx = ROW_START[S.view];
+  S.rowPx = TODAY_ROWS[S.rowIdx];
+  S.fit = isNew() ? 'loop' : 'region';
+  applyFit();
+  centreRows();
+  clampView();
+  $('tryLine').textContent = TRY[S.opt];
+  paint();
+}
+function pick(segId, attr, key) {
+  $(segId).addEventListener('click', (e) => {
+    const b = e.target.closest(`[data-${attr}]`);
+    if (!b) return;
+    S[key] = b.dataset[attr];
+    for (const x of $(segId).children) x.setAttribute('aria-pressed', String(x === b));
+    reset();
+  });
+}
+pick('optSeg', 'opt', 'opt');
+pick('dataSeg', 'data', 'song');
+pick('screenSeg', 'screen', 'screen');
+pick('viewSeg', 'view', 'view');
+$('dupBox').addEventListener('change', (e) => { S.dup = e.target.checked; buildCol2(); paint(); });
+
+// ---------- the readout that floats while a gesture zooms ----------
+let badgeTimer = 0;
+function badge(text, pane, x, y) {
+  const b = $('badge');
+  const g = $('grid').getBoundingClientRect();
+  const r = pane.getBoundingClientRect();
+  b.textContent = text;
+  b.style.left = `${clamp(r.left - g.left + x, 40, g.width - 40)}px`;
+  b.style.top = `${clamp(r.top - g.top + y, 2, g.height - 20)}px`;
+  b.classList.add('on');
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => b.classList.remove('on'), 900);
+}
+const timeBadge = (x) => badge(`${spanText(visTicks())} · ${shownBars()}`, $('body'), x, 6);
+const rowBadge = (y) => badge(octText(), $('body'), 60, clamp(y - 8, 4, S.H - 24));
+
+// ---------- one pointer drag, with the Song tab's threshold ----------
+function dragOn(target, onStart, onMove, onTap) {
+  target.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.pointerType === 'touch' && target === $('body')) return;
+    const start = onStart(e);
+    if (!start) return;
+    e.preventDefault();
+    target.setPointerCapture(e.pointerId);
+    let moved = false;
+    const move = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if ((ev.buttons & 1) === 0) return end(ev);
+      const dx = ev.clientX - e.clientX;
+      const dy = ev.clientY - e.clientY;
+      if (!moved && Math.hypot(dx, dy) < DRAG.threshold) return;
+      moved = true;
+      onMove(start, dx, dy, ev);
+      paint();
+    };
+    const end = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', end);
+      target.removeEventListener('pointercancel', end);
+      if (!moved && onTap) onTap(start, ev);
+      target.querySelectorAll('.drag').forEach((d) => d.classList.remove('drag'));
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', end);
+    target.addEventListener('pointercancel', end);
+  });
+}
+const localX = (pane, e) => e.clientX - pane.getBoundingClientRect().left;
+const localY = (pane, e) => e.clientY - pane.getBoundingClientRect().top;
+
+// The ruler: up zooms in, down out, around the pressed tick; sideways drags the view.
+dragOn($('head'), (e) => {
+  if (!isNew()) return null;
+  const x = localX($('head'), e);
+  return { x, tick: tickAt(x), beatPx: S.beatPx };
+}, (st, dx, dy) => {
+  S.beatPx = clamp(st.beatPx * 2 ** (-dy / DRAG.perDoubling), minBeatPx(), maxBeatPx());
+  S.left = st.tick - ((st.x + dx) * PPQ) / S.beatPx;
+  S.fit = null;
+  clampView();
+  timeBadge(st.x + dx);
+});
+$('head').addEventListener('dblclick', () => {
+  if (!isNew()) return;
+  fitTo(S.fit === 'loop' ? 'region' : 'loop');
+  timeBadge(S.W / 2);
+});
+
+// The keys: sideways sets the row height, up and down scrolls, around the pressed row.
+dragOn($('keys'), (e) => {
+  if (!isNew()) return null;
+  const y = localY($('keys'), e);
+  return { y, row: S.top + y / S.rowPx, rowPx: S.rowPx };
+}, (st, dx, dy) => {
+  const rb = rowBounds();
+  S.rowPx = Math.round(clamp(st.rowPx * 2 ** (dx / DRAG.perDoubling), rb.min, rb.max) * 2) / 2;
+  S.top = st.row - (st.y + dy) / S.rowPx;
+  clampView();
+  rowBadge(st.y + dy);
+});
+
+// The bars: the thumb scrolls; in B its ends zoom, and a press on the track jumps there.
+function barDrag(barId, horizontal) {
+  const bar = $(barId);
+  dragOn(bar, (e) => {
+    const grip = e.target.closest('.zgrip');
+    const thumb = e.target.closest('.zthumb');
+    const along = horizontal ? localX(bar, e) : localY(bar, e);
+    if (!thumb) {
+      if (horizontal) S.left = (along / S.W) * S.region - visTicks() / 2;
+      else S.top = (along / S.H) * rows() - visRows() / 2;
+      if (horizontal) S.fit = null;
+      clampView();
+      paint();
+      return null;
+    }
+    (grip || thumb).classList.add('drag');
+    const edge = grip && S.opt === 'b' ? (grip.classList.contains('a') ? 'a' : 'b') : null;
+    return {
+      edge, left: S.left, vis: visTicks(), top: S.top, visRows: visRows(),
+      tickPerPx: perPx(S.W, visTicks(), S.region), rowPerPx: perPx(S.H, visRows(), rows()),
+    };
+  }, (st, dx, dy) => {
+    if (horizontal) {
+      const dt = (dx / S.W) * S.region;
+      if (st.edge === 'a') {
+        const right = st.left + st.vis;
+        S.beatPx = clamp((S.W * PPQ) / Math.max(1, right - (st.left + dt)), minBeatPx(), maxBeatPx());
+        S.left = right - visTicks();
+      } else if (st.edge === 'b') {
+        S.beatPx = clamp((S.W * PPQ) / Math.max(1, st.vis + dt), minBeatPx(), maxBeatPx());
+        S.left = st.left;
+      } else {
+        S.left = st.left + dx * st.tickPerPx;
+      }
+      S.fit = null;
+      clampView();
+      timeBadge(X(S.left + visTicks() / 2));
+    } else {
+      const dr = (dy / S.H) * rows();
+      const rb = rowBounds();
+      if (st.edge === 'a') {
+        const bottom = st.top + st.visRows;
+        S.rowPx = clamp(S.H / Math.max(1, bottom - (st.top + dr)), rb.min, rb.max);
+        S.top = bottom - visRows();
+      } else if (st.edge === 'b') {
+        S.rowPx = clamp(S.H / Math.max(1, st.visRows + dr), rb.min, rb.max);
+        S.top = st.top;
+      } else {
+        S.top = st.top + dy * st.rowPerPx;
+      }
+      clampView();
+      rowBadge(S.H / 2);
+    }
+  });
+}
+barDrag('hbar', true);
+barDrag('vbar', false);
+
+// The notes pane: the wheel scrolls; a pinch (ctrl + wheel) zooms time; touch pans and pinches.
+$('grid').addEventListener('wheel', (e) => {
+  const body = $('body');
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) {
+    if (!isNew()) return;
+    const x = clamp(localX(body, e), 0, S.W);
+    zoomTimeAt(Math.exp(-e.deltaY * 0.01), x);
+    timeBadge(x);
+  } else {
+    const dx = e.shiftKey ? e.deltaY : e.deltaX;
+    const dy = e.shiftKey ? 0 : e.deltaY;
+    if (dx) { S.left += (dx * PPQ) / S.beatPx; S.fit = null; }
+    S.top += dy / S.rowPx;
+    clampView();
+  }
+  paint();
+}, { passive: false });
+const touches = new Map();
+const PINCH_MIN_PX = 40;
+let pinch = null;
+$('body').addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || e.target.closest('.zbar')) return;
+  $('body').setPointerCapture(e.pointerId);
+  touches.set(e.pointerId, { x: localX($('body'), e), y: localY($('body'), e) });
+  pinch = null;
+});
+$('body').addEventListener('pointermove', (e) => {
+  const prev = touches.get(e.pointerId);
+  if (!prev) return;
+  const now = { x: localX($('body'), e), y: localY($('body'), e) };
+  if (touches.size === 1) {
+    S.left -= ((now.x - prev.x) * PPQ) / S.beatPx;
+    S.top -= (now.y - prev.y) / S.rowPx;
+    if (now.x !== prev.x) S.fit = null;
+  } else if (touches.size === 2 && isNew()) {
+    // Spread sideways zooms time, up and down zooms rows, each once the fingers are apart on it.
+    const [a, b] = [...touches.values()];
+    const other = a === prev ? b : a;
+    const mx = (now.x + other.x) / 2;
+    const my = (now.y + other.y) / 2;
+    const x0 = Math.abs(prev.x - other.x);
+    const x1 = Math.abs(now.x - other.x);
+    const y0 = Math.abs(prev.y - other.y);
+    const y1 = Math.abs(now.y - other.y);
+    if (x0 > PINCH_MIN_PX && x1 > PINCH_MIN_PX) { zoomTimeAt(x1 / x0, mx); timeBadge(mx); }
+    if (y0 > PINCH_MIN_PX && y1 > PINCH_MIN_PX) { zoomRowsAt((S.rowPx * y1) / y0, my); rowBadge(my); }
+  }
+  touches.set(e.pointerId, now);
+  clampView();
+  paint();
+});
+const lift = (e) => touches.delete(e.pointerId);
+$('body').addEventListener('pointerup', lift);
+$('body').addEventListener('pointercancel', lift);
+
+// ---------- the static parts ----------
+function knob(value, label, frac) {
+  const a0 = Math.PI * 0.75;
+  const a1 = a0 + Math.PI * 1.5 * frac;
+  const pt = (a, r) => [16 + r * Math.cos(a), 16 + r * Math.sin(a)];
+  const [x0, y0] = pt(a0, 12);
+  const [x1, y1] = pt(a1, 12);
+  const [ex, ey] = pt(a0 + Math.PI * 1.5, 12);
+  const [px, py] = pt(a1, 7);
+  return `<div class="knob"><svg width="28" height="25" viewBox="2 2 28 25">
+    <path d="M${x0} ${y0} A12 12 0 1 1 ${ex} ${ey}" stroke="${C.lineBright}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M${x0} ${y0} A12 12 0 ${frac > 2 / 3 ? 1 : 0} 1 ${x1} ${y1}" stroke="${C.inkDim}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="16" cy="16" r="8" fill="${C.inset}" stroke="${C.line}"/>
+    <line x1="16" y1="16" x2="${px}" y2="${py}" stroke="${C.ink}" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <span class="v">${value}</span><span class="l">${label}</span></div>`;
+}
+
+new ResizeObserver(() => paint()).observe($('body'));
+document.fonts.ready.then(() => paint());
+// A link can open an option and a song: #opt=b&song=two.
+const hash = new URLSearchParams(location.hash.slice(1));
+if (hash.get('opt')) document.querySelector(`[data-opt="${hash.get('opt')}"]`)?.click();
+if (hash.get('song')) document.querySelector(`[data-data="${hash.get('song')}"]`)?.click();
+if (hash.get('screen')) document.querySelector(`[data-screen="${hash.get('screen')}"]`)?.click();
+if (hash.get('view')) document.querySelector(`[data-view="${hash.get('view')}"]`)?.click();
+reset();
+</script>
+</body>
+</html>
