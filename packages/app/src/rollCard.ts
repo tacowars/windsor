@@ -170,6 +170,8 @@ class RollDevice {
       }),
       repaint: () => this.paint(),
       stepLoop: (dir) => this.editing.stepLoop(dir),
+      duplicateRefusal: () => this.editing.duplicateRefusal(),
+      duplicate: () => this.editing.duplicate(),
       selectedCount: () => this.editing.editor.selected().length,
       quantise: () => this.editing.quantise(),
       rec: this.rec.control,
