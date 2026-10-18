@@ -6,7 +6,9 @@
  * transport, undo and the part chips stay live above it. Its bar picks how
  * many octaves the keys show and in how many rows; the keys fit the view
  * with no sideways scrolling, and a pick the room does not allow is drawn as
- * the nearest one it does (`keyboardViewModel.ts`).
+ * the nearest one it does (`keyboardViewModel.ts`). Fold follows Rows
+ * (windsor#919); folded, a row's slots stand in for its white keys, and the
+ * pick is drawn again whenever the fold's tone count changes.
  *
  * The keyboard is the console's one `Keyboard`: its keys move into the view
  * while it is open and back into the Parts row when it closes, with their
@@ -21,8 +23,9 @@ import { type ExpandedFrame, mountExpandedView } from './expandedViewFrame';
 import type { Keyboard } from './keyboard';
 import { EXPAND_ICON_PATH, VIEW_LABELS, VIEW_OCTAVES, VIEW_ROWS } from './keyboardConstants';
 import type { KeysPick } from './keyboardConstants';
+import { foldControl } from './keyboardFoldControl';
 import type { KeysSurface } from './keyboardKeys';
-import { keyCountFor } from './keyboardLayout';
+import type { RowSlots } from './keyboardLayout';
 import { normalizePick, octavesWhyNot, rowsFor, whyNot } from './keyboardViewModel';
 import { readViewPick, writeViewPick } from './keyboardViewPrefs';
 
@@ -100,7 +103,8 @@ export function openKeyboardView(host: KeyboardViewHost, from: HTMLElement): voi
   let hint = '';
   const keys = el('div', 'kb-keys');
   const room = (): number => keys.clientWidth;
-  const drawn = (): KeysPick => normalizePick(room(), stored);
+  const drawn = (slots: RowSlots = keyboard.rowSlots()): KeysPick =>
+    normalizePick(room(), stored, slots);
 
   const choose = (why: string, next: KeysPick): void => {
     hint = why;
@@ -112,15 +116,16 @@ export function openKeyboardView(host: KeyboardViewHost, from: HTMLElement): voi
     sync();
   };
   const octaves = segment(VIEW_OCTAVES, (count) => {
-    const { rows } = drawn();
-    choose(octavesWhyNot(room(), count, rows), {
+    const pick = { octaves: count, rows: drawn().rows };
+    const slots = keyboard.rowSlots();
+    choose(octavesWhyNot(room(), pick, slots), {
       octaves: count,
-      rows: rowsFor(room(), count, rows) ?? rows,
+      rows: rowsFor(room(), pick, slots) ?? pick.rows,
     });
   });
   const rows = segment(VIEW_ROWS, (count) => {
     const next = { octaves: drawn().octaves, rows: count };
-    choose(whyNot(room(), next), next);
+    choose(whyNot(room(), next, keyboard.rowSlots()), next);
   });
   const hintEl = el('span', 'roll-overlay-note kb-hint');
   hintEl.setAttribute('aria-live', 'polite');
@@ -134,14 +139,19 @@ export function openKeyboardView(host: KeyboardViewHost, from: HTMLElement): voi
     hintEl.textContent = hint;
     const width = room();
     if (width === 0) return; // On another tab.
-    const now = drawn();
+    const slots = keyboard.rowSlots();
+    const now = drawn(slots);
     octaves.buttons.forEach((b, i) => {
       const count = VIEW_OCTAVES[i] ?? now.octaves;
-      mark(b, count === now.octaves, octavesWhyNot(width, count, now.rows));
+      mark(
+        b,
+        count === now.octaves,
+        octavesWhyNot(width, { octaves: count, rows: now.rows }, slots),
+      );
     });
     rows.buttons.forEach((b, i) => {
       const count = VIEW_ROWS[i] ?? now.rows;
-      mark(b, count === now.rows, whyNot(width, { octaves: now.octaves, rows: count }));
+      mark(b, count === now.rows, whyNot(width, { octaves: now.octaves, rows: count }, slots));
     });
   }
 
@@ -159,6 +169,7 @@ export function openKeyboardView(host: KeyboardViewHost, from: HTMLElement): voi
     button(VIEW_LABELS.octUp, () => keyboard.shiftOctave(1)),
     labelled(VIEW_LABELS.octaves, octaves),
     labelled(VIEW_LABELS.rows, rows),
+    foldControl((fold) => keyboard.chooseFold(fold)),
     hintEl,
     hold,
     button(VIEW_LABELS.panic, () => keyboard.panic()),
@@ -170,11 +181,9 @@ export function openKeyboardView(host: KeyboardViewHost, from: HTMLElement): voi
   const surface: KeysSurface = {
     box: keys,
     nested: true,
-    shape: () => {
-      if (room() === 0) return null;
-      const pick = drawn();
-      return { count: keyCountFor(pick.octaves), rows: pick.rows };
-    },
+    // The pick is normalized for the fold's slots at every build: a fold switch or a chord change.
+    shape: (slots) => (room() === 0 ? null : drawn(slots)),
+    built: () => sync(),
   };
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && frame.shown()) {

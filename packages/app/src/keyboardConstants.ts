@@ -125,5 +125,16 @@ export const VIEW_LABELS = {
   hold: 'Hold',
   panic: 'Panic',
 };
+/**
+ * The Fold control's words and a hatched key's title (windsor#919, record
+ * `2026-10-18-keyboard-fold` decisions 2 and 4; US English, windsor#821).
+ */
+export const FOLD_LABELS = {
+  fold: 'Fold',
+  off: 'Off',
+  scale: 'Scale',
+  chord: 'Chord',
+  outOfRange: 'Past the engine’s range (127): plays nothing',
+};
 /** Expand's icon: the Roll rail's expand path (`rollExpand.ts`), in a 12 px box. */
 export const EXPAND_ICON_PATH = 'M7 1.5h3.5V5M10.5 1.5 6.8 5.2M5 10.5H1.5V7M1.5 10.5l3.7-3.7';

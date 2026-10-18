@@ -20,6 +20,7 @@ import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
 import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard, qwertyPlaysOn } from './keyboard';
+import { consoleFoldHost } from './keyboardFoldNow';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { installPageZoomLock } from './pageZoomLock';
@@ -47,6 +48,8 @@ const keyboard = new Keyboard(
   () => ctx.livePart(),
   () => qwertyPlaysOn(ctx.activeTab),
 );
+// Folded, it plays the played part's scale or chord (windsor#919).
+keyboard.foldHost = consoleFoldHost(ctx);
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
