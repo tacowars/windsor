@@ -6,6 +6,7 @@
  * bars' thumbs.
  */
 import { describe, expect, it } from 'vitest';
+import { rollRows } from './rollRows';
 import {
   type TimeBounds,
   clampRows,
@@ -16,6 +17,7 @@ import {
   leastThumb,
   loopFitPx,
   regionFitPx,
+  rowBoundsOf,
   rowsHeight,
   settleFit,
   shownTicks,
@@ -199,6 +201,33 @@ describe('the rows', () => {
       rowPx: 8,
       top: 0,
     });
+  });
+});
+
+describe('a row grip moved several times before the repaint', () => {
+  // A minor's rows at 8 px, with C#4 a thin sliver outside the scale.
+  const layout = rollRows({
+    keys: 'scale',
+    fold: false,
+    rowPx: 8,
+    used: new Set([61]),
+    scalePcs: new Set([9, 11, 0, 2, 4, 5, 7]),
+    panePx: 160,
+  });
+
+  it('lands where one move straight to the last pointer lands', () => {
+    const drawn = { rowPx: layout.rowPx, top: 0 };
+    const bounds = rowBoundsOf(layout, 160);
+    expect(bounds.scaled).toBeGreaterThan(0);
+    expect(bounds.fixedPx).toBe(layout.height - bounds.scaled * 8);
+    // Each move writes the zoom; the rows drawn stay the ones laid out at 8 px.
+    let zoom = drawn;
+    for (const end of [0.62, 0.68, 0.75]) {
+      zoom = spanRows(drawn, rowBoundsOf(layout, 160), { start: 0.4, end, hold: 'start' });
+    }
+    const once = spanRows(drawn, bounds, { start: 0.4, end: 0.75, hold: 'start' });
+    expect(zoom).toEqual(once);
+    expect(once.rowPx).not.toBe(8);
   });
 });
 

@@ -21,11 +21,11 @@ import { type BarAxis, type RollZoomBars, rollZoomBars } from './rollZoomBars';
 import {
   type AxisShare,
   type RollFit,
-  type RowBounds,
   type TimeBounds,
   type TimeView,
   type ViewEdge,
   fitsOf,
+  rowBoundsOf,
   settleFit,
   spanRows,
   spanTime,
@@ -43,21 +43,6 @@ export interface ZoomControlHost {
   /** The scene last drawn. */
   scene(): RollScene | null;
   repaint(): void;
-}
-
-/**
- * The rows' bounds for `scene`: a row drawn at the zoom's height scales
- * with it; a thin sliver, or a folded row the pane's fill holds taller,
- * does not.
- */
-function rowBoundsOf(scene: RollScene, heightPx: number, rowPx: number): RowBounds {
-  let scaled = 0;
-  let fixedPx = 0;
-  for (const row of scene.rows.rows) {
-    if (!row.thin && row.h === rowPx) scaled++;
-    else fixedPx += row.h;
-  }
-  return { heightPx, scaled, fixedPx };
 }
 
 /** One card's zoom: its bars, its Show fits, and the zoom they write. */
@@ -180,9 +165,10 @@ export class RollZoomControl {
       this.host.spot.aim(view.left, null);
     } else {
       const { body } = this.host.panes;
-      const now = { rowPx: this.zoom.rowPx, top: body.scrollTop };
-      const bounds = rowBoundsOf(scene, body.clientHeight, now.rowPx);
-      const view = spanRows(now, bounds, { start, end, hold });
+      // The scene drawn, never the zoom: a move before the repaint has changed the zoom.
+      const drawn = { rowPx: scene.rows.rowPx, top: body.scrollTop };
+      const bounds = rowBoundsOf(scene.rows, body.clientHeight);
+      const view = spanRows(drawn, bounds, { start, end, hold });
       this.zoom = { ...this.zoom, rowPx: view.rowPx };
       this.host.spot.aim(null, view.top);
     }

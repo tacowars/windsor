@@ -17,6 +17,7 @@
  * (`thumbOf`, `fracAt`).
  */
 import { PPQ } from '@windsor/engine';
+import type { RowLayout } from './rollRows';
 import { ROLL_FIT_TOLERANCE, ROLL_ROW_ZOOM, ROLL_TIME_ZOOM } from './rollTables';
 
 /** The two spans a view can be fitted to. */
@@ -156,6 +157,23 @@ export interface RowBounds {
   readonly heightPx: number;
   readonly scaled: number;
   readonly fixedPx: number;
+}
+
+/**
+ * The row bounds of the rows drawn, in a pane `heightPx` tall: a row at the
+ * height they were laid out at scales with the zoom; a thin sliver, or a
+ * folded row the pane's fill holds taller, does not. Read from the layout's
+ * own row height, never the zoom's, which a move may have changed before the
+ * repaint lays the rows out again.
+ */
+export function rowBoundsOf(layout: RowLayout, heightPx: number): RowBounds {
+  let scaled = 0;
+  let fixedPx = 0;
+  for (const row of layout.rows) {
+    if (!row.thin && row.h === layout.rowPx) scaled++;
+    else fixedPx += row.h;
+  }
+  return { heightPx, scaled, fixedPx };
 }
 
 /** A vertical view: the row height, and the px of the rows above its top edge. */
