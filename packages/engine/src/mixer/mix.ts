@@ -172,9 +172,11 @@ export const DEFAULT_STRIP: ChannelStrip = {
  * Where each aux part sits, keyed by strip name — the strips `createAuxPart`
  * reaches for. Music parts are not here: since #597 each music part carries
  * its own strip in the song document, so a song's mix travels with the song.
+ * No aux strip sends (windsor#907): a send would return through the song
+ * master, past the aux fader, so Cue at -∞ would still let a room through.
  */
 export const MIX = {
-  audition: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { a: 0.08 }, inserts: [] },
+  audition: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
   ui: { level: 0.7, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
 } satisfies Record<string, ChannelStrip<ReturnName>>;
 

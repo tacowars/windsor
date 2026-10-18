@@ -31,6 +31,7 @@ import {
 
 import { loadBuiltIns } from './builtInLibrary';
 import type { ConsoleTransport } from './context';
+import { cueLevel } from './cueLevel';
 import { HARMONY_AUDITION_PATCH } from './harmonyAuditionTables';
 import { nextTransportState, type TransportState } from './transportModel';
 
@@ -404,6 +405,7 @@ export class EngineHost {
     const engine = new FmEngine(this.context);
     await engine.init(this.urls);
     this.system = new AudioSystem(engine);
+    this.system.setAuxGain(cueLevel());
     await this.system.init();
     this.system.initMusic(document);
     // The console's knobs retune the voices already ringing (off by default in the engine).

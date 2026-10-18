@@ -41,21 +41,8 @@ describe('MIX', () => {
     }
   });
 
-  it('sends only to buses that exist, at amounts inside 0..1', () => {
-    for (const [name, strip] of strips) {
-      for (const [target, amount] of Object.entries(strip.sends)) {
-        expect(RETURN_NAMES, `${name}.sends.${target}`).toContain(target);
-        expect(amount, `${name}.sends.${target}`).toBeGreaterThanOrEqual(0);
-        expect(amount, `${name}.sends.${target}`).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('exercises a dry SFX strip and one with a send', () => {
-    const dry = strips.filter(([, s]) => Object.keys(s.sends).length === 0);
-    const sent = strips.filter(([, s]) => Object.keys(s.sends).length > 0);
-    expect(dry.length).toBeGreaterThan(0);
-    expect(sent.length).toBeGreaterThan(0);
+  it('gives no aux strip a send, so the aux fader silences an aux part completely (windsor#907)', () => {
+    for (const [name, strip] of strips) expect(strip.sends, `${name}.sends`).toEqual({});
   });
 });
 
