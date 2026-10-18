@@ -10237,12 +10237,15 @@ dialog.song-dlg {
   color: var(--ground);
 }
 /* The popover: one element on the page, under the part bar (ccPanel.ts sets
-   its top in the window, and moves it as the console scrolls). */
+   its top in the window, and moves it as the console scrolls, and bounds its
+   height to the window below; a longer list scrolls inside, under the head). */
 .cc-pop {
   position: fixed;
   z-index: 30;
   left: 16px;
   width: min(1080px, calc(100% - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   container: ccpop / inline-size;
   background: var(--panel);
   border: 1px solid var(--line-bright);
@@ -10253,12 +10256,16 @@ dialog.song-dlg {
   display: none;
 }
 .cc-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
+  background: var(--panel);
 }
 .cc-title {
   margin-right: 4px;
