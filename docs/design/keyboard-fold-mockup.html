@@ -730,8 +730,10 @@
       </li>
       <li>
         <b>Folded keys</b> are one equal rectangle per tone of the set, with no black keys, each
-        named (A, C, E). The first key is the set's root in the octave the label names (A3), and the
-        row ends on the root an octave or two up: (octaves × tones) + 1 keys. Scale is the song's
+        named (A, C, E). The first key is the set's root in the octave the label names (A3), or,
+        when a custom scale leaves the root out, the set's first tone above it (root C with
+        <code>[2, 5, 9]</code> starts on D3, and the label says D3). The row ends on the first
+        key's note an octave or two up: (octaves × tones) + 1 keys. Scale is the song's
         key and scale; Chord is the chord at the playhead, the scale when the song has no chords.
         Step the chord above, or press Run: the keys rename at each chord.
       </li>
@@ -931,11 +933,12 @@
     <h2>MIDI's grace window, at 120 BPM</h2>
     <p>
       A tick is 500 ms ÷ 24 = 20.8 ms, so the proposed window of 1/16 (6 ticks) is 125 ms. A min
-      plays bar 1 and F maj starts at bar 2, tick 96. An F heard 15 ms before the change is stamped
-      at tick 96 − 15 ÷ 20.8 = 95.28: A min (A C E) does not hold F, but F maj starts at 96, within
-      95.28 + 6, and holds it, so the F is <b>kept</b>, sounded and recorded. A B heard at the same
-      moment is in neither chord and is <b>dropped</b>. An F 150 ms early (tick 88.8) is dropped
-      too: the window ends at 94.8, before the change.
+      plays bar 1 and F maj starts at bar 2, tick 96. The recorder stamps whole ticks, the tick
+      sounding when the note is heard. An F heard 15 ms before the change is stamped tick 95: A min
+      (A C E) does not hold F, but the window's ticks are 96 to 101, and F maj starts at 96 and
+      holds it, so the F is <b>kept</b>, sounded and recorded. A B heard at the same moment is in
+      neither chord and is <b>dropped</b>. An F 150 ms early (stamped tick 88) is dropped too: the
+      window's ticks are 89 to 94, before the change.
     </p>
 
     <h2>To decide</h2>
@@ -1094,7 +1097,9 @@
       const st = stack(s.scale, c.degree, c.size);
       return { name: c.name, rootPc: (s.root + st[0]) % 12, pcs: st.map((t) => (s.root + t) % 12) };
     }
-    // The fold's set: its root and its tones as semitones above that root; null when Off.
+    // The fold's set: its root, its first tone's step above that root (0 when the set holds the
+    // root; a custom scale may leave it out), and its tones as semitones above that first tone;
+    // null when Off.
     function foldSet() {
       if (state.fold === 'off') return null;
       const s = song();
@@ -1102,17 +1107,20 @@
       const pcs =
         state.fold === 'chord' && chord ? chord.pcs : s.scale.map((o) => (s.root + o) % 12);
       const rootPc = state.fold === 'chord' && chord ? chord.rootPc : s.root;
-      const steps = [...new Set(pcs.map((pc) => (pc - rootPc + 12) % 12))].sort((a, b) => a - b);
+      const above = [...new Set(pcs.map((pc) => (pc - rootPc + 12) % 12))].sort((a, b) => a - b);
+      const firstStep = above[0];
       return {
         rootPc,
-        steps,
+        firstStep,
+        steps: above.map((step) => step - firstStep),
         chordPcs: chord ? new Set(chord.pcs) : new Set(),
         fallback: state.fold === 'chord' && !chord,
       };
     }
 
     /* ---------- the keys ---------- */
-    // One folded row: `octaves` octaves from `first`, closing on the root when `closing`, else an empty slot when `slot`.
+    // One folded row: `octaves` octaves from `first`, closing on the first key's note an octave
+    // up when `closing`, else an empty slot when `slot`.
     function foldedKeys(set, first, octaves, closing, slot) {
       const keys = [];
       for (let o = 0; o < octaves; o++)
@@ -1169,11 +1177,13 @@
       ]
         .map((f) => `<button data-fold="${f}" aria-pressed="${state.fold === f}">${f}</button>`)
         .join('')}</span></span>`;
+    // The label names the first key with its own octave: D3 for root C and [2, 5, 9] at octave 3.
     function octaveLabel() {
-      const set = foldSet();
-      return `${set ? NAMES[set.rootPc] : 'C'}${state.octave}`;
+      const first = firstNote(foldSet());
+      return `${NAMES[first % 12]}${Math.floor(first / 12)}`;
     }
-    const firstNote = (set) => 12 * state.octave + (set ? set.rootPc : 0);
+    // The root in the label's octave when the set holds it, otherwise the set's first tone above it.
+    const firstNote = (set) => 12 * state.octave + (set ? set.rootPc + set.firstStep : 0);
 
     /* ---------- the Parts tab keys row ---------- */
     function partsHtml(device) {

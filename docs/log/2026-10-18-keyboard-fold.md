@@ -80,21 +80,30 @@ record's Later list. So A3 below is note 45.
 3. **The set.**
    - **Scale:** the song's key and scale, from `scalePitchClasses`
      (`rollHarmony.ts`), as the Roll colors notes. A custom scale works the
-     same way. Its root is the key's root.
+     same way. Its root is the key's root, which a custom scale may leave
+     out: the normalizer keeps any offsets (`arrangementNormalise.ts`), so
+     root C with the scale `[2, 5, 9]` is the set D, F, A, with no C.
    - **Chord:** the chord's tones at the tick, `tonesOf` over the engine's
      `chordAt`, which carries the quality, accidental and size. Its root is
-     the chord's root (`tonesRoot`). With no harmony events the fold falls
-     back to the scale, as Bloom's Song chord does (windsor#729 decision 2).
+     the chord's root (`tonesRoot`), which is always in the set: it is the
+     stack's first tone (`harmonyTimeline.ts`). With no harmony events the
+     fold falls back to the scale, as Bloom's Song chord does (windsor#729
+     decision 2).
    - **The tick:** the audible playhead while the transport runs
      (`audibleTick`, as `chordRegionChord.ts` reads it), otherwise where the
      playhead stands (the logic of `rollGuide.ts`).
 
 4. **The folded keys.** One equal rectangle per tone, with no black keys,
    each named with its note (`A`, `C`, `E`, in the app's spelling,
-   `CHORD_NOTE_NAMES`). The first key is the set's root in the octave the
-   label names: note 12 × octave + the root's pitch class. A row holds
-   (octaves shown × tones in the set) + 1 keys, ending on the root one
-   octave or more up, and the label names the first key (`A3`, not `C3`).
+   `CHORD_NOTE_NAMES`). The first key is the set's root in the octave
+   the label's number names (note 12 × octave + the root's pitch class)
+   when the set holds the root, otherwise the set's first tone above that
+   root: root C with the scale `[2, 5, 9]` at octave 3 starts on D3 (38),
+   not C3. A Chord fold always starts on its root, since a chord's stack
+   holds it. A row holds (octaves shown × tones in the set) + 1 keys,
+   ending on the first key's note one octave or more up, and the label
+   names the first key with its own octave (`A3`, not `C3`; `D3` in the
+   custom example, `C♯4` for root B and `[2, 5, 9]` at octave 3).
    Oct − and Oct + move it by an octave within today's bounds
    (`OCTAVE_MIN` 0, and `octaveMaxFor`: 8 for 1 and 2 octaves, 7 for 3,
    6 for 4). Worked through:
@@ -107,9 +116,10 @@ record's Later list. So A3 below is note 45.
    | F maj (triad) | 3 | 7 keys | F3 A3 C4 F4 A4 C5 F5 (41 to 65) |
    | G 7 (seventh) | 4 | 9 keys | G3 B3 D4 F4 G4 B4 D5 F5 G5 (43 to 67) |
 
-   At the top bound the closing root can pass the engine's range (0 … 127,
+   At the top bound the closing key can pass the engine's range (0 … 127,
    `MIDI_NOTE_MAX`): with 2, 3 or 4 octaves at their bound the last key is
-   120 + the root's pitch class, past 127 for a root of G♯, A, A♯ or B. A
+   120 + the first key's semitones above the label octave's C, past 127
+   for a first key of G♯, A, A♯ or B (or past B, for a custom scale). A
    key past 127 is drawn hatched and plays nothing; at octave 8, A minor's
    closing A would be 129, and every other key is in range. The bounds do
    not move.
@@ -175,7 +185,8 @@ record's Later list. So A3 below is note 45.
    1127.1 px in one row and 557.5 px in two (1163.1 and 575.5 today).
 
    Two rows split the octaves evenly, the lower octaves on the lower row,
-   and every row ends on its root, so a row is complete and the rows' keys
+   and every row ends on its first key's note (the root, unless a custom
+   scale leaves it out), so a row is complete and the rows' keys
    line up (the lower row's last key and the upper row's first are the same
    note; To decide 4).
 
@@ -215,19 +226,19 @@ record's Later list. So A3 below is note 45.
    no change is coming.
 
    At 120 BPM a tick is 500 ms ÷ 24 = 20.8 ms, so the window is 125 ms.
-   A min plays bar 1 and F maj starts at bar 2, tick 96:
-   - An F heard 15 ms before the change is at tick 96 − 15 ÷ 20.8 = 95.28,
-     in tick 95. A min (A C E) does not hold F, but the window's ticks are
-     96 to 101, F maj starts at 96 and holds it: the F is **kept**,
+   The recorder stamps whole ticks: `audibleTick` gives the tick sounding
+   at the heard time. A min plays bar 1 and F maj starts at bar 2, tick 96:
+   - An F heard 15 ms before the change is stamped tick 95, which sounds
+     from 20.8 ms before the change. A min (A C E) does not hold F, but
+     the window's ticks are 96 to 101, F maj starts at 96 and holds it: the F is **kept**,
      sounded, lit and recorded, where the recorder writes any note.
    - A B heard at the same moment is in neither A min nor F maj: it is
      **dropped**.
-   - An F heard 150 ms early (tick 88.8, in tick 88) is dropped: the
+   - An F heard 150 ms early (stamped tick 88) is dropped: the
      window's ticks are 89 to 94, before the change.
 
    The window walks the ticks the transport will play, not the song's
-   timeline. From the heard tick's whole tick `n` (the stamp rounded
-   down), its six ticks are `n₁ = followingTick(n, loop)`,
+   timeline. From the stamped tick `n`, its six ticks are `n₁ = followingTick(n, loop)`,
    `n₂ = followingTick(n₁, loop)`, and so on to `n₆`, with
    `loop = tickLoopOf(transport)` (`sequencing/scheduler.ts`,
    `song/songLoop.ts`, both on the engine's index). The note passes when
@@ -243,8 +254,7 @@ record's Later list. So A3 below is note 45.
    A 4-bar song (`songTicks` 384) loops bars 1 and 2 (`start` 0, `end`
    192) over A min in bar 1, F maj in bar 2 and C maj from bar 3, tick 192,
    so the loop ends on a chord change. A note heard 15 ms before the
-   loop's end is at tick 192 − 15 ÷ 20.8 = 191.28, in tick 191, under
-   F maj (F A C). `followingTick(191, loop)` is 0, the loop's start, and
+   loop's end is stamped tick 191, under F maj (F A C). `followingTick(191, loop)` is 0, the loop's start, and
    the window's ticks are 0 to 5, all A min (A C E):
    - An E is **kept**: F maj does not hold it, A min at the loop's start
      does.
@@ -289,7 +299,7 @@ recorder as they stand.
   lit keys follow decision 5. The tap is one undo step; undo switches the
   keys back the same way.
 - **A song with no chords.** Chord folds to the scale; the label names the
-  key's root, and a MIDI note is judged against the scale with no window.
+  scale's first key (the key's root when the scale holds it), and a MIDI note is judged against the scale with no window.
 - **Part switch.** The keyboard plays the new part, folded or not by its
   own field; held notes stay on the part that struck them (the tablet
   record's boundary case). All three Fold controls show the new part's.
@@ -297,7 +307,7 @@ recorder as they stand.
   the keys past 127 (129 and 131 here) are hatched and play nothing; a home
   row letter on them plays nothing.
 - **Recording.** A kept early note is recorded at the tick it was heard,
-  95.28 in the example, and written where the recorder writes any onset;
+  tick 95 in the example, and written where the recorder writes any onset;
   Quantize moves it. A dropped note leaves no trace in the take.
 
 ## Consequences
