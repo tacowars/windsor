@@ -39,8 +39,8 @@ function meterBar(): { bar: HTMLElement; boost: HTMLElement; cut: HTMLElement } 
 export function transientMeter(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   const root = el('div', 'transient-meter');
   const { bar, boost, cut } = meterBar();
-  const boostLabel = el('span', 'readout', fmtSignedDb(0));
-  const cutLabel = el('span', 'readout', fmtSignedDb(0));
+  const boostLabel = el('span', 'tr-readout', fmtSignedDb(0));
+  const cutLabel = el('span', 'tr-readout', fmtSignedDb(0));
   root.append(boostLabel, bar, cutLabel);
   let active: InsertStage<InsertSpec>['shaping'];
   let reading = AT_REST;

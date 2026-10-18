@@ -1687,7 +1687,7 @@ input {
   margin-top: -0.5px;
   background: var(--ink-faint);
 }
-.transient-meter .readout {
+.tr-readout {
   font-family: var(--f-panel);
   font-size: 8.5px;
   font-weight: 600;
