@@ -106,7 +106,8 @@ describe('a shorter song', () => {
 describe('a longer song', () => {
   it('changes nothing: the last value holds', () => {
     const result = makeArrangement(song(8));
-    expect(hatOf(result.document)).toEqual(AUTOMATION_PART);
+    // The normaliser fills every part's `fold` (windsor#918).
+    expect(hatOf(result.document)).toEqual({ ...AUTOMATION_PART, fold: 'off' });
     expect(result.corrections.filter((line) => line.includes('automation'))).toEqual([]);
   });
 });
