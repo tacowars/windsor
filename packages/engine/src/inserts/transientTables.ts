@@ -31,5 +31,5 @@ export const TRANSIENT_TIMINGS = {
 
 export type TransientTimingName = keyof typeof TRANSIENT_TIMINGS;
 
-/** The row that ships until tacowars's listen picks one. */
+/** The row that ships, picked by ear from the three in tacowars's listen. */
 export const TRANSIENT_SHIPPED_TIMING: TransientTimingName = 'medium';

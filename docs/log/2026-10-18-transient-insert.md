@@ -1,8 +1,8 @@
 # The Transient insert: attack and sustain shaping with no threshold
 
 - **Date:** 2026-10-18
-- **Status:** proposed, until tacowars's listen settles the timing row
-  (decision 5)
+- **Status:** accepted. tacowars listened to the three timing rows and
+  approved the PR on 2026-10-18, with `medium` to ship (decision 5)
 - **Links:** windsor#897 · the compressor's sleep and meter (windsor#660,
   windsor#793) · Advanced Drive's smoothing (#701) · the switch fade
   (windsor#630) · format rules `2026-09-28-format-versions-refuse-never-destroy`
@@ -62,7 +62,7 @@ The reference values are the hardware's published manual and Paul White,
    `inserts/transientTables.ts` holds `tight` (12, 5, 8, 200 ms), `medium`
    (20, 10, 15, 400 ms) and `loose` (25, 20, 30, 800 ms) for `hold`,
    `fRelease`, `aAttack` and `sRelease`. `medium` ships, as the named
-   constant `TRANSIENT_SHIPPED_TIMING`, until tacowars's listen picks a row.
+   constant `TRANSIENT_SHIPPED_TIMING`: tacowars picked it from the listen.
    The DSP takes its row as a parameter, and `processorOptions.timing`
    overrides it for the tests and the listen only. `hold` sets the lowest
    note the detector rides without ripple, about `1/(2·hold)`, and how late
