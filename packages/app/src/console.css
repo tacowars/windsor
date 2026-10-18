@@ -10236,9 +10236,10 @@ dialog.song-dlg {
   background: var(--carrier);
   color: var(--ground);
 }
-/* The popover: one element on the page, under the part bar (ccPanel.ts sets its top). */
+/* The popover: one element on the page, under the part bar (ccPanel.ts sets
+   its top in the window, and moves it as the console scrolls). */
 .cc-pop {
-  position: absolute;
+  position: fixed;
   z-index: 30;
   left: 16px;
   width: min(1080px, calc(100% - 32px));

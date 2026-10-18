@@ -66,6 +66,11 @@ export class CcPanel {
     document.addEventListener('keydown', (e) => this.key(e));
     document.addEventListener('pointerdown', (e) => this.outside(e), true);
     window.addEventListener('resize', () => this.place());
+    // The page scrolls in the console, not the document: the panel is placed
+    // in the window, so it follows the part bar as the console scrolls.
+    document
+      .getElementById('console')
+      ?.addEventListener('scroll', () => this.place(), { passive: true });
   }
 
   /** A MIDI CC button for the part bar, with the selected part's mapping count. */
@@ -134,7 +139,7 @@ export class CcPanel {
     const over = shownBar ?? document.getElementById('tabRoot');
     const rect = over?.getBoundingClientRect();
     const top = rect ? (shownBar ? rect.bottom : rect.top) : 0;
-    this.root.style.top = `${top + window.scrollY + CC_POP_GAP_PX}px`;
+    this.root.style.top = `${top + CC_POP_GAP_PX}px`;
   }
 
   /** Something the rows are drawn from changed: the button now, the panel when nothing holds it. */

@@ -5,7 +5,8 @@
 - **Links:** windsor#899 · `2026-10-17-the-console-selects-no-text` (the
   console is an instrument, not a page) · `2026-10-03-parts-tab-layout`
   decision 9 (zoom-safe UI) · `packages/app/index.html` (the viewport meta) ·
-  `packages/app/src/console.css` (`html`) · `packages/app/src/pageZoomLock.ts`
+  `packages/app/src/console.css` (`html`, `body`, `.console`) ·
+  `packages/app/src/pageZoomLock.ts`
 
 ## Context
 
@@ -47,6 +48,14 @@ allowed scaling.
    menu still work, since the UI is zoom-safe by rule. The gesture handlers
    also block trackpad pinch in the desktop browser that sends gesture
    events; that is accepted.
+6. **The document never scrolls; `.console` does.** `html` and `body` take
+   the window's height with `overflow: hidden`, and `.console` (`#console`)
+   is the scroll container, at `100dvh` with `overflow-y: auto`. The
+   tablet's browser lets a pinch through while the document's own scroll
+   is moving, since its touch events are not cancelable then, so the
+   handlers in decision 4 cannot stop it. A document that cannot scroll
+   gives the pinch nothing to ride on. The sticky header stays at the top
+   of the scroller.
 
 ## Consequences
 
@@ -57,6 +66,14 @@ allowed scaling.
   lanes and long-press are unchanged: they run on pointer events, which the
   lock does not touch. A two-finger move cancels only the browser's default
   for that move, a pinch or a two-finger pan.
+- Code that reads or sets the page's scroll uses `#console`'s `scrollTop`,
+  never `window.scrollY`, which now always reads 0, or `window.scrollTo`. An
+  expanded view saves and restores the console's scroll. A popover hung
+  from `body` is placed in the window (`position: fixed`) from
+  `getBoundingClientRect`, never with a document scroll offset; one that
+  should move with the page re-places itself on the console's `scroll`
+  (the MIDI CC panel), and one that closes on scroll keeps its capturing
+  `window` listener, which still hears the console.
 - A new control or dialog needs no zoom rule. A new text field needs no
   16px font to avoid the focus zoom.
 - There is no unit test: the installer is DOM wiring and the tests run in
