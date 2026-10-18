@@ -14,10 +14,12 @@
  * in, down out, around the pressed tick, and sideways carries the view with
  * the pointer. The keys' drag is the same drag turned a quarter: sideways
  * sets the row height (right taller) and along the keys carries the rows
- * with the pointer, around the pressed row.
+ * with the pointer, around the pressed row. Both start past the Song tab's
+ * threshold (`SONG_DRAG_THRESHOLD_PX`, `stepRulerDrag`'s default).
  */
 import { PPQ } from '@windsor/engine';
 import { ROLL_ROW_ZOOM, ROLL_TIME_ZOOM, ROLL_ZOOM_GESTURE } from './rollTables';
+import { type RowLayout, relaidY, rowsHeightAt } from './rollRows';
 import {
   type RowBounds,
   type RowView,
@@ -47,8 +49,8 @@ export interface ZoomPress {
 }
 
 /** A drag after one event: the drag (null once it ended), the view a move gave, and whether a release in place ended it. */
-export interface ZoomStep<View> {
-  readonly drag: RulerDrag | null;
+export interface ZoomStep<View, Drag = RulerDrag> {
+  readonly drag: Drag | null;
   readonly view: View | null;
   readonly tap: boolean;
 }
@@ -77,34 +79,39 @@ export function rulerDrag(
 }
 
 /** One event of the ruler's drag. */
-export function stepRuler(
-  drag: RulerDrag | null,
-  event: RulerDragEvent,
-  table: GestureTable = ROLL_ZOOM_GESTURE,
-): ZoomStep<TimeView> {
-  const step = stepRulerDrag(drag, event, table.dragPx);
+export function stepRuler(drag: RulerDrag | null, event: RulerDragEvent): ZoomStep<TimeView> {
+  const step = stepRulerDrag(drag, event);
   const zoom = step.view;
   const view = zoom && { beatPx: zoom.pxPerBar, left: (zoom.scrollPx * PPQ) / zoom.pxPerBar };
   return { drag: step.drag, view, tap: step.clickPx !== null };
 }
 
 /**
- * The keys' drag from `press`, over the rows at the press: the ruler's drag
- * turned a quarter, the rows that scale for its bars and the slivers that
- * do not for its chrome.
+ * The keys' drag: the ruler's drag turned a quarter for its events and its
+ * row height, and the rows drawn at the press for where the pressed row
+ * sits at each height.
  */
+export interface KeysDrag {
+  readonly pointerId: number;
+  readonly ruler: RulerDrag;
+  readonly rows: RowLayout;
+  readonly heightPx: number;
+}
+
+/** The keys' drag from `press`, over the rows view at the press and the rows drawn in a pane `heightPx` tall. */
 export function keysDrag(
   press: ZoomPress,
   view: RowView,
-  bounds: RowBounds,
+  drawn: { readonly rows: RowLayout; readonly heightPx: number },
   table: typeof ROLL_ROW_ZOOM = ROLL_ROW_ZOOM,
-): RulerDrag {
-  return {
+): KeysDrag {
+  const ruler: RulerDrag = {
     pointerId: press.pointerId,
     originX: press.clientY,
     originY: -press.clientX,
     start: { pxPerBar: view.rowPx, scrollPx: view.top, pointerPx: view.top + press.at.y },
-    bounds: { bars: bounds.scaled, viewportPx: bounds.heightPx, chromePx: bounds.fixedPx },
+    // Only its row height is read: `stepKeys` places the rows from the layout.
+    bounds: { bars: 0, viewportPx: drawn.heightPx, chromePx: 0 },
     scale: {
       minPxPerBar: table.minPx,
       maxPxPerBar: table.maxPx,
@@ -112,22 +119,35 @@ export function keysDrag(
     },
     moved: false,
   };
+  return { pointerId: press.pointerId, ruler, rows: drawn.rows, heightPx: drawn.heightPx };
 }
 
 /** A move turned a quarter, as `keysDrag` reads it: down the keys is along, left is up. */
 const turned = (event: RulerDragEvent): RulerDragEvent =>
   event.type === 'move' ? { ...event, clientX: event.clientY, clientY: -event.clientX } : event;
 
-/** One event of the keys' drag; a release in place is a tap, which does what a tap on a key does. */
+/**
+ * One event of the keys' drag; a release in place is a tap, which does what
+ * a tap on a key does. The pressed point stays under the pointer: laid out
+ * again at the new row height by `rollRows`'s own maths (thin slivers and
+ * Fold's filled rows keep their height), less the press's place in the
+ * pane, less how far the pointer moved along the keys.
+ */
 export function stepKeys(
-  drag: RulerDrag | null,
+  drag: KeysDrag | null,
   event: RulerDragEvent,
-  table: GestureTable = ROLL_ZOOM_GESTURE,
-): ZoomStep<RowView> {
-  const step = stepRulerDrag(drag, turned(event), table.dragPx);
-  const zoom = step.view;
-  const view = zoom && { rowPx: zoom.pxPerBar, top: zoom.scrollPx };
-  return { drag: step.drag, view, tap: step.clickPx !== null };
+): ZoomStep<RowView, KeysDrag> {
+  const step = stepRulerDrag(drag && drag.ruler, turned(event));
+  const next = drag && step.drag && { ...drag, ruler: step.drag };
+  const tap = step.clickPx !== null;
+  if (!drag || !step.view || event.type !== 'move') return { drag: next, view: null, tap };
+  const { start, originX } = drag.ruler;
+  const rowPx = step.view.pxPerBar;
+  const at = relaidY(drag.rows, { y: start.pointerPx, from: start.pxPerBar, to: rowPx });
+  // The pressed point's px under the pane's top, carried by the move along the keys.
+  const under = start.pointerPx - start.scrollPx + (event.clientY - originX);
+  const room = Math.max(0, rowsHeightAt(drag.rows, rowPx) - drag.heightPx);
+  return { drag: next, view: { rowPx, top: Math.min(room, Math.max(0, at - under)) }, tap };
 }
 
 /** One axis of a pinch: the spread its zoom counts from (null until the fingers were apart enough), and the zoom. */

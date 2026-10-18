@@ -127,14 +127,14 @@ export const ROLL_NOTE = {
 /**
  * The zoom gestures (windsor#903; record
  * `2026-10-18-roll-zoom-bars-and-duplicate` decisions 4 to 6). A press on
- * the ruler or the keys becomes a drag past `dragPx`, at the Song tab's px
- * per doubling (`SONG_VIEW.dragPxPerDoubling`). A pinch zooms an axis once
+ * the ruler or the keys becomes a drag past the Song tab's threshold
+ * (`SONG_DRAG_THRESHOLD_PX`), at its px per doubling
+ * (`SONG_VIEW.dragPxPerDoubling`). A pinch zooms an axis once
  * the fingers are `pinchMinPx` apart on it. A Ctrl or ⌘ wheel zooms by e
  * for every `wheelPxPerE` px of wheel, at most `wheelMaxPx` an event, a
  * line of wheel counting `wheelLinePx` and a page `wheelPagePx`.
  */
 export const ROLL_ZOOM_GESTURE = {
-  dragPx: 3,
   pinchMinPx: 40,
   wheelPxPerE: 100,
   wheelMaxPx: 50,

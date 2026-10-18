@@ -2,11 +2,13 @@
  * The Roll's zoom gestures (windsor#903): the ruler's drag zooms around the
  * pressed tick and scrolls with the pointer, within the region's floor and
  * 240 px per beat; the keys' drag sets the row height around the pressed
- * row and scrolls the rows; a pinch zooms an axis only once the fingers are
- * apart on it; the Ctrl or ⌘ wheel's zoom. Every move works from the press,
- * so moves between two paints land where the last one says.
+ * row, whatever mix of zoomed, thin and filled rows the keys lay out, and
+ * scrolls the rows; a pinch zooms an axis only once the fingers are apart on
+ * it; the Ctrl or ⌘ wheel's zoom. Every move works from the press, so moves
+ * between two paints land where the last one says.
  */
 import { describe, expect, it } from 'vitest';
+import { type RollRow, type RowInput, type RowLayout, rollRows, rowIndexAt } from './rollRows';
 import { ROLL_ROW_ZOOM, ROLL_TIME_ZOOM, ROLL_ZOOM_GESTURE } from './rollTables';
 import {
   type PanePoint,
@@ -21,13 +23,13 @@ import {
   wheelFactor,
 } from './rollZoomGestures';
 import {
-  type RowBounds,
   type TimeBounds,
   fitsOf,
   regionFitPx,
   zoomRowsAbout,
   zoomTimeAbout,
 } from './rollZoomModel';
+import { SONG_DRAG_THRESHOLD_PX } from './songViewTables';
 import type { RulerDrag, RulerDragEvent } from './songZoomModel';
 
 const BEAT = 24;
@@ -91,10 +93,10 @@ describe('the ruler', () => {
     expect(second.view?.beatPx).toBeCloseTo(100 * Math.SQRT2);
   });
 
-  it('starts past the threshold, and a release in place changes nothing', () => {
-    const under = ROLL_ZOOM_GESTURE.dragPx - 1;
+  it("starts past the Song tab's threshold, and a release in place changes nothing", () => {
+    const under = SONG_DRAG_THRESHOLD_PX - 1;
     expect(stepRuler(drag, move(drag, 0, -under)).view).toBeNull();
-    expect(stepRuler(drag, move(drag, 0, -ROLL_ZOOM_GESTURE.dragPx)).view).not.toBeNull();
+    expect(stepRuler(drag, move(drag, 0, -SONG_DRAG_THRESHOLD_PX)).view).not.toBeNull();
     const up = stepRuler(drag, { type: 'up', pointerId: 1 });
     expect(up).toEqual({ drag: null, view: null, tap: true });
   });
@@ -108,24 +110,75 @@ describe('the ruler', () => {
 });
 
 describe('the keys', () => {
-  const rows: RowBounds = { heightPx: 168, scaled: 73, fixedPx: 0 };
+  /** A minor's pitch classes: A B C D E F G. */
+  const A_MINOR = new Set([9, 11, 0, 2, 4, 5, 7]);
+  /** The rows `rollRows` lays out in a pane 168 px tall, 12 at 7 px unless `over` says otherwise. */
+  const layout = (over: Partial<RowInput>): RowLayout =>
+    rollRows({
+      keys: '12',
+      fold: false,
+      rowPx: 7,
+      used: new Set(),
+      scalePcs: A_MINOR,
+      panePx: 168,
+      ...over,
+    });
+  type View = { rowPx: number; top: number };
   const start = { rowPx: 7, top: 100 };
-  const drag = keysDrag(press(20, 50), start, rows);
-  const keysMove = (dx: number, dy: number): RulerDragEvent => ({
+  const drag = keysDrag(press(20, 50), start, { rows: layout({}), heightPx: 168 });
+  const keysMove = (dx: number, dy: number, y = 50): RulerDragEvent => ({
     type: 'move',
     pointerId: 1,
     buttons: 1,
     clientX: 40 + 20 + dx,
-    clientY: 20 + 50 + dy,
+    clientY: 20 + y + dy,
   });
-  /** The row height's share of the rows under the press. */
-  const pressedRow = (view: { rowPx: number; top: number }, y: number): number =>
-    (view.top + y) / view.rowPx;
+  /** The pitch `y` px under the pane's top in `view`, and how far down its row, as the next paint lays the rows out. */
+  const pressed = (input: Partial<RowInput>, view: View, y: number) => {
+    const { rows } = layout({ ...input, rowPx: view.rowPx });
+    const row = rows[rowIndexAt(rows, view.top + y)] as RollRow;
+    return { pitch: row.pitch, share: (view.top + y - row.top) / row.h };
+  };
+  const expectSameRow = (a: ReturnType<typeof pressed>, b: ReturnType<typeof pressed>): void => {
+    expect(a.pitch).toBe(b.pitch);
+    expect(a.share).toBeCloseTo(b.share);
+  };
+
+  /**
+   * A press `y` px down `input`'s rows at `view`: a drag right of 60 px
+   * doubles the rows with the pressed row under the pointer, and a second
+   * move before the paint lands where one move to it lands, the row still
+   * under the pointer.
+   */
+  const holdsPressedRow = (input: Partial<RowInput>, view: View, y: number): void => {
+    const rows = layout({ ...input, rowPx: view.rowPx });
+    const from = keysDrag(press(20, y), view, { rows, heightPx: 168 });
+    const before = pressed(input, view, y);
+    const first = stepKeys(from, keysMove(PER, 0, y));
+    expect(first.view?.rowPx).toBeCloseTo(2 * view.rowPx);
+    expectSameRow(pressed(input, first.view ?? view, y), before);
+    const second = stepKeys(first.drag, keysMove(PER / 2, 6, y));
+    expect(second.view).toEqual(stepKeys(from, keysMove(PER / 2, 6, y)).view);
+    expectSameRow(pressed(input, second.view ?? view, y + 6), before);
+  };
 
   it('doubles the row height for a drag right of 60 px, around the pressed row', () => {
-    const view = stepKeys(drag, keysMove(PER, 0)).view;
-    expect(view?.rowPx).toBeCloseTo(14);
-    expect(pressedRow(view ?? start, 50)).toBeCloseTo(pressedRow(start, 50));
+    holdsPressedRow({}, start, 50);
+  });
+
+  it('holds the pressed row under Keys: Scale, past thin slivers that keep their height', () => {
+    // Bb3, C#4 and F#4 lie outside A minor and hold notes: three 3 px slivers above the press.
+    const scale = { keys: 'scale' as const, used: new Set([57, 58, 61, 66]) };
+    expect(layout(scale).rows.filter((row) => row.thin)).toHaveLength(3);
+    holdsPressedRow(scale, { rowPx: 7, top: 100 }, 90);
+  });
+
+  it('holds the pressed row under Fold, its rows filled taller than the zoom', () => {
+    // 20 rows fill 168 px at 8 px each over the zoom's 7: the eleventh starts at y = 80.
+    const fold = { fold: true, used: new Set(Array.from({ length: 20 }, (_, i) => 50 + i)) };
+    const { rows } = layout(fold);
+    expect(rows[10]).toMatchObject({ top: 80, h: 8 });
+    holdsPressedRow(fold, { rowPx: 7, top: 0 }, 84);
   });
 
   it('a drag left makes rows shorter, between 4 and 24 px', () => {

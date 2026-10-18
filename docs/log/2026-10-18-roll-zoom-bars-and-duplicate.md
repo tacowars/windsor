@@ -38,7 +38,7 @@ the controls (A), zoom bars (B) and gestures only (C).
    whole region.
 4. **The ruler zooms as the Song tab's does:** drag up to zoom in and down
    to zoom out, around the tick that was pressed, and drag sideways to
-   scroll, with the Song tab's 60 px per doubling and 3 px threshold. A
+   scroll, with the Song tab's 60 px per doubling and drag threshold (`SONG_DRAG_THRESHOLD_PX`). A
    double-click switches between the loop and the region. The loop
    brace's handle keeps its own drag.
 5. **The keys zoom the rows:** drag sideways for taller or shorter rows,

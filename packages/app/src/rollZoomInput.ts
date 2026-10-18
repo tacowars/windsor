@@ -28,7 +28,7 @@ import {
   wheelFactor,
 } from './rollZoomGestures';
 import { zoomTimeAbout } from './rollZoomModel';
-import type { RulerDrag, RulerDragEvent } from './songZoomModel';
+import type { RulerDragEvent } from './songZoomModel';
 
 /** What the gestures read and zoom. */
 export interface ZoomInputHost {
@@ -37,9 +37,9 @@ export interface ZoomInputHost {
 }
 
 /** One drag: its start from a press (null refuses the press), and one event of it (null once it ended). */
-interface Stepper {
-  begin(down: PointerEvent): RulerDrag | null;
-  step(drag: RulerDrag, event: RulerDragEvent): RulerDrag | null;
+interface Stepper<Drag> {
+  begin(down: PointerEvent): Drag | null;
+  step(drag: Drag, event: RulerDragEvent): Drag | null;
 }
 
 /** A pointer's place in the notes pane, px from its left and top edges. */
@@ -61,8 +61,11 @@ const lands = (node: Element | null, e: MouseEvent): boolean => {
 };
 
 /** Run `stepper`'s drags on `node`, one at a time, with the pointer captured. */
-function wireDrag(node: HTMLElement, stepper: Stepper): void {
-  let drag: RulerDrag | null = null;
+function wireDrag<Drag extends { readonly pointerId: number }>(
+  node: HTMLElement,
+  stepper: Stepper<Drag>,
+): void {
+  let drag: Drag | null = null;
   const onBlur = (): void => run({ type: 'blur' });
   const run = (event: RulerDragEvent): void => {
     const was = drag;
@@ -128,8 +131,8 @@ function wireKeys({ panes, zoom }: ZoomInputHost): void {
   wireDrag(panes.keys, {
     begin: (down) => {
       const view = zoom.rowView();
-      const bounds = zoom.rowBounds();
-      return view && bounds ? keysDrag(pressOf(panes.body, down), view, bounds) : null;
+      const drawn = zoom.rowsDrawn();
+      return view && drawn ? keysDrag(pressOf(panes.body, down), view, drawn) : null;
     },
     step: (drag, event) => {
       const next = stepKeys(drag, event);

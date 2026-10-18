@@ -20,6 +20,7 @@
  */
 import { PPQ } from '@windsor/engine';
 import type { RollPanes } from './rollPanes';
+import type { RowLayout } from './rollRows';
 import type { RollScene } from './rollScene';
 import { type ShownBars, shownBars, slackTicks } from './rollSummary';
 import { ROLL_ZOOM_TEXT } from './rollTables';
@@ -104,6 +105,12 @@ export class RollZoomControl {
   rowBounds(): RowBounds | null {
     const scene = this.host.scene();
     return scene ? rowBoundsOf(scene.rows, this.host.panes.body.clientHeight) : null;
+  }
+
+  /** The rows drawn and the notes pane's height, which the keys' drag lays out again; null before a paint. */
+  rowsDrawn(): { rows: RowLayout; heightPx: number } | null {
+    const scene = this.host.scene();
+    return scene && { rows: scene.rows, heightPx: this.host.panes.body.clientHeight };
   }
 
   /** The px per beat the next paint draws at. */
