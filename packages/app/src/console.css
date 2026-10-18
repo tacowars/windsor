@@ -9616,6 +9616,22 @@ dialog.song-dlg {
 .master-captions .is-one {
   width: var(--meter-ch-w);
 }
+/* The Cue knob (windsor#907), centered under the Level fader: its cell is
+   the fader's width, and the rest of the row the meters' and the scale's. */
+.master-cue {
+  display: flex;
+  justify-content: center;
+}
+.master-cue .is-fader {
+  flex: none;
+  width: var(--fader-w);
+  display: flex;
+  justify-content: center;
+}
+.master-cue .is-rest {
+  flex: none;
+  width: calc(5 * var(--meter-ch-w) + 22px);
+}
 .master-column.is-off .meter-ceiling,
 .meter-bridge.is-off .meter-ceiling {
   visibility: hidden;

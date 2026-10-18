@@ -7,6 +7,7 @@
  * - the meters: the Level fader, In L and R with clip LEDs, the dBFS scale
  *   In and Out share, Out L and R with the ceiling line, and the GR bar, with
  *   "In" and "Out" captions under each pair;
+ * - the Cue knob under the Level fader: the engine's aux fader (windsor#907);
  * - the mode's two-by-two control and the Lookahead toggle;
  * - the transfer curve beside the Ceiling knob.
  *
@@ -15,8 +16,12 @@
  */
 import { DEFAULT_MASTER } from '@windsor/engine';
 import type { AppCtx } from './context';
+import { cueLevel, setCueLevel } from './cueLevel';
+import { CUE_LEVEL } from './cueLevelTables';
 import { el } from './dom';
+import { makeKnob } from './knob';
 import { createLevelFader } from './levelFader';
+import { faderValueText } from './levelFaderModel';
 import {
   LEVEL_FADER_WIDTH_PX,
   MASTER_CHANNEL_WIDTH_PX,
@@ -48,6 +53,29 @@ function captions(): HTMLElement {
   ] as const) {
     row.appendChild(el('span', cls, text));
   }
+  return row;
+}
+
+/**
+ * The Cue knob in its own row, under the Level fader (windsor#907): the aux
+ * fader's gain, a console preference, applied live to the running system.
+ */
+function cueRow(ctx: AppCtx): HTMLElement {
+  const row = el('div', 'master-cue');
+  const cell = el('div', 'is-fader');
+  const knob = makeKnob({
+    ...CUE_LEVEL,
+    curve: 'log',
+    fmt: faderValueText,
+    get: cueLevel,
+    set: (gain) => {
+      setCueLevel(gain);
+      ctx.host.system?.setAuxGain(gain);
+    },
+  });
+  knob.title = CUE_LEVEL.title;
+  cell.appendChild(knob);
+  row.append(cell, el('div', 'is-rest'));
   return row;
 }
 
@@ -96,7 +124,7 @@ export function renderMasterColumn(
   loop.add(curve);
   const shape = el('div', 'master-shape');
   shape.append(curve.root, controls.ceiling);
-  root.append(header(link, loop), meters, captions(), controls.modes, shape);
+  root.append(header(link, loop), meters, captions(), cueRow(ctx), controls.modes, shape);
   const syncMode = (): void => void root.classList.toggle('is-off', link.settings().mode === 'off');
   link.onChange(syncMode);
   syncMode();
