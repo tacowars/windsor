@@ -6,10 +6,14 @@
  * the take holds, drawn growing; and the summary line, which says when the
  * region being recorded into is full. The state is the console's recorder
  * (`rollRecMount.ts`); the device reads it on its playhead loop (`frame`).
+ * The metronome sits beside the switch, and Keyboard fold
+ * (`rollKeyboardFold.ts`), which follows the slot Rec records into, is read
+ * on the same frame (windsor#922).
  */
 import { ROLL_NOTES_MAX } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { type RollKeyboardFold, rollKeyboardFold } from './rollKeyboardFold';
 import { paintHeld } from './rollNotesPaint';
 import type { RollPanes } from './rollPanes';
 import { rollRecorder } from './rollRecMount';
@@ -37,7 +41,11 @@ export interface RecViewHost {
 /** Rec's switch for the controls, and what the device calls on each frame and paint. */
 export interface RollRecView {
   readonly control: HTMLElement;
-  /** Read the recorder: the look, the summary, the held notes. */
+  /** Keyboard fold, for the controls to place under Rec. */
+  readonly keyboardFold: HTMLElement;
+  /** Place `node` (the metronome) beside the switch. */
+  besideSwitch(node: HTMLElement): void;
+  /** Read the recorder: the look, the summary, the held notes, Keyboard fold. */
   frame(): void;
   /** The summary line as the device words it, kept under a full region's. */
   summary(text: string): void;
@@ -65,6 +73,8 @@ function sideButton(className: string, text: string): HTMLButtonElement {
 interface RecControl {
   readonly root: HTMLElement;
   readonly state: HTMLElement;
+  /** The switch's row, with room beside it (the metronome). */
+  readonly row: HTMLElement;
   readonly box: HTMLElement;
   readonly off: HTMLButtonElement;
   readonly on: HTMLButtonElement;
@@ -82,9 +92,14 @@ function recControl(): RecControl {
   const on = sideButton('rec-on', R.on);
   on.prepend(el('i', 'rec-dot'));
   box.append(off, on);
-  root.append(label, box, el('span', 'rec-hint', R.hint));
-  return { root, state, box, off, on };
+  const row = el('div', 'rec-row');
+  row.append(box);
+  root.append(label, row, el('span', 'rec-hint', R.hint));
+  return { root, state, row, box, off, on };
 }
+
+/** The slot the keyboard plays and Rec records into (`RecorderHost.selected`); the selection before the recorder mounts. */
+const playedSlot = (ctx: AppCtx): number => rollRecorder()?.target() ?? ctx.parts.selected;
 
 /** Show look `next` on the switch, having shown `prev`. */
 function paintLook(ui: RecControl, prev: RecLook | null, next: RecLook): void {
@@ -103,6 +118,7 @@ function paintLook(ui: RecControl, prev: RecLook | null, next: RecLook): void {
 /** Rec on one Roll device. */
 class RecView implements RollRecView {
   private readonly ui = recControl();
+  private readonly fold: RollKeyboardFold;
   private look: RecLook | null = null;
   private full = false;
   private words = '';
@@ -113,10 +129,19 @@ class RecView implements RollRecView {
     this.ui.off.onclick = () => this.set(false);
     this.ui.on.onclick = () => this.set(true);
     this.show('no-region');
+    this.fold = rollKeyboardFold(host.ctx, host.slot, () => playedSlot(host.ctx));
   }
 
   get control(): HTMLElement {
     return this.ui.root;
+  }
+
+  get keyboardFold(): HTMLElement {
+    return this.fold.node;
+  }
+
+  besideSwitch(node: HTMLElement): void {
+    this.ui.row.append(node);
   }
 
   frame(): void {
@@ -132,6 +157,7 @@ class RecView implements RollRecView {
       this.showSummary();
     }
     this.drawHeld();
+    this.fold.frame();
   }
 
   summary(text: string): void {

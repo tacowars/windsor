@@ -2,8 +2,9 @@
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
  * columns: Snap, Loop, Keys, Fold and Quantise; then Show, Loop | Region
  * (windsor#902; record `2026-10-18-roll-zoom-bars-and-duplicate` decision
- * 2), with the zoom bars' hint under it, the Audition switch, Rec (windsor#663, `rollRecView.ts`) and the metronome
- * (windsor#906, `rollMetronome.ts`). Under both, the
+ * 2), with the zoom bars' hint under it, the Audition switch, Rec (windsor#663, `rollRecView.ts`) with the metronome
+ * beside its switch (windsor#906, `rollMetronome.ts`), and Keyboard fold
+ * (windsor#922, `rollKeyboardFold.ts`). Under both, the
  * Velocity row (windsor#754; record `2026-10-12-roll-note-accent-and-ratchet`
  * decision 9): Vel, the console's knob on the part's `velocity`, beside Acc
  * vel and Acc mod, the Grid's knobs on the roll's `accentVelocity` and
@@ -25,6 +26,7 @@ import { ROLL_DUPLICATE, ROLL_DUPLICATE_REFUSED } from './rollDuplicateTables';
 import { barsOf, loopText } from './rollSummary';
 import { quantiseOff } from './rollQuantise';
 import { ROLL_QUANTISE, ROLL_SHOW, ROLL_SNAPS, ROLL_VELOCITY_ROW } from './rollTables';
+import type { RollRecView } from './rollRecView';
 import type { RollKeys } from './rollRows';
 import { type RollViewState, snapOf } from './rollView';
 import type { RollFit } from './rollZoomModel';
@@ -54,9 +56,9 @@ export interface RollControlsTarget {
   selectedCount(): number;
   /** One press of Quantise, written to the song. */
   quantise(): void;
-  /** The Rec switch, placed under Audition. */
-  readonly rec: HTMLElement;
-  /** The metronome button (windsor#906), placed after Rec. */
+  /** Rec, placed under Audition, and Keyboard fold, placed under Rec. */
+  readonly rec: Pick<RollRecView, 'control' | 'keyboardFold' | 'besideSwitch'>;
+  /** The metronome button (windsor#906), placed beside Rec's switch. */
   readonly metronome: HTMLElement;
 }
 
@@ -250,8 +252,10 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
     (v) => setAudition(v === 'on'),
   );
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
+  const { rec } = target;
+  rec.besideSwitch(target.metronome);
   const col = el('div', 'roll-ctl');
-  col.append(show.node, item('Audition', audition), target.rec, target.metronome);
+  col.append(show.node, item('Audition', audition), rec.control, rec.keyboardFold);
   return { node: col, refresh: show.refresh };
 }
 

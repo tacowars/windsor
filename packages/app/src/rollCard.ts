@@ -179,7 +179,7 @@ class RollDevice {
       duplicate: () => this.editing.duplicate(),
       selectedCount: () => this.editing.editor.selected().length,
       quantise: () => this.editing.quantise(),
-      rec: this.rec.control,
+      rec: this.rec,
       metronome: rollMetronome(this.ctx),
     });
   }
