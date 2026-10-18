@@ -3465,8 +3465,9 @@ body.chord-dragging {
   font-size: 9px;
   line-height: 10px;
 }
+/* The hint's line is kept while it is hidden, so Keyboard fold under it never moves. */
 .rec-item:not(.disabled):not(.paused) .rec-hint {
-  display: none;
+  visibility: hidden;
 }
 .rec-item.disabled .rec-seg {
   opacity: 0.45;
