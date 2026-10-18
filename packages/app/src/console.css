@@ -42,6 +42,16 @@ html {
   touch-action: pan-x pan-y;
 }
 
+/* The document never scrolls; .console does. iOS lets a pinch through while
+   the document's own scroll is moving, and a document that cannot move gives
+   it nothing to ride on (windsor#899). */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--ground);
   color: var(--ink);
@@ -90,7 +100,9 @@ input {
 .console {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: none;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
