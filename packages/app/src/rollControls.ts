@@ -1,7 +1,8 @@
 /**
  * The Roll device's controls (windsor#602 decision 2), in the mockup's two
  * columns: Snap, Loop, Keys, Fold and Quantise; then the ↔ and ↕ zooms, the
- * Audition switch and Rec (windsor#663, `rollRecView.ts`). Under both, the
+ * Audition switch, Rec (windsor#663, `rollRecView.ts`) and the metronome
+ * (windsor#906, `rollMetronome.ts`). Under both, the
  * Velocity row (windsor#754; record `2026-10-12-roll-note-accent-and-ratchet`
  * decision 9): Vel, the console's knob on the part's `velocity`, beside Acc
  * vel and Acc mod, the Grid's knobs on the roll's `accentVelocity` and
@@ -48,6 +49,8 @@ export interface RollControlsTarget {
   quantise(): void;
   /** The Rec switch, placed under Audition. */
   readonly rec: HTMLElement;
+  /** The metronome button (windsor#906), placed after Rec. */
+  readonly metronome: HTMLElement;
 }
 
 /** The controls, and the readouts' refresh after a repaint. */
@@ -234,7 +237,7 @@ function secondColumn(target: RollControlsTarget): { node: HTMLElement; refresh:
   );
   audition.title = 'Hear a note as you add it or drag it to a new pitch';
   const col = el('div', 'roll-ctl');
-  col.append(zoom.node, item('Audition', audition), target.rec);
+  col.append(zoom.node, item('Audition', audition), target.rec, target.metronome);
   return { node: col, refresh: zoom.refresh };
 }
 

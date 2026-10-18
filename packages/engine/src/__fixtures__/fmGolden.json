@@ -138,6 +138,11 @@
       "generic": "34ce1a722f8b4c636dd1b5a32458427f1050619602c21b1c1336df03eefd7e43",
       "noDormancy": "34ce1a722f8b4c636dd1b5a32458427f1050619602c21b1c1336df03eefd7e43"
     },
+    "metronome-click": {
+      "default": "85a527ff20dd1a1eb9ed4ea390d4ebb7e0dd70cbf9d6cfcb71e9a7e017cec8b5",
+      "generic": "85a527ff20dd1a1eb9ed4ea390d4ebb7e0dd70cbf9d6cfcb71e9a7e017cec8b5",
+      "noDormancy": "85a527ff20dd1a1eb9ed4ea390d4ebb7e0dd70cbf9d6cfcb71e9a7e017cec8b5"
+    },
     "pad-drift": {
       "default": "d0b23d1766a4aac79232850d448cb08cc87b5f9fe7668a229a27ffb14338fd79",
       "generic": "d0b23d1766a4aac79232850d448cb08cc87b5f9fe7668a229a27ffb14338fd79",

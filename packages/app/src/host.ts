@@ -33,6 +33,8 @@ import { loadBuiltIns } from './builtInLibrary';
 import type { ConsoleTransport } from './context';
 import { cueLevel } from './cueLevel';
 import { HARMONY_AUDITION_PATCH } from './harmonyAuditionTables';
+import { readMetronomeOn } from './rollMetronomePrefs';
+import { ROLL_METRONOME } from './rollTables';
 import { nextTransportState, type TransportState } from './transportModel';
 
 export type HostLog = (message: string) => void;
@@ -222,6 +224,8 @@ export class EngineHost {
   private latest: ArrangementDocument | null = null;
   /** The harmony card's audition part (windsor#332), made on the first press; dropped with its system. */
   private audition: { system: AudioSystem; part: Promise<AudioPart | null> } | null = null;
+  /** The Roll's metronome switch (windsor#906): the console's preference, never the song's. */
+  private metronome = readMetronomeOn();
   private readonly log: HostLog;
   /** Who hears the context's state changes (windsor#578); `onAudioState`. */
   private readonly audioListeners = new Set<() => void>();
@@ -408,6 +412,7 @@ export class EngineHost {
     this.system.setAuxGain(cueLevel());
     await this.system.init();
     this.system.initMusic(document);
+    this.applyMetronome(this.system);
     // The console's knobs retune the voices already ringing (off by default in the engine).
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
@@ -496,6 +501,40 @@ export class EngineHost {
       this.audition = { system, part };
     }
     return this.audition.part;
+  }
+
+  /** The Roll's metronome is on (windsor#906), whether or not audio is. */
+  get metronomeOn(): boolean {
+    return this.metronome;
+  }
+
+  /**
+   * Turn the Roll's metronome on or off (windsor#906 decision 2): the
+   * built-in `ROLL_METRONOME.patch` handed to the live system's
+   * `setMetronome`, or null. Before audio the switch is only kept, and every
+   * system built hears it once built, so the clicks start once audio is on
+   * and the transport runs.
+   */
+  setMetronome(on: boolean): void {
+    this.metronome = on;
+    if (this.system) this.applyMetronome(this.system);
+  }
+
+  /**
+   * Hand `system` the switch; a press or a rebuild while the library loads
+   * wins. A system still in its `init` is left to `install`, which hands it
+   * the switch once its music is built.
+   */
+  private applyMetronome(system: AudioSystem): void {
+    if (!system.isStarted) return;
+    if (!this.metronome) {
+      system.setMetronome(null);
+      return;
+    }
+    void loadBuiltIns().then((library) => {
+      const entry = library[ROLL_METRONOME.patch];
+      if (entry && this.metronome && this.system === system) system.setMetronome(entry.patch);
+    });
   }
 
   /** Pump the look-ahead scheduler; driven by the page's interval timer. */
