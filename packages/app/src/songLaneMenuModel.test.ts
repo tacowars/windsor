@@ -114,6 +114,7 @@ describe("the mockups' states", () => {
       'Basslead',
       'Figure',
       'Roll',
+      'Drum',
     ]);
   });
 

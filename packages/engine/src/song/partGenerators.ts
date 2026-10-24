@@ -3,7 +3,8 @@
  * a part's generator, says what rebuilds it, reconfigures it live, releases
  * what it holds and reads its playhead. `ArrangementPlayer` owns the parts
  * and the transport; this file owns the kinds, so adding one (#706's `arp`,
- * #707's `bass`) is a `case` here and nothing in the player.
+ * #707's `bass`, windsor#948's `drum`) is a `case` here and nothing in the
+ * player.
  *
  * Every generator meets one contract: `attach(gate)` at its divisor,
  * `reconfigure(config, sampler?)`, `enter(regionIndex)` when the region gate
@@ -15,6 +16,7 @@ import type {
   ArpDriver,
   BassDriver,
   ChordDriver,
+  DrumDriver,
   EuclideanDriver,
   FigureDriver,
   GridDriver,
@@ -27,6 +29,7 @@ import { assertArpConfig } from '../sequencing/arpSequencer';
 import { Arpeggiator } from '../sequencing/arpeggiator';
 import { BassSequencer, assertBassConfig } from '../sequencing/bassSequencer';
 import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
+import { DrumSequencer, assertDrumConfig } from '../sequencing/drumSequencer';
 import { EuclideanSequencer, assertEuclideanConfig } from '../sequencing/euclideanSequencer';
 import {
   FigureSequencer,
@@ -45,7 +48,8 @@ export type Generator =
   | Arpeggiator
   | BassSequencer
   | FigureSequencer
-  | RollSequencer;
+  | RollSequencer
+  | DrumSequencer;
 
 /** A generator emitting note events, whose held notes a region end releases. */
 export type PitchedGenerator = Exclude<Generator, EuclideanSequencer>;
@@ -104,6 +108,8 @@ export function buildGenerator(
       return new FigureSequencer(sampler, driver as FigureDriver, barTicks, figureOf);
     case 'roll':
       return new RollSequencer(driver as RollDriver);
+    case 'drum':
+      return new DrumSequencer(driver as DrumDriver);
     default:
       return null;
   }
@@ -155,6 +161,11 @@ export function liveReconfiguration(
   if (spec.kind === 'roll' && generator instanceof RollSequencer) {
     const config = driver as RollDriver;
     assertRollConfig(config);
+    return () => generator.reconfigure(config);
+  }
+  if (spec.kind === 'drum' && generator instanceof DrumSequencer) {
+    const config = driver as DrumDriver;
+    assertDrumConfig(config);
     return () => generator.reconfigure(config);
   }
   return null;

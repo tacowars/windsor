@@ -83,6 +83,10 @@ const PURE_FILES = [
   'rollEnvelopeTables.ts',
   // A note's tunables (windsor#753): the shortest note a ratchet plays on.
   'rollNoteTables.ts',
+  // The Drum (windsor#948): its line of hits, its step and its tunables.
+  'drumSequencer.ts',
+  'drumSteps.ts',
+  'drumConstants.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',

@@ -343,6 +343,7 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   bass: 'pitch',
   figure: 'pitch',
   roll: 'pitch',
+  drum: 'perc',
 };
 
 /** A part's name by slot, for a table that names another part (a Figure's leader, windsor#490). */
@@ -407,6 +408,7 @@ export const REGION_SUMMARY: KindTable<string> = {
       : `figure · ${lineSummary(spec.cells, spec.length)} ${divisorLabel(spec.divisor, meter)}`,
   roll: (spec, meter) =>
     `roll · ${spec.notes.length} notes · ${loopBars(spec.loopTicks, meter)} bar loop`,
+  drum: (spec, meter) => `drum · ${spec.length} steps · ${divisorLabel(spec.divisor, meter)}`,
 };
 
 /**
@@ -415,7 +417,7 @@ export const REGION_SUMMARY: KindTable<string> = {
  * with no strip loads as one bar of plain notes), the steps' durations and
  * repeats for a Chord Player, `steps` for a Euclidean line, a Figure's
  * schedule in bars or else its line (windsor#490), a Roll's loop
- * (windsor#599); null for the kind that
+ * (windsor#599), a Drum's loop length (windsor#948); null for the kind that
  * has none (arp, a Figure canon) or a cycle with nothing in it.
  */
 export const CYCLE_TICKS: KindTable<number | null> = {
@@ -436,4 +438,5 @@ export const CYCLE_TICKS: KindTable<number | null> = {
     return spec.length > 0 ? spec.length * spec.divisor : null;
   },
   roll: (spec) => spec.loopTicks,
+  drum: (spec) => spec.length * spec.divisor,
 };
