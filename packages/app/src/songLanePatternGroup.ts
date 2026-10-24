@@ -8,9 +8,10 @@
  * `songLaneMenuModel.ts` sets the group between Loop region and Bounce part
  * to Roll…, a separator on each side.
  *
- * - Grid: Randomize, Reverse. Arp, Basslead and Figure add Reseed. Euclid:
- *   Capture, or Release once captured. Roll: `Quantize to <Snap>` with the
- *   card's Snap, tagged `all notes`. Chord: none, so its group is Fit alone.
+ * - Grid, Arp, Basslead and Figure: Randomize, Reverse, Reseed (the Grid's
+ *   since windsor#936). Euclid: Capture, or Release once captured. Roll:
+ *   `Quantize to <Snap>` with the card's Snap, tagged `all notes`. Chord:
+ *   none, so its group is Fit alone.
  * - A row is off exactly where the card's button is (`actionBlocked`), with
  *   the card's reason as its tag: a Figure canon's Randomize and Reverse,
  *   the Roll's Quantize at Snap Off.

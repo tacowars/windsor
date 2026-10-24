@@ -203,8 +203,8 @@ describe("the picker's Sequencer group (windsor#491)", () => {
     expect(seqGroup(GRID_PART)).toEqual({
       label: 'Sequencer',
       options: [
-        { target: 'seq.randomness', label: 'Randomness', disabled: false },
-        { target: 'seq.probability', label: 'Probability', disabled: false },
+        { target: 'seq.randomness', label: 'Vary', disabled: false },
+        { target: 'seq.probability', label: 'Chance', disabled: false },
       ],
     });
     expect(seqGroup(BASS_PART)?.options.map((o) => o.label)).toEqual(['Gate', 'Density']);
@@ -263,6 +263,9 @@ describe('a lane', () => {
       kindLine: 'Sequencer',
       kind: 'seq',
     });
+    // Step variation's lanes take their knobs' names (windsor#936).
+    expect(laneTitle(GRID_PART, 'seq.probability').name).toBe('Chance');
+    expect(laneTitle(GRID_PART, 'seq.randomness').name).toBe('Vary');
   });
 
   it('starts flat at the value from tick 0 to the song end, on (decision 4)', () => {

@@ -74,9 +74,11 @@ export const ARP_GATE_BAR: ArpGateBarTable = {
 /**
  * The device's table knobs after Octave, Octaves and Rotate (windsor#370
  * decision 2; the mockup's order), in columns of three, named by the field
- * each writes: the dynamics, then Gate.
+ * each writes: the dynamics, then Gate and step variation's Vary and Chance
+ * (windsor#936), with the Rests sound and Octave toggles in a column of
+ * their own beside it (`arpCard.ts`).
  */
 export const ARP_KNOB_COLUMNS: readonly (readonly SequencerKnobEntry['f'][])[] = [
   ['velocity', 'accentVelocity', 'accentMod'],
-  ['gate'],
+  ['gate', 'randomness', 'probability'],
 ];

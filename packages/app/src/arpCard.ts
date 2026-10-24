@@ -6,7 +6,8 @@
  * device's one height. Two sections: Play, the controls in columns — Style,
  * Rate and Voicing; Retrigger, Seed with Reseed as an icon beside it,
  * Randomize and Reverse; then, behind a rule, Octave, Octaves and Rotate, Vel, Acc vel
- * and Acc mod, Gate and Skip — and Cycle, the strip (`arpGrid.ts`), as wide
+ * and Acc mod, Gate, Vary and Chance, and the Rests sound and Octave toggles
+ * beside the last two (windsor#936) — and Cycle, the strip (`arpGrid.ts`), as wide
  * as the arp's cycle. The sizes are the `--arp-*` entries of
  * `SEQUENCER_DEVICE_PX`; the hint paragraph went with windsor#370, and the
  * cells keep their tooltips.
@@ -21,14 +22,12 @@ import type { ArpSpec } from '@windsor/engine';
 import { DEFAULT_ARP_CONFIG } from '@windsor/engine';
 import { arpGrid } from './arpGrid';
 import { ARP_KNOB_COLUMNS } from './arpGridConstants';
-import { arpSeedChange, parseSeed } from './arpModel';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, seg, select } from './dom';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
-import { runPatternAction } from './patternActionRun';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
 import { divisorOptions } from './divisorLabels';
@@ -38,11 +37,11 @@ import {
   ARP_STYLE_OPTIONS,
   ARP_VOICING_OPTIONS,
 } from './sequencerKnobTables';
-import { railIcon, railSvg } from './sequencerRail';
+import { seedField } from './seedField';
 import { specOf } from './stepStrip';
+import { isVariationAmount, titleVariationKnob, variationToggles } from './stepVariationControls';
 
-/** Reseed's icon: a circling arrow. */
-export const ICON_RESEED = '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>';
+export { ICON_RESEED } from './seedField';
 
 /** The part on `slot`, and the region whose pattern the card edits (windsor#75). */
 interface ArpTarget {
@@ -95,38 +94,6 @@ function retrigger(target: ArpTarget): HTMLElement {
   return wrap;
 }
 
-/** The Seed field, and Reseed as an icon beside it (decision 8): today's title and write. */
-function seedField(target: ArpTarget): HTMLElement {
-  const { ctx, slot } = target;
-  const field = document.createElement('input');
-  field.className = 'field';
-  field.name = 'arp-seed';
-  field.inputMode = 'numeric';
-  field.setAttribute('aria-label', 'Seed');
-  field.value = String(spec(target).seed);
-  field.onchange = (): void => {
-    const seed = parseSeed(field.value);
-    if (seed === null || !ctx.change(arpSeedChange(slot, seed)).ok) {
-      field.value = String(spec(target).seed);
-    }
-  };
-  const reseed = railIcon(
-    'A new seed: the part restarts its random stream now',
-    'seq-icon arp-reseed',
-  );
-  reseed.setAttribute('aria-label', 'Reseed');
-  reseed.appendChild(railSvg(ICON_RESEED, 'seq-icon-svg seq-line-icon'));
-  reseed.onclick = (): void => {
-    if (runPatternAction(ctx, slot, target.region, 'reseed'))
-      field.value = String(spec(target).seed);
-  };
-  const row = el('div', 'arp-seed');
-  row.append(field, reseed);
-  const wrap = el('div');
-  wrap.append(el('span', 'field-label', 'Seed'), row);
-  return wrap;
-}
-
 /** The pattern's register octave (today's Reg): where the arp's chord is voiced. */
 function octave(target: ArpTarget): HTMLElement {
   const { ctx } = target;
@@ -148,12 +115,16 @@ function knobStrip(target: ArpTarget, rotate: HTMLElement): HTMLElement {
   const entries = [...ARP_KNOBS, ...ARP_GRID_KNOBS];
   const knob = (field: string): HTMLElement[] => {
     const entry = entries.find((e) => e.f === field);
-    return entry ? [tableKnob(ctx, slot, entry, PITCH_COLOR, region)] : [];
+    if (!entry) return [];
+    const node = tableKnob(ctx, slot, entry, PITCH_COLOR, region);
+    return [isVariationAmount(field) ? titleVariationKnob(node, field) : node];
   };
   const strip = el('div', 'arp-knobs');
   strip.append(
     column('k3', [octave(target), ...knob('octaves'), rotate]),
     ...ARP_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),
+    // Rests sound level with Vary, Octave with Chance (windsor#936).
+    column('k3 variation-col', [el('div'), ...variationToggles(target)]),
   );
   return strip;
 }
@@ -163,7 +134,12 @@ function controls(target: ArpTarget, grid: ReturnType<typeof arpGrid>): HTMLElem
   const body = el('div', 'seq-sec-body');
   body.append(
     column('wide arp-fields', pickers(target)),
-    column('wide arp-fields', [retrigger(target), seedField(target), grid.randomize, grid.reverse]),
+    column('wide arp-fields', [
+      retrigger(target),
+      seedField({ ...target, device: 'arp', seed: () => spec(target).seed }),
+      grid.randomize,
+      grid.reverse,
+    ]),
     knobStrip(target, grid.rotate),
   );
   const section = el('div', 'seq-section play');

@@ -41,6 +41,7 @@ describe("the mockups' states", () => {
       ...EDITS('Paste at bar 6'),
       'Randomize',
       'Reverse',
+      'Reseed',
       'Fit region to pattern [1 bar]',
       '—',
       'Load rack…',

@@ -115,6 +115,7 @@ describe('each kind’s group', () => {
     expect(group(press(grid, [bars(1, 1)]))).toEqual([
       'Randomize',
       'Reverse',
+      'Reseed',
       'Fit region to pattern [already fits] (off)',
     ]);
   });

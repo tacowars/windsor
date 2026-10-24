@@ -38,4 +38,10 @@ describe('the readout', () => {
     expect(readout(requireCatalogRow('strip.send.a'), 0.3)).toBe('0.30');
     expect(readout({ ...requireCatalogRow('strip.send.a'), unit: '%' }, 25)).toBe('25%');
   });
+
+  it('reads Vary and Chance as a percent, as their knobs do (windsor#936)', () => {
+    expect(readout(requireCatalogRow('seq.probability'), 0.3)).toBe('30%');
+    expect(readout(requireCatalogRow('seq.randomness'), 1)).toBe('100%');
+    expect(readout(requireCatalogRow('seq.skipChance'), 0.3)).toBe('0.30');
+  });
 });

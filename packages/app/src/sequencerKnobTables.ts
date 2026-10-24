@@ -45,11 +45,12 @@ import {
   VELOCITY_DEFAULT,
   WALK_CHANCE,
 } from '@windsor/engine';
-import { fmt0, fmt2, fmtMs } from './consoleFormat';
+import { fmt0, fmt2, fmtMs, fmtPct } from './consoleFormat';
 import type { PulseField } from './euclidModel';
 import { FIGURE_DRIFT_EVERY_DEFAULT } from './figureConstants';
 import { GRID_ROTATE_MAX } from './gridConstants';
 import type { KnobSpec } from './knob';
+import { STEP_VARIATION_NAMES, type VariationAmount } from './stepVariationTables';
 
 type KeysOfUnion<T> = T extends unknown ? keyof T : never;
 /** A field of some sequencer spec, `kind` aside: what a driver knob may address (#618 decision 8). */
@@ -163,8 +164,25 @@ export const euclidPulseKnob = (field: PulseField): CardKnobSpec => ({
   fmt: fmt0,
 });
 
+/**
+ * Step variation's Vary and Chance (windsor#936, record
+ * `2026-10-24-step-variation-controls` decision 1): the engine's
+ * `randomness` and `probability`, 0 to 1 shown as 0% to 100%, over the
+ * kind's own defaults.
+ */
+const variationKnobs = (
+  defaults: Readonly<Record<VariationAmount, number>>,
+): readonly DriverKnobEntry[] =>
+  (['randomness', 'probability'] as const).map((f) => ({
+    kind: 'driver',
+    f,
+    label: STEP_VARIATION_NAMES[f],
+    o: { min: 0, max: 1, def: defaults[f], fmt: fmtPct },
+  }));
+
 export const GRID_KNOBS: readonly SequencerKnobEntry[] = [
   VELOCITY_KNOB,
+  ...variationKnobs(DEFAULT_GRID_CONFIG),
   {
     kind: 'driver',
     f: 'accentVelocity',
@@ -233,10 +251,11 @@ export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
 
 /**
  * The Arp card's step-grid knobs (windsor#137): Acc vel and Acc mod, the
- * grid's ranges and readouts over the arp's own defaults. They follow Reg
- * in the card's row.
+ * grid's ranges and readouts over the arp's own defaults, and step
+ * variation's Vary and Chance (windsor#936).
  */
 export const ARP_GRID_KNOBS: readonly SequencerKnobEntry[] = [
+  ...variationKnobs(DEFAULT_ARP_CONFIG),
   {
     kind: 'driver',
     f: 'accentVelocity',

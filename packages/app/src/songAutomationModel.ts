@@ -35,7 +35,6 @@ import {
   STRIP_AUTOMATION_ROWS,
   VOICE_AUTOMATION_ROWS,
   automatableInsertFields,
-  catalogRow,
   formatTargetId,
   parseTargetId,
   seqTargetIds,
@@ -45,6 +44,7 @@ import {
 import { INSERT_LABELS } from './insertKnobTables';
 import { macroName, offersVoicePath } from './macroTargets';
 import { voiceSlotTargets } from './partVoiceSlots';
+import { seqLaneName } from './stepVariationTables';
 import { getPath } from './patchPath';
 import type { LaneOwner } from './songAutomationOwner';
 import { isGroupLaneOwner, ownerInserts, ownerLanes, ownerStrip } from './songAutomationOwner';
@@ -102,8 +102,19 @@ const insertOf = (owner: LaneOwner, insertId: string): InsertSpec | undefined =>
   ownerInserts(owner).find((spec) => spec.id === insertId);
 
 /**
- * The row behind `target` on `owner`: its bounds, scale and label, a macro's
- * label the name `patch` (the part's) gives it.
+ * The name the console gives `target` where it is not the catalog's: a
+ * macro's, as `patch` (the part's) names it, or a step variation lane's,
+ * named as its knob (Vary, Chance; windsor#936).
+ */
+function consoleName(target: string, patch: Patch | undefined): string | undefined {
+  const parsed = parseTargetId(target);
+  if (parsed?.kind === 'voice') return macroName(patch, parsed.path);
+  return parsed?.kind === 'seq' ? seqLaneName(parsed.field) : undefined;
+}
+
+/**
+ * The row behind `target` on `owner`: its bounds, scale and label, under the
+ * name the console gives it (`consoleName`).
  */
 export function laneRow(
   owner: LaneOwner,
@@ -111,8 +122,7 @@ export function laneRow(
   patch?: Patch,
 ): AutomationTargetRow | undefined {
   const row = targetRow(target, (insertId) => insertOf(owner, insertId));
-  const parsed = parseTargetId(target);
-  const name = parsed?.kind === 'voice' ? macroName(patch, parsed.path) : undefined;
+  const name = consoleName(target, patch);
   return row && name !== undefined ? { ...row, label: name } : row;
 }
 
@@ -182,7 +192,7 @@ export function pickerGroups(owner: LaneOwner, patch?: Patch): PickerGroup[] {
   const voiceFull = held.size >= FM_LANES_MAX;
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
   const seq = seqTargetIds(owner.sequencer.kind).map((target) =>
-    option(target, catalogRow(target)?.label ?? target),
+    option(target, laneRow(owner, target)?.label ?? target),
   );
   return [
     { label: MIXER_GROUP_LABEL, options: mixer },

@@ -14,7 +14,10 @@ describe('the Grid device’s columns (windsor#368)', () => {
     expect(new Set(placed).size).toBe(placed.length);
   });
 
-  it('puts Vel, Acc vel and Acc mod together', () => {
-    expect(GRID_KNOB_COLUMNS).toEqual([['velocity', 'accentVelocity', 'accentMod']]);
+  it('puts Vel, Acc vel and Acc mod together, then Vary and Chance (windsor#936)', () => {
+    expect(GRID_KNOB_COLUMNS).toEqual([
+      ['velocity', 'accentVelocity', 'accentMod'],
+      ['randomness', 'probability'],
+    ]);
   });
 });

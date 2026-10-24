@@ -22,6 +22,8 @@ export const fmtHz = (v: number): string =>
 export const fmtSigned = (v: number): string => (v >= 0 ? '+' : '') + v.toFixed(2);
 /** A phase kept in cycles (0..1), printed in whole degrees. */
 export const fmtCycleDegrees = (v: number): string => `${(v * DEGREES_PER_CYCLE).toFixed(0)}°`;
+/** A fraction kept in 0..1, printed in whole percent: step variation's Vary and Chance (windsor#936). */
+export const fmtPct = (v: number): string => `${Math.round(v * PERCENT)}%`;
 /** A level or a biquad `Q` in dB, signed, one decimal. */
 export const fmtDb = (v: number): string => `${(v >= 0 ? '+' : '') + v.toFixed(1)}dB`;
 

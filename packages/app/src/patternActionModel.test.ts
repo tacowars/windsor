@@ -6,8 +6,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { RollNote, SequencerKind } from '@windsor/engine';
-import { TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine';
+import type { GridSpec, NoteEvent, RollNote, SequencerKind } from '@windsor/engine';
+import {
+  DIVISORS,
+  GridSequencer,
+  ScaleSampler,
+  TICKS_PER_BAR,
+  gridNote,
+  partAt,
+  regionPattern,
+} from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import { reverseGrid } from './gridModel';
 import type { ActionReads, PatternAction } from './patternActionModel';
@@ -43,8 +51,7 @@ const run = (model: DocumentModel, action: PatternAction, over: Partial<ActionRe
 
 describe('what each card offers', () => {
   it('lists the cards’ buttons in their order, and none on Chord or no sequencer', () => {
-    expect(offeredActions('grid')).toEqual(['randomize', 'reverse']);
-    for (const kind of ['arp', 'bass', 'figure'] as const) {
+    for (const kind of ['grid', 'arp', 'bass', 'figure'] as const) {
       expect(offeredActions(kind), kind).toEqual(['randomize', 'reverse', 'reseed']);
     }
     expect(offeredActions('euclidean')).toEqual(['capture']);
@@ -54,7 +61,8 @@ describe('what each card offers', () => {
   });
 
   it('refuses an action the kind doesn’t offer', () => {
-    expect(run(songWith('grid'), 'reseed')).toBeNull();
+    expect(run(songWith('chord'), 'reseed')).toBeNull();
+    expect(run(songWith('grid'), 'capture')).toBeNull();
   });
 });
 
@@ -71,7 +79,7 @@ describe('the writes', () => {
   });
 
   it('Reseed writes a new seed to the part', () => {
-    for (const kind of ['arp', 'bass', 'figure'] as const) {
+    for (const kind of ['grid', 'arp', 'bass', 'figure'] as const) {
       const model = songWith(kind);
       const before = partAt(model.doc, 0)?.sequencer;
       const edit = run(model, 'reseed');
@@ -133,5 +141,50 @@ describe('the rules that turn a button off', () => {
     expect(actionBlocked('quantize', spec, SIXTEENTH)).toBeNull();
     const off = { loop: BAR, region: 4 * BAR, snap: ROLL_SNAP_OFF_TICKS };
     expect(run(model, 'quantize', { rollFrame: () => off })).toBeNull();
+  });
+});
+
+/** Every event region 0's Grid pattern plays over four bars of sixteenths, from its own stream. */
+function playGrid(model: DocumentModel): NoteEvent[] {
+  const part = partAt(model.doc, 0);
+  const spec = part && regionPattern(part, 0);
+  if (spec?.kind !== 'grid') throw new Error('not a grid');
+  const seq = new GridSequencer(new ScaleSampler({ root: 0, scale: 'naturalMinor' }), spec);
+  const events: NoteEvent[] = [];
+  const step = DIVISORS.sixteenth;
+  for (let s = 0; s < (4 * BAR) / step; s++) {
+    const at = { tick: s * step, step: s, bar: 0, tickInBar: 0, seconds: 0, secondsPerTick: 0 };
+    events.push(...seq.handleTick({ ...at, time: 0 }));
+  }
+  return events;
+}
+
+describe('Reseed on a Grid (windsor#936)', () => {
+  /** A Grid song whose line climbs the scale, varying at `amount` on every step. */
+  function variedGrid(amount: number): DocumentModel {
+    const model = songWith('grid');
+    const steps: GridSpec['steps'] = Array.from({ length: 16 }, (_, i) => gridNote(i % 7));
+    const pattern = { steps, randomness: amount, probability: amount };
+    const partial = regionPatternChange(model.doc, 0, 0, pattern);
+    if (partial) model.merge(partial);
+    return model;
+  }
+  const reseeded = (model: DocumentModel): NoteEvent[] => {
+    const edit = run(model, 'reseed');
+    if (!edit) throw new Error('no reseed');
+    model.merge(edit.partial);
+    return playGrid(model);
+  };
+
+  it('changes what a randomized line plays', () => {
+    const model = variedGrid(1);
+    const before = playGrid(model);
+    expect(reseeded(model)).not.toEqual(before);
+  });
+
+  it('leaves a line at amount 0 as it played', () => {
+    const model = variedGrid(0);
+    const before = playGrid(model);
+    expect(reseeded(model)).toEqual(before);
   });
 });
