@@ -363,7 +363,12 @@ describe("the grid's knobs on the Arp card", () => {
     });
     const sequencer = partAt(bare.doc, 0)!.sequencer;
     if (sequencer.kind !== 'arp') throw new Error('not an arp');
-    expect(ARP_GRID_KNOBS.map((entry) => entry.f)).toEqual(['accentVelocity', 'accentMod']);
+    expect(ARP_GRID_KNOBS.map((entry) => entry.f)).toEqual([
+      'randomness',
+      'probability',
+      'accentVelocity',
+      'accentMod',
+    ]);
     for (const entry of ARP_GRID_KNOBS) {
       expect(entry.o.def, entry.f).toBe(Reflect.get(sequencer, entry.f));
       expect([entry.o.min, entry.o.max]).toEqual([0, 1]);
