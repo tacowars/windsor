@@ -14,6 +14,7 @@ import type { SequencerKind } from '@windsor/engine';
 import { arpCard } from './arpCard';
 import { bassCard } from './bassCard';
 import { chordCard } from './chordCard';
+import { drumCard } from './drumCard';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { CardBody } from './sequencerDevice';
@@ -46,4 +47,5 @@ export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   bass: bassCard,
   figure: figureCard,
   roll: rollCard,
+  drum: drumCard,
 };

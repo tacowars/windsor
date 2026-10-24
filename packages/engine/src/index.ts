@@ -45,6 +45,8 @@ export type {
   MusicPart,
   ChordDriver,
   ChordSpec,
+  DrumDriver,
+  DrumSpec,
   GridDriver,
   GridSpec,
   NoSequencer,
@@ -89,6 +91,12 @@ export type {
   GridStep,
   GridStepKind,
 } from './sequencing/gridSequencer';
+// The Drum (windsor#948): a written line of rests and hits at a base note.
+export { DEFAULT_DRUM_CONFIG, DrumSequencer, drumGateTicks } from './sequencing/drumSequencer';
+export type { DrumSequencerConfig } from './sequencing/drumSequencer';
+export { DRUM_STEP_KINDS, defaultDrumSteps, drumHit } from './sequencing/drumSteps';
+export type { DrumHitStep, DrumStep, DrumStepKind } from './sequencing/drumSteps';
+export { DRUM_GATE_DEFAULT, DRUM_PITCH_MAX } from './sequencing/drumConstants';
 // Step variation on the Grid and the Arp (windsor#935): its fields, defaults and tunables.
 export { variationFlipsRests, variationMovesPitch } from './sequencing/stepVariation';
 export type { StepVariationConfig } from './sequencing/stepVariation';

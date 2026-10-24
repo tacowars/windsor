@@ -22,6 +22,7 @@ import {
 } from './performerNormalise';
 import { figureDriver } from './figureNormalise';
 import { rollDriver } from './rollNormalise';
+import { drumDriver } from './drumNormalise';
 import {
   cycledStepModLanes,
   drawnLane,
@@ -100,6 +101,8 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       return { kind, ...figureDriver(driver, path, n) };
     case 'roll':
       return { kind, ...rollDriver(driver, path, n) };
+    case 'drum':
+      return { kind, ...drumDriver(driver, path, n) };
     default:
       n.dropUnknown(driver, [], path);
       return { kind: 'none' };

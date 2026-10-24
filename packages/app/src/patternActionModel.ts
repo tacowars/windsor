@@ -119,6 +119,8 @@ const borrowed = (spec: SpecOf<'figure'>): string | null =>
 export const PATTERN_ACTIONS: KindActions = {
   none: {},
   chord: {},
+  // The Drum's actions come with its device (windsor#948's plan, ticket 4/4).
+  drum: {},
   grid: {
     randomize: {
       edit: (spec, at) =>
