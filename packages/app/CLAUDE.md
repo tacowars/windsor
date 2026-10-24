@@ -240,8 +240,8 @@ detail pane at the bottom. Its layers, top down:
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
    the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row
-   244 px high and as wide as its content. All six cards (Grid, Chord,
-   Arp, Basslead, Euclid, Figure) hand back a `DeviceBody` with `fit: 'fixed'`
+   244 px high and as wide as its content. All seven cards (Grid, Chord,
+   Arp, Basslead, Euclid, Figure, Drum) hand back a `DeviceBody` with `fit: 'fixed'`
    and size themselves from `SEQUENCER_DEVICE_PX`
    (`sequencerDeviceTables.ts`). Its rail (`sequencerRail.ts`) holds the
    accent dot, the kind's name (a click folds it), the region `n/m`, and

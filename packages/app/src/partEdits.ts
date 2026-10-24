@@ -138,7 +138,8 @@ export function setPartColourLive(ctx: AppCtx, slot: number, colour: number): bo
 
 /**
  * The kinds whose card edits the selected region's pattern (windsor#75; the
- * grid, lanes included, since windsor#76; the Figure since windsor#490).
+ * grid, lanes included, since windsor#76; the Figure since windsor#490; the
+ * Drum since its device, windsor#951).
  */
 export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<SequencerKind>([
   'grid',
@@ -148,6 +149,7 @@ export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<Sequence
   'euclidean',
   'figure',
   'roll',
+  'drum',
 ]);
 
 /** True when `part`'s regions each carry their own pattern. */

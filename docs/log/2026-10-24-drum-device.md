@@ -54,3 +54,45 @@ sequencer device is (record `2026-10-01-sequencer-rack-devices`).
    row gap was the other way to pay for it, but it needed 1.6 px in place
    of 4 across the five gaps, off the Arp's rows, so the lanes scroll
    sooner instead.
+
+## Choices made in the build (windsor#951)
+
+The device is built to the mockup row by row; these are the choices the
+build made where the mockup or the issue left one open, and what it
+measured.
+
+- **The Pitch cell's gestures are the mockup's**: a vertical drag, a
+  semitone per 8 px within ±24, previewed and written on release, and a
+  double-click back to the part's note. The issue also named a click (up a
+  semitone), a shift-click (down) and the wheel. The mockup wins where the
+  two differ, and a click that wrote would race the double-click, as the
+  Vel bar's would, so a press without a drag writes nothing and the wheel
+  keeps scrolling the lanes.
+- **Randomize draws from `Math.random`**, as the Grid's does, through the
+  pattern action the Song tab's region menu runs too (`patternActionRun.ts`),
+  not the part's seed stream. Its new hits are plain: no accent, pitch or
+  ratchet, at 0.3 to 1 in steps of 0.05, each as likely (`DRUM_RANDOM`).
+  The lanes and the steps past the loop are kept.
+- **The Drum's pattern actions are Randomize, Reverse and Reseed**, as the
+  Grid's, so the region menu offers them too (`patternActionModel.ts`).
+- **A Drum part's regions carry their own patterns** (`REGION_PATTERN_KINDS`,
+  `partEdits.ts`). Without it the pane handed the card no region, so every
+  edit went to the part's sequencer and the playhead never ghosted; a split
+  or a drawn region now copies its neighbour's line as every other kind's
+  does.
+- **A pattern pick rebases Rotate** to zero, as Length, Randomize and
+  Reverse do, since it replaces the line Rotate turned.
+- **The Rate picker lists the app's divisors** (`divisorOptions`, the
+  triplets included), as the Arp's does; the mockup's eight stood in.
+- **Bounce to Roll is not on the Drum's pane yet.** The mockup's header
+  draws the button, but the engine's bounce leaves the `drum` kind out
+  (`bounceRenderTables.ts`, record `2026-10-24-drum-sequencer`), and the
+  app's list is pinned to it. It comes with the engine's support.
+
+Measured in the project's headless Chrome on `npm run dev`, with the
+mockup's example data imported (2026-10-24): the device is 1156 px wide and
+244 px high at 16 steps on all three frames, its held rows 138 px and the
+hit pad 32 × 32 px. The rack fits on the desktop (1440 × 900, the rack at
+y 402) and the landscape tablet (1366 × 1024, 1336 px inside, the rack at
+y 460.9), and scrolls 174 px on the portrait tablet (1024 × 1366, 994 px
+inside, the rack at y 501.7), as the mockup measured.
