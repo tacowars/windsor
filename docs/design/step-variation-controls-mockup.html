@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Step variation's controls on the Grid and Arp devices (windsor#936, the
+     controls for windsor#935's engine fields randomness, probability,
+     restsSound and octaveMode, which replace Skip on both). Today is the real
+     thing: screenshots of main (1a71af2) taken on 2026-10-24 from `npm run dev`
+     in the project's headless Chrome at CSS 1440 x 900 with a mouse, and at
+     1366 x 1024 and 1024 x 1366 with touch, with a two-part song in A minor
+     (Acid, a 16-step Grid on Acid Saw, Skip 0.25; Arp, an Up-down Arp on Saw
+     Arp, Skip 0.20 under a Skip lane from 0.30 to 0.60; harmony A min, F maj,
+     C maj, G 7, one bar each, 128 BPM), saved beside this file as
+     step-variation-controls-today-*.jpg. Proposed draws the new controls over
+     those screenshots at the places and sizes measured there: the device's top
+     (467.9 px, 508.7 px on the portrait tablet), the Play section's columns
+     (Grid: 96 px wide column, 52 px knob columns, 2 px apart, from x 54; Arp:
+     112 px field columns 13 px apart from x 58, the knob strip from x 308 with
+     a 1 px rule and 9 px padding), a knob at 52 x 56 px (67 px locked) with a
+     30 px dial, the 22 px controls, the lane row's name at 11 px, and the
+     region menu's 32 px items. The Steps and Cycle sections are today's
+     pixels, moved right by the width the Play section gains. Sizes and colors
+     are copied from packages/app/src/console.css (the tokens, .seq-section,
+     .seq-col, .knob, .knob.locked, .arp-device .seg, .arp-seed, .seq-icon,
+     .context-menu) and sequencerDeviceTables.ts. What works: the frame picker,
+     Today | Proposed, the label pickers (To decide 1 to 4), dragging a knob
+     (double-click resets it to 0), the switches, Reseed (a new seed number),
+     the Arp's lane on or off, and the look toggles. Nothing makes sound. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Step Variation Controls</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --well: #0c0f10;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --carrier: #e0a44e;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --seq: #cc7a9c;
+      --hot: #d2643c;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own controls (not the console) ---------- */
+    .mock-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--return);
+    }
+    .mock-bar label,
+    .mock-bar .grp {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select,
+    .mock-bar .mb {
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 7px;
+      font: 11px var(--f-ui);
+    }
+    .mock-bar .mb[aria-pressed='true'] {
+      background: var(--return);
+      border-color: var(--return);
+      color: #17121f;
+    }
+    body.marks .new {
+      outline: 1px dashed var(--return);
+      outline-offset: 1px;
+    }
+    .stage-wrap {
+      padding: 16px;
+      overflow-x: auto;
+    }
+    /* `bare` in the link: the frame alone at the page's corner, for the rendered pictures. */
+    body.bare .mock-bar,
+    body.bare .caption,
+    body.bare .notes {
+      display: none;
+    }
+    body.bare .stage-wrap {
+      padding: 0;
+    }
+    body.bare .frame {
+      outline: 0;
+    }
+    .caption {
+      margin: 0 0 8px;
+      font: 11px var(--f-num);
+      color: var(--ink-dim);
+    }
+
+    /* ---------- the frame: a device's screen at its CSS size, today's screenshot behind ---------- */
+    .frame {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      outline: 1px dashed var(--return);
+      background: var(--ground) var(--shot) no-repeat 0 0 / 100% 100%;
+    }
+    .ov {
+      position: absolute;
+    }
+    /* Today's pixels, moved: a slice of the same screenshot at a new place. */
+    .slice {
+      background-image: var(--shot);
+      background-repeat: no-repeat;
+      background-size: var(--w) var(--h);
+    }
+    /* The rack's inner box: what a device wider than the rack scrolls inside. */
+    .rack-clip {
+      overflow: hidden;
+    }
+    .scroll-hint {
+      position: absolute;
+      bottom: 2px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--line-bright);
+    }
+
+    /* ---------- the device's Play section (console.css .seq-sec-body, .seq-col, .knob) ---------- */
+    .play {
+      background: var(--panel);
+    }
+    .seq-sec-body {
+      display: flex;
+      gap: 2px;
+    }
+    .seq-col {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly;
+      align-items: center;
+      gap: 2px;
+    }
+    .seq-col.wide {
+      width: 96px;
+      align-items: stretch;
+    }
+    .seq-col.k3 {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      align-items: center;
+      justify-items: center;
+      width: 52px;
+    }
+    /* Proposed: the switches' column, three rows like the knobs', so each switch sits level with a knob. */
+    .seq-col.wide.rows3 {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      grid-template-columns: 100%;
+      align-items: center;
+    }
+    .field-label {
+      display: block;
+      margin: 0 0 2px;
+      color: var(--ink-faint);
+      font: 600 8.5px/11px var(--f-panel);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .sel {
+      height: 22px;
+      padding: 0 16px 0 6px;
+      background: var(--inset)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+        no-repeat calc(100% - 6px) 50%;
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      font: 11.5px/20px var(--f-ui);
+      color: var(--ink);
+    }
+    .seed-row {
+      display: flex;
+      gap: 3px;
+    }
+    .seed-field {
+      flex: 1;
+      min-width: 0;
+      height: 22px;
+      padding: 0 6px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      font: 11px/20px var(--f-ui);
+      color: var(--ink);
+    }
+    .seq-icon {
+      flex: none;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-faint);
+    }
+    .seq-icon:hover {
+      color: var(--ink);
+    }
+    .seq-icon svg {
+      display: block;
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .seq-btn {
+      height: 22px;
+      padding: 0 8px;
+      background: var(--inset);
+      border: 1px solid var(--modulator);
+      border-radius: var(--r);
+      color: var(--ink);
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    /* The Arp's Retrigger switch (.arp-device .seg): the same 22 px off | on for the new switches. */
+    .sw {
+      display: flex;
+      height: 22px;
+      background: var(--line);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .sw button {
+      flex: 1;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: var(--inset);
+      color: var(--ink-dim);
+      font: 500 11px/20px var(--f-ui);
+    }
+    .sw button + button {
+      border-left: 1px solid var(--line-bright);
+    }
+    .sw button:hover {
+      background: var(--panel-hi);
+      color: var(--ink);
+    }
+    .sw button[aria-pressed='true'] {
+      background: var(--modulator);
+      color: #111416;
+    }
+    .knob {
+      width: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1px 0;
+      border-radius: var(--r);
+      cursor: ns-resize;
+      touch-action: none;
+      user-select: none;
+    }
+    .knob:hover {
+      background: var(--panel-hi);
+    }
+    .knob svg {
+      display: block;
+      width: 30px;
+      height: 30px;
+    }
+    .dial-track {
+      stroke: var(--line-bright);
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+    }
+    .dial-arc {
+      stroke: var(--modulator);
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+    }
+    .dial-pin {
+      stroke: var(--ink);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+    .dial-face {
+      fill: var(--inset);
+      stroke: var(--line);
+    }
+    .knob-val {
+      font: 10px/13px var(--f-num);
+      font-variant-numeric: tabular-nums;
+      color: var(--ink);
+    }
+    .knob-label {
+      font: 600 8.5px/11px var(--f-panel);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      white-space: nowrap;
+    }
+    .knob-auto {
+      display: none;
+      padding: 0 4px;
+      border-radius: 6px;
+      background: var(--seq);
+      color: var(--ground);
+      font: 600 7.5px/11px var(--f-panel);
+      letter-spacing: 0.14em;
+    }
+    .knob.locked {
+      cursor: not-allowed;
+    }
+    .knob.locked .dial-arc,
+    .knob.locked .dial-pin {
+      stroke: var(--seq);
+    }
+    .knob.locked .dial-pin {
+      stroke-width: 2;
+    }
+    .knob.locked .dial-face {
+      stroke: var(--seq);
+    }
+    .knob.locked .knob-auto {
+      display: block;
+    }
+
+    /* ---------- the Song tab's lane row name and readout (console.css .lane-auto) ---------- */
+    .lane-patch {
+      background: var(--ground);
+    }
+    .lane-name {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .lane-name b {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: 600 11px/13.2px var(--f-panel);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .lane-name small {
+      display: block;
+      font: 9px/10.8px var(--f-num);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .auto-btn {
+      width: 20px;
+      height: 20px;
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      background: var(--panel-hi);
+      color: var(--ink-dim);
+      font:
+        10px/18px system-ui,
+        sans-serif;
+      text-align: center;
+    }
+    .lane-val {
+      text-align: right;
+      font: 10px/13px var(--f-num);
+      color: var(--seq);
+    }
+
+    /* ---------- the region menu's lower part (console.css .context-menu) ---------- */
+    .menu-upper {
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .menu-patch {
+      background: var(--panel);
+      border: 1px solid var(--line-bright);
+      border-top: 0;
+      border-radius: 0 0 var(--r) var(--r);
+      padding: 0 0 4px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .menu-patch button {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      height: 32px;
+      padding: 0 12px;
+      background: transparent;
+      border: 0;
+      text-align: left;
+      font: 12px var(--f-ui);
+      color: var(--ink);
+    }
+    .menu-patch button:hover {
+      background: var(--panel-hi);
+    }
+    .menu-patch .tag {
+      margin-left: auto;
+      font: 9.5px var(--f-num);
+      color: var(--ink-faint);
+    }
+    .menu-patch hr {
+      margin: 3px 0;
+      border: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    /* ---------- notes ---------- */
+    .notes {
+      max-width: 980px;
+      padding: 8px 16px 48px;
+      color: var(--ink-dim);
+      font: 13px/1.55 var(--f-ui);
+    }
+    .notes[hidden] {
+      display: none;
+    }
+    .notes h2 {
+      margin: 26px 0 8px;
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .notes ol,
+    .notes ul,
+    .notes p {
+      margin: 0 0 8px;
+      padding-left: 20px;
+    }
+    .notes p {
+      padding-left: 0;
+    }
+    .notes b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .notes code {
+      font: 12px var(--f-num);
+      color: var(--ink);
+    }
+    .notes table {
+      border-collapse: collapse;
+      margin: 4px 0 10px;
+      font: 12px var(--f-num);
+    }
+    .notes th,
+    .notes td {
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      text-align: right;
+    }
+    .notes th {
+      color: var(--ink);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .notes td.l,
+    .notes th.l {
+      text-align: left;
+    }
+    .notes td.over {
+      color: var(--hot);
+    }
+  </style>
+
+  <div class="mock-bar">
+    <b>Mockup</b>
+    <label
+      >Frame
+      <select id="mFrame"></select
+    ></label>
+    <span class="grp" id="mMode"
+      ><button class="mb" data-mode="today">Today</button
+      ><button class="mb" data-mode="proposed">Proposed</button></span
+    >
+    <label
+      >Randomness label
+      <select id="mRand">
+        <option>Randomness</option>
+        <option>Stray</option>
+        <option>Drift</option>
+        <option>Vary</option>
+      </select></label
+    >
+    <label
+      >Probability label
+      <select id="mProb">
+        <option>Probability</option>
+        <option>Chance</option>
+        <option>Often</option>
+        <option>Odds</option>
+      </select></label
+    >
+    <label
+      >Rests sound label
+      <select id="mRests">
+        <option>Rests sound</option>
+        <option>Rhythm</option>
+        <option>Flip rests</option>
+      </select></label
+    >
+    <label
+      >Octave label
+      <select id="mOct">
+        <option>Octave</option>
+        <option>By octave</option>
+        <option>Oct jumps</option>
+      </select></label
+    >
+    <label><input type="checkbox" id="mLane" checked /> Arp Probability lane on</label>
+    <label><input type="checkbox" id="mMarks" checked /> Mark new</label>
+    <label><input type="checkbox" id="mFit" /> Fit to window</label>
+    <label><input type="checkbox" id="mNotes" checked /> Notes</label>
+    <span>It plays nothing.</span>
+  </div>
+
+  <div class="stage-wrap">
+    <p class="caption"><span id="caption"></span> · <span id="tag"></span></p>
+    <div id="fit">
+      <div class="frame" id="frame"></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes">
+    <h2>What changes</h2>
+    <ol>
+      <li>
+        <b>Skip goes</b> from both devices, and its Skip lane from the Song tab (windsor#935
+        decision 7: the migration drops <code>skipChance</code> and its <code>seq.skipChance</code>
+        lanes). The Figure keeps its Skip.
+      </li>
+      <li>
+        <b>Randomness and Probability</b> are two knobs of today's kind (the 52 × 56 px sequencer
+        knob, 30 px dial, the part's teal), 0 to 1 shown as 0% to 100%, default 0%. They take the
+        column Skip had: on the Grid, rows 1 and 2 of the last knob column; on the Arp, rows 2 and 3
+        under Gate. Each knob writes its field into the selected region's pattern, as Skip did.
+      </li>
+      <li>
+        <b>Lanes.</b> Both are automatable: <code>seq.randomness</code> and
+        <code>seq.probability</code> join the Song tab's <b>+ Add lane</b> list under Sequencer, on
+        a Grid or an Arp part. A knob whose lane is on is drawn locked as Skip is today: the
+        sequencer-lane pink arc and pin, the AUTO tag, the lane's value at the playhead, no input.
+        The Arp frames show the example song's Skip lane as a Probability lane (30% to 60%, read 30%
+        at bar 1). Untick <b>Arp Probability lane on</b> above to see the knob free.
+      </li>
+      <li>
+        <b>Rests sound and Octave</b> are two switches of the Arp's Retrigger kind (a 22 px
+        <b>off | on</b>, labelled above), both off by default, in one column of their own after the
+        knobs. The column has three rows like a knob column, so each switch sits level with a knob:
+        rows 1 and 2 on the Grid (beside Randomness and Probability), rows 2 and 3 on the Arp. Click
+        them.
+      </li>
+      <li>
+        <b>Reseed on the Grid.</b> The Grid's first column gains the Arp's Seed field with Reseed as
+        an icon beside it, so it reads Step, Seed, Randomize, Reverse, as the Arp's reads Retrigger,
+        Seed, Randomize, Reverse. The field shows and edits the part's seed; the icon draws a new
+        one and restarts the part's stream (the Arp's title: "A new seed: the part restarts its
+        random stream now").
+      </li>
+      <li>
+        <b>Reseed in the region menu.</b> A Grid region's menu lists Randomize, Reverse,
+        <b>Reseed</b>, then Fit region to pattern, the order the Basslead's menu has. The menu grows
+        32 px. Hover an item.
+      </li>
+      <li>
+        <b>What the cells show</b> does not change: the playhead and the cells show the steps as
+        written, not what a varied step played (decision 3).
+      </li>
+    </ol>
+
+    <h2>The numbers</h2>
+    <p>
+      Measured in the app, in place: the knob label and the field label at 8.5 px Chakra Petch with
+      0.1 em letter spacing, the lane row's name at 11 px. A sequencer knob is 52 px wide, its
+      column pitch is 54 px, and today's widest knob label, Acc mod, is 42.9 px. Today's lane name
+      box is 78 px wide; with a 30% readout in place of 0.30 it gains about 6 px.
+    </p>
+    <table>
+      <tr>
+        <th class="l">Label</th>
+        <th>Knob label px</th>
+        <th class="l">In a 52 px knob</th>
+        <th>Lane name px</th>
+      </tr>
+      <tr>
+        <td class="l">Randomness</td>
+        <td class="over">65.5</td>
+        <td class="l over">runs 6.8 px past each side: the column widens to 70 px</td>
+        <td>80.3</td>
+      </tr>
+      <tr>
+        <td class="l">Probability</td>
+        <td class="over">62.4</td>
+        <td class="l over">runs 5.2 px past each side</td>
+        <td>75.9</td>
+      </tr>
+      <tr>
+        <td class="l">Stray / Drift / Vary</td>
+        <td>29.9 / 27.7 / 24.3</td>
+        <td class="l">fits</td>
+        <td>36.5 / 33.6 / 29.7</td>
+      </tr>
+      <tr>
+        <td class="l">Chance / Often / Odds</td>
+        <td>38.3 / 30.8 / 26.2</td>
+        <td class="l">fits</td>
+        <td>47.0 / 37.7 / 32.1</td>
+      </tr>
+    </table>
+    <p>
+      In a 52 px column, Randomness would come within 1.4 px of Acc vel's label and run 4.8 px into
+      the Rests sound switch beside it on the Grid; Probability would come within 1.4 px of Acc
+      mod's. So the mockup widens that knob column to its widest label plus 4 px, and the tag above
+      the frame reports what the frame draws. Field labels all fit their columns: Rests sound 66.3
+      px, By octave 51.4, Oct jumps 54.3, Flip rests 53.9, Rhythm 39.4, Octave 35.8 (Retrigger, for
+      scale, 53.3).
+    </p>
+    <table>
+      <tr>
+        <th class="l">Device width, px</th>
+        <th>Today</th>
+        <th>Short labels</th>
+        <th>Randomness, Probability</th>
+      </tr>
+      <tr>
+        <td class="l">Grid, 16 steps</td>
+        <td>939</td>
+        <td>1037 (+98)</td>
+        <td>1055 (+116)</td>
+      </tr>
+      <tr>
+        <td class="l">Arp, 10 cells</td>
+        <td>926</td>
+        <td>1051 (+125)</td>
+        <td>1069 (+143)</td>
+      </tr>
+    </table>
+    <p>
+      The rack's inner width is 1410 px on the desktop and 1336 px on the landscape tablet, so both
+      devices fit. On the portrait tablet it is 994 px: today the 16-step Grid fills it exactly and
+      the Arp leaves 13 px. Proposed, both scroll sideways inside the rack, as a 32-step Grid
+      already does today: the Grid by 98 px (116 px with the long labels), the Arp by 112 px (130
+      px). The portrait frames clip at the rack's edge and draw its scroll bar.
+    </p>
+
+    <h2>To decide</h2>
+    <ol>
+      <li>
+        <b>The name for Randomness.</b> Randomize already sits on both cards and rerolls the written
+        pattern once; "Randomness" beside it reads like its amount. Alternatives: <b>Stray</b> (how
+        far a step strays, the engine's own word), <b>Drift</b>, <b>Vary</b>. Recommended: Stray. It
+        fits the knob, and it says the step moves away from what is written.
+      </li>
+      <li>
+        <b>The name for Probability.</b> Alternatives: <b>Chance</b>, <b>Often</b>, <b>Odds</b>.
+        Recommended: Chance, which fits the knob and reads with Stray as "how far, how often".
+      </li>
+      <li>
+        <b>The name for Rests sound.</b> Alternatives: <b>Rhythm</b>, <b>Flip rests</b>.
+        Recommended: Rests sound, since it says what turning it on allows.
+      </li>
+      <li>
+        <b>The name for the Octave switch.</b> Both devices already have an <b>Octave</b> knob, the
+        register, and the Arp has <b>Octaves</b> too, so a third "Octave" is ambiguous.
+        Alternatives: <b>By octave</b>, <b>Oct jumps</b>. Recommended: By octave.
+      </li>
+      <li>
+        <b>Where the switches sit.</b> Drawn: one column of their own after the knobs, the two
+        switches one above the other and level with the two amount knobs. A row of two 112 px
+        switches would cost 237 px of width instead of 98 to 125.
+      </li>
+      <li>
+        <b>The portrait tablet's sideways scroll</b> (see The numbers). Proposed as drawn, since the
+        rack already scrolls a long Grid. The other way is to fold the switches under the Step
+        picker on narrow screens, which is a second layout to build and test.
+      </li>
+      <li>
+        <b>The lane readout</b> for both amounts shows a percent (30%), as the knob does. Today's
+        Skip lane shows 0.30.
+      </li>
+    </ol>
+  </div>
+
+  <script>
+    /* ---------- the app's own numbers, measured in the screenshots ---------- */
+    const DEVICES = {
+      desktop: {
+        w: 1440,
+        h: 900,
+        label: 'desktop, 1440 × 900',
+        top: 467.9,
+        rack: [14, 460.9, 1412, 258],
+        lane: 312.9,
+        menu: [751, 246],
+      },
+      landscape: {
+        w: 1366,
+        h: 1024,
+        label: 'tablet landscape, 1366 × 1024',
+        top: 467.9,
+        rack: [14, 460.9, 1338, 258],
+        lane: 312.9,
+        menu: [610, 246],
+      },
+      portrait: {
+        w: 1024,
+        h: 1366,
+        label: 'tablet portrait, 1024 × 1366',
+        top: 508.7,
+        rack: [14, 501.7, 996, 258],
+        lane: 353.7,
+        menu: [484, 287],
+      },
+    };
+    // The seq-device box (left, width) and where its Play section and Steps or Cycle section start.
+    const CARD = {
+      grid: { left: 21, width: 965, play: 46, steps: 320 },
+      arp: { left: 21, width: 952, play: 46, steps: 487 },
+    };
+    const DEVICE_H = 244;
+    // The body of the Play section starts 19 px under the device's top (1 px border, 4 px padding, 14 px label) and is 218 px high.
+    const BODY_TOP = 19;
+    const BODY_H = 218;
+    // The Arp's Gate knob sits 26.7 px under the device's top; the rail and border take 26 px of the device's width.
+    const GATE_TOP = 26.7;
+    const RAIL = 26;
+    const RACK_EXTRA = 29;
+    const KNOB_W = 52;
+    const LABEL_PAD = 4;
+    // The menu: the item below Reverse starts 363 px under the menu's top, and the menu is 220 px wide.
+    const MENU_BELOW_REVERSE = 363;
+    const MENU_W = 220;
+    const ICON_RESEED = '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>';
+
+    const FRAMES = [];
+    for (const d of ['desktop', 'landscape', 'portrait'])
+      for (const [v, name] of [
+        ['grid', 'Grid device'],
+        ['arp', 'Arp device'],
+        ['menu', 'Grid region menu'],
+      ])
+        FRAMES.push({
+          id: `${d}-${v}`,
+          device: d,
+          view: v,
+          label: `${DEVICES[d].label} · ${name}`,
+        });
+
+    // The example values: a Grid varying half way on a quarter of its steps; an Arp under a Probability lane.
+    const state = {
+      frame: FRAMES[0],
+      mode: 'proposed',
+      grid: { randomness: 0.5, probability: 0.25, restsSound: false, octaveMode: false, seed: 7 },
+      arp: { randomness: 0.4, probability: 0.2, restsSound: false, octaveMode: false, seed: 3 },
+      laneValue: 0.3,
+    };
+    const $ = (id) => document.getElementById(id);
+    const pct = (v) => `${Math.round(v * 100)}%`;
+    const labels = () => ({
+      randomness: $('mRand').value,
+      probability: $('mProb').value,
+      restsSound: $('mRests').value,
+      octaveMode: $('mOct').value,
+    });
+
+    /* ---------- the controls, as knob.ts, dom.ts's seg and arpCard.ts build them ---------- */
+    // The dial: a 270° sweep from -135°, radius 15 on a 38 px box, as knob.ts draws it.
+    function dial(v) {
+      const a = (-135 + 270 * v) * (Math.PI / 180);
+      const x = (19 + 15 * Math.sin(a)).toFixed(2);
+      const y = (19 - 15 * Math.cos(a)).toFixed(2);
+      const large = v * 270 > 180 ? 1 : 0;
+      const arc =
+        v > 0 ? `<path class="dial-arc" d="M 8.39 29.61 A 15 15 0 ${large} 1 ${x} ${y}"/>` : '';
+      return `<svg viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"/><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"/>${arc}<line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(${-135 + 270 * v} 19 19)"/></svg>`;
+    }
+    const TITLES = {
+      randomness:
+        'How far a step that varies strays: its velocity, its pitch and, on the Arp, its gate',
+      probability: 'How often a step varies; the others play as written',
+      restsSound: 'On: a note may go silent and a rest may sound. Off: the rhythm stays as written',
+      octaveMode: "On: pitch varies by whole octaves of the step's own note",
+    };
+    function knob(card, field, locked) {
+      const v = locked ? state.laneValue : state[card][field];
+      const name = labels()[field];
+      return `<div class="knob new${locked ? ' locked' : ''}" data-card="${card}" data-field="${field}" title="${name} - ${locked ? 'held by its lane' : 'drag, double-click to reset'}. ${TITLES[field]}">${dial(v)}<span class="knob-val">${pct(v)}</span><span class="knob-auto">AUTO</span><span class="knob-label">${name}</span></div>`;
+    }
+    function toggle(card, field) {
+      const on = state[card][field];
+      return `<div class="new" title="${TITLES[field]}"><span class="field-label">${labels()[field]}</span><div class="sw"><button data-card="${card}" data-field="${field}" data-on="0" aria-pressed="${!on}">off</button><button data-card="${card}" data-field="${field}" data-on="1" aria-pressed="${on}">on</button></div></div>`;
+    }
+    function seedField(card, isNew) {
+      return `<div class="${isNew ? 'new' : ''}"><span class="field-label">Seed</span><div class="seed-row"><div class="seed-field">${state[card].seed}</div><button class="seq-icon" data-reseed="${card}" title="A new seed: the part restarts its random stream now" aria-label="Reseed"><svg viewBox="0 0 12 12">${ICON_RESEED}</svg></button></div></div>`;
+    }
+    const field = (label, inner) => `<div><span class="field-label">${label}</span>${inner}</div>`;
+    const sel = (text) => `<div class="sel">${text}</div>`;
+
+    // The widest of a column's labels, measured in the page's own font, so a long name widens its column.
+    function labelWidth(text) {
+      const probe = document.createElement('span');
+      probe.className = 'knob-label';
+      probe.style.cssText = 'position:absolute;visibility:hidden';
+      probe.textContent = text;
+      document.body.appendChild(probe);
+      const w = probe.getBoundingClientRect().width;
+      probe.remove();
+      return w;
+    }
+    const amountColumnW = () => {
+      const l = labels();
+      return Math.max(
+        KNOB_W,
+        Math.ceil(Math.max(labelWidth(l.randomness), labelWidth(l.probability)) + LABEL_PAD),
+      );
+    };
+
+    // Today's pixels as a block inside a column: a knob that stays (the Arp's Gate) keeps its exact look.
+    const pixels = (x, y, w, h) =>
+      `<div class="slice" style="width:${w}px;height:${h}px;background-position:${-x}px ${-y}px"></div>`;
+    // The Play section's width: today's plus the switches' column, plus what a long label adds to the knob column.
+    const growth = (card) => (card === 'grid' ? 96 + 2 : 112 + 13) + (amountColumnW() - KNOB_W);
+    // How far the device scrolls inside the rack: the rack's content is the device plus 29 px (padding, border, gap).
+    const scrollOf = (device, card) =>
+      Math.max(0, CARD[card].width + RACK_EXTRA + growth(card) - (DEVICES[device].rack[2] - 2));
+
+    /* ---------- a frame ---------- */
+    // The Grid: column 1 redrawn (Step, Seed, Randomize, Reverse); Octave to Acc mod stay as they are; then the new columns.
+    function gridCover(d, x0, y0) {
+      const w = amountColumnW();
+      const bodyTop = d.top + BODY_TOP;
+      const col1 = `<div class="ov play" style="left:${54 - x0}px;top:${bodyTop - y0}px;width:96px;height:${BODY_H}px"><div class="seq-col wide" style="height:100%">${field('Step', sel('1/16'))}${seedField('grid', true)}<button class="seq-btn">Randomize</button><button class="seq-btn">Reverse</button></div></div>`;
+      const cols = `<div class="ov play" style="left:${258 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.grid.steps + growth('grid') - 258}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 8px 0 2px"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${w}px">${knob('grid', 'randomness')}${knob('grid', 'probability')}</div><div class="seq-col wide rows3">${toggle('grid', 'restsSound')}${toggle('grid', 'octaveMode')}</div></div></div>`;
+      return col1 + cols;
+    }
+    // The Arp: the last knob column keeps Gate and takes the two amounts; the switches follow inside the knob strip.
+    function arpCover(d, x0, y0) {
+      const w = amountColumnW();
+      const locked = $('mLane').checked;
+      const gate = pixels(426, d.top + GATE_TOP, KNOB_W, 56);
+      return `<div class="ov play" style="left:${426 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.arp.steps + growth('arp') - 426}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 9px 0 0"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${w}px">${gate}${knob('arp', 'randomness')}${knob('arp', 'probability', locked)}</div><div class="seq-col wide rows3" style="width:112px;margin-left:11px"><div></div>${toggle('arp', 'restsSound')}${toggle('arp', 'octaveMode')}</div></div></div>`;
+    }
+    // `from` names the screenshot the moved Steps come from: the menu frame takes the Grid frame's, which has no menu over them.
+    function cardHtml(device, card, from) {
+      const d = DEVICES[device];
+      const c = CARD[card];
+      const grow = growth(card);
+      const [rx, ry, rw, rh] = d.rack;
+      const clip = { left: rx + 1, top: ry + 1, width: rw - 2, height: rh - 2 };
+      const stepsW = c.left + c.width + 1 - c.steps;
+      const moved = `<div class="ov slice" style="left:${c.steps + grow - clip.left}px;top:${d.top - clip.top}px;width:${stepsW}px;height:${DEVICE_H}px;background-position:${-c.steps}px ${-d.top}px${from ? `;background-image:url('${from}')` : ''}"></div>`;
+      const cover =
+        card === 'grid' ? gridCover(d, clip.left, clip.top) : arpCover(d, clip.left, clip.top);
+      // The rack's own scroll bar when the device no longer fits it.
+      const over = scrollOf(device, card);
+      const hint = over
+        ? `<div class="scroll-hint" style="left:4px;width:${Math.round(((clip.width - 8) * clip.width) / (clip.width + over))}px"></div>`
+        : '';
+      return `<div class="ov rack-clip" style="left:${clip.left}px;top:${clip.top}px;width:${clip.width}px;height:${clip.height}px">${moved}${cover}${hint}</div>`;
+    }
+    // The lane row: today's Skip lane, renamed. Off, its value goes gray and its ● button unlit, as .lane-auto.off.
+    function laneHtml(device) {
+      const d = DEVICES[device];
+      const on = $('mLane').checked;
+      const name = labels().probability;
+      return `<div class="ov lane-patch lane-name new" style="left:47px;top:${d.lane + 14}px;width:86px;height:28px"><b>${name}</b><small>Sequencer</small></div><div class="ov lane-patch lane-val new" style="left:138px;top:${d.lane + 8}px;width:41px;height:15px;${on ? '' : 'color:var(--ink-faint)'}">${pct(state.laneValue)}</div>${on ? '' : `<div class="ov auto-btn" style="left:135px;top:${d.lane + 27}px">●</div>`}`;
+    }
+    function menuHtml(device) {
+      const [x, y] = DEVICES[device].menu;
+      // The menu down to Reverse is today's pixels, laid back over the moved Steps; Reseed and the rest are drawn.
+      const upper = `<div class="ov slice menu-upper" style="left:${x}px;top:${y}px;width:${MENU_W}px;height:${MENU_BELOW_REVERSE}px;background-position:${-x}px ${-y}px"></div>`;
+      return `${upper}<div class="ov menu-patch" style="left:${x}px;top:${y + MENU_BELOW_REVERSE}px;width:${MENU_W}px"><button class="new" data-reseed="grid">Reseed</button><button>Fit region to pattern <span class="tag">1 bar</span></button><hr /><button>Load rack…</button><button>Bounce part to Roll…</button><button>Part color…</button></div>`;
+    }
+    function render() {
+      const { device, view } = state.frame;
+      const d = DEVICES[device];
+      const f = $('frame');
+      f.style.setProperty('--w', `${d.w}px`);
+      f.style.setProperty('--h', `${d.h}px`);
+      f.style.setProperty('--shot', `url('step-variation-controls-today-${device}-${view}.jpg')`);
+      let html = '';
+      if (state.mode === 'proposed') {
+        if (view === 'arp') html = cardHtml(device, 'arp') + laneHtml(device);
+        else if (view === 'menu')
+          html =
+            cardHtml(device, 'grid', `step-variation-controls-today-${device}-grid.jpg`) +
+            menuHtml(device);
+        else html = cardHtml(device, 'grid');
+      }
+      f.innerHTML = html;
+      wire(f);
+      $('fit').style.zoom = $('mFit').checked ? String(Math.min(1, (innerWidth - 32) / d.w)) : '1';
+      syncBar();
+      tag();
+    }
+    function tag() {
+      const { device, view } = state.frame;
+      if (state.mode === 'today') {
+        $('tag').textContent = 'the screenshot from main (1a71af2), 2026-10-24';
+        return;
+      }
+      const card = view === 'arp' ? 'arp' : 'grid';
+      const today = CARD[card].width - RAIL;
+      const grow = growth(card);
+      const scroll = scrollOf(device, card);
+      const w = amountColumnW();
+      $('tag').textContent =
+        `${card === 'grid' ? 'Grid' : 'Arp'} ${today} → ${today + grow} px · amount column ${w} px${w > KNOB_W ? ' (widened for its label)' : ''} · ${scroll ? `scrolls ${scroll} px in the rack` : 'fits the rack'}`;
+    }
+    function wire(f) {
+      for (const k of f.querySelectorAll('.knob[data-field]:not(.locked)')) {
+        const { card, field } = k.dataset;
+        k.onpointerdown = (e) => {
+          try {
+            k.setPointerCapture(e.pointerId);
+          } catch {
+            // A synthetic pointer has no capture; the drag still follows it over the knob.
+          }
+          const y0 = e.clientY;
+          const v0 = state[card][field];
+          k.onpointermove = (m) => {
+            state[card][field] = Math.min(1, Math.max(0, v0 + (y0 - m.clientY) / 150));
+            k.querySelector('svg').outerHTML = dial(state[card][field]);
+            k.querySelector('.knob-val').textContent = pct(state[card][field]);
+          };
+          k.onpointerup = () => {
+            k.onpointermove = null;
+          };
+        };
+        k.ondblclick = () => {
+          state[card][field] = 0;
+          render();
+        };
+      }
+      for (const b of f.querySelectorAll('.sw button[data-field]'))
+        b.onclick = () => {
+          state[b.dataset.card][b.dataset.field] = b.dataset.on === '1';
+          render();
+        };
+      for (const b of f.querySelectorAll('[data-reseed]'))
+        b.onclick = () => {
+          state[b.dataset.reseed].seed = Math.floor(Math.random() * 2 ** 32);
+          render();
+        };
+    }
+    function syncBar() {
+      for (const b of $('mMode').children)
+        b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode));
+      $('caption').textContent =
+        `${state.mode === 'today' ? 'Today' : 'Proposed'} · ${state.frame.label}`;
+    }
+
+    $('mFrame').innerHTML = FRAMES.map((f, i) => `<option value="${i}">${f.label}</option>`).join(
+      '',
+    );
+    $('mFrame').onchange = (e) => {
+      state.frame = FRAMES[Number(e.target.value)];
+      render();
+    };
+    for (const b of $('mMode').children)
+      b.onclick = () => {
+        state.mode = b.dataset.mode;
+        render();
+      };
+    const look = () => {
+      document.body.classList.toggle('marks', $('mMarks').checked);
+      $('notes').hidden = !$('mNotes').checked;
+      render();
+    };
+    for (const id of ['mRand', 'mProb', 'mRests', 'mOct', 'mLane', 'mMarks', 'mFit', 'mNotes'])
+      $(id).onchange = look;
+    addEventListener('resize', () => $('mFit').checked && render());
+
+    // `#frame=portrait-arp&mode=proposed&rand=Stray&prob=Chance&bare` opens a state, for the rendered pictures.
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const start = Math.max(
+      0,
+      FRAMES.findIndex((f) => f.id === hash.get('frame')),
+    );
+    $('mFrame').value = String(start);
+    state.frame = FRAMES[start];
+    if (hash.get('mode')) state.mode = hash.get('mode');
+    for (const [key, id] of [
+      ['rand', 'mRand'],
+      ['prob', 'mProb'],
+      ['rests', 'mRests'],
+      ['oct', 'mOct'],
+    ])
+      if (hash.get(key)) $(id).value = hash.get(key);
+    if (hash.has('bare')) document.body.classList.add('bare');
+    if (hash.has('nomarks')) $('mMarks').checked = false;
+    look();
+    document.fonts.ready.then(render);
+  </script>
+</html>
