@@ -97,6 +97,8 @@ Two things in step variation did less than its knobs promised.
    - **Tooltip:** "Per effect: Chance rolls separately for velocity, pitch,
      the Arp's gate and, with Rests sound on, a rest or note flip, instead
      of once for the whole step".
+     The Drum build names the Drum's gate beside the Arp's (windsor#959):
+     "...pitch, the Arp's and the Drum's gate and, with Rests sound on...".
    - **Place:** on the Grid it wraps under Rests sound at the pair's 47 px,
      the three centered in the third row of the Vary and Chance column, at
      no width (the device stays 965 px); on the Arp it takes the toggle
