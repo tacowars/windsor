@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { GRID_STEP_OCTAVE_MAX } from '../audioConstants';
+import { GATE_MIN, GRID_STEP_OCTAVE_MAX } from '../audioConstants';
 import { DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
 import { arpNote, defaultArpSteps, type ArpStep } from '../sequencing/arpSteps';
@@ -140,6 +140,43 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
       `${PATH}.skipChance: "often" is not a number — using 0`,
     ]);
     expect(spec).toMatchObject({ accentVelocity: 1, accentMod: 0, skipChance: 0 });
+  });
+});
+
+describe('an arp cell’s gate through the normaliser (windsor#933)', () => {
+  it('round-trips a set gate, and leaves no key for an absent one or 1', () => {
+    const steps = padded([arpNote({ gate: 0.5 }), arpNote({ gate: GATE_MIN, accent: true })]);
+    const { spec, corrections } = arp({ steps });
+    expect(corrections).toEqual([]);
+    expect(spec.steps).toStrictEqual(steps);
+    const one = arp({
+      steps: padded([{ kind: 'note', octave: 0, accent: false, slide: false, gate: 1 } as ArpStep]),
+    });
+    expect(one.corrections).toEqual([]);
+    expect((one.spec.steps as ArpStep[])[0]).toStrictEqual(arpNote());
+  });
+
+  it('clamps an out-of-range gate and drops a non-number, reported', () => {
+    const { spec, corrections } = arp({
+      steps: padded([
+        arpNote({ gate: 0 }),
+        arpNote({ gate: 1.5 }),
+        { ...arpNote(), gate: 'short' } as unknown as ArpStep,
+        { kind: 'tie', gate: 0.5 } as unknown as ArpStep,
+      ]),
+    });
+    expect(corrections).toEqual([
+      `${PATH}.steps[0].gate: clamped 0 to ${GATE_MIN}`,
+      `${PATH}.steps[1].gate: clamped 1.5 to 1`,
+      `${PATH}.steps[2].gate: "short" is not a number — gate dropped`,
+      `${PATH}.steps[3].gate: unknown key dropped`,
+    ]);
+    expect((spec.steps as ArpStep[]).slice(0, 4)).toStrictEqual([
+      arpNote({ gate: GATE_MIN }),
+      arpNote(),
+      arpNote(),
+      { kind: 'tie' },
+    ]);
   });
 });
 

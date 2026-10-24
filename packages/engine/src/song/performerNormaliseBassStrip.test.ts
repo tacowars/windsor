@@ -91,6 +91,12 @@ describe('the Basslead strip through the normaliser (windsor#367)', () => {
     ]);
   });
 
+  it('drops an Arp cell’s gate, which the Basslead does not play (windsor#933)', () => {
+    const { spec, corrections } = bass({ steps: [{ ...bassNote(), gate: 0.5 }] });
+    expect(spec.steps).toStrictEqual([bassNote()]);
+    expect(corrections).toEqual([`${PATH}.steps[0].gate: unknown key dropped`]);
+  });
+
   it('caps the steps at 32 and a junk list is a bar of plain notes, each reported', () => {
     const long = bass({ steps: Array.from({ length: 40 }, () => bassNote()) });
     expect(long.spec.steps).toHaveLength(GRID_STEPS_MAX);

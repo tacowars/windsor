@@ -28,11 +28,12 @@
  * cell `(step − base) mod arpCycleLength(style, L)`, the traversal index over
  * the current list's cycle, so the cell restarts wherever the walk does and
  * with `retrigger` off carries on modulo the new cycle. What a cell does —
- * octave, accent, slide, tie, rest, the lanes, the gate's look-ahead and
- * skip chance — is `arpCellPlay.ts`. The walk advances and a random style
- * draws at every onset whatever its cell plays, so a rest, a tie or a skip
- * never moves the pitches of the cells after it; skip chance draws from its
- * own stream, minted beside the walk's at region entry.
+ * octave, accent, slide, tie, rest, the lanes, the cell's gate
+ * (windsor#933), the gate's look-ahead and skip chance — is
+ * `arpCellPlay.ts`. The walk advances and a random style draws at every
+ * onset whatever its cell plays, so a rest, a tie or a skip never moves the
+ * pitches of the cells after it; skip chance draws from its own stream,
+ * minted beside the walk's at region entry.
  *
  * **The gate's look-ahead across a chord change.** The gate is decided at
  * the onset, and it reads the next cell in the current list's cycle
@@ -59,8 +60,9 @@
  * decision 4).
  *
  * **Rhythm.** Every step is an onset while a chord is active — density is
- * the bass's, not the arp's. A note lasts `gate` of the last step it covers;
- * at gate 1 it runs to the next onset, which releases and restrikes it. A
+ * the bass's, not the arp's. A note lasts its played gate (the part's gate
+ * times its cell's, `arpPlayedGate`) of the last step it covers; at a played
+ * gate of 1 it runs to the next onset, which releases and restrikes it. A
  * new arp's cells are all plain notes, so it plays exactly as it did before
  * the grid.
  *
@@ -69,12 +71,13 @@
  * hits of its note, spaced evenly across the step's swung span. The cell's
  * note-on is hit 0, as a plain cell plays it, and carries a `roll` the
  * player spends on the later hits (`rollSpan.ts`), each with the cell's
- * accent and offsets and no slide, and each held `gate` of its slice. Where
- * a plain note would run to the next onset (a tie or slide next, or a gate
- * covering the step), the last hit is held open and the next onset releases
- * it; otherwise the roll leaves nothing held. The walk and the skip draw
- * once per onset, before the roll, so a skipped cell plays no hit. A slide
- * to the pitch held is still a tie, its ratchet unheard.
+ * accent and offsets and no slide, and each held the cell's played gate
+ * (`arpPlayedGate`, windsor#933) of its slice. Where a plain note would
+ * run to the next onset (a tie or slide next, or a played gate covering the
+ * step), the last hit is held open and the next onset releases it;
+ * otherwise the roll leaves nothing held. The walk and the skip draw once
+ * per onset, before the roll, so a skipped cell plays no hit. A slide to
+ * the pitch held is still a tie, its ratchet unheard.
  *
  * Pure: it reads the chord and local tick the gate forwards, never the
  * transport, and emits note events on the tick grid.
@@ -84,6 +87,7 @@ import { voiceChord } from '../harmony/chordVoicing';
 import { chordIdentity, type HarmonyChord } from '../harmony/harmonyTimeline';
 import {
   arpCellIndex,
+  arpPlayedGate,
   arpSkipRng,
   type ArpCellOutcome,
   holdsToNext,
@@ -369,6 +373,7 @@ export class Arpeggiator {
     const played = skipCell(written, skipChance, this.skipRng);
     // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
     const cell = reset ? strikeCell(played) : played;
+    const gate = arpPlayedGate(config.gate, cell);
     const outcome = playArpCell(
       {
         tick: event.tick,
@@ -379,11 +384,13 @@ export class Arpeggiator {
         pitch,
         held: this.held,
         holdsOn: holdsToNext(steps, i, cycle),
+        gate,
       },
       config,
     );
     const hits = cell.kind === 'note' ? (cell.ratchet ?? 1) : 1;
-    return this.settle(hits > 1 ? rollOutcome(outcome, hits, config, event) : outcome);
+    const roll = { divisor: config.divisor, gate };
+    return this.settle(hits > 1 ? rollOutcome(outcome, hits, roll, event) : outcome);
   }
 
   /** Keep what an onset leaves sounding, and hand back what it emitted. */
