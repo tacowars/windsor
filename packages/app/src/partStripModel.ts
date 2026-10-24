@@ -36,6 +36,11 @@ export function chipLabel(
   };
 }
 
+/** Every chip, in the document's order: what the strip draws on each render, pick and document change. */
+export const chipLabels = (
+  parts: readonly Pick<DocumentPart, 'name' | 'sequencer' | 'colour'>[],
+): ChipLabel[] => parts.map((part, index) => chipLabel(part, index));
+
 /** + is offered below the song's part limit. */
 export const canAddPart = (count: number, max: number = MUSIC_PARTS_MAX): boolean => count < max;
 
