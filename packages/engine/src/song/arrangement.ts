@@ -11,7 +11,7 @@
  * Since #597 a song is a list of 1 to `MUSIC_PARTS_MAX` parts, each identified
  * by its `slot` (0 to `MUSIC_SLOT_MAX`) and carrying any sequencer: a
  * Euclidean fixed-note trigger, the written grid (#602), the Chord Player (#606), the arpeggiator and bass
- * (#706, #707), the Figure (windsor#484), the Roll (windsor#599), or `none` — an inert part the keyboard can still play but
+ * (#706, #707), the Figure (windsor#484), the Roll (windsor#599), the Drum (windsor#948), or `none` — an inert part the keyboard can still play but
  * nothing sequences. A part's name is a label and keys nothing (record
  * `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -25,6 +25,7 @@
 import type { ArpSequencerConfig } from '../sequencing/arpSequencer';
 import type { BassSequencerConfig } from '../sequencing/bassSequencer';
 import type { ChordSequencerConfig } from '../sequencing/chordSequencer';
+import type { DrumSequencerConfig } from '../sequencing/drumSequencer';
 import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
 import { FIGURE_OPTIONAL_KEYS, type FigureSequencerConfig } from '../sequencing/figureSequencer';
@@ -51,12 +52,14 @@ export type ArpDriver = ArpSequencerConfig;
 export type BassDriver = BassSequencerConfig;
 export type FigureDriver = FigureSequencerConfig;
 export type RollDriver = RollSequencerConfig;
+export type DrumDriver = DrumSequencerConfig;
 
 /**
  * What may drive a part (#597, #705). `none` is inert: allowed anywhere,
  * skipped by every sequencing path. `arp` and `bass` are normalised in full
  * here and performed by #706 / #707, `figure` (windsor#484) by windsor#485.
  * `roll` (windsor#599) is normalised in full and performed by windsor#600.
+ * `drum` (windsor#948) is a written line of hits at a base note.
  */
 export const SEQUENCER_KINDS = [
   'none',
@@ -67,6 +70,7 @@ export const SEQUENCER_KINDS = [
   'bass',
   'figure',
   'roll',
+  'drum',
 ] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
@@ -77,6 +81,7 @@ export const SEEDED_KINDS: readonly SequencerKind[] = [
   'arp',
   'bass',
   'figure',
+  'drum',
 ];
 
 export interface NoSequencer {
@@ -103,9 +108,19 @@ export type BassSpec = { readonly kind: 'bass' } & BassDriver;
 export type FigureSpec = { readonly kind: 'figure' } & FigureDriver;
 /** The Roll (windsor#599): absolute notes with a free onset, length and velocity over a loop. */
 export type RollSpec = { readonly kind: 'roll' } & RollDriver;
+/** The Drum (windsor#948): a written line of rests and hits, each with its velocity, accent, pitch and ratchet. */
+export type DrumSpec = { readonly kind: 'drum' } & DrumDriver;
 
 export type SequencerSpec =
-  NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec | FigureSpec | RollSpec;
+  | NoSequencer
+  | EuclideanSpec
+  | GridSpec
+  | ChordSpec
+  | ArpSpec
+  | BassSpec
+  | FigureSpec
+  | RollSpec
+  | DrumSpec;
 
 /** `Omit` applied to each member of a union, so the kind still discriminates. */
 type WithoutSeed<S> = S extends unknown ? Omit<S, 'seed'> : never;
@@ -211,10 +226,15 @@ export interface Arrangement {
   readonly parts: readonly MusicPart[];
 }
 
-/** The fields of a sequencer spec that build its generator: `kind`, `note` and `hold` do not. */
+/**
+ * The fields of a sequencer spec that build its generator: `kind` does not,
+ * nor a Euclidean spec's `note` and `hold`, which the player plays its
+ * onsets at. A Drum's `note` is its generator's own (windsor#948).
+ */
 export function driverOf(spec: SequencerSpec): Record<string, unknown> {
   const driver: Record<string, unknown> = { ...spec };
   delete driver.kind;
+  if (spec.kind !== 'euclidean') return driver;
   delete driver.note;
   delete driver.hold;
   return driver;
