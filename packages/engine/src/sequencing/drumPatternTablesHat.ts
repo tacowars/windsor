@@ -7,7 +7,12 @@ import type { DrumPatternRows } from './drumPatternTables';
 
 export const DRUM_PATTERNS_HAT: readonly DrumPatternRows[] = [
   { id: 'hat-eighths', name: 'Eighths', velocity: 'X.7.X.7.X.7.X.7.' },
-  { id: 'hat-offbeats', name: 'Offbeats', velocity: '..9...9...9...9.' },
+  {
+    id: 'hat-offbeats',
+    name: 'Offbeats with pickups',
+    velocity: '.39..39..39..39.',
+    half: '.+...+...+...+..',
+  },
   {
     id: 'hat-sixteenths',
     name: 'Sixteenths',

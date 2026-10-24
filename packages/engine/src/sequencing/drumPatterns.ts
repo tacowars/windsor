@@ -167,9 +167,8 @@ function sameStep(a: DrumStep, b: DrumStep): boolean {
 /**
  * The id of the pattern a line still is: a loop of `DRUM_PATTERN_STEPS`
  * whose steps equal the pattern's hit for hit and field for field. Steps
- * past the loop are not played and not compared. Two patterns that write
- * the same line (`hat-offbeats` and `open-offbeats`) give the earlier.
- * Null, what the picker shows as Custom, for any other line.
+ * past the loop are not played and not compared. No two patterns in the
+ * bank write the same line. Null, what the picker shows as Custom, for any other line.
  */
 export function drumPatternOf(
   steps: readonly DrumStep[],

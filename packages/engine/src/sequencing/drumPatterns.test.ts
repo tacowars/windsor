@@ -126,12 +126,10 @@ describe('applyDrumPattern', () => {
 });
 
 describe('drumPatternOf', () => {
-  it('finds every pattern from its own steps, the earlier of two that write the same line', () => {
-    // The one pair the bank writes alike: offbeats at 0.9 on a closed and an open hat.
-    const twins: Record<string, string> = { 'open-offbeats': 'hat-offbeats' };
+  it('finds every pattern from its own steps', () => {
     for (const p of DRUM_PATTERNS) {
       const { steps, length } = applyDrumPattern(DEFAULT_DRUM_CONFIG, p.id);
-      expect(drumPatternOf(steps, length)).toBe(twins[p.id] ?? p.id);
+      expect(drumPatternOf(steps, length)).toBe(p.id);
     }
   });
 
