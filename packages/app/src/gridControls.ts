@@ -1,12 +1,17 @@
 /**
  * The Grid device's controls (#603; in columns since windsor#368, decision
- * 5, as the insert rack lays its pages out): Step, Randomize and Reverse; Octave,
- * Length and Rotate; Vel, Acc vel and Acc mod; Skip. Every knob writes the
- * selected region's pattern through `changePattern` (windsor#76), Vel
- * aside, which is the part's. Randomize and Reverse run the pattern actions
- * the Song tab's region menu runs too (`patternActionRun.ts`, windsor#827).
+ * 5, as the insert rack lays its pages out): Step, Seed with Reseed beside
+ * it, Randomize and Reverse; Octave, Length and Rotate; Vel, Acc vel and Acc
+ * mod; Vary and Chance, with the Rests sound and Octave toggles side by side
+ * under them (windsor#936, the approved mockup
+ * `docs/design/step-variation-controls-mockup.html`). Every knob and toggle
+ * writes the selected region's pattern through `changePattern`
+ * (windsor#76), Vel aside, which is the part's, as is the seed. Randomize,
+ * Reverse and Reseed run the pattern actions the Song tab's region menu runs
+ * too (`patternActionRun.ts`, windsor#827).
  */
 import type { GridSpec } from '@windsor/engine';
+import { DEFAULT_GRID_CONFIG } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { GRID_KNOB_COLUMNS } from './gridDeviceTables';
@@ -15,10 +20,12 @@ import { octaveKnob } from './harmonyTables';
 import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { runPatternAction } from './patternActionRun';
+import { seedField } from './seedField';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import { lanesForSteps } from './stepModLaneModel';
 import type { Strip } from './stepStrip';
+import { isVariationAmount, titleVariationKnob, variationToggles } from './stepVariationControls';
 
 type GridStrip = Strip<GridSpec>;
 
@@ -123,23 +130,41 @@ function column(className: string, nodes: readonly HTMLElement[]): HTMLElement {
   return col;
 }
 
-/** The controls' section: its label, then the four columns. */
+/** A table knob by its field, Vary and Chance with their sentence in the tooltip. */
+function tableKnobs(strip: GridStrip, field: string): HTMLElement[] {
+  const entry = GRID_KNOBS.find((e) => e.f === field);
+  if (!entry) return [];
+  const node = tableKnob(strip.ctx, strip.slot, entry, PITCH_COLOR, strip.region);
+  return [isVariationAmount(field) ? titleVariationKnob(node, field) : node];
+}
+
+/**
+ * A knob column; the one holding Vary and Chance takes the Rests sound and
+ * Octave toggles side by side in its third row, which costs no width.
+ */
+function knobColumn(strip: GridStrip, fields: readonly string[]): HTMLElement {
+  const knobs = fields.flatMap((field) => tableKnobs(strip, field));
+  if (!fields.some(isVariationAmount)) return column('k3', knobs);
+  const pair = el('div', 'variation-pair');
+  pair.append(...variationToggles({ ctx: strip.ctx, slot: strip.slot, region: strip.region }));
+  return column('k3', [...knobs, pair]);
+}
+
+/** The controls' section: its label, then the columns. */
 export function gridControls(strip: GridStrip): HTMLElement {
   const { ctx, slot, region } = strip;
-  const knob = (field: string): HTMLElement[] => {
-    const entry = GRID_KNOBS.find((e) => e.f === field);
-    return entry ? [tableKnob(ctx, slot, entry, PITCH_COLOR, region)] : [];
-  };
+  const seed = (): number => strip.spec()?.seed ?? DEFAULT_GRID_CONFIG.seed;
   const rotor: GridRotor = { turned: GRID_TURN_REBASED, knob: null };
   const body = el('div', 'seq-sec-body');
   body.append(
     column('wide', [
       divisorPicker(ctx, slot, region),
+      seedField({ ctx, slot, region, device: 'grid', seed }),
       randomizeButton(strip, rotor),
       reverseButton(strip, rotor),
     ]),
     column('k3', [octave(strip), lengthKnob(strip, rotor), rotateKnob(strip, rotor)]),
-    ...GRID_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),
+    ...GRID_KNOB_COLUMNS.map((fields) => knobColumn(strip, fields)),
   );
   const section = el('div', 'seq-section');
   section.append(el('div', 'seq-sec-label', 'Play'), body);

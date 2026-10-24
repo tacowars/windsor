@@ -1,6 +1,7 @@
 /**
  * The sequencer lane rows held to their knobs (windsor#491): every field a
- * kind offers a lane is a knob on that kind's device, under the row's label,
+ * kind offers a lane is a knob on that kind's device, under the lane's name
+ * (the row's label, or the console's own: Vary and Chance, windsor#936),
  * whose range is the row's (windsor#514), so a locked knob shows every value
  * the lane reaches and the lane reaches every value the knob does.
  */
@@ -15,6 +16,7 @@ import {
   GRID_KNOBS,
   type SequencerKnobEntry,
 } from './sequencerKnobTables';
+import { seqLaneName } from './stepVariationTables';
 
 /** The knob tables each kind with sequencer lanes draws. */
 const KNOBS_OF: Partial<Record<SequencerKind, readonly SequencerKnobEntry[]>> = {
@@ -24,24 +26,15 @@ const KNOBS_OF: Partial<Record<SequencerKind, readonly SequencerKnobEntry[]>> = 
   bass: BASS_KNOBS,
 };
 
-/**
- * Step variation's lanes (windsor#935), whose Randomness and Probability
- * knobs come with the devices' step variation controls in the next step of
- * that work; until then a lane on them locks no knob.
- */
-const KNOBS_TO_COME: readonly string[] = ['randomness', 'probability'];
-
 describe('the sequencer lane rows and their knobs', () => {
   const offered = Object.entries(SEQ_AUTOMATION_FIELDS).flatMap(([kind, fields]) =>
-    (fields ?? [])
-      .filter((field) => !KNOBS_TO_COME.includes(field))
-      .map((field) => [kind as SequencerKind, field] as const),
+    (fields ?? []).map((field) => [kind as SequencerKind, field] as const),
   );
 
-  it.each(offered)('%s offers %s, a knob under the row’s label with its range', (kind, field) => {
+  it.each(offered)('%s offers %s, a knob under the lane’s name with its range', (kind, field) => {
     const row = requireCatalogRow(seqTargetId(field));
     const knob = KNOBS_OF[kind]?.find((e) => e.kind === 'driver' && e.f === field);
-    expect(knob?.label, `${kind} ${field}`).toBe(row.label);
+    expect(knob?.label, `${kind} ${field}`).toBe(seqLaneName(field) ?? row.label);
     expect(knob?.o.min).toBe(row.min);
     expect(knob?.o.max).toBe(row.max);
   });

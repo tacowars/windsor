@@ -9,8 +9,9 @@
  * same document as one undo step with the same name.
  *
  * Which actions a kind offers is the keys of its entry in `PATTERN_ACTIONS`,
- * in the order the cards and the menu list them: Grid has no Reseed, Chord
- * none at all. The Roll's Quantize here acts on every note, as the card's
+ * in the order the cards and the menu list them: Chord has none at all. The
+ * Grid's Reseed came with step variation (windsor#936), whose draws its seed
+ * shapes. The Roll's Quantize here acts on every note, as the card's
  * does with nothing selected; the card's own press also reads its selection
  * (`rollEditing.ts`), over the same `quantiseNotes`.
  */
@@ -99,7 +100,7 @@ function fields(at: ActionAt, values: Readonly<Record<string, unknown>>): Patter
   return partial ? { partial } : null;
 }
 
-/** The part's seed, which Arp and Figure write with `arpSeedChange`. */
+/** The part's seed, which Grid, Arp and Figure write with `arpSeedChange`. */
 const seedEdit = (spec: { seed: number }, at: ActionAt): PatternEdit => ({
   partial: arpSeedChange(
     at.slot,
@@ -128,6 +129,7 @@ export const PATTERN_ACTIONS: KindActions = {
         }),
     },
     reverse: { edit: (spec, at) => fields(at, reverseGrid(spec)) },
+    reseed: { edit: seedEdit },
   },
   arp: {
     randomize: {

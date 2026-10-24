@@ -14,9 +14,10 @@
  *   a knob a macro mapping covers is held by its macro first (windsor#561,
  *   record `2026-10-04-patch-macro-knobs` decision 11): a lane on the
  *   target is inert while the mapping exists;
- * - a sequencer knob (Gate, Skip, Density) by its field, while the part's
- *   sequencer kind offers that field a lane (windsor#491). Changing the kind
- *   drops the lane in the engine, so the knob frees on the next read.
+ * - a sequencer knob (Gate, Skip, Density, and step variation's Vary and
+ *   Chance, windsor#936) by its field, while the part's sequencer kind
+ *   offers that field a lane (windsor#491). Changing the kind drops the
+ *   lane in the engine, so the knob frees on the next read.
  *
  * A group bus's Level, Pan and insert knobs on the Mixer tab lock under the
  * group's own lanes the same way (windsor#616 decision 4): the strip and

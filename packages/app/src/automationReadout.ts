@@ -4,12 +4,15 @@
  * mixer cell, the shape popover, and a step lane's played value
  * (windsor#424), so a target reads the same wherever it shows. The number
  * rules are `songAutomationTables.ts`'s `READOUT_NUMBERS`; an insert's
- * on/off switch reads `On` or `Off` as the engine reads it (windsor#631).
+ * on/off switch reads `On` or `Off` as the engine reads it (windsor#631),
+ * and step variation's Vary and Chance read a percent, as their knobs do
+ * (windsor#936).
  */
 import type { AutomationTargetRow } from '@windsor/engine';
 import { switchReading } from '@windsor/engine';
-import { fmtVowel } from './consoleFormat';
+import { fmtPct, fmtVowel } from './consoleFormat';
 import { READOUT_NUMBERS, type ReadoutNumbers } from './songAutomationTables';
+import { PERCENT_SEQ_TARGETS } from './stepVariationTables';
 
 /** `value` with its sign, a value that rounds to zero as +0 (never "-0.0"). */
 const signed = (value: number, decimals: number): string => {
@@ -68,6 +71,7 @@ export function readout(
       return `${value.toFixed(0)}${row.unit}`;
     case '':
       if (row.target === 'strip.pan') return pan(value, n);
+      if (PERCENT_SEQ_TARGETS.has(row.target)) return fmtPct(value);
       // The Formant vowel reads as its knob does (windsor#406): "a", "o→u 25%".
       return row.target === VOWEL_TARGET ? fmtVowel(value) : plain(value, n);
     default:

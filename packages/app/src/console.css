@@ -2872,12 +2872,14 @@ body.chord-dragging {
   border-left: 1px solid var(--line-bright);
 }
 .arp-seed,
-.bass-seed {
+.bass-seed,
+.grid-seed {
   display: flex;
   gap: 3px;
 }
 .arp-device input.field,
-.bass-device input.field {
+.bass-device input.field,
+.grid-device input.field {
   flex: 1;
   min-width: 0;
   max-width: none;
@@ -2888,10 +2890,18 @@ body.chord-dragging {
   font-size: 11px;
 }
 .seq-icon.arp-reseed,
-.seq-icon.bass-reseed {
+.seq-icon.bass-reseed,
+.seq-icon.grid-reseed,
+.seq-icon.variation-toggle {
   width: var(--arp-reseed);
   height: var(--arp-reseed);
   border-color: var(--line-bright);
+}
+/* Step variation's Rests sound and Octave toggles side by side under the
+   Grid's Vary and Chance (windsor#936), 3 px apart as the seed and Reseed. */
+.variation-pair {
+  display: flex;
+  gap: 3px;
 }
 /* The strip: roomier cells than the Grid's, the ratchet row kept at its 14 px. */
 .arp-device .seq-strip > .grid-strip,
