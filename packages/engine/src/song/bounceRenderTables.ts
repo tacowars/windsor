@@ -14,6 +14,7 @@ export const BOUNCE_KINDS: readonly SequencerKind[] = [
   'arp',
   'bass',
   'figure',
+  'drum',
 ];
 
 /**
