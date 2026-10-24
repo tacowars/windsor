@@ -1,11 +1,15 @@
 import { MUSIC_PARTS_MAX } from '@windsor/engine';
 import type { DocumentPart, SequencerKind } from '@windsor/engine';
 import { describe, expect, it } from 'vitest';
+import { DocumentModel } from './documentModel';
+import { sequencerKindChange } from './partEdits';
+import { newSong } from './songParts';
 import {
   addPartTitle,
   canAddPart,
   canRemovePart,
   chipLabel,
+  chipLabels,
   chipsOverflow,
   pageScrollTarget,
   removePartTitle,
@@ -76,5 +80,21 @@ describe('the chip row’s scroll', () => {
     expect(revealScrollLeft(box, { left: 600, width: 80 }, fade)).toBe(202);
     expect(revealScrollLeft({ ...box, scrollLeft: 400 }, { left: 300, width: 80 }, fade)).toBe(278);
     expect(revealScrollLeft(box, { left: 1120, width: 80 }, fade)).toBe(700);
+  });
+});
+
+describe('chipLabels', () => {
+  it('follows the document on every change, as the strip draws them (windsor#962)', () => {
+    const model = new DocumentModel(newSong());
+    const slot = model.doc.parts[0]!.slot;
+    const toKind = (kind: SequencerKind): void =>
+      model.merge(sequencerKindChange(model.doc, slot, kind, (raw) => model.preview(raw)));
+    toKind('grid');
+    const before = model.doc;
+    const heard: string[] = [];
+    model.onChange(() => heard.push(chipLabels(model.doc.parts)[0]!.meta));
+    toKind('roll');
+    model.replace(before);
+    expect(heard).toEqual(['1 · Roll', '1 · Grid']);
   });
 });

@@ -16,10 +16,14 @@
  * scrolls sideways like browser tabs: ‹ › page it, its edges fade, ▾ lists
  * every part, and the selected chip is kept in view after every draw.
  *
- * It is chrome (`ctx.addChrome`), so it draws on every `render()`, and it
- * hears every selection change (`ctx.parts.onSelect`), so a pick made in the
- * Song view moves its highlight. The rules are `partStripModel.ts`.
+ * It is chrome (`ctx.addChrome`), so it draws on every `render()`; it hears
+ * every selection change (`ctx.parts.onSelect`), so a pick made in the Song
+ * view moves its highlight; and it hears every document change
+ * (`ctx.model.onChange`, windsor#962), so an edit committed without a full
+ * render, like the Song pane's Bounce to Roll and its undo, shows on the
+ * chips at once. The rules are `partStripModel.ts`.
  */
+import type { DocumentPart } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
@@ -39,12 +43,13 @@ import {
   addPartTitle,
   canAddPart,
   canRemovePart,
-  chipLabel,
+  chipLabels,
   chipsOverflow,
   pageScrollTarget,
   removePartTitle,
   revealScrollLeft,
 } from './partStripModel';
+import type { ChipLabel } from './partStripModel';
 import { PART_STRIP } from './partStripTables';
 
 function stripButton(className: string, text: string, title: string): HTMLButtonElement {
@@ -59,10 +64,13 @@ export function pickPart(ctx: AppCtx, slot: number): void {
   if (ctx.parts.pick(slot)) ctx.refreshTabs();
 }
 
-function chip(ctx: AppCtx, index: number, lights: HTMLElement | undefined): HTMLElement {
-  const part = ctx.model.doc.parts[index]!;
+function chip(
+  ctx: AppCtx,
+  part: DocumentPart,
+  label: ChipLabel,
+  lights: HTMLElement | undefined,
+): HTMLElement {
   const { slot } = part;
-  const label = chipLabel(part, index);
   const node = stripButton('pchip', '', part.name);
   node.style.setProperty('--tone', label.tone);
   node.setAttribute('aria-pressed', String(slot === ctx.parts.selected));
@@ -143,7 +151,7 @@ function wireAddMenu(ctx: AppCtx, add: HTMLButtonElement): LongPressHandle {
   return hold;
 }
 
-/** The strip's frame: built once; the chips inside are drawn again on every render and pick. */
+/** The strip's frame: built once; the chips inside are drawn again on every render, pick and document change. */
 interface StripFrame {
   readonly root: HTMLElement;
   readonly scroll: HTMLElement;
@@ -220,14 +228,16 @@ function revealSelected(frame: StripFrame): void {
   );
 }
 
-export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement): void {
+/** Mount the strip in `root`; returns the unmount, which stops it hearing document changes. */
+export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement): () => void {
   const frame = buildFrame(ctx, root);
   const lights = watchStripLights(ctx, root);
   const draw = (): void => {
     const { parts } = ctx.model.doc;
     const focused = focusedSlot(frame);
     const drawn = lights.draw(parts.map((part) => part.slot));
-    const chips = parts.map((part, index) => chip(ctx, index, drawn.get(part.slot)));
+    const labels = chipLabels(parts);
+    const chips = parts.map((part, index) => chip(ctx, part, labels[index]!, drawn.get(part.slot)));
     frame.scroll.replaceChildren(...chips);
     // A keyboard pick redraws the chip it was made on; the focus stays with it.
     if (focused !== undefined) {
@@ -245,5 +255,7 @@ export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement):
   }
   ctx.addChrome(draw);
   ctx.parts.onSelect(draw);
+  const unlisten = ctx.model.onChange(draw);
   draw();
+  return unlisten;
 }
