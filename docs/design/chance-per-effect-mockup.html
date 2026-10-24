@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The switch that rolls Chance per effect, on the Grid and Arp devices
+     (windsor#945 decision 8: a third glyph toggle beside Rests sound and Octave,
+     for the engine's new `chancePerEffect` field). Today is the real thing:
+     screenshots of main (75d2020) taken on 2026-10-24 from `npm run dev` in the
+     project's headless Chrome at CSS 1440 x 900 with a mouse, and at 1366 x 1024
+     and 1024 x 1366 with touch, with a two-part song in A minor (Acid, a 16-step
+     Grid on Acid Saw, Vary 50%, Chance 25%, Octave on, seed 7; Arp, an Up-down
+     Arp on Saw Arp over two octaves, 10 cells, Vary 40%, Chance under a Chance
+     lane from 30% to 60%, Rests sound on, seed 3; harmony A min, F maj, C maj,
+     G 7, one bar each, 128 BPM), saved beside this file as
+     chance-per-effect-today-*.jpg. Proposed draws the new toggle over those
+     screenshots at the places and sizes measured there, in the app, by putting a
+     third .seq-icon.variation-toggle into the live device: the device's top
+     (339.9 px, 373.9 px on the portrait tablet); on the Grid, the Vary and Chance
+     column (x 260, 52 px wide, its knobs at 26.7 and 100 px under the device's
+     top) and today's pair (x 262.5, 190.4 px under the top, two 22 px buttons 3
+     px apart); on the Arp, the toggle column (x 480, 22 px wide), whose first row,
+     level with Gate, is empty today (a button there sits 43.7 px under the top).
+     Sizes and colors are copied from packages/app/src/console.css (the tokens,
+     .seq-icon, .seq-icon[aria-pressed], .seq-icon.variation-toggle,
+     .variation-pair) and the glyph grid from stepVariationTables.ts. What works:
+     the frame picker, Today | Proposed, the name, glyph, title and placement
+     pickers, the three glyph buttons (click to toggle, hover for the tooltip),
+     hovering Vary for its new tooltip, and the look toggles. Nothing makes
+     sound. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Chance Per Effect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --hot: #d2643c;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own controls (not the console) ---------- */
+    .mock-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--return);
+    }
+    .mock-bar label,
+    .mock-bar .grp {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select,
+    .mock-bar .mb {
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 7px;
+      font: 11px var(--f-ui);
+    }
+    .mock-bar .mb[aria-pressed='true'] {
+      background: var(--return);
+      border-color: var(--return);
+      color: #17121f;
+    }
+    body.marks .new {
+      outline: 1px dashed var(--return);
+      outline-offset: 1px;
+    }
+    .stage-wrap {
+      padding: 16px;
+      overflow-x: auto;
+    }
+    /* `bare` in the link: the frame alone at the page's corner, for the rendered pictures. */
+    body.bare .mock-bar,
+    body.bare .caption,
+    body.bare .notes {
+      display: none;
+    }
+    body.bare .stage-wrap {
+      padding: 0;
+    }
+    body.bare .frame {
+      outline: 0;
+    }
+    .caption {
+      margin: 0 0 8px;
+      font: 11px var(--f-num);
+      color: var(--ink-dim);
+    }
+
+    /* ---------- the frame: a device's screen at its CSS size, today's screenshot behind ---------- */
+    .frame {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      outline: 1px dashed var(--return);
+      background: var(--ground) var(--shot) no-repeat 0 0 / 100% 100%;
+    }
+    .ov {
+      position: absolute;
+    }
+    /* Today's pixels, moved: a slice of the same screenshot at a new place. */
+    .slice {
+      background-image: var(--shot);
+      background-repeat: no-repeat;
+      background-size: var(--w) var(--h);
+    }
+    /* The rack's inner box: what a device wider than the rack scrolls inside. */
+    .rack-clip {
+      overflow: hidden;
+    }
+    .scroll-hint {
+      position: absolute;
+      bottom: 2px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--line-bright);
+    }
+    .play {
+      background: var(--panel);
+    }
+    /* A knob's tooltip, laid over today's pixels of the knob. */
+    .tip {
+      cursor: ns-resize;
+    }
+
+    /* ---------- the toggles (console.css .seq-icon, .seq-icon.variation-toggle) ---------- */
+    .seq-icon {
+      flex: none;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink-faint);
+    }
+    .seq-icon:hover {
+      color: var(--ink);
+    }
+    /* .seq-icon[aria-pressed='true']: the device's accent (the pitch teal on a Grid or an Arp) on the inset. */
+    .seq-icon[aria-pressed='true'] {
+      color: var(--modulator);
+      background: var(--inset);
+    }
+    .seq-icon svg {
+      display: block;
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    /* .variation-pair: side by side, 3 px apart. Under the pair, it wraps at the pair's 47 px. */
+    .variation-pair {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+    }
+
+    /* ---------- notes ---------- */
+    .notes {
+      max-width: 980px;
+      padding: 8px 16px 48px;
+      color: var(--ink-dim);
+      font: 13px/1.55 var(--f-ui);
+    }
+    .notes[hidden] {
+      display: none;
+    }
+    .notes h2 {
+      margin: 26px 0 8px;
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .notes ol,
+    .notes ul,
+    .notes p {
+      margin: 0 0 8px;
+      padding-left: 20px;
+    }
+    .notes p {
+      padding-left: 0;
+    }
+    .notes b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .notes code {
+      font: 12px var(--f-num);
+      color: var(--ink);
+    }
+    .notes q {
+      color: var(--ink);
+    }
+    .notes table {
+      border-collapse: collapse;
+      margin: 4px 0 10px;
+      font: 12px var(--f-num);
+    }
+    .notes th,
+    .notes td {
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      text-align: right;
+    }
+    .notes th {
+      color: var(--ink);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .notes td.l,
+    .notes th.l {
+      text-align: left;
+    }
+    .notes .glyph {
+      display: inline-grid;
+      vertical-align: middle;
+      margin: 0 2px;
+    }
+  </style>
+
+  <div class="mock-bar">
+    <b>Mockup</b>
+    <label
+      >Frame
+      <select id="mFrame"></select
+    ></label>
+    <span class="grp" id="mMode"
+      ><button class="mb" data-mode="today">Today</button
+      ><button class="mb" data-mode="proposed">Proposed</button></span
+    >
+    <label
+      >Name
+      <select id="mName">
+        <option value="perEffect">Per effect (recommended)</option>
+        <option value="split">Split Chance</option>
+        <option value="each">Roll each</option>
+      </select></label
+    >
+    <label
+      >Glyph
+      <select id="mGlyph">
+        <option value="die">Die of three (recommended)</option>
+        <option value="fork">Fork</option>
+        <option value="bars">Three bars</option>
+      </select></label
+    >
+    <label
+      >Title
+      <select id="mTitle">
+        <option value="separately">Rolls separately (recommended)</option>
+        <option value="own">Its own roll</option>
+        <option value="without">One without the others</option>
+      </select></label
+    >
+    <label
+      >On the Grid
+      <select id="mPlace">
+        <option value="under">Under the pair (recommended)</option>
+        <option value="row">A row of three</option>
+      </select></label
+    >
+    <label><input type="checkbox" id="mMarks" checked /> Mark new</label>
+    <label><input type="checkbox" id="mFit" /> Fit to window</label>
+    <label><input type="checkbox" id="mNotes" checked /> Notes</label>
+    <span>It plays nothing.</span>
+  </div>
+
+  <div class="stage-wrap">
+    <p class="caption"><span id="caption"></span> · <span id="tag"></span></p>
+    <div id="fit">
+      <div class="frame" id="frame"></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes">
+    <h2>What changes</h2>
+    <ol>
+      <li>
+        <b>A third glyph toggle</b> on the Grid and the Arp writes the part's new
+        <code>chancePerEffect</code> (windsor#945 decision 5), off by default. It is drawn exactly
+        as Rests sound and Octave are (<code>.seq-icon.variation-toggle</code>, 22 px, its border
+        always drawn): off, a faint glyph on the panel; on, the glyph in the part's teal on the
+        inset. Its name is its accessible name, and its tooltip is one sentence. The example has the
+        Grid's on and the Arp's off. Hover a button for its tooltip, click it to toggle.
+      </li>
+      <li>
+        <b>On the Arp</b> it takes the toggle column's first row, level with Gate, which is empty
+        today: the column reads the new toggle, Rests sound (level with Vary), Octave (level with
+        Chance). The Arp keeps its width.
+      </li>
+      <li>
+        <b>On the Grid</b> (recommended, <b>Under the pair</b>): the pair wraps at its own 47 px, so
+        the new toggle sits under Rests sound in the third row of the Vary and Chance column. The
+        pair moves up 12.5 px to keep the three centered in the row, 22 px under Chance's label. The
+        Grid keeps its width. The other way, <b>A row of three</b> in the picker above, puts it
+        after Octave in one row: the column grows from 52 px to 72 px, and the Steps section moves
+        right by 20 px.
+      </li>
+      <li>
+        <b>Vary's tooltip</b> says velocity strays up and down (decision 2):
+        <q id="varyTitleNote"></q>. Hover the Vary knob on either device. The knob itself does not
+        change.
+      </li>
+      <li>
+        <b>It is not automatable</b> (decision 8): Rests sound and Octave have no lanes, so neither
+        does this toggle, and the Song tab's + Add lane list does not change.
+      </li>
+    </ol>
+
+    <h2>The numbers</h2>
+    <p>
+      Measured in the app, in place: a third <code>.seq-icon.variation-toggle</code> put into the
+      live device, on each frame size, with the rack's <code>scrollWidth</code> read against its
+      <code>clientWidth</code>.
+    </p>
+    <table>
+      <tr>
+        <th class="l">Device width, px</th>
+        <th>Today</th>
+        <th>Under the pair</th>
+        <th>A row of three</th>
+      </tr>
+      <tr>
+        <td class="l">Grid, 16 steps</td>
+        <td>965</td>
+        <td>965 (+0)</td>
+        <td>985 (+20)</td>
+      </tr>
+      <tr>
+        <td class="l">Arp, 10 cells</td>
+        <td>976</td>
+        <td>976 (+0)</td>
+        <td>976 (+0)</td>
+      </tr>
+    </table>
+    <p>
+      The rack's inner width is 1410 px on the desktop and 1336 px on the landscape tablet, so every
+      case fits there. On the portrait tablet it is 994 px, and today neither device scrolls (the
+      Grid's content is 977 px, the Arp's 988 px). Proposed, <b>the Arp never scrolls</b>: the
+      toggle takes a row that is empty today.
+      <b>Under the pair, the Grid does not scroll</b> either.
+      <b>A row of three makes the portrait Grid scroll 3 px sideways</b> (its rack's content is 997
+      px); the portrait Grid frame draws the rack's scroll bar in that case.
+    </p>
+
+    <h2>Decided in the issue</h2>
+    <p>
+      The switch exists, is off by default, sits beside Rests sound and Octave on both devices and
+      is drawn as they are, and is not automatable (decisions 5 and 8). Vary's tooltip says velocity
+      strays up and down (decision 2).
+    </p>
+
+    <h2>To decide</h2>
+    <ol>
+      <li>
+        <b>The name</b>, which is also the tooltip's first words and the accessible name.
+        Recommended: <b>Per effect</b>, the issue's own words, short, and it says what changes: the
+        roll moves from the step to each effect. The others: <b>Split Chance</b> (names the knob it
+        changes) and <b>Roll each</b> (a verb, like the dice it stands for).
+      </li>
+      <li>
+        <b>The glyph</b>, on the app's 12 px icon grid at the toggles' 1.4 px stroke. Recommended:
+        <b>Die of three</b> <span class="glyph" data-glyph="die"></span>, a die showing three pips:
+        a roll, three times. The others: <b>Fork</b> <span class="glyph" data-glyph="fork"></span>,
+        one stem splitting into three (one roll becomes three), and <b>Three bars</b>
+        <span class="glyph" data-glyph="bars"></span>, three strokes at different heights (three
+        effects, each on its own).
+      </li>
+      <li>
+        <b>The title</b> (tooltip), after the name and a colon as the other two toggles' are. All
+        three say the switch's one fact in one sentence.
+        <ul id="titleList"></ul>
+        Recommended: <b>Rolls separately</b>, the shortest, and it names the knob it changes.
+      </li>
+      <li>
+        <b>Where it sits on the Grid.</b> Recommended: <b>under the pair</b>, as drawn, at no width
+        and no sideways scroll. The other way, <b>a row of three</b>, keeps the three toggles in one
+        line, costs 20 px, and makes the portrait tablet's Grid scroll 3 px.
+      </li>
+      <li>
+        <b>Chance's tooltip</b> stays <q id="chanceTitleNote"></q>. With the switch on, each effect
+        varies on that fraction of steps, so the sentence still holds; the new toggle's own tooltip
+        says the rest. Proposed as is.
+      </li>
+    </ol>
+  </div>
+
+  <script>
+    /* ---------- the app's own numbers, measured in the screenshots ---------- */
+    const DEVICES = {
+      desktop: { w: 1440, h: 900, label: 'desktop, 1440 × 900', top: 339.9, rackW: 1412 },
+      landscape: {
+        w: 1366,
+        h: 1024,
+        label: 'tablet landscape, 1366 × 1024',
+        top: 339.9,
+        rackW: 1338,
+      },
+      portrait: { w: 1024, h: 1366, label: 'tablet portrait, 1024 × 1366', top: 373.9, rackW: 996 },
+    };
+    // The rack: from x 14, 7 px above the device and 258 px high; the device sits in it from x 21, 244 px high.
+    const RACK_X = 14;
+    const RACK_ABOVE = 7;
+    const RACK_H = 258;
+    const DEVICE_H = 244;
+    // What the rack's content adds to the device's width (measured: a 985 px Grid gives a 997 px scrollWidth).
+    const RACK_EXTRA = 12;
+    const WIDTH = { grid: 965, arp: 976 };
+    // The Grid: the Vary and Chance column at x 260, its knobs' tops, today's pair, the Steps section from x 320.
+    const GRID_COL_X = 260;
+    const KNOB_W = 52;
+    const KNOB_H = 56;
+    const GRID_VARY_TOP = 26.7;
+    const GRID_CHANCE_TOP = 100;
+    const PAIR_X = 262.5;
+    const PAIR_TOP = 190.4;
+    // Under the pair: the three wrap at 47 px and center in the row, 12.5 px higher.
+    const WRAP_TOP = 177.9;
+    const WRAP_W = 47;
+    const TOGGLE = 22;
+    const STEPS_X = 320;
+    const ROW_GROWTH = 20;
+    // The Arp: the toggle column at x 480, its empty first row; Vary and the locked Chance in the column before.
+    const ARP_TOGGLE_X = 480;
+    const ARP_TOGGLE_TOP = 43.7;
+    const ARP_KNOB_X = 426;
+    const ARP_VARY_TOP = 100;
+
+    // Today's two glyphs (stepVariationTables.ts) and the three candidates for the new one.
+    const GLYPHS = {
+      restsSound:
+        '<circle cx="4.6" cy="3.4" r="1.3" fill="currentColor" stroke="none"/><path d="M4.6 4.7c1.7.6 3.1.1 3.9-1.5L5.4 10.5"/>',
+      octaveMode:
+        '<circle cx="4" cy="3.4" r="1.6"/><circle cx="4" cy="8.3" r="1.9"/><path d="M9.5 1.8v8.4M8 3.3l1.5-1.5L11 3.3M8 8.7l1.5 1.5L11 8.7"/>',
+      die: '<rect x="1.5" y="1.5" width="9" height="9" rx="2"/><circle cx="4" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/>',
+      fork: '<path d="M6 10.5V6.5M6 6.5 2.5 2.2M6 6.5V1.5M6 6.5l3.5-4.3"/>',
+      bars: '<path d="M2.5 4.5v6M6 1.5v6M9.5 3.5v6"/>',
+    };
+    const NAME_OPTIONS = { perEffect: 'Per effect', split: 'Split Chance', each: 'Roll each' };
+    // The title's sentence after "<name>: ".
+    const TITLE_OPTIONS = {
+      separately:
+        "Chance rolls separately for velocity, pitch, the Arp's gate and, with Rests sound on, a rest or note flip, instead of once for the whole step",
+      own: "each effect takes its own Chance roll (velocity, pitch, the Arp's gate and, with Rests sound on, a rest or note flip) instead of the step taking one for all",
+      without:
+        "velocity, pitch, the Arp's gate and, with Rests sound on, a rest or note flip each roll Chance on their own instead of once per step, so one can vary without the others",
+    };
+    const TITLES = {
+      restsSound: 'Rests sound: a varied step may also go silent or sound where a rest was written',
+      octaveMode:
+        "Octave: pitch strays by whole octaves of the step's own note instead of borrowing another step's",
+      varyToday:
+        'How far a step that varies strays: its velocity, its pitch and, on the Arp, its gate',
+      vary: 'How far a step that varies strays: its velocity up or down, its pitch and, on the Arp, its gate',
+      chance: 'How often a step varies; the others play as written',
+    };
+    const KNOB_GESTURES = 'drag, shift-drag for fine, double-click to reset';
+    const NAMES = { restsSound: 'Rests sound', octaveMode: 'Octave' };
+
+    const FRAMES = [];
+    for (const d of ['desktop', 'landscape', 'portrait'])
+      for (const [v, name] of [
+        ['grid', 'Grid device'],
+        ['arp', 'Arp device'],
+      ])
+        FRAMES.push({
+          id: `${d}-${v}`,
+          device: d,
+          view: v,
+          label: `${DEVICES[d].label} · ${name}`,
+        });
+
+    // The example: the Grid's Octave and the new toggle on; the Arp's Rests sound on, the new toggle off.
+    const state = {
+      frame: FRAMES[0],
+      mode: 'proposed',
+      grid: { restsSound: false, octaveMode: true, chancePerEffect: true },
+      arp: { restsSound: true, octaveMode: false, chancePerEffect: false },
+    };
+    const $ = (id) => document.getElementById(id);
+    const nameOf = () => NAME_OPTIONS[$('mName').value];
+    const titleOf = (field) =>
+      field === 'chancePerEffect'
+        ? `${nameOf()}: ${TITLE_OPTIONS[$('mTitle').value]}`
+        : TITLES[field];
+    const glyphOf = (field) => GLYPHS[field === 'chancePerEffect' ? $('mGlyph').value : field];
+    const placement = () => $('mPlace').value;
+
+    /* ---------- the controls, as stepVariationControls.ts builds them ---------- */
+    // A glyph button that toggles: railIcon's title, the name as aria-label, aria-pressed for its state.
+    function toggle(card, field) {
+      const isNew = field === 'chancePerEffect';
+      const name = isNew ? nameOf() : NAMES[field];
+      return `<button type="button" class="seq-icon variation-toggle${isNew ? ' new' : ''}" data-card="${card}" data-field="${field}" aria-pressed="${state[card][field]}" aria-label="${name}" title="${titleOf(field)}"><svg viewBox="0 0 12 12" aria-hidden="true">${glyphOf(field)}</svg></button>`;
+    }
+    // A knob's new tooltip over its pixels: the knob's name and gestures, then its sentence (titleVariationKnob).
+    const tip = (x, y, h, title) =>
+      `<div class="ov tip new" style="left:${x}px;top:${y}px;width:${KNOB_W}px;height:${h}px" title="Vary - ${KNOB_GESTURES}. ${title}"></div>`;
+    // Today's pixels as a block at a new place.
+    const moved = (sx, sy, w, h, dx, dy) =>
+      `<div class="ov slice" style="left:${dx}px;top:${dy}px;width:${w}px;height:${h}px;background-position:${-sx}px ${-sy}px"></div>`;
+
+    const growth = (card) => (card === 'grid' && placement() === 'row' ? ROW_GROWTH : 0);
+    const scrollOf = (device, card) =>
+      Math.max(0, WIDTH[card] + growth(card) + RACK_EXTRA - (DEVICES[device].rackW - 2));
+
+    /* ---------- a frame ---------- */
+    function gridCover(d) {
+      const top = d.top;
+      const three = ['restsSound', 'octaveMode', 'chancePerEffect'].map((f) => toggle('grid', f));
+      if (placement() === 'under') {
+        // Clear today's pair, then the three wrapped at the pair's width, centered in the row.
+        return `<div class="ov play" style="left:${GRID_COL_X}px;top:${top + WRAP_TOP - 2}px;width:${KNOB_W}px;height:${PAIR_TOP + TOGGLE + 2 - (WRAP_TOP - 2)}px"></div><div class="ov variation-pair" style="left:${PAIR_X}px;top:${top + WRAP_TOP}px;width:${WRAP_W}px">${three.join('')}</div>${tip(GRID_COL_X, top + GRID_VARY_TOP, KNOB_H, TITLES.vary)}`;
+      }
+      // A row of three: the column grows 20 px; Vary and Chance (today's pixels) center in it; the Steps move right.
+      const x = GRID_COL_X + ROW_GROWTH / 2;
+      const stepsW = 21 + WIDTH.grid + 1 - STEPS_X;
+      return `<div class="ov play" style="left:${GRID_COL_X - 2}px;top:${top + 1}px;width:${STEPS_X + ROW_GROWTH - GRID_COL_X + 2}px;height:${DEVICE_H - 2}px"></div>${moved(STEPS_X, top, stepsW, DEVICE_H, STEPS_X + ROW_GROWTH, top)}${moved(GRID_COL_X, top + GRID_VARY_TOP, KNOB_W, KNOB_H, x, top + GRID_VARY_TOP)}${moved(GRID_COL_X, top + GRID_CHANCE_TOP, KNOB_W, KNOB_H, x, top + GRID_CHANCE_TOP)}<div class="ov variation-pair" style="left:${GRID_COL_X}px;top:${top + PAIR_TOP}px;width:${KNOB_W + ROW_GROWTH}px">${three.join('')}</div>${tip(x, top + GRID_VARY_TOP, KNOB_H, TITLES.vary)}`;
+    }
+    function arpCover(d) {
+      return `<div class="ov" style="left:${ARP_TOGGLE_X}px;top:${d.top + ARP_TOGGLE_TOP}px">${toggle('arp', 'chancePerEffect')}</div>${tip(ARP_KNOB_X, d.top + ARP_VARY_TOP, KNOB_H, TITLES.vary)}`;
+    }
+    function cardHtml(device, card) {
+      const d = DEVICES[device];
+      const clip = {
+        left: RACK_X + 1,
+        top: d.top - RACK_ABOVE + 1,
+        width: d.rackW - 2,
+        height: RACK_H - 2,
+      };
+      const cover = card === 'grid' ? gridCover(d) : arpCover(d);
+      const over = scrollOf(device, card);
+      const hint = over
+        ? `<div class="scroll-hint" style="left:4px;width:${Math.round(((clip.width - 8) * clip.width) / (clip.width + over))}px"></div>`
+        : '';
+      // The covers are placed in frame coordinates; the clip shifts them back by its own corner.
+      return `<div class="ov rack-clip" style="left:${clip.left}px;top:${clip.top}px;width:${clip.width}px;height:${clip.height}px"><div class="ov" style="left:${-clip.left}px;top:${-clip.top}px">${cover}</div>${hint}</div>`;
+    }
+    function render() {
+      const { device, view } = state.frame;
+      const d = DEVICES[device];
+      const f = $('frame');
+      f.style.setProperty('--w', `${d.w}px`);
+      f.style.setProperty('--h', `${d.h}px`);
+      f.style.setProperty('--shot', `url('chance-per-effect-today-${device}-${view}.jpg')`);
+      f.innerHTML = state.mode === 'proposed' ? cardHtml(device, view) : '';
+      for (const b of f.querySelectorAll('button[data-field]'))
+        b.onclick = () => {
+          state[b.dataset.card][b.dataset.field] = !state[b.dataset.card][b.dataset.field];
+          render();
+        };
+      $('fit').style.zoom = $('mFit').checked ? String(Math.min(1, (innerWidth - 32) / d.w)) : '1';
+      syncBar();
+      tag();
+      notes();
+    }
+    function tag() {
+      const { device, view } = state.frame;
+      if (state.mode === 'today') {
+        $('tag').textContent = 'the screenshot from main (75d2020), 2026-10-24';
+        return;
+      }
+      const grow = growth(view);
+      const scroll = scrollOf(device, view);
+      $('tag').textContent =
+        `${view === 'grid' ? 'Grid' : 'Arp'} ${WIDTH[view]} → ${WIDTH[view] + grow} px · ${scroll ? `scrolls ${scroll} px in the rack` : 'fits the rack'}`;
+    }
+    function notes() {
+      $('varyTitleNote').textContent = TITLES.vary;
+      $('chanceTitleNote').textContent = TITLES.chance;
+      const name = nameOf();
+      $('titleList').innerHTML = Object.entries(TITLE_OPTIONS)
+        .map(
+          ([key, text]) =>
+            `<li><b>${$('mTitle').querySelector(`option[value="${key}"]`).textContent.replace(' (recommended)', '')}</b>: <q>${name}: ${text}</q></li>`,
+        )
+        .join('');
+      for (const g of document.querySelectorAll('.notes .glyph'))
+        g.innerHTML = `<span class="seq-icon" aria-pressed="true"><svg viewBox="0 0 12 12" aria-hidden="true">${GLYPHS[g.dataset.glyph]}</svg></span>`;
+    }
+    function syncBar() {
+      for (const b of $('mMode').children)
+        b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode));
+      $('caption').textContent =
+        `${state.mode === 'today' ? 'Today' : 'Proposed'} · ${state.frame.label}`;
+    }
+
+    $('mFrame').innerHTML = FRAMES.map((f, i) => `<option value="${i}">${f.label}</option>`).join(
+      '',
+    );
+    $('mFrame').onchange = (e) => {
+      state.frame = FRAMES[Number(e.target.value)];
+      render();
+    };
+    for (const b of $('mMode').children)
+      b.onclick = () => {
+        state.mode = b.dataset.mode;
+        render();
+      };
+    const look = () => {
+      document.body.classList.toggle('marks', $('mMarks').checked);
+      $('notes').hidden = !$('mNotes').checked;
+      render();
+    };
+    for (const id of ['mName', 'mGlyph', 'mTitle', 'mPlace', 'mMarks', 'mFit', 'mNotes'])
+      $(id).onchange = look;
+    addEventListener('resize', () => $('mFit').checked && render());
+
+    // `#frame=portrait-grid&mode=proposed&name=split&glyph=fork&title=own&place=row&bare&nomarks` opens a state, for the rendered pictures.
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const start = Math.max(
+      0,
+      FRAMES.findIndex((f) => f.id === hash.get('frame')),
+    );
+    $('mFrame').value = String(start);
+    state.frame = FRAMES[start];
+    if (hash.get('mode')) state.mode = hash.get('mode');
+    for (const [key, id] of [
+      ['name', 'mName'],
+      ['glyph', 'mGlyph'],
+      ['title', 'mTitle'],
+      ['place', 'mPlace'],
+    ])
+      if (hash.get(key)) $(id).value = hash.get(key);
+    if (hash.has('bare')) document.body.classList.add('bare');
+    if (hash.has('nomarks')) $('mMarks').checked = false;
+    look();
+    document.fonts.ready.then(render);
+  </script>
+</html>
