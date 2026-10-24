@@ -1,0 +1,2294 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The Drum device (windsor#949, the device for windsor#948's `drum`
+     sequencer kind): the spec the build (Drum sequencer 4/4) follows. Today is the real thing: screenshots of main (8b2761d) taken on
+     2026-10-24 from `npm run dev` in the project's headless Chrome at CSS
+     1440 x 900 with a mouse, and at 1366 x 1024 and 1024 x 1366 with touch,
+     with an imported two-part song in A minor (Acid, a 16-step Grid on Acid
+     Saw; Arp, an Up-down Arp on Saw Arp, its lane row open on a Chance lane
+     from 50% to 80%, one Cutoff step lane; harmony A min, F maj, C maj, G 7,
+     one bar each, 128 BPM), saved beside this file as
+     drum-device-today-*.jpg. Proposed draws the Drum device in the Arp's
+     place, in the same pane and rack, as a Drum part named Snare. The device
+     is built from the app's own markup (sequencerRail.ts, arpCard.ts,
+     arpGrid.ts, arpStepCells.ts, figureCells.ts, euclidStepper.ts,
+     stepModLane.ts, knob.ts) and laid out by the app's own rules: the
+     console.css rules below were collected, unchanged, by laying this
+     builder's markup into the running app and keeping every rule that
+     matches it. The rules under "new" are the Drum's own. The device's
+     widths in the notes were read there, in place, on each frame. What works:
+     the frame picker, Today | Proposed, the five pickers, the pattern picker
+     (a choice replaces the steps and the length), a hit cell (click: hit or
+     rest), the Vel bar (drag up or down, double-click for 1), the Pitch cell
+     (drag up or down, double-click for 0), A, the ratchet, the knobs (drag,
+     double-click to reset; Chance is held by its lane), Note's - and +,
+     Reseed, Randomize and Reverse, the glyph toggles, and the look toggles.
+     Nothing makes sound. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Drum Device</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --well: #0c0f10;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --carrier: #e0a44e;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --seq: #cc7a9c;
+      --hot: #d2643c;
+      --sub-ground: #1a1f23;
+      --sub-rail: #20272b;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+      -webkit-font-smoothing: antialiased;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own controls (not the console) ---------- */
+    .mock-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--return);
+    }
+    .mock-bar label,
+    .mock-bar .grp {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select,
+    .mock-bar .mb {
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 7px;
+      font: 11px var(--f-ui);
+    }
+    .mock-bar .mb[aria-pressed='true'] {
+      background: var(--return);
+      border-color: var(--return);
+      color: #17121f;
+    }
+    body.marks .frame .new {
+      outline: 1px dashed var(--return);
+      outline-offset: 1px;
+    }
+    .stage-wrap {
+      padding: 16px;
+      overflow-x: auto;
+    }
+    /* `bare` in the link: the frame alone at the page's corner, for the rendered pictures. */
+    body.bare .mock-bar,
+    body.bare .caption,
+    body.bare .notes {
+      display: none;
+    }
+    body.bare .stage-wrap {
+      padding: 0;
+    }
+    body.bare .frame {
+      outline: 0;
+    }
+    .caption {
+      margin: 0 0 8px;
+      font: 11px var(--f-num);
+      color: var(--ink-dim);
+    }
+
+    /* ---------- the frame: a device's screen at its CSS size, today's screenshot behind ---------- */
+    .frame {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      outline: 1px dashed var(--return);
+      background: var(--ground) var(--shot) no-repeat 0 0 / 100% 100%;
+      font-family: var(--f-ui);
+      font-size: 13px;
+      line-height: normal;
+      user-select: none;
+    }
+    .ov {
+      position: absolute;
+    }
+    /* Text laid over today's pixels, in the fonts the app draws it with (measured in place). */
+    .cover {
+      position: absolute;
+      white-space: nowrap;
+    }
+    .cover.chip-n {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.88px;
+      text-transform: uppercase;
+      color: #14181a;
+      line-height: 14px;
+    }
+    .cover.chip-k {
+      font: 500 9.5px var(--f-ui);
+      color: #14181a;
+      line-height: 13px;
+    }
+    .cover.lb {
+      font: small-caps 10px var(--f-panel);
+      letter-spacing: 0.5px;
+      color: var(--ink);
+      line-height: 13px;
+    }
+    .cover.head {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      line-height: 22px;
+      display: flex;
+      align-items: center;
+    }
+    .cover.head small {
+      margin-left: 8px;
+      font: 600 9px var(--f-num);
+      letter-spacing: 0.36px;
+      text-transform: none;
+      color: var(--ink-faint);
+    }
+    .cover.head .bounce {
+      margin-left: 16px;
+      height: 22px;
+      padding: 0 8px;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.76px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      line-height: 20px;
+    }
+
+    /* ---------- notes ---------- */
+    .notes {
+      max-width: 980px;
+      padding: 8px 16px 48px;
+      color: var(--ink-dim);
+      font: 13px/1.55 var(--f-ui);
+    }
+    .notes[hidden] {
+      display: none;
+    }
+    .notes h2 {
+      margin: 26px 0 8px;
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .notes ol,
+    .notes ul,
+    .notes p {
+      margin: 0 0 8px;
+      padding-left: 20px;
+    }
+    .notes p {
+      padding-left: 0;
+    }
+    .notes b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .notes code {
+      font: 12px var(--f-num);
+      color: var(--ink);
+    }
+    .notes q {
+      color: var(--ink);
+    }
+    .notes table {
+      border-collapse: collapse;
+      margin: 4px 0 10px;
+      font: 12px var(--f-num);
+    }
+    .notes th,
+    .notes td {
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      text-align: right;
+    }
+    .notes th {
+      color: var(--ink);
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .notes td.l,
+    .notes th.l {
+      text-align: left;
+    }
+  </style>
+  <style id="console-rules">
+    /* ---------- console.css, the rules that match the device (collected in the app, unchanged) ---------- */
+    :is(input, textarea, [contenteditable]) {
+      user-select: text;
+    }
+    .seq-rack {
+      display: flex;
+      gap: 6px;
+      min-width: 0px;
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior: none;
+      padding: 6px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      scrollbar-color: var(--line-bright) var(--inset);
+    }
+    .seq-device {
+      display: flex;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .seq-device.fixed {
+      flex: 0 0 auto;
+      height: var(--seq-h);
+    }
+    .seq-device :focus-visible {
+      outline: 2px solid var(--carrier);
+      outline-offset: 1px;
+    }
+    .seq-device-body {
+      flex: 1 1 0%;
+      min-width: 0px;
+    }
+    .seq-rail {
+      width: var(--seq-rail);
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 4px 0px;
+      background: var(--panel-hi);
+      border-right: 1px solid var(--line);
+    }
+    .seq-dot {
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      margin-top: 3px;
+      border-radius: 50%;
+      background: var(--kc, var(--modulator));
+    }
+    .seq-name {
+      flex: 0 1 auto;
+      min-height: 0px;
+      overflow: hidden;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 4px 0px;
+      background: transparent;
+      border: 0px;
+      border-radius: var(--r);
+      color: var(--ink);
+      font-family: var(--f-panel);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .seq-name:hover {
+      background: var(--panel);
+    }
+    .seq-rail-spacer {
+      flex: 1 1 0%;
+    }
+    .seq-rail-gap {
+      flex: 0 0 auto;
+      height: 6px;
+    }
+    .seq-icon {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      padding: 0px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--r);
+      color: var(--ink-faint);
+      font-size: 10px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .seq-icon:hover:not(:disabled) {
+      color: var(--ink);
+      border-color: var(--line-bright);
+    }
+    .seq-icon.danger:hover:not(:disabled) {
+      color: var(--hot);
+    }
+    .seq-icon[aria-pressed='true'] {
+      color: var(--kc, var(--carrier));
+      border-color: var(--line-bright);
+      background: var(--inset);
+    }
+    .seq-icon-svg svg {
+      display: block;
+      width: 12px;
+      height: 12px;
+    }
+    .seq-line-icon svg {
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .seq-region {
+      flex: 0 0 auto;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      color: var(--ink-faint);
+      font-family: var(--f-num);
+      font-size: 8.5px;
+      white-space: nowrap;
+    }
+    .seq-section {
+      flex: 0 0 auto;
+      min-width: 0px;
+      min-height: 0px;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 8px 6px;
+    }
+    .seq-section + .seq-section {
+      border-left: 1px solid var(--line);
+    }
+    .seq-section.steps {
+      padding-right: 4px;
+    }
+    .seq-sec-label {
+      flex: 0 0 auto;
+      height: 14px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      color: var(--ink-faint);
+      font-family: var(--f-panel);
+      font-size: 8.5px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .seq-sec-label em {
+      color: var(--ink-dim);
+      font-family: var(--f-num);
+      font-size: 10px;
+      font-style: normal;
+      font-weight: 400;
+      letter-spacing: 0px;
+      text-transform: none;
+    }
+    .seq-sec-body {
+      flex: 1 1 0%;
+      min-height: 0px;
+      display: flex;
+      gap: 2px;
+    }
+    .seq-col {
+      min-height: 0px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly;
+      align-items: center;
+      gap: 2px;
+    }
+    .seq-col.wide {
+      width: var(--seq-wide-col);
+      align-items: stretch;
+    }
+    .seq-col.k3 {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      place-items: center;
+    }
+    .seq-device.fixed .knob {
+      width: 52px;
+      gap: 0px;
+      padding: 1px 0px;
+    }
+    .seq-device.fixed .knob svg {
+      width: var(--seq-dial);
+      height: var(--seq-dial);
+    }
+    .seq-device.fixed .knob .knob-val {
+      line-height: 13px;
+    }
+    .seq-device.fixed .knob .knob-label {
+      line-height: 11px;
+    }
+    .seq-device.fixed .field-label {
+      margin: 0px 0px 2px;
+      font-size: 8.5px;
+      letter-spacing: 0.1em;
+      line-height: 11px;
+    }
+    .seq-device.fixed select.field {
+      appearance: none;
+      width: 100%;
+      max-width: none;
+      height: 22px;
+      padding: 0px 16px 0px 6px;
+      background: var(--inset)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+        no-repeat right 6px center;
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink);
+      font-family: var(--f-ui);
+      font-size: 11.5px;
+      line-height: 20px;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .seq-device.fixed .btn.seq-btn {
+      padding: 4px 8px;
+      border-color: var(--kc);
+      color: var(--ink);
+      font-size: 9.5px;
+      letter-spacing: 0.08em;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .seq-strip {
+      flex: 0 0 auto;
+      min-height: 0px;
+      display: flex;
+      gap: 2px;
+      overflow: hidden auto;
+      overscroll-behavior: none;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line-bright) var(--panel);
+      scrollbar-gutter: stable;
+    }
+    .seq-strip > .grid-strip {
+      flex: 0 0 auto;
+      gap: 2px;
+      overflow: visible;
+      padding: 0px;
+    }
+    .seq-strip .grid-col {
+      width: var(--step-w);
+    }
+    .seq-strip .grid-col.beat {
+      margin-left: var(--beat-gap);
+    }
+    .seq-strip .grid-col.bar {
+      margin-left: var(--bar-gap);
+    }
+    .seq-strip .strip-head {
+      position: sticky;
+      top: 0px;
+      z-index: 1;
+      flex: 0 0 auto;
+      height: var(--strip-head-h);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--panel);
+    }
+    .seq-strip .grid-idx {
+      flex: 0 0 auto;
+      height: 12px;
+      padding: 0px;
+      border-radius: 2px;
+      line-height: 12px;
+    }
+    .seq-strip .gcell {
+      flex: 0 0 auto;
+      height: 18px;
+      min-height: 0px;
+      padding: 0px;
+      overflow: hidden;
+      font-size: 9.5px;
+      letter-spacing: 0.02em;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+    .seq-strip .gcell[aria-pressed='true'] {
+      background: var(--kc);
+      border-color: var(--kc);
+    }
+    .seq-strip .gcell.ratchet {
+      position: relative;
+      height: 14px;
+      color: var(--ink-faint);
+      font-family: var(--f-num);
+      font-size: 8px;
+      font-weight: 400;
+      line-height: 12px;
+    }
+    .seq-strip .gcell.ratchet:is(.r2, .r3, .r4) {
+      border-color: color-mix(in srgb, var(--carrier) 60%, var(--line));
+    }
+    .seq-strip .gcell.ratchet.idle {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .seq-strip .gcell.ratchet.idle:hover {
+      background: var(--inset);
+    }
+    .ratchet-ticks {
+      position: absolute;
+      inset: 3px 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .ratchet-ticks i {
+      width: 2px;
+      border-radius: 1px;
+      background: var(--carrier);
+    }
+    .seq-strip .mod-cell {
+      height: var(--lane-h);
+    }
+    .seq-strip .mod-cell.first {
+      margin-top: 0px;
+    }
+    .seq-names {
+      flex: 0 0 auto;
+      width: var(--names-w);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-right: 4px;
+      background: var(--panel);
+    }
+    .seq-names .seq-corner {
+      z-index: 2;
+      justify-content: flex-end;
+      gap: 3px;
+    }
+    .seq-corner select.field {
+      height: 20px;
+      font-size: 10.5px;
+    }
+    .seq-meas {
+      color: var(--ink-faint);
+      font-family: var(--f-num);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .seq-row-label {
+      height: 14px;
+      margin-top: 2px;
+      color: var(--ink-faint);
+      font-family: var(--f-panel);
+      font-size: 8.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      line-height: 14px;
+      text-align: right;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .seq-lane-names {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .seq-lane-names .mod-name {
+      height: var(--lane-h);
+      flex: 0 0 auto;
+      justify-content: flex-start;
+      padding-top: 2px;
+      border-left-color: var(--kc);
+    }
+    .grid-strip {
+      display: flex;
+      gap: 3px;
+      overflow-x: auto;
+      padding: 8px 0px 6px;
+      scrollbar-width: thin;
+    }
+    .grid-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 0 0 auto;
+      width: 46px;
+    }
+    .grid-col.off {
+      opacity: 0.35;
+    }
+    .grid-idx {
+      font-family: var(--f-num);
+      font-size: 9px;
+      color: var(--ink-faint);
+      text-align: center;
+      border-radius: var(--r);
+      padding: 1px 0px;
+    }
+    .grid-col.playing .grid-idx {
+      background: var(--carrier);
+      color: rgb(17, 20, 22);
+    }
+    .gcell {
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      color: var(--ink-dim);
+      font-family: var(--f-panel);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 4px 0px;
+      cursor: pointer;
+      text-align: center;
+      min-height: 22px;
+    }
+    .gcell:hover {
+      background: var(--panel-hi);
+      color: var(--ink);
+    }
+    .gcell[aria-pressed='true'] {
+      background: var(--modulator);
+      border-color: var(--modulator);
+      color: rgb(17, 20, 22);
+    }
+    .gcell.note {
+      color: var(--ink);
+      border-color: var(--line-bright);
+    }
+    .gcell.blank {
+      visibility: hidden;
+    }
+    .mod-name {
+      height: 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      padding: 0px 2px 0px 6px;
+      border-left: 2px solid var(--modulator);
+    }
+    .mod-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .mod-title {
+      font-family: var(--f-panel);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mod-x {
+      background: none;
+      border-width: medium;
+      border-style: none;
+      border-color: currentcolor;
+      border-image: none;
+      color: var(--ink-faint);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0px 2px;
+    }
+    .mod-x:hover {
+      color: var(--hot);
+    }
+    .mod-readout {
+      font-family: var(--f-num);
+      font-size: 9px;
+      color: var(--modulator);
+      line-height: 11px;
+      min-height: 11px;
+      max-height: 22px;
+      overflow: hidden;
+    }
+    .mod-cell {
+      position: relative;
+      height: 44px;
+      flex: 0 0 auto;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      cursor: ns-resize;
+      touch-action: none;
+      --mag: 0;
+    }
+    .mod-cell.first {
+      margin-top: auto;
+    }
+    .mod-cell::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      top: 50%;
+      height: 1px;
+      background: var(--line-bright);
+    }
+    .mod-cell:hover {
+      border-color: var(--line-bright);
+    }
+    .mod-cell.mute {
+      opacity: 0.45;
+    }
+    .mod-bar {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 50%;
+      height: calc(var(--mag) * (50% - 2px));
+      background: var(--modulator);
+      border-radius: 1px;
+    }
+    .mod-cell.neg .mod-bar {
+      bottom: auto;
+      top: 50%;
+    }
+    .mod-cell.zero .mod-bar {
+      display: none;
+    }
+    .grid-col.playing .mod-cell {
+      border-color: var(--carrier);
+    }
+    :is(.grid-scroll, .chord-strip, .seq-strip) .grid-col.playing {
+      --head: var(--carrier);
+      --head-tint: color-mix(in srgb, var(--carrier) 22%, transparent);
+    }
+    :is(.grid-scroll, .chord-strip, .seq-strip) .grid-col:is(.playing, .ghost) {
+      background: var(--head-tint);
+      border-radius: var(--r);
+      box-shadow: 0 0 0 2px var(--head-tint);
+    }
+    :is(.grid-scroll, .chord-strip, .seq-strip)
+      .grid-col:is(.playing, .ghost)
+      :is(.gcell, select.gsel, .mod-cell) {
+      border-color: var(--head);
+    }
+    :is(.grid-scroll, .chord-strip, .seq-strip) .grid-col:is(.playing, .ghost) .grid-idx {
+      background: var(--head);
+      color: rgb(17, 20, 22);
+    }
+    .seq-strip .grid-col:is(.playing, .ghost) .strip-head {
+      background: linear-gradient(var(--head-tint), var(--head-tint)), var(--panel);
+    }
+    .arp-device {
+      display: flex;
+      min-height: 0px;
+    }
+    .arp-device {
+      --strip-head-h: var(--arp-strip-head-h);
+    }
+    .arp-device .seq-section.play {
+      padding-right: 0px;
+      padding-left: var(--arp-inset);
+    }
+    .arp-device .seq-section.play .seq-sec-body {
+      gap: var(--arp-col-gap);
+    }
+    .seq-col.arp-fields {
+      width: var(--arp-field-w);
+    }
+    .arp-knobs {
+      display: flex;
+      gap: 2px;
+      padding: 0 var(--arp-knob-pad);
+      border-left: 1px solid var(--line);
+    }
+    .arp-seed {
+      display: flex;
+      gap: 3px;
+    }
+    .arp-device input.field {
+      flex: 1 1 0%;
+      min-width: 0px;
+      max-width: none;
+      height: 22px;
+      padding: 0px 6px;
+      border-color: var(--line-bright);
+      color: var(--ink);
+      font-size: 11px;
+    }
+    .seq-icon.arp-reseed,
+    .seq-icon.variation-toggle {
+      width: var(--arp-reseed);
+      height: var(--arp-reseed);
+      border-color: var(--line-bright);
+    }
+    .arp-device .seq-strip > .grid-strip {
+      gap: var(--arp-step-gap);
+    }
+    .arp-device .grid-col > .strip-head {
+      gap: var(--arp-row-gap);
+    }
+    .arp-device .seq-strip .gcell:not(.ratchet) {
+      height: var(--arp-cell-h);
+      line-height: calc(var(--arp-cell-h) - 2px);
+    }
+    .arp-device .seq-strip .gcell.note {
+      border-color: var(--line-bright);
+      color: var(--ink);
+    }
+    .euclid-kn {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .euclid-kn-label {
+      color: var(--ink-faint);
+      font-family: var(--f-panel);
+      font-size: 8.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      line-height: 11px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .euclid-kn-value {
+      height: 22px;
+      display: flex;
+      align-items: center;
+      background: var(--inset);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      color: var(--ink);
+      font-family: var(--f-num);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    .euclid-kn-value output {
+      flex: 1 1 0%;
+      min-width: 0px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .euclid-step {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      margin: 1px;
+      padding: 0px;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--ink-dim);
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    :is(.euclid-len, .euclid-step):hover:not(:disabled) {
+      color: var(--ink);
+      border-color: var(--line-bright);
+    }
+    .knob {
+      width: 54px;
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      padding: 3px 0px 4px;
+      border-radius: var(--r);
+      cursor: ns-resize;
+      touch-action: none;
+    }
+    .knob:hover {
+      background: var(--panel-hi);
+    }
+    .knob svg {
+      display: block;
+    }
+    .knob .dial-track {
+      stroke: var(--line-bright);
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+    }
+    .knob .dial-arc {
+      stroke: var(--knob-color, var(--ink-dim));
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+    }
+    .knob .dial-pin {
+      stroke: var(--ink);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+    .knob .dial-face {
+      fill: var(--inset);
+      stroke: var(--line);
+    }
+    .knob .knob-label {
+      font-family: var(--f-panel);
+      font-size: 8.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .knob .knob-val {
+      font-family: var(--f-num);
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink);
+      pointer-events: none;
+    }
+    .knob.locked {
+      cursor: not-allowed;
+    }
+    .knob.locked .dial-arc {
+      stroke: var(--lock-color);
+    }
+    .knob.locked .dial-pin {
+      stroke: var(--lock-color);
+      stroke-width: 2;
+    }
+    .knob.locked .dial-face {
+      stroke: var(--lock-color);
+    }
+    .knob .knob-auto {
+      display: none;
+      padding: 0px 4px;
+      border-radius: 6px;
+      background: var(--lock-color);
+      color: var(--ground);
+      font-family: var(--f-panel);
+      font-size: 7.5px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      line-height: 11px;
+      pointer-events: none;
+    }
+    .knob.locked .knob-auto {
+      display: block;
+    }
+    select.field,
+    input.field {
+      width: 100%;
+      max-width: 260px;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+    input.field {
+      font-family: var(--f-num);
+      font-variant-numeric: tabular-nums;
+    }
+    .btn {
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 6px 12px;
+      cursor: pointer;
+      color: var(--ink-dim);
+      font-family: var(--f-panel);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .btn:hover {
+      background: var(--panel-hi);
+      color: var(--ink);
+      border-color: var(--line-bright);
+    }
+    .field-label {
+      font-family: var(--f-panel);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      display: block;
+      margin-bottom: 3px;
+    }
+  </style>
+  <style id="drum-rules">
+    /* ---------- new: the Drum's own rules (the build adds them to console.css) ---------- */
+    /* Its held rows are Basslead's count: the step number, hit, Vel, Pitch, A (20 px each) and the ratchet. */
+    .drum-device {
+      --strip-head-h: var(--bass-strip-head-h);
+    }
+    /* Its columns the Grid's 2 px apart (not the Arp's 6), the beats set off by the meter's gaps. */
+    .drum-device .seq-strip > .grid-strip {
+      gap: 2px;
+    }
+    /* The hit cell: a filled dot for a hit in the part's accent, an empty ring for a rest. */
+    .drum-device .seq-strip .gcell.drum-hit {
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+    .drum-device .gcell.drum-hit i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--kc);
+    }
+    .drum-device .gcell.drum-hit.rest i {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--line-bright);
+    }
+    /* To decide 3, recommended: a hit under 0.5 dims its dot. */
+    .drum-device.ghost-dim .gcell.drum-hit.ghost i {
+      background: color-mix(in srgb, var(--kc) 40%, transparent);
+    }
+    /* The Vel bar: the Figure's (.figure-device .gcell.vel), over the hit's velocity. */
+    .drum-device .seq-strip .gcell.vel {
+      position: relative;
+      color: var(--ink);
+      font-family: var(--f-num);
+      font-size: 8.5px;
+      font-weight: 400;
+      cursor: ns-resize;
+      touch-action: none;
+      overflow: hidden;
+    }
+    .drum-device .gcell.vel i {
+      position: absolute;
+      inset: 0 auto 0 0;
+      background: color-mix(in srgb, var(--kc) 45%, transparent);
+    }
+    .drum-device.vel-up .gcell.vel i {
+      inset: auto 0 0 0;
+    }
+    .drum-device .gcell.vel span {
+      position: relative;
+    }
+    .drum-device .seq-strip .gcell.vel.full {
+      color: var(--ink-faint);
+    }
+    .drum-device .gcell.vel.full i {
+      display: none;
+    }
+    /* Pitch: the Grid's note cell; at the part's own note (offset 0) faint, as Oct at 0. */
+    .drum-device .seq-strip .gcell.pitch {
+      font-family: var(--f-num);
+      font-size: 9px;
+      letter-spacing: 0;
+      cursor: ns-resize;
+      touch-action: none;
+    }
+    .drum-device .seq-strip .gcell.pitch.flat {
+      color: var(--ink-faint);
+    }
+    /* The Pattern picker on the rail (To decide 2's other way): an 18 px rail icon over a picker. */
+    .seq-icon.drum-pattern {
+      position: relative;
+    }
+    .seq-icon.drum-pattern select {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+  </style>
+
+  <div class="mock-bar">
+    <b>Mockup</b>
+    <label
+      >Frame
+      <select id="mFrame"></select
+    ></label>
+    <span class="grp" id="mMode"
+      ><button class="mb" data-mode="today">Today</button
+      ><button class="mb" data-mode="proposed">Proposed</button></span
+    >
+    <label
+      >1 Pitch
+      <select id="mPitch">
+        <option value="name">Note name (recommended)</option>
+        <option value="offset">Offset</option>
+      </select></label
+    >
+    <label
+      >2 Pattern
+      <select id="mPlace">
+        <option value="play">Head of Play (recommended)</option>
+        <option value="rail">On the rail</option>
+      </select></label
+    >
+    <label
+      >3 Ghost hit
+      <select id="mGhost">
+        <option value="dim">Dims below 0.5 (recommended)</option>
+        <option value="solid">Solid</option>
+      </select></label
+    >
+    <label
+      >4 Randomize
+      <select id="mRandom">
+        <option value="count">Hit count kept (recommended)</option>
+        <option value="density">8 of 16</option>
+      </select></label
+    >
+    <label
+      >5 Vel fill
+      <select id="mVel">
+        <option value="across">Across, the Figure's (recommended)</option>
+        <option value="up">Up</option>
+      </select></label
+    >
+    <button class="mb" id="mReset" type="button">Reset example</button>
+    <label><input type="checkbox" id="mMarks" checked /> Mark new</label>
+    <label><input type="checkbox" id="mFit" /> Fit to window</label>
+    <label><input type="checkbox" id="mNotes" checked /> Notes</label>
+    <span>It plays nothing.</span>
+  </div>
+
+  <div class="stage-wrap">
+    <p class="caption"><span id="caption"></span> · <span id="tag"></span></p>
+    <div id="fit">
+      <div class="frame" id="frame"></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes">
+    <h2>What it draws</h2>
+    <ol>
+      <li>
+        <b>A Drum part named Snare</b> in the Arp's place, in the same pane and rack: the part chip,
+        the region's summary (<code>drum · 16 steps · 1/16</code>, windsor#948 decision 9) and the
+        pane's header are rewritten over today's pixels in the app's fonts. The Chance lane in the
+        part's lane row is the song's <code>seq.probability</code> lane, reading 50% at bar 1, so
+        the device's Chance knob is drawn held by it (its AUTO tag and the lane's pink), as a held
+        knob is today.
+      </li>
+      <li>
+        <b>The device</b> is a rack device, 244 px high, laid out as the Arp: the shared rail (the
+        dot in the Drum's perc accent, <b>Drum</b>, the region 1/1, Split, Delete), then
+        <b>Play</b>, 12 px in from the rail, two 112 px field columns 13 px apart and the knob strip
+        behind its rule, then <b>Steps</b>. Every control is the app's own markup, laid out by the
+        app's own rules (copied from <code>console.css</code> as the app applies them); the Drum
+        adds only the rules marked new in this file.
+      </li>
+      <li>
+        <b>Play.</b> Column 1: <b>Pattern</b>, <b>Rate</b>, <b>Note</b>. Column 2: <b>Seed</b> with
+        Reseed, <b>Randomize</b>, <b>Reverse</b>. The knob strip: <b>Length</b> and
+        <b>Rotate</b> (the Grid's pair); <b>Vel</b>, <b>Acc vel</b>, <b>Acc mod</b>; <b>Gate</b>,
+        <b>Vary</b>, <b>Chance</b>; then the toggle column, <b>Per effect</b> level with Gate,
+        <b>Rests sound</b> with Vary and <b>Octave</b> with Chance, exactly as the Arp draws it.
+        Gate moves from the issue's first group into the Arp's column, so the toggles sit beside the
+        knobs they shape exactly as on the Arp, and the first column holds only fields. No Octave
+        register knob: the pitch is Note.
+      </li>
+      <li>
+        <b>Pattern</b> is the insert cards' preset picker (<code>presetInsertCard.ts</code>: a
+        <code>select.field</code>, Custom first), grouped Kick, Snare, Clap, Hat, Open hat, Perc. It
+        shows the pattern the steps and the length equal, or <b>Custom</b>. The example reads
+        Custom, since its ratchet and its pitch offsets leave every pattern; pick Snare, Ghost
+        backbeat, to see the same line without them. A choice replaces the steps and the length and
+        nothing else (the step lane's values stay). The names and lines in it here stand in for the
+        bank, which 3/4 writes.
+      </li>
+      <li>
+        <b>Note is a stepper</b>, the Euclid's Note box (<code>euclidStepper.ts</code>: − C4 · 60 +,
+        a semitone a press), at the field column's width. Why not a knob: the Euclid, the other drum
+        device, already sets a drum part's base note with this box, so a Snare reads the same on
+        both; a press lands on a semitone exactly, where a knob over 0 to 127 needs a fine drag; and
+        it fits the field column, where a knob would need a slot of its own.
+      </li>
+      <li>
+        <b>Steps.</b> A column per step at the Grid's 32 px, <b>2 px apart as the Grid's</b> (the
+        Arp's are 6), each beat set off by the meter's 4 px and each bar by 10
+        (<code>meterGrid.ts</code>); steps past Length greyed as the Grid's (drag Length down to see
+        it, up to add rests to 32). Rows, top down: the step number; the <b>hit</b>; the
+        <b>Vel bar</b>; <b>Pitch</b>; <b>A</b>; the ratchet at 14 px. The cells are the Arp's 20 px
+        with its 4 px row gap, so the held rows are Basslead's 126 px. Then + Lane and the lane
+        count in the corner, the Ratchet label, and one step lane (Op A Decay: the ghosts shorter,
+        the backbeat longer) at 42 px. The playhead ring is on step 5.
+      </li>
+      <li>
+        <b>The hit cell</b>: a filled dot in the part's accent for a hit, an empty ring for a rest.
+        A click toggles; a new hit plays at 1.
+      </li>
+      <li>
+        <b>The Vel bar</b> is the Figure's (<code>figureCells.ts</code>): the value written on it
+        (.3, .25), a fill to it, faint and unfilled at 1. A vertical drag moves it in steps of 0.05
+        over 80 px; a double-click puts it back to 1.
+      </li>
+      <li>
+        <b>Pitch</b> is the Grid's note cell with the played note's name (<code>note + pitch</code>,
+        moved by octaves into 0 to 127 as the engine plays it), the offset in its tooltip. At offset
+        0 it shows the part's own note, faint, as Oct is faint at 0. A vertical drag moves it a
+        semitone per 8 px, to ±24; a double-click puts it back to the part's note.
+      </li>
+      <li>
+        <b>A</b> and <b>the ratchet</b> are the Arp's: A lit in the accent, the ratchet ×1 to ×4 by
+        click (three ticks on step 15), grey and inert on a rest.
+      </li>
+      <li>
+        <b>The glyph toggles</b> carry today's glyphs, names and tooltips, copied word for word
+        (Octave's reads <q>the step's own note</q> and stays). The example has Rests sound on.
+      </li>
+    </ol>
+
+    <h2>Choices made here</h2>
+    <ul>
+      <li>
+        <b>Note as a stepper</b>, and <b>Gate beside Vary and Chance</b> rather than in the first
+        group (above).
+      </li>
+      <li>
+        <b>The Grid's 2 px column gap.</b> The Drum groups its steps by the meter as the Grid does;
+        the Arp's 6 px gap is for an ungrouped cycle. It saves 60 px at 16 steps (1156 against 1216)
+        and 124 px at 32.
+      </li>
+      <li>
+        <b>The Chance lane.</b> The issue lists it among the strip's lanes, but the strip holds step
+        lanes (voice targets) only: Chance is the song's lane, in the part's lane row, where the
+        frames draw it. The strip carries the one step lane.
+      </li>
+      <li>
+        <b>Two tooltips that name the Arp.</b> Vary's says <q>on the Arp, its gate</q> and Per
+        effect's <q>the Arp's gate</q>, and the Drum's gate varies too (windsor#948 decision 5).
+        They are the app's shared text and stay as written here; the build can say
+        <q>the Arp's and the Drum's gate</q>.
+      </li>
+      <li>
+        <b>Picker 5, the Vel bar's fill</b>, is an addition: the issue reads the Figure's bar as
+        filling upward (<q>a velocity bar's height is the velocity</q>), but the Figure's bar, and
+        the Arp's Gate bar after it, fill across, dragged up or down. Recommended: across, the real
+        bar. <b>Up</b> draws the fill from the cell's foot.
+      </li>
+    </ul>
+
+    <h2>The numbers</h2>
+    <p>
+      Measured in the app, in place: this file's device put into the running Song pane in place of
+      the Arp's, on each frame size, with the rack's <code>scrollWidth</code> read against its
+      <code>clientWidth</code>. The tag above the frame reads the same live from the mockup.
+    </p>
+    <table>
+      <tr>
+        <th class="l">Device width, px</th>
+        <th>Width</th>
+      </tr>
+      <tr>
+        <td class="l">The Arp today, 10 cells</td>
+        <td>976</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 16 steps, the lane row open</td>
+        <td>1156</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 16 steps, the lane row closed</td>
+        <td>1156</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 16 steps, no step lane</td>
+        <td>1156</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 16 steps, Pattern on the rail</td>
+        <td>1156</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 16 steps, at the Arp's 6 px gap</td>
+        <td>1216</td>
+      </tr>
+      <tr>
+        <td class="l">Drum, 32 steps</td>
+        <td>1722</td>
+      </tr>
+    </table>
+    <p>
+      The parts: rail 24, Play 465 (two 112 px field columns, the knob strip 203), Steps 665 (the
+      names column 96, the 16 columns 554). The rack adds 12 px to the device. Neither lane row
+      moves the width: the part's lane row is the timeline's, and the step lane's names share the
+      corner's 96 px column.
+    </p>
+    <table>
+      <tr>
+        <th class="l">Rack, 16 steps</th>
+        <th>Inside</th>
+        <th>Content</th>
+        <th class="l">Result</th>
+      </tr>
+      <tr>
+        <td class="l">Desktop</td>
+        <td>1410</td>
+        <td>1168</td>
+        <td class="l">fits, 242 px spare</td>
+      </tr>
+      <tr>
+        <td class="l">Landscape tablet</td>
+        <td>1336</td>
+        <td>1168</td>
+        <td class="l">fits, 168 px spare</td>
+      </tr>
+      <tr>
+        <td class="l">Portrait tablet</td>
+        <td>994</td>
+        <td>1168</td>
+        <td class="l"><b>scrolls 174 px</b>, as a long Grid does</td>
+      </tr>
+    </table>
+    <p>
+      At 32 steps the rack scrolls 324 px on the desktop, 398 on the landscape tablet and 740 on the
+      portrait one. The portrait frame shows the rack's left end: the last steps are past its edge,
+      and the rack scrolls sideways.
+    </p>
+    <table>
+      <tr>
+        <th class="l">Label at 8.5 px</th>
+        <th>Width, px</th>
+        <th class="l">In</th>
+      </tr>
+      <tr>
+        <td class="l">Pattern</td>
+        <td>41.8</td>
+        <td class="l">the 112 px field column</td>
+      </tr>
+      <tr>
+        <td class="l">Note</td>
+        <td>25.0</td>
+        <td class="l">the 112 px field column</td>
+      </tr>
+      <tr>
+        <td class="l">Gate</td>
+        <td>23.6</td>
+        <td class="l">the 52 px knob</td>
+      </tr>
+      <tr>
+        <td class="l">Length</td>
+        <td>37.1</td>
+        <td class="l">the 52 px knob</td>
+      </tr>
+      <tr>
+        <td class="l">Rotate</td>
+        <td>35.3</td>
+        <td class="l">the 52 px knob</td>
+      </tr>
+    </table>
+    <p>All fit; today's widest knob label is Acc mod's, 42.9 px, so no knob column widens.</p>
+
+    <h2>Decided in the issue</h2>
+    <p>
+      The device's place and height, the rail, the controls and the rows and their order, the
+      pattern picker's look and rule, the glyph toggles as the Arp's, and no Octave register knob
+      (windsor#949 decisions 2 to 4, over windsor#948's fields).
+    </p>
+
+    <h2>To decide</h2>
+    <ol>
+      <li>
+        <b>Pitch display.</b> Recommended: <b>the played note's name</b> (C4, D#4): what sounds, and
+        a tom roll reads as notes. The other way, <b>Offset</b>, writes +3 and -2 (0 faint), with
+        the note in the tooltip.
+      </li>
+      <li>
+        <b>Where Pattern sits.</b> Recommended: <b>at the head of Play</b>, the first thing a new
+        part needs, showing its name. The other way puts it <b>on the rail</b> between the name and
+        the region, as an 18 px button (a new glyph, steps with hits) that opens the same grouped
+        list, the chosen name in its tooltip. Neither changes the width: Rate and Note keep the
+        field column.
+      </li>
+      <li>
+        <b>A ghost hit's look.</b> Recommended: <b>the dot dims below 0.5</b>, so the ghosts read in
+        the hit row. The other way keeps every dot <b>solid</b> and the Vel bar alone shows it.
+      </li>
+      <li>
+        <b>Randomize's rule</b> (its tooltip; the button works). Recommended:
+        <b>the hit count kept</b>, the hits at new places, each at a velocity from 0.3 to 1. The
+        other way draws <b>8 of 16</b> (half the Length) at the same velocities. Here a new hit has
+        no accent, pitch or ratchet; the build's ticket says what Randomize does to those.
+      </li>
+      <li>
+        <b>The Vel bar's fill</b> (an addition, above). Recommended: <b>across</b>, the Figure's bar
+        as it is; the other way fills <b>up</b>.
+      </li>
+    </ol>
+  </div>
+
+  <script id="drum-builder">
+    /* ---------- the Drum device's markup, as the app's builders would write it ---------- */
+    // Shared by the mockup and the in-app measurement: `window.drumDevice(state, look)` returns the rack row.
+    (() => {
+      const PERC = '#E0A44E';
+      const GATE_MIN = 0.01;
+      const STEPS_MAX = 32;
+      const ARC_START = -135;
+      const ARC_END = 135;
+      const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      // SEQUENCER_DEVICE_PX entries the device reads, set on the row as sequencerDevice.ts sets them.
+      const PX = {
+        '--seq-h': 244,
+        '--seq-rail': 24,
+        '--step-w': 32,
+        '--arp-inset': 12,
+        '--arp-col-gap': 13,
+        '--arp-field-w': 112,
+        '--arp-knob-pad': 9,
+        '--arp-reseed': 22,
+        '--arp-cell-h': 20,
+        '--arp-row-gap': 4,
+        '--arp-step-gap': 6,
+        '--arp-strip-head-h': 150,
+        '--bass-strip-head-h': 126,
+        '--beat-gap': 4,
+        '--bar-gap': 10,
+        '--lane-h': 42,
+        '--names-w': 96,
+        '--strip-head-h': 128,
+        '--seq-wide-col': 96,
+        '--seq-dial': 30,
+      };
+      const ICON = {
+        split:
+          '<rect x="1" y="3" width="4" height="6" rx="1"/><rect x="7" y="3" width="4" height="6" rx="1"/><path d="M6 1v10" stroke-dasharray="1.5 1.5"/>',
+        remove: '<path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"/>',
+        reseed: '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>',
+        chancePerEffect:
+          '<rect x="1.5" y="1.5" width="9" height="9" rx="2"/><circle cx="4" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/>',
+        restsSound:
+          '<circle cx="4.6" cy="3.4" r="1.3" fill="currentColor" stroke="none"/><path d="M4.6 4.7c1.7.6 3.1.1 3.9-1.5L5.4 10.5"/>',
+        octaveMode:
+          '<circle cx="4" cy="3.4" r="1.6"/><circle cx="4" cy="8.3" r="1.9"/><path d="M9.5 1.8v8.4M8 3.3l1.5-1.5L11 3.3M8 8.7l1.5 1.5L11 8.7"/>',
+        // New: the rail's Pattern button, four rows of steps with hits on them.
+        pattern:
+          '<path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h9" stroke-width="1" opacity=".5"/><circle cx="3" cy="2.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="2.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="4.5" cy="9.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="7.5" cy="9.5" r="1.1" fill="currentColor" stroke="none"/>',
+      };
+      // The toggles' names and tooltips, word for word as stepVariationTables.ts holds them.
+      const TOGGLES = [
+        [
+          'chancePerEffect',
+          'Per effect',
+          "Per effect: Chance rolls separately for velocity, pitch, the Arp's gate and, with Rests sound on, a rest or note flip, instead of once for the whole step",
+        ],
+        [
+          'restsSound',
+          'Rests sound',
+          'Rests sound: a varied step may also go silent or sound where a rest was written',
+        ],
+        [
+          'octaveMode',
+          'Octave',
+          "Octave: pitch strays by whole octaves of the step's own note instead of borrowing another step's",
+        ],
+      ];
+      const VARY_TITLE =
+        'How far a step that varies strays: its velocity up or down, its pitch and, on the Arp, its gate';
+      const CHANCE_TITLE = 'How often a step varies; the others play as written';
+      const GESTURES = 'drag, shift-drag for fine, double-click to reset';
+
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+        );
+      const noteName = (n) => `${NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
+      /** `note + pitch`, moved by whole octaves into 0–127 (the engine's shiftOctaveWithin). */
+      const played = (note, pitch) => {
+        let n = note + pitch;
+        while (n > 127) n -= 12;
+        while (n < 0) n += 12;
+        return n;
+      };
+      const velLabel = (v) =>
+        v >= 1 ? '1' : v <= 0 ? '0' : String(Number(v.toFixed(2))).replace(/^0/, '');
+      const signed = (p) => (p > 0 ? `+${p}` : `${p}`);
+
+      /* The dial (knob.ts, knobRing.ts): a 270° sweep from -135°, radius 15 on a 38 px box. */
+      const polar = (c, r, deg) => {
+        const a = ((deg - 90) * Math.PI) / 180;
+        return [c + r * Math.cos(a), c + r * Math.sin(a)];
+      };
+      const arc = (a0, a1) => {
+        const [x0, y0] = polar(19, 15, a0);
+        const [x1, y1] = polar(19, 15, a1);
+        return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A 15 15 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+      };
+      function dial(norm, zero) {
+        const ang = ARC_START + Math.min(1, Math.max(0, norm)) * (ARC_END - ARC_START);
+        const zeroAng = ARC_START + zero * (ARC_END - ARC_START);
+        const a0 = Math.min(ang, zeroAng);
+        const a1 = Math.max(ang, zeroAng);
+        return `<svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="${arc(ARC_START, ARC_END)}"></path><path class="dial-arc" d="${a1 - a0 < 0.4 ? '' : arc(a0, a1)}"></path><line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(${ang} 19 19)"></line></svg>`;
+      }
+      // A knob of the device: its field, label, readout, place on its range, and whether a lane holds it.
+      function knob(k) {
+        const lock = k.locked ? ' --lock-color: var(--seq);' : '';
+        const title = `${k.label} - ${GESTURES}${k.title ? `. ${k.title}` : ''}`;
+        return `<div class="knob${k.locked ? ' locked' : ''}" tabindex="0" role="slider" data-knob="${k.f}" style="--knob-color: ${PERC};${lock}" aria-label="${k.label}" title="${esc(title)}" aria-valuetext="${k.text}${k.locked ? ', automated' : ''}">${dial(k.norm, k.zero ?? 0)}<span class="knob-val">${k.text}</span>${k.auto ? '<span class="knob-auto">AUTO</span>' : ''}<span class="knob-label">${k.label}</span></div>`;
+      }
+      const icon = (paths, cls = 'seq-icon-svg') =>
+        `<span class="${cls}"><svg viewBox="0 0 12 12" aria-hidden="true">${paths}</svg></span>`;
+
+      /* ---------- the pattern bank (3/4 writes it; these stand in for its names and lines) ---------- */
+      const hit = (velocity = 1, more = {}) => ({
+        kind: 'hit',
+        velocity,
+        accent: false,
+        pitch: 0,
+        ratchet: 1,
+        ...more,
+      });
+      const line = (hits) => {
+        const steps = Array.from({ length: 16 }, () => ({ kind: 'rest' }));
+        for (const [i, v, more] of hits) steps[i] = hit(v, more);
+        return steps;
+      };
+      const ACC = { accent: true };
+      const BANK = [
+        [
+          'Kick',
+          [
+            [
+              'four',
+              'Four on floor',
+              line([
+                [0, 1],
+                [4, 1],
+                [8, 1],
+                [12, 1],
+              ]),
+            ],
+            [
+              'broken',
+              'Broken kick',
+              line([
+                [0, 1],
+                [3, 0.8],
+                [6, 0.9],
+                [10, 1],
+                [13, 0.7],
+              ]),
+            ],
+          ],
+        ],
+        [
+          'Snare',
+          [
+            [
+              'backbeat',
+              'Backbeat',
+              line([
+                [4, 1, ACC],
+                [12, 1, ACC],
+              ]),
+            ],
+            [
+              'ghosts',
+              'Ghost backbeat',
+              line([
+                [3, 0.3],
+                [4, 1, ACC],
+                [7, 0.25],
+                [10, 0.3],
+                [12, 1, ACC],
+                [14, 0.35],
+              ]),
+            ],
+          ],
+        ],
+        [
+          'Clap',
+          [
+            [
+              'clap24',
+              'Clap 2 & 4',
+              line([
+                [4, 1],
+                [12, 1],
+              ]),
+            ],
+            [
+              'clapoff',
+              'Clap offbeat',
+              line([
+                [4, 1],
+                [12, 1],
+                [15, 0.5],
+              ]),
+            ],
+          ],
+        ],
+        [
+          'Hat',
+          [
+            [
+              'sixteenths',
+              '16th hats',
+              line(
+                Array.from({ length: 16 }, (_, i) => [
+                  i,
+                  i % 4 === 0 ? 1 : i % 2 === 0 ? 0.75 : 0.5,
+                ]),
+              ),
+            ],
+            [
+              'offbeats',
+              '8th offbeats',
+              line([
+                [2, 1],
+                [6, 1],
+                [10, 1],
+                [14, 1],
+              ]),
+            ],
+          ],
+        ],
+        [
+          'Open hat',
+          [
+            [
+              'openoff',
+              'Open offbeat',
+              line([
+                [2, 0.9],
+                [6, 0.9],
+                [10, 0.9],
+                [14, 0.9],
+              ]),
+            ],
+            ['openup', 'Open upbeat', line([[14, 1]])],
+          ],
+        ],
+        [
+          'Perc',
+          [
+            [
+              'clave',
+              'Clave 3-2',
+              line([
+                [0, 1],
+                [3, 1],
+                [6, 1],
+                [10, 1],
+                [12, 1],
+              ]),
+            ],
+            [
+              'rim',
+              'Rim shuffle',
+              line([
+                [2, 0.6],
+                [5, 0.4],
+                [7, 0.6],
+                [10, 0.4],
+                [13, 0.6],
+                [15, 0.4],
+              ]),
+            ],
+          ],
+        ],
+      ];
+      const PATTERNS = Object.fromEntries(
+        BANK.flatMap(([, list]) => list.map(([id, label, steps]) => [id, { label, steps }])),
+      );
+      const sameStep = (a, b) =>
+        a.kind === b.kind &&
+        (a.kind === 'rest' ||
+          (a.velocity === b.velocity &&
+            a.accent === b.accent &&
+            a.pitch === b.pitch &&
+            a.ratchet === b.ratchet));
+      /** The bank pattern the steps and the length equal, or '' (Custom). */
+      function matchPattern(s) {
+        for (const [id, p] of Object.entries(PATTERNS)) {
+          if (
+            s.length === p.steps.length &&
+            s.steps.length === p.steps.length &&
+            p.steps.every((step, i) => sameStep(step, s.steps[i]))
+          )
+            return id;
+        }
+        return '';
+      }
+      function patternOptions(s) {
+        const now = matchPattern(s);
+        const opt = (id, label) =>
+          `<option value="${id}"${id === now ? ' selected' : ''}>${esc(label)}</option>`;
+        return (
+          opt('', 'Custom') +
+          BANK.map(
+            ([group, list]) =>
+              `<optgroup label="${group}">${list.map(([id, label]) => opt(id, label)).join('')}</optgroup>`,
+          ).join('')
+        );
+      }
+      const RATES = [
+        ['96', '1 bar'],
+        ['48', '1/2'],
+        ['24', '1/4'],
+        ['12', '1/8'],
+        ['8', '1/8T'],
+        ['6', '1/16'],
+        ['4', '1/16T'],
+        ['3', '1/32'],
+      ];
+
+      /* ---------- the rail (sequencerRail.ts) ---------- */
+      function rail(s, look) {
+        const tool =
+          look.place === 'rail'
+            ? `<button class="seq-icon drum-pattern new" type="button" title="Pattern: ${esc(matchPattern(s) ? PATTERNS[matchPattern(s)].label : 'Custom')}. Pick one from the bank: it replaces the steps and the length" aria-label="Pattern">${icon(ICON.pattern)}<select data-act="pattern" aria-label="Pattern">${patternOptions(s)}</select></button><span class="seq-rail-gap"></span>`
+            : '';
+        return `<div class="seq-rail"><span class="seq-dot" aria-hidden="true"></span><button class="seq-name" type="button" title="Fold the Drum device to its rail, or open it" aria-expanded="true">Drum</button><span class="seq-rail-spacer"></span>${tool}<span class="seq-region" title="Region 1 of 1">1/1</span><button class="seq-icon seq-line-icon" type="button" title="Split the region in two at its middle bar (alt-click a region to cut it under the pointer)" aria-label="Split the region in two at its middle bar (alt-click a region to cut it under the pointer)">${icon(ICON.split)}</button><button class="seq-icon seq-line-icon danger" type="button" title="Delete this region, leaving a rest" aria-label="Delete this region, leaving a rest">${icon(ICON.remove)}</button></div>`;
+      }
+
+      /* ---------- Play (arpCard.ts's columns) ---------- */
+      const RANDOM_TITLES = {
+        count: 'New hits: as many as now, at new places, each at a velocity from 0.3 to 1',
+        density: 'New hits: 8 in every 16 steps, at new places, each at a velocity from 0.3 to 1',
+      };
+      function play(s, look) {
+        const pattern =
+          look.place === 'play'
+            ? `<div class="new"><span class="field-label">Pattern</span><select class="field" name="pattern" aria-label="Pattern" data-act="pattern" title="A pattern from the bank: it replaces the steps and the length">${patternOptions(s)}</select></div>`
+            : '';
+        const rate = `<div><span class="field-label">Rate</span><select class="field" name="rate" aria-label="Rate">${RATES.map(([v, l]) => `<option value="${v}"${Number(v) === s.divisor ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
+        const note = `<div class="euclid-kn new"><span class="euclid-kn-label">Note</span><span class="euclid-kn-value euclid-stepper"><button class="euclid-step" type="button" aria-label="Note down a semitone" data-act="note-" ${s.note <= 0 ? 'disabled' : ''}>−</button><output>${noteName(s.note)} · ${s.note}</output><button class="euclid-step" type="button" aria-label="Note up a semitone" data-act="note+" ${s.note >= 127 ? 'disabled' : ''}>+</button></span></div>`;
+        const seed = `<div><span class="field-label">Seed</span><div class="arp-seed"><input class="field" name="drum-seed" inputmode="numeric" aria-label="Seed" value="${s.seed}" /><button class="seq-icon arp-reseed" type="button" title="A new seed: the part restarts its random stream now" aria-label="Reseed" data-act="reseed">${icon(ICON.reseed, 'seq-icon-svg seq-line-icon')}</button></div></div>`;
+        const randomize = `<button class="btn seq-btn" type="button" data-act="randomize" title="${RANDOM_TITLES[look.randomize]}">Randomize</button>`;
+        const reverse = `<button class="btn seq-btn" type="button" data-act="reverse" title="Mirror the steps: every cell and lane value, last to first">Reverse</button>`;
+        const k = (f, label, text, norm, more = {}) => knob({ f, label, text, norm, ...more });
+        const knobs = [
+          [
+            k('length', 'Length', String(s.length), (s.length - 1) / (STEPS_MAX - 1)),
+            k('rotate', 'Rotate', String(s.turned), (s.turned + 16) / 32, { zero: 0.5 }),
+          ],
+          [
+            k('velocity', 'Vel', s.velocity.toFixed(2), s.velocity),
+            k('accentVelocity', 'Acc vel', s.accentVelocity.toFixed(2), s.accentVelocity),
+            k('accentMod', 'Acc mod', s.accentMod.toFixed(2), s.accentMod),
+          ],
+          [
+            k('gate', 'Gate', s.gate.toFixed(2), (s.gate - GATE_MIN) / (1 - GATE_MIN), {
+              auto: true,
+            }),
+            k('randomness', 'Vary', `${Math.round(s.randomness * 100)}%`, s.randomness, {
+              auto: true,
+              title: VARY_TITLE,
+            }),
+            k('probability', 'Chance', `${Math.round(s.chanceLane * 100)}%`, s.chanceLane, {
+              auto: true,
+              locked: true,
+              title: CHANCE_TITLE,
+            }),
+          ],
+        ];
+        const toggles = TOGGLES.map(
+          ([f, name, title]) =>
+            `<button class="seq-icon variation-toggle" type="button" data-tog="${f}" title="${esc(title)}" aria-label="${name}" aria-pressed="${s[f]}">${icon(ICON[f], 'seq-icon-svg seq-line-icon')}</button>`,
+        ).join('');
+        return `<div class="seq-section play"><div class="seq-sec-label">Play</div><div class="seq-sec-body"><div class="seq-col wide arp-fields">${pattern}${rate}${note}</div><div class="seq-col wide arp-fields">${seed}${randomize}${reverse}</div><div class="arp-knobs">${knobs.map((col) => `<div class="seq-col k3">${col.join('')}</div>`).join('')}<div class="seq-col k3 variation-col">${toggles}</div></div></div></div>`;
+      }
+
+      /* ---------- Steps (the strip: stepStrip.ts columns, arpStepCells.ts and figureCells.ts cells) ---------- */
+      function column(s, i, look) {
+        const step = s.steps[i];
+        const n = i + 1;
+        const isHit = step.kind === 'hit';
+        const cls = ['grid-col'];
+        if (i > 0 && i % 16 === 0) cls.push('bar');
+        else if (i > 0 && i % 4 === 0) cls.push('beat');
+        if (i === look.playhead && i < s.length) cls.push('playing');
+        if (i >= s.length) cls.push('off');
+        const blank = (extra = '') => `<button class="gcell ${extra}blank" type="button"></button>`;
+        let cells;
+        if (isHit) {
+          const v = step.velocity;
+          const ghost = v < 0.5 ? ' ghost' : '';
+          const note = played(s.note, step.pitch);
+          const pct = `${(v * 100).toFixed(0)}%`;
+          const fill = look.vel === 'up' ? `height: ${pct}` : `width: ${pct}`;
+          const pitchText = look.pitch === 'name' ? noteName(note) : signed(step.pitch);
+          const pitchTitle =
+            look.pitch === 'name'
+              ? `${noteName(note)} (${signed(step.pitch)} from Note): drag up or down, double-click for ${noteName(s.note)}`
+              : `${signed(step.pitch)} semitones, plays ${noteName(note)}: drag up or down, double-click for 0`;
+          const r = step.ratchet;
+          const ratchet =
+            r > 1
+              ? `<button class="gcell ratchet r${r}" type="button" data-act="ratchet" data-i="${i}" title="Ratchet ×${r}: click for ×1 → ×2 → ×3 → ×4" aria-label="Step ${n} ratchet: times ${r}"><span class="ratchet-ticks">${'<i></i>'.repeat(r)}</span></button>`
+              : `<button class="gcell ratchet r1" type="button" data-act="ratchet" data-i="${i}" title="Ratchet ×1: click for ×1 → ×2 → ×3 → ×4" aria-label="Step ${n} ratchet: times 1">×1</button>`;
+          cells = [
+            `<button class="gcell note drum-hit${ghost}" type="button" data-act="hit" data-i="${i}" title="hit: click for a rest" aria-label="Step ${n}: hit"><i></i></button>`,
+            `<button class="gcell vel${v >= 1 ? ' full' : ''}" type="button" role="slider" data-act="vel" data-i="${i}" aria-label="Step ${n} velocity" aria-valuemin="0" aria-valuemax="1" aria-valuenow="${v}" title="velocity ${v.toFixed(2)}: drag up or down, double-click for 1"><i style="${fill}"></i><span>${velLabel(v)}</span></button>`,
+            `<button class="gcell pitch${step.pitch ? ' note' : ' flat'}" type="button" data-act="pitch" data-i="${i}" aria-label="Step ${n} pitch" title="${pitchTitle}">${pitchText}</button>`,
+            `<button class="gcell" type="button" data-act="accent" data-i="${i}" title="accent" aria-pressed="${step.accent}">A</button>`,
+            ratchet,
+          ];
+        } else {
+          cells = [
+            `<button class="gcell drum-hit rest" type="button" data-act="hit" data-i="${i}" title="rest: click for a hit" aria-label="Step ${n}: rest"><i></i></button>`,
+            blank('vel '),
+            blank(),
+            blank(),
+            `<button class="gcell ratchet r1 idle" type="button" disabled title="A rest has no ratchet" aria-label="Step ${n} ratchet: none on a rest"></button>`,
+          ];
+        }
+        const lanes = s.lanes
+          .map((lane, k) => {
+            const v = lane.values[i] ?? 0;
+            const c = ['mod-cell'];
+            if (k === 0) c.push('first');
+            if (v === 0) c.push('zero');
+            if (v < 0) c.push('neg');
+            if (!isHit) c.push('mute');
+            return `<div class="${c.join(' ')}" data-lane="${k}" aria-label="${lane.name} step ${n}" style="--mag: ${Math.abs(v)};"><div class="mod-bar"></div></div>`;
+          })
+          .join('');
+        return `<div class="${cls.join(' ')}"><div class="strip-head"><div class="grid-idx">${n}</div>${cells.join('')}</div>${lanes}</div>`;
+      }
+      function strip(s, look) {
+        const names = s.lanes
+          .map(
+            (lane) =>
+              `<div class="mod-name"><div class="mod-head"><span class="mod-title">${lane.name}</span><button class="mod-x" type="button" title="Remove the ${lane.name} lane">×</button></div><div class="mod-readout" data-lane="0"></div></div>`,
+          )
+          .join('');
+        const corner = `<div class="strip-head seq-corner"><select class="field mod-add" aria-label="add a modulation lane"><option value="">+ Lane</option><option>Op A Level</option><option>Op B Decay</option><option>Pitch Env</option></select><span class="seq-meas">${s.lanes.length} of 4 lanes</span><span class="seq-row-label">Ratchet</span></div>`;
+        const cols = s.steps.map((_, i) => column(s, i, look)).join('');
+        return `<div class="seq-section steps"><div class="seq-sec-label">Steps<em>${s.length}</em></div><div class="seq-sec-body"><div class="seq-strip"><div class="seq-names">${corner}<div class="seq-lane-names"${s.lanes.length ? '' : ' hidden'}>${names}</div></div><div class="grid-strip">${cols}</div></div></div></div>`;
+      }
+
+      /** The rack row for the Drum part's region, in `look`'s choices. */
+      window.drumDevice = (s, look) => {
+        const props = Object.entries(PX)
+          .map(([k, v]) => `${k}: ${v}px`)
+          .join('; ');
+        const cls = ['seq-device-body', 'arp-device', 'drum-device'];
+        if (look.ghost === 'dim') cls.push('ghost-dim');
+        if (look.vel === 'up') cls.push('vel-up');
+        return `<div class="seq-rack" style="${props};"><div class="seq-device fixed" style="--kc: ${PERC};">${rail(s, look)}<div class="${cls.join(' ')}">${play(s, look)}${strip(s, look)}</div></div></div>`;
+      };
+      window.drumModel = { PATTERNS, matchPattern, noteName, played, hit, STEPS_MAX, GATE_MIN };
+    })();
+  </script>
+
+  <script>
+    /* ---------- the app's own numbers, measured in the screenshots ---------- */
+    // Each frame: the screen, the rack's box (the device sits in it 7 px in), the pane header's top,
+    // the part chip's name and kind lines, and the region's label, all read from the app in place.
+    const DEVICES = {
+      desktop: {
+        w: 1440,
+        h: 900,
+        label: 'desktop, 1440 × 900',
+        rack: { x: 14, y: 402, w: 1412 },
+        head: 372,
+        chip: 51,
+        lb: 282.4,
+      },
+      landscape: {
+        w: 1366,
+        h: 1024,
+        label: 'tablet landscape, 1366 × 1024, touch',
+        rack: { x: 14, y: 460.9, w: 1338 },
+        head: 430.9,
+        chip: 51,
+        lb: 282.4,
+      },
+      portrait: {
+        w: 1024,
+        h: 1366,
+        label: 'tablet portrait, 1024 × 1366, touch',
+        rack: { x: 14, y: 501.7, w: 996 },
+        head: 471.7,
+        chip: 85,
+        lb: 323.2,
+      },
+    };
+    const RACK_H = 258;
+    const ARP_TODAY_W = 976;
+    // Colors under the text the Proposed frame rewrites, read from the screenshots.
+    const CHIP_BG = '#ede36e';
+    const REGION_BG = '#3b3d28';
+    const PANE_BG = '#1f2529';
+    const FRAMES = Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label }));
+    const M = window.drumModel;
+
+    /* ---------- the example (windsor#949 decision 1) ---------- */
+    // A snare: hits on 4 and 12 (0-based, the strip numbers 5 and 13) at 1 and accented, ghosts on
+    // 3, 7, 10 and 14 at 0.30, 0.25, 0.30 and 0.35; a ratchet of 3 on 14; 7 at +3 and 10 at -2;
+    // Vary 30%, Chance 50% under the song's Chance lane (it reads 50% at bar 1); one step lane.
+    function example() {
+      const steps = M.PATTERNS.ghosts.steps.map((s) => ({ ...s }));
+      steps[7] = { ...steps[7], pitch: 3 };
+      steps[10] = { ...steps[10], pitch: -2 };
+      steps[14] = { ...steps[14], ratchet: 3 };
+      const decay = steps.map((s) => (s.kind !== 'hit' ? 0 : s.accent ? 0.3 : -0.4));
+      return {
+        steps,
+        length: 16,
+        note: 60,
+        divisor: 6,
+        gate: 0.5,
+        velocity: 0.8,
+        accentVelocity: 0.2,
+        accentMod: 1,
+        randomness: 0.3,
+        probability: 0.5,
+        chanceLane: 0.5,
+        restsSound: true,
+        octaveMode: false,
+        chancePerEffect: false,
+        seed: 12,
+        turned: 0,
+        lanes: [{ name: 'Op A Decay', values: decay }],
+      };
+    }
+    const state = { frame: FRAMES[0], mode: 'proposed', drum: example() };
+    const $ = (id) => document.getElementById(id);
+    const look = () => ({
+      pitch: $('mPitch').value,
+      place: $('mPlace').value,
+      ghost: $('mGhost').value,
+      randomize: $('mRandom').value,
+      vel: $('mVel').value,
+      playhead: 4,
+    });
+
+    /* ---------- the edits the device's controls make (the rules the build writes in its model) ---------- */
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const snap = (v, step) => Math.round(v / step) * step;
+    const KNOBS = {
+      length: { min: 1, max: M.STEPS_MAX, step: 1, def: 16 },
+      rotate: { min: -16, max: 16, step: 1, def: 0 },
+      velocity: { min: 0, max: 1, step: 0.01, def: 0.8 },
+      accentVelocity: { min: 0, max: 1, step: 0.01, def: 0.2 },
+      accentMod: { min: 0, max: 1, step: 0.01, def: 1 },
+      gate: { min: M.GATE_MIN, max: 1, step: 0.01, def: 0.5 },
+      randomness: { min: 0, max: 1, step: 0.01, def: 0 },
+    };
+    // A full sweep of a knob's range over this many pixels of vertical drag.
+    const KNOB_DRAG_PX = 160;
+    // The Vel bar's drag (FIGURE_VEL): 80 px from 0 to 1, in steps of 0.05; Pitch: a semitone per 8 px.
+    const VEL_DRAG_PX = 80;
+    const PITCH_DRAG_PX = 8;
+    const PITCH_MAX = 24;
+    const RANDOM_VEL = { min: 0.3, steps: 14 };
+
+    function setLength(d, length) {
+      d.length = length;
+      while (d.steps.length < length) {
+        d.steps.push({ kind: 'rest' });
+        for (const lane of d.lanes) lane.values.push(0);
+      }
+    }
+    const turnSpan = (list, by, n) => {
+      const head = list.slice(0, n);
+      const k = ((by % n) + n) % n;
+      return [...head.slice(n - k), ...head.slice(0, n - k), ...list.slice(n)];
+    };
+    function setKnob(d, f, v) {
+      if (f === 'length') return setLength(d, v);
+      if (f === 'rotate') {
+        const by = v - d.turned;
+        d.turned = v;
+        d.steps = turnSpan(d.steps, by, d.length);
+        for (const lane of d.lanes) lane.values = turnSpan(lane.values, by, d.length);
+        return;
+      }
+      d[f] = v;
+    }
+    const knobValue = (d, f) => (f === 'rotate' ? d.turned : d[f]);
+    function randomize(d, rule) {
+      const n = d.length;
+      const hits = d.steps.slice(0, n).filter((s) => s.kind === 'hit').length;
+      const want = rule === 'count' ? Math.max(1, hits) : Math.round(n / 2);
+      const order = [...Array(n).keys()].sort(() => Math.random() - 0.5).slice(0, want);
+      for (let i = 0; i < n; i++) d.steps[i] = { kind: 'rest' };
+      for (const i of order)
+        d.steps[i] = M.hit(
+          Number(
+            (RANDOM_VEL.min + 0.05 * Math.floor(Math.random() * (RANDOM_VEL.steps + 1))).toFixed(2),
+          ),
+        );
+    }
+    function reverse(d) {
+      const n = d.length;
+      d.steps = [...d.steps.slice(0, n).reverse(), ...d.steps.slice(n)];
+      for (const lane of d.lanes)
+        lane.values = [...lane.values.slice(0, n).reverse(), ...lane.values.slice(n)];
+      d.turned = 0;
+    }
+    function applyPattern(d, id) {
+      const p = M.PATTERNS[id];
+      if (!p) return;
+      d.steps = p.steps.map((s) => ({ ...s }));
+      d.length = p.steps.length;
+      d.turned = 0;
+      for (const lane of d.lanes) lane.values = d.steps.map((_, i) => lane.values[i] ?? 0);
+    }
+
+    /* ---------- a frame ---------- */
+    const SUMMARY = (d) => `drum · ${d.length} steps · 1/16`;
+    function covers(dev, d) {
+      const head = dev.head;
+      return [
+        `<div class="ov new" style="left:179px;top:${dev.chip}px;width:128px;height:28px;background:${CHIP_BG}"></div>`,
+        `<span class="cover chip-n" style="left:179px;top:${dev.chip}px">Snare</span>`,
+        `<span class="cover chip-k" style="left:179px;top:${dev.chip + 15}px">2 · Drum</span>`,
+        `<div class="ov" style="left:210px;top:${dev.lb - 1}px;width:150px;height:15px;background:${REGION_BG}"></div>`,
+        `<span class="cover lb new" style="left:211.5px;top:${dev.lb}px">${SUMMARY(d)}</span>`,
+        `<div class="ov" style="left:40px;top:${head}px;width:440px;height:22px;background:${PANE_BG}"></div>`,
+        `<div class="cover head new" style="left:44px;top:${head}px">Snare — Drum<small>${SUMMARY(d)} · 1 region</small><span class="bounce">Bounce to Roll</span></div>`,
+      ].join('');
+    }
+    function render() {
+      const dev = DEVICES[state.frame.id];
+      const f = $('frame');
+      f.style.setProperty('--w', `${dev.w}px`);
+      f.style.setProperty('--h', `${dev.h}px`);
+      f.style.setProperty('--shot', `url('drum-device-today-${state.frame.id}.jpg')`);
+      if (state.mode === 'proposed') {
+        const scroll = f.querySelector('.seq-rack')?.scrollLeft ?? 0;
+        f.innerHTML = `${covers(dev, state.drum)}<div class="ov" style="left:${dev.rack.x}px;top:${dev.rack.y}px;width:${dev.rack.w}px;height:${RACK_H}px">${window.drumDevice(state.drum, look())}</div>`;
+        f.querySelector('.seq-rack').scrollLeft = scroll;
+      } else f.innerHTML = '';
+      $('fit').style.zoom = $('mFit').checked
+        ? String(Math.min(1, (innerWidth - 32) / dev.w))
+        : '1';
+      syncBar();
+      tag();
+    }
+    function tag() {
+      if (state.mode === 'today') {
+        $('tag').textContent =
+          `the screenshot from main (8b2761d), 2026-10-24: the Arp, ${ARP_TODAY_W} px`;
+        return;
+      }
+      const rack = $('frame').querySelector('.seq-rack');
+      const width = $('frame').querySelector('.seq-device').getBoundingClientRect().width;
+      const over = rack.scrollWidth - rack.clientWidth;
+      $('tag').textContent =
+        `Drum ${Math.round(width)} px at ${state.drum.steps.length} steps (the Arp today ${ARP_TODAY_W}) · ${over > 0 ? `scrolls ${over} px in the rack` : 'fits the rack'}`;
+    }
+    function syncBar() {
+      for (const b of $('mMode').children)
+        b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode));
+      $('caption').textContent =
+        `${state.mode === 'today' ? 'Today' : 'Proposed'} · ${state.frame.label}`;
+    }
+
+    /* ---------- the device's gestures ---------- */
+    function drag(e, from, perPx, apply) {
+      e.preventDefault();
+      const y0 = e.clientY;
+      const move = (ev) => {
+        apply(from + (y0 - ev.clientY) / perPx);
+        render();
+      };
+      const up = () => {
+        removeEventListener('pointermove', move);
+        removeEventListener('pointerup', up);
+      };
+      addEventListener('pointermove', move);
+      addEventListener('pointerup', up);
+    }
+    const frameEl = $('frame');
+    frameEl.addEventListener('pointerdown', (e) => {
+      const d = state.drum;
+      const k = e.target.closest('.knob[data-knob]');
+      if (k && !k.classList.contains('locked')) {
+        const f = k.dataset.knob;
+        const spec = KNOBS[f];
+        if (!spec) return;
+        const span = spec.max - spec.min;
+        drag(e, knobValue(d, f), KNOB_DRAG_PX / span, (v) =>
+          setKnob(d, f, clamp(Number(snap(v, spec.step).toFixed(2)), spec.min, spec.max)),
+        );
+        return;
+      }
+      const cell = e.target.closest('[data-act="vel"], [data-act="pitch"]');
+      if (!cell) return;
+      const step = d.steps[Number(cell.dataset.i)];
+      if (cell.dataset.act === 'vel')
+        drag(e, step.velocity, VEL_DRAG_PX, (v) => {
+          step.velocity = clamp(Number(snap(v, 0.05).toFixed(2)), 0, 1);
+        });
+      else
+        drag(e, step.pitch, PITCH_DRAG_PX, (v) => {
+          step.pitch = clamp(Math.round(v), -PITCH_MAX, PITCH_MAX);
+        });
+    });
+    frameEl.addEventListener('dblclick', (e) => {
+      const d = state.drum;
+      const k = e.target.closest('.knob[data-knob]');
+      if (k && !k.classList.contains('locked') && KNOBS[k.dataset.knob]) {
+        setKnob(d, k.dataset.knob, KNOBS[k.dataset.knob].def);
+        return render();
+      }
+      const cell = e.target.closest('[data-act="vel"], [data-act="pitch"]');
+      if (!cell) return;
+      const step = d.steps[Number(cell.dataset.i)];
+      if (cell.dataset.act === 'vel') step.velocity = 1;
+      else step.pitch = 0;
+      render();
+    });
+    frameEl.addEventListener('click', (e) => {
+      const d = state.drum;
+      const tog = e.target.closest('[data-tog]');
+      if (tog) {
+        d[tog.dataset.tog] = !d[tog.dataset.tog];
+        return render();
+      }
+      const act = e.target.closest('[data-act]');
+      if (!act || act.tagName === 'SELECT') return;
+      const i = Number(act.dataset.i);
+      const step = d.steps[i];
+      switch (act.dataset.act) {
+        case 'hit':
+          d.steps[i] = step.kind === 'hit' ? { kind: 'rest' } : M.hit(1);
+          break;
+        case 'accent':
+          step.accent = !step.accent;
+          break;
+        case 'ratchet':
+          step.ratchet = (step.ratchet % 4) + 1;
+          break;
+        case 'note-':
+          d.note = Math.max(0, d.note - 1);
+          break;
+        case 'note+':
+          d.note = Math.min(127, d.note + 1);
+          break;
+        case 'reseed':
+          d.seed = 1 + Math.floor(Math.random() * 9999);
+          break;
+        case 'randomize':
+          randomize(d, $('mRandom').value);
+          break;
+        case 'reverse':
+          reverse(d);
+          break;
+        default:
+          return;
+      }
+      render();
+    });
+    frameEl.addEventListener('change', (e) => {
+      if (e.target.dataset.act !== 'pattern') return;
+      applyPattern(state.drum, e.target.value);
+      render();
+    });
+
+    /* ---------- the bar ---------- */
+    $('mFrame').innerHTML = FRAMES.map((f, i) => `<option value="${i}">${f.label}</option>`).join(
+      '',
+    );
+    $('mFrame').onchange = (e) => {
+      state.frame = FRAMES[Number(e.target.value)];
+      render();
+    };
+    for (const b of $('mMode').children)
+      b.onclick = () => {
+        state.mode = b.dataset.mode;
+        render();
+      };
+    $('mReset').onclick = () => {
+      state.drum = example();
+      render();
+    };
+    const restyle = () => {
+      document.body.classList.toggle('marks', $('mMarks').checked);
+      $('notes').hidden = !$('mNotes').checked;
+      render();
+    };
+    for (const id of ['mPitch', 'mPlace', 'mGhost', 'mRandom', 'mVel', 'mMarks', 'mFit', 'mNotes'])
+      $(id).onchange = restyle;
+    addEventListener('resize', () => $('mFit').checked && render());
+
+    // `#frame=portrait&mode=proposed&pitch=offset&place=rail&ghost=solid&random=density&vel=up&bare&nomarks` opens a state.
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const start = Math.max(
+      0,
+      FRAMES.findIndex((f) => f.id === hash.get('frame')),
+    );
+    $('mFrame').value = String(start);
+    state.frame = FRAMES[start];
+    if (hash.get('mode')) state.mode = hash.get('mode');
+    for (const [key, id] of [
+      ['pitch', 'mPitch'],
+      ['place', 'mPlace'],
+      ['ghost', 'mGhost'],
+      ['random', 'mRandom'],
+      ['vel', 'mVel'],
+    ])
+      if (hash.get(key)) $(id).value = hash.get(key);
+    if (hash.has('bare')) document.body.classList.add('bare');
+    if (hash.has('nomarks')) $('mMarks').checked = false;
+    restyle();
+    document.fonts.ready.then(render);
+  </script>
+</html>
