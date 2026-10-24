@@ -1,5 +1,5 @@
 /**
- * The Drum's pattern bank (windsor#950): the thirty patterns are well
+ * The Drum's pattern bank (windsor#950): the thirty-three patterns are well
  * formed, the row notation expands exactly, and applying and matching a
  * pattern touch only the line.
  */
@@ -21,10 +21,10 @@ import { DRUM_REST, assertDrumStep, drumHit, type DrumStep } from './drumSteps';
 const pattern = (id: string): DrumPattern => DRUM_PATTERNS.find((p) => p.id === id)!;
 
 describe('the bank', () => {
-  it('holds thirty patterns of sixteen steps, with unique kebab-case ids and names', () => {
-    expect(DRUM_PATTERNS).toHaveLength(30);
-    expect(new Set(DRUM_PATTERNS.map((p) => p.id)).size).toBe(30);
-    expect(new Set(DRUM_PATTERNS.map((p) => p.name)).size).toBe(30);
+  it('holds thirty-three patterns of sixteen steps, with unique kebab-case ids and names', () => {
+    expect(DRUM_PATTERNS).toHaveLength(33);
+    expect(new Set(DRUM_PATTERNS.map((p) => p.id)).size).toBe(33);
+    expect(new Set(DRUM_PATTERNS.map((p) => p.name)).size).toBe(33);
     for (const p of DRUM_PATTERNS) {
       expect(p.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
       expect(p.steps, p.id).toHaveLength(16);
@@ -85,6 +85,26 @@ describe('expandDrumRows', () => {
       ),
     ];
     expect(pattern('tom-roll').steps).toEqual(expected);
+  });
+
+  it('expands the trap rolls: eighths, then a roll that speeds up across the last beat', () => {
+    const hits: Record<number, { velocity: number; ratchet?: number }> = {
+      0: { velocity: 0.95 },
+      2: { velocity: 0.75 },
+      4: { velocity: 0.95 },
+      6: { velocity: 0.75 },
+      8: { velocity: 0.95 },
+      10: { velocity: 0.75 },
+      11: { velocity: 0.6 },
+      12: { velocity: 0.95, ratchet: 2 },
+      13: { velocity: 0.65, ratchet: 3 },
+      14: { velocity: 0.7, ratchet: 4 },
+      15: { velocity: 0.8, ratchet: 4 },
+    };
+    const expected: DrumStep[] = Array.from({ length: 16 }, (_, i) =>
+      hits[i] === undefined ? DRUM_REST : drumHit(hits[i]),
+    );
+    expect(pattern('hat-trap-rolls').steps).toEqual(expected);
   });
 
   it('refuses a short row, an unknown character and a mark on a rest', () => {

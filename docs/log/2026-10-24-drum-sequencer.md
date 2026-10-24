@@ -130,7 +130,7 @@ each on its own part.
 1. windsor#948, this record: the engine's kind, the normaliser, the player
    wiring and the minimum the app needs to compile, with the listen.
 2. windsor#949: the Drum device's mockup, for tacowars's approval.
-3. windsor#950: the pattern bank, thirty rhythm presets for the Drum.
+3. windsor#950: the pattern bank, thirty-three rhythm presets for the Drum.
 4. windsor#951: the Drum device, built to the approved mockup.
 
 ## Choices made in the build
