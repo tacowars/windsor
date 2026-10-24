@@ -32,6 +32,7 @@ import {
   arpCycleLength,
   arpNote,
   arpNoteList,
+  arpPlayedGate,
   chordName,
   eventChord,
   scaleOffsets,
@@ -122,13 +123,12 @@ export function arpOctaveLabel(octave: number): string {
 export const arpCellGate = (step: ArpStep): number => (step.kind === 'note' ? (step.gate ?? 1) : 1);
 
 /**
- * The gate a cell at `cellGate` plays at, as the engine's `arpPlayedGate`
- * rules it (windsor#933): the part's gate times the cell's, floored at
- * `GATE_MIN`; a cell at 1 (no gate written) plays the part's gate as it is.
+ * The gate a cell at `cellGate` plays at under the part's gate `partGate`:
+ * the engine's own `arpPlayedGate` (windsor#933) on a note at that gate.
  * What the Gate bar's fill shows (windsor#934 decision 2).
  */
-export const arpPlayedGateOf = (partGate: number, cellGate: number, floor = GATE_MIN): number =>
-  cellGate >= 1 ? partGate : Math.max(floor, partGate * cellGate);
+export const arpPlayedGateAt = (partGate: number, cellGate: number): number =>
+  arpPlayedGate(partGate, arpNote({ gate: cellGate }));
 
 /** A gate on the bar's grid: 0 to 1 in steps of `step`, floored at `GATE_MIN`. */
 export function snapArpGate(value: number, table: ArpGateBarTable = ARP_GATE_BAR): number {

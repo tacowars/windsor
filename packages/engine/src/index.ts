@@ -549,6 +549,7 @@ export { chordAt, chordIdentity, eventBounds } from './harmony/harmonyTimeline';
 export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
 export { ARP_STYLES, DEFAULT_ARP_CONFIG, assertArpConfig } from './sequencing/arpSequencer';
 export { Arpeggiator, arpCellPitch, arpNoteList } from './sequencing/arpeggiator';
+export { arpPlayedGate } from './sequencing/arpCellPlay';
 export type { ArpSequencerConfig, ArpStyle } from './sequencing/arpSequencer';
 // The arp's step grid (windsor#127): the cells, their defaults and the cycle rule.
 export { ARP_BOUNCE_STYLES, ARP_STEPS_MAX } from './sequencing/arpStepConstants';

@@ -1,19 +1,16 @@
 /**
  * The Arp device's Gate bar rules (windsor#934, the approved
  * `docs/design/arp-gate-bar-mockup.html`): a cell's gate read, written,
- * dragged and labelled, and the played gate its fill shows, held to the
- * engine's own `arpPlayedGate`.
+ * dragged and labelled, and the played gate its fill shows.
  */
 import { describe, expect, it } from 'vitest';
 
-import type { ArpStep } from '@windsor/engine';
 import { GATE_MIN, arpNote } from '@windsor/engine';
-import { arpPlayedGate } from '@windsor/engine/sequencing/arpCellPlay';
 import {
   arpCellGate,
   arpGateLabel,
   arpGateTitle,
-  arpPlayedGateOf,
+  arpPlayedGateAt,
   dragArpGate,
   setArpGate,
 } from './arpGridModel';
@@ -46,16 +43,9 @@ describe('the Gate bar (windsor#934)', () => {
   });
 
   it('fills to the played gate as the engine plays it (decision 2, the mockup’s worked cells)', () => {
-    const cells = [1, 0.5, 0.25, 0.75, 0.01, 0.05];
-    for (const partGate of [0.8, 1, GATE_MIN, 0.5]) {
-      for (const gate of cells) {
-        const cell: ArpStep = gate < 1 ? { ...note, gate } : note;
-        expect(arpPlayedGateOf(partGate, gate)).toBeCloseTo(arpPlayedGate(partGate, cell), 12);
-      }
-    }
-    expect(arpPlayedGateOf(0.8, 0.5)).toBeCloseTo(0.4, 12);
-    expect(arpPlayedGateOf(0.8, 0.01)).toBe(GATE_MIN);
-    expect(arpPlayedGateOf(0.8, 1)).toBe(0.8);
+    expect(arpPlayedGateAt(0.8, 0.5)).toBeCloseTo(0.4, 12);
+    expect(arpPlayedGateAt(0.8, 0.01)).toBe(GATE_MIN);
+    expect(arpPlayedGateAt(0.8, 1)).toBe(0.8);
   });
 
   it('reads the cell’s own gate as the Vel bar reads velocity, and titles both', () => {
