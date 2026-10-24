@@ -79,13 +79,14 @@ describe('the record’s worked examples', () => {
     expect(roll.notes).toHaveLength(48);
   });
 
-  it('unrolls the Arp’s skip take to a 4-bar loop of its 49 notes', () => {
-    const doc = bounceDocument({ kind: 'arp', ...DEFAULT_ARP_CONFIG, skipChance: 0.25, seed: 0 });
+  it('unrolls the Arp’s varied take to a 4-bar loop of its 47 notes', () => {
+    const varied = { randomness: 1, probability: 0.5, restsSound: true };
+    const doc = bounceDocument({ kind: 'arp', ...DEFAULT_ARP_CONFIG, ...varied, seed: 0 });
     const result = bounceToRoll(doc, BOUNCE_SLOT);
     const roll = rollOf(bounced(doc, result));
     expect(roll.loopTicks).toBe(4 * TICKS_PER_BAR);
-    expect(roll.notes).toHaveLength(49);
-    expect(result.ok && result.summary.notes).toBe(49);
+    expect(roll.notes).toHaveLength(47);
+    expect(result.ok && result.summary.notes).toBe(47);
   });
 });
 
@@ -122,8 +123,8 @@ describe('empty regions', () => {
 });
 
 describe('the part’s lanes', () => {
-  const skip: AutomationLane = {
-    target: 'seq.skipChance',
+  const probability: AutomationLane = {
+    target: 'seq.probability',
     on: true,
     points: [{ tick: 0, value: 0.5, bend: 0 }],
   };
@@ -133,13 +134,14 @@ describe('the part’s lanes', () => {
     points: [{ tick: 0, value: 0.5, bend: 0 }],
   };
 
-  it('removes the Skip lane, names it baked, and leaves the Volume lane as it was', () => {
-    const grid = gridSpec([gridNote(0), gridNote(2), gridNote(4), gridNote(2)], { seed: 4 });
-    const doc = bounceDocument(grid, { automation: [skip, volume] });
+  it('removes the Probability lane, names it baked, and leaves the Volume lane as it was', () => {
+    const steps = [gridNote(0), gridNote(2), gridNote(4), gridNote(2)];
+    const grid = gridSpec(steps, { seed: 4, randomness: 1, restsSound: true });
+    const doc = bounceDocument(grid, { automation: [probability, volume] });
     const result = bounceToRoll(doc, BOUNCE_SLOT);
     const part = bounced(doc, result) as MusicPart & { automation?: readonly AutomationLane[] };
     expect(part.automation).toEqual([volume]);
-    expect(result.ok && result.summary.lanesBaked).toEqual(['skipChance']);
+    expect(result.ok && result.summary.lanesBaked).toEqual(['probability']);
   });
 });
 

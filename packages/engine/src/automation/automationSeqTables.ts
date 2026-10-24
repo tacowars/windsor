@@ -5,15 +5,17 @@
  * depends on its sequencer kind; a kind left out offers none. The lookups
  * are `automationTargets.ts`, the read `automationSeqLanes.ts`.
  *
- * The Grid offers `skipChance` alone: it has no gate (a Grid note holds to
- * the next note or rest), so a gate lane would have nothing to move.
+ * The Grid offers Randomness and Probability (windsor#935) and no gate (a
+ * Grid note holds to the next note or rest), so a gate lane would have
+ * nothing to move. Skip is the Figure's alone since step variation replaced
+ * it on the Grid and the Arp.
  */
 import { GATE_MIN } from '../audioConstants';
 import type { SequencerKind } from '../song/arrangement';
 import type { SeqField } from '../sequencing/regionGate';
 import type { AutomationTargetRow, SeqTargetId } from './automationLane';
 
-/** The three sequencer rows, each a field the generators read on their onset. */
+/** The sequencer rows, each a field the generators read on their onset. */
 export const SEQ_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
   readonly target: SeqTargetId;
   readonly field: SeqField;
@@ -38,6 +40,24 @@ export const SEQ_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
     unit: '',
   },
   {
+    target: 'seq.randomness',
+    field: 'randomness',
+    label: 'Randomness',
+    min: 0,
+    max: 1,
+    scale: 'linear',
+    unit: '',
+  },
+  {
+    target: 'seq.probability',
+    field: 'probability',
+    label: 'Probability',
+    min: 0,
+    max: 1,
+    scale: 'linear',
+    unit: '',
+  },
+  {
     target: 'seq.density',
     field: 'density',
     label: 'Density',
@@ -52,7 +72,7 @@ export const SEQ_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
 export const SEQ_AUTOMATION_FIELDS: Readonly<Partial<Record<SequencerKind, readonly SeqField[]>>> =
   {
     figure: ['gate', 'skipChance'],
-    grid: ['skipChance'],
-    arp: ['gate', 'skipChance'],
+    grid: ['randomness', 'probability'],
+    arp: ['gate', 'randomness', 'probability'],
     bass: ['gate', 'density'],
   };

@@ -224,7 +224,7 @@ describe('round-trip: normalise → serialise → normalise', () => {
           strip: { level: 9 },
           sequencer: { kind: 'euclidean', divisor: 5, seed: 204.4 },
         },
-        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', skipChance: 2, length: 99 } },
+        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', randomness: 2, length: 99 } },
         { slot: 1, preset: 'hat', strip: { sends: { echo: 2 } }, regions: [{ start: 400 }] },
       ],
       {

@@ -35,6 +35,8 @@ const HARMONY: Harmony = {
   ],
 };
 const BASE: Arrangement = { ...FULL_ARRANGEMENT, harmony: HARMONY };
+/** Step variation that silences steps (windsor#935), where these tests once skipped. */
+const VARIED = { randomness: 1, probability: 0.5, restsSound: true } as const;
 const c2 = new ScaleSampler(HARMONY).rootNote(FULL_PARTS.drone.sequencer.register.octave);
 const C_MINOR = [c2, c2 + 3, c2 + 7];
 const A_FLAT = [c2 + 8, c2 + 12, c2 + 15];
@@ -111,7 +113,7 @@ describe('a region end releases what the part holds', () => {
   it('a grid tie running into the region end produces a note-off on that tick', () => {
     const quarter = PPQ;
     const held: GridStep[] = [gridNote(0), { kind: 'tie' }, { kind: 'tie' }, { kind: 'tie' }];
-    const arrangement = grid({ divisor: quarter, steps: held, length: 4, skipChance: 0 }, firstBar);
+    const arrangement = grid({ divisor: quarter, steps: held, length: 4, randomness: 0 }, firstBar);
     const r = rig(arrangement);
     r.run(2);
     const on = kinds(r.parts.arp, 'noteOn');
@@ -129,8 +131,8 @@ describe('a region end releases what the part holds', () => {
 });
 
 describe('the determinism rule (■ then ▶ is a fresh player at tick 0)', () => {
-  it('two players over the same document produce the same note sequence, skips included', () => {
-    const arrangement = grid({ skipChance: 0.5, seed: 11 });
+  it('two players over the same document produce the same note sequence, step variation included', () => {
+    const arrangement = grid({ ...VARIED, seed: 11 });
     const first = rig(arrangement);
     const second = rig(arrangement);
     first.run(2);
@@ -146,7 +148,7 @@ describe('the determinism rule (■ then ▶ is a fresh player at tick 0)', () =
   });
 
   it('reset() after releaseAll replays the same notes from tick 0 on the same player (#708)', () => {
-    const arrangement = grid({ skipChance: 0.5, seed: 11 });
+    const arrangement = grid({ ...VARIED, seed: 11 });
     const r = rig(arrangement);
     const trace = (part: RecordingPart, from: number) =>
       part.calls
@@ -169,7 +171,7 @@ describe('the determinism rule (■ then ▶ is a fresh player at tick 0)', () =
   });
 
   it('without reset() the same player does not replay: the stream carries on', () => {
-    const arrangement = grid({ skipChance: 0.5, seed: 11 });
+    const arrangement = grid({ ...VARIED, seed: 11 });
     const r = rig(arrangement);
     const ons = (from: number) =>
       r.parts.arp.calls

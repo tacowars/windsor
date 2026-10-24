@@ -11,6 +11,7 @@ import { playArpCell, type ArpCellConfig, type ArpCellOutcome, type ArpOnset } f
 import { rollOutcome } from './arpeggiator';
 import { assertArpGrid, arpNote, defaultArpSteps, type ArpStep } from './arpSteps';
 import type { NoteEvent, NoteOnEvent } from './noteEvent';
+import { STEP_VARIATION_DEFAULTS } from './stepVariationConstants';
 
 const CONFIG: ArpCellConfig = {
   gate: 0.5,
@@ -73,7 +74,7 @@ describe('an arp cell’s ratchet in the config check (windsor#366)', () => {
     lanes: [],
     accentVelocity: 0,
     accentMod: 0,
-    skipChance: 0,
+    ...STEP_VARIATION_DEFAULTS,
   });
 
   it('takes 1–4 and refuses anything else', () => {

@@ -66,7 +66,10 @@ describe('the version-3 document (#705)', () => {
       lanes: [],
       accentVelocity: 0.3,
       accentMod: 0.9,
-      skipChance: 0.1,
+      randomness: 0.1,
+      probability: 0.7,
+      restsSound: true,
+      octaveMode: true,
       seed: 31,
     };
     const bass = {

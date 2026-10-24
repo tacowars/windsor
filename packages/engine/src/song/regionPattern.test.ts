@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import { CHORD_PATTERN_B, REGION_PATTERN_CHORD, song } from '../__fixtures__/documentCases';
 import type { MusicPart, RegionPattern, SequencerSpec } from './arrangement';
 import { makeArrangement } from './arrangementDocument';
@@ -18,7 +19,7 @@ const GRID_PART: SequencerSpec = {
   divisor: 6,
   steps: [{ kind: 'rest' }],
   length: 1,
-  skipChance: 0,
+  ...STEP_VARIATION_DEFAULTS,
   accentVelocity: 1,
   accentMod: 0,
   register: { octave: 2 },
@@ -31,7 +32,10 @@ const GRID_PATTERN: RegionPattern = {
   divisor: 12,
   steps: [{ kind: 'tie' }, { kind: 'rest' }],
   length: 2,
-  skipChance: 0.5,
+  randomness: 0.5,
+  probability: 0.5,
+  restsSound: true,
+  octaveMode: true,
   accentVelocity: 0.8,
   accentMod: 0.2,
   register: { octave: 3 },

@@ -6,8 +6,8 @@
  * ratchet, no hold past the next hit), so every note the part was asked to
  * play is a written note, at its pitch, onset, release and velocity. The
  * region rendered is the second of two, so its stream is the one the gate
- * mints for region 1, and its draws (skips, densities, random styles,
- * pitch choices) must land where the player's did.
+ * mints for region 1, and its draws (step variation, skips, densities,
+ * random styles, pitch choices) must land where the player's did.
  *
  * Since windsor#755 a note may carry an accent, whose bump its roll adds
  * back, so the render is held against the player through the bounced Roll
@@ -61,11 +61,13 @@ describe('each kind renders what the player plays from the region’s start', ()
     );
   });
 
-  it('Grid: a written line with skips drawn from the region’s stream', () => {
+  it('Grid: a written line with step variation drawn from the region’s stream', () => {
     const steps = [0, 2, 4, 2, 5, 4, 2, 1].map((degree) =>
       gridNote(degree, { accent: degree === 4 }),
     );
-    expectParity(gridSpec(steps, { divisor: 12, skipChance: 0.3, seed: 3 }));
+    expectParity(
+      gridSpec(steps, { divisor: 12, randomness: 1, probability: 0.5, restsSound: true, seed: 3 }),
+    );
   });
 
   it('Chord: the harmony’s chord voiced on every hit, its notes on one tick', () => {
@@ -80,8 +82,9 @@ describe('each kind renders what the player plays from the region’s start', ()
     expectParity(chord, 'drone-sqr');
   });
 
-  it('Arp: a random walk with skips, at its gate', () => {
-    expectParity({ kind: 'arp', ...DEFAULT_ARP_CONFIG, style: 'random', skipChance: 0.2, seed: 5 });
+  it('Arp: a random walk with step variation, at its gate', () => {
+    const varied = { randomness: 1, probability: 0.5, restsSound: true };
+    expectParity({ kind: 'arp', ...DEFAULT_ARP_CONFIG, style: 'random', ...varied, seed: 5 });
   });
 
   it('Basslead: follow chord with a root bias and its density', () => {

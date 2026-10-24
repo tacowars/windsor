@@ -163,8 +163,60 @@ const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
  */
 const delayLoopRebuilt = (doc: RawDocument): RawDocument => everyInsert(doc, upgradeDelayEntry);
 
+/** The sequencer kinds whose Skip step variation replaced (windsor#935). */
+const SKIPLESS_KINDS: readonly unknown[] = ['grid', 'arp'];
+
+const isSkipless = (spec: unknown): spec is Record<string, unknown> =>
+  isRecord(spec) && SKIPLESS_KINDS.includes(spec['kind']);
+
+/** A Grid or Arp spec without its `skipChance`; any other value as it is. A rack's sequencer upgrades through it too (`rackMigrations.ts`). */
+export function withoutSkip(spec: unknown): unknown {
+  if (!isSkipless(spec) || !Object.hasOwn(spec, 'skipChance')) return spec;
+  const out = { ...spec };
+  delete out['skipChance'];
+  return out;
+}
+
+/** A region with its own Grid or Arp pattern's `skipChance` deleted. */
+const regionWithoutSkip = (region: unknown): unknown =>
+  isRecord(region) && isSkipless(region['pattern'])
+    ? { ...region, pattern: withoutSkip(region['pattern']) }
+    : region;
+
+/** A lane on the Skip row, which a Grid or Arp part no longer offers. */
+const isSkipLane = (lane: unknown): boolean =>
+  isRecord(lane) && lane['target'] === 'seq.skipChance';
+
+/** One part with Skip gone from its Grid or Arp sequencer, its regions' patterns and its lanes. */
+function partWithoutSkip(part: unknown): unknown {
+  if (!isRecord(part)) return part;
+  const out: Record<string, unknown> = { ...part };
+  if (isSkipless(part['sequencer'])) {
+    out['sequencer'] = withoutSkip(part['sequencer']);
+    if (Array.isArray(part['automation'])) {
+      out['automation'] = part['automation'].filter((lane) => !isSkipLane(lane));
+    }
+  }
+  if (Array.isArray(part['regions'])) out['regions'] = part['regions'].map(regionWithoutSkip);
+  return out;
+}
+
 /**
- * Seven upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10, 15 → 16 and 17 → 18, and none from
+ * Version 18 → 19 (windsor#935, record `2026-10-24-step-variation`): step
+ * variation replaced Skip on the Grid and the Arp, so every Grid or Arp
+ * sequencer, and every region pattern of either kind, loses its
+ * `skipChance`, and a Grid or Arp part loses its `seq.skipChance` lanes. The
+ * Figure keeps its Skip. The four new fields are additive, their defaults
+ * vary nothing, so the normaliser fills them. A version-18 snapshot already
+ * holds the current patch format, so `patches` is not touched.
+ */
+const skipReplacedByVariation = (doc: RawDocument): RawDocument =>
+  Array.isArray(doc['parts']) || isRecord(doc['parts'])
+    ? { ...doc, parts: eachOf(doc['parts'], partWithoutSkip) }
+    : doc;
+
+/**
+ * Eight upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10, 15 → 16, 17 → 18 and 18 → 19, and none from
  * 16 to 17 (windsor#842: operator feedback runs to 10 and a feedback step's
  * span is 5, so an old song's step offsets on feedback play five times
  * deeper; tacowars keeps no song to carry, record
@@ -193,6 +245,7 @@ export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   9: bloomScalesRenamed,
   15: tapeMotionOnSquareLaw,
   17: delayLoopRebuilt,
+  18: skipReplacedByVariation,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

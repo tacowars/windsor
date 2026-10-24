@@ -56,8 +56,9 @@ describe('a part Vel of 0', () => {
 });
 
 describe('a region that is all rests', () => {
-  it('renders no notes, no envelopes and no counts, rested or skipped', () => {
-    for (const grid of [gridSpec([REST, REST]), gridSpec([gridNote(0)], { skipChance: 1 })]) {
+  it('renders no notes, no envelopes and no counts, its rests written or varied', () => {
+    const varied = { randomness: 1, probability: 1, restsSound: true };
+    for (const grid of [gridSpec([REST, REST]), gridSpec([REST, REST], varied)]) {
       const { notes, envelopes, counts } = render(bounceSong(grid));
       expect(notes).toEqual([]);
       expect(envelopes).toEqual([]);
@@ -147,8 +148,8 @@ describe('overlaps that did not slide', () => {
 });
 
 describe('the part’s sequencer lanes', () => {
-  const skipLane: AutomationLane = {
-    target: 'seq.skipChance',
+  const probabilityLane: AutomationLane = {
+    target: 'seq.probability',
     on: true,
     points: [
       { tick: 0, value: 0, bend: 0 },
@@ -156,16 +157,17 @@ describe('the part’s sequencer lanes', () => {
     ],
   };
 
-  it('are read as the gate reads them, so the render skips where the player did, and are named', () => {
-    const grid = gridSpec([gridNote(0), gridNote(2), gridNote(4), gridNote(2)], { seed: 4 });
-    const song = bounceSong(grid, { automation: [skipLane] });
+  it('are read as the gate reads them, so the render rests where the player did, and are named', () => {
+    const steps = [gridNote(0), gridNote(2), gridNote(4), gridNote(2)];
+    const grid = gridSpec(steps, { seed: 4, randomness: 1, restsSound: true });
+    const song = bounceSong(grid, { automation: [probabilityLane] });
     const { notes, seqLanes } = render(song);
     const onsets = playRegion(song).calls.filter((call) => call.kind === 'noteOn');
     expect(notes.map((note) => note.tick)).toEqual(
       onsets.map((call) => Math.round(call.time! / SPT)),
     );
     expect(notes.length).toBeLessThan(64);
-    expect(seqLanes).toEqual(['skipChance']);
+    expect(seqLanes).toEqual(['probability']);
   });
 
   it('a part with none reads none', () => {

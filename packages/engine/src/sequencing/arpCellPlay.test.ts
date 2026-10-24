@@ -1,7 +1,8 @@
 /**
  * How one arp cell plays (windsor#129): the cell index, the gate's
- * look-ahead, the octave shift and its MIDI fallback, the skip draw and its
- * own stream, and what each kind of cell emits over the note held into it.
+ * look-ahead, the octave shift and its MIDI fallback, step variation on a
+ * cell and its own stream, and what each kind of cell emits over the note
+ * held into it.
  * The arpeggiator driving them is `arpeggiatorGrid.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
@@ -11,18 +12,21 @@ import { GATE_MIN } from '../audioConstants';
 import {
   arpCellIndex,
   arpPlayedGate,
-  arpSkipRng,
-  arpSkipSeed,
+  arpVariationRng,
+  arpVariationSeed,
+  flipCell,
   holdsToNext,
   playArpCell,
   shiftOctave,
-  skipCell,
   strikeCell,
+  variedCell,
   type ArpCellConfig,
   type ArpOnset,
+  type ArpVariationContext,
 } from './arpCellPlay';
 import { arpNote, defaultArpSteps, type ArpStep } from './arpSteps';
 import { hashSeed, streamRng } from './generatorSeed';
+import type { StepDraw } from './stepVariation';
 
 const TIE: ArpStep = { kind: 'tie' };
 const REST: ArpStep = { kind: 'rest' };
@@ -75,29 +79,40 @@ describe('the octave shift', () => {
   });
 });
 
-describe('skip chance', () => {
-  const counting = (value: number) => {
-    const rng = () => {
-      rng.draws++;
-      return value;
-    };
-    rng.draws = 0;
-    return rng;
-  };
-
-  it('draws nothing at 0, and nothing for a tie or a rest', () => {
-    const rng = counting(0);
-    expect(skipCell(arpNote(), 0, rng)).toEqual(arpNote());
-    expect(skipCell(TIE, 1, rng)).toBe(TIE);
-    expect(skipCell(REST, 1, rng)).toBe(REST);
-    expect(rng.draws).toBe(0);
+describe('step variation on a cell (windsor#935)', () => {
+  const DRAW: StepDraw = { flip: 0, velocity: -1, pitch: 1, gate: 1 };
+  const LIST = [48, 52, 55, 60];
+  const context = (over: Partial<ArpVariationContext['config']> = {}): ArpVariationContext => ({
+    list: LIST,
+    at: 1,
+    config: { gate: 0.5, randomness: 1, octaveMode: false, ...over },
   });
 
-  it('turns a note into a rest when its one draw falls under the chance', () => {
-    const rng = counting(0.4);
-    expect(skipCell(arpNote({ accent: true }), 0.5, rng)).toEqual(REST);
-    expect(skipCell(arpNote({ accent: true }), 0.4, rng).kind).toBe('note');
-    expect(rng.draws).toBe(2);
+  it('flips a note to a rest and a rest to a plain note; a tie never flips', () => {
+    expect(flipCell(arpNote({ accent: true, ratchet: 3 }))).toEqual(REST);
+    expect(flipCell(REST)).toEqual(arpNote());
+    expect(flipCell(TIE)).toBe(TIE);
+  });
+
+  it('plays as written with no draw, and varies nothing on a tie or a rest', () => {
+    const cell = arpNote({ octave: 1, gate: 0.5 });
+    expect(variedCell(cell, null, context())).toEqual({ cell, pitch: 52, gate: 0.25 });
+    expect(variedCell(TIE, DRAW, context())).toEqual({ cell: TIE, pitch: 52, gate: 0.5 });
+  });
+
+  it('borrows the list neighbour a normal offset away, wrapping, and keeps the cell', () => {
+    const cell = arpNote({ octave: 1 });
+    // z = 1: σ = 0.25 × 4 notes = 1 place up; the gate moves up 0.25 and the velocity down 0.2.
+    const varied = variedCell(cell, DRAW, context());
+    expect(varied).toEqual({ cell, pitch: 55, gate: 0.75, velocity: 0.8 });
+    const wrapped = variedCell(cell, { ...DRAW, pitch: 2.5 }, { ...context(), at: 3 });
+    expect(wrapped.pitch).toBe(LIST[(3 + 3) % 4]);
+  });
+
+  it('with Octave on, moves the cell’s own note by whole octaves, its shift folded into the pitch', () => {
+    const varied = variedCell(arpNote({ octave: 1 }), DRAW, context({ octaveMode: true }));
+    expect(varied.cell).toEqual(arpNote({ octave: 0 }));
+    expect(varied.pitch).toBe(52 + 12 + 12);
   });
 
   it('its stream is its own: not the walk stream, and deterministic per seed and region', () => {
@@ -106,14 +121,20 @@ describe('skip chance', () => {
       [7, 0],
       [7, 1],
     ] as const) {
-      expect(arpSkipSeed(seed, region)).not.toBe(hashSeed(seed, region));
-      const skip = arpSkipRng(seed, region);
+      expect(arpVariationSeed(seed, region)).not.toBe(hashSeed(seed, region));
+      const variation = arpVariationRng(seed, region);
       const walk = streamRng(seed, region);
-      const skipDraws = Array.from({ length: 8 }, skip);
-      expect(skipDraws).not.toEqual(Array.from({ length: 8 }, walk));
-      expect(Array.from({ length: 8 }, arpSkipRng(seed, region))).toEqual(skipDraws);
+      const draws = Array.from({ length: 8 }, variation);
+      expect(draws).not.toEqual(Array.from({ length: 8 }, walk));
+      expect(Array.from({ length: 8 }, arpVariationRng(seed, region))).toEqual(draws);
     }
-    expect(arpSkipSeed(7, 1)).not.toBe(arpSkipSeed(7, 0));
+    expect(arpVariationSeed(7, 1)).not.toBe(arpVariationSeed(7, 0));
+  });
+
+  it('a varied velocity reaches the note-on, and a plain onset sends none', () => {
+    const on = (o: ReturnType<typeof playArpCell>) => o.events.find((e) => e.kind === 'noteOn');
+    expect(on(playArpCell(onset({ velocity: 0.6 }), CONFIG))).toMatchObject({ velocity: 0.6 });
+    expect(on(playArpCell(onset(), CONFIG))).not.toHaveProperty('velocity');
   });
 });
 

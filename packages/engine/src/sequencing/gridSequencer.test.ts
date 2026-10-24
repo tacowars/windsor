@@ -177,29 +177,6 @@ describe('GridSequencer', () => {
     ).toEqual([48 + 3 + 12, 48 + 10]);
   });
 
-  it('skipChance is deterministic per seed and a skipped step rests', () => {
-    const line = Array.from({ length: 16 }, () => gridNote(0));
-    const a = run(make(line, { skipChance: 0.5, seed: 7 }), 4);
-    const b = run(make(line, { skipChance: 0.5, seed: 7 }), 4);
-    const c = run(make(line, { skipChance: 0.5, seed: 8 }), 4);
-    expect(a).toEqual(b);
-    expect(a).not.toEqual(c);
-    const played = ons(a).length;
-    expect(played).toBeGreaterThan(0);
-    expect(played).toBeLessThan(64);
-    // A skipped step released the note before it: every on is followed by its
-    // own off, and a skipped step is silence (no on at that tick).
-    const onTicks = new Set(ons(a).map((e) => e.tick));
-    for (let step = 0; step < 64; step++) {
-      const tick = step * DIVISORS.sixteenth;
-      if (!onTicks.has(tick)) {
-        expect(a.some((e) => e.kind === 'noteOn' && e.tick === tick)).toBe(false);
-      }
-    }
-    // With no skip every step plays.
-    expect(ons(run(make(line, { skipChance: 0 }), 4))).toHaveLength(64);
-  });
-
   it('loops over the first `length` steps and keeps the rest written (#603)', () => {
     const seq = make([gridNote(0), gridNote(2), gridNote(4), gridNote(6)], { length: 3 });
     expect(seq.length).toBe(3);
@@ -213,11 +190,12 @@ describe('GridSequencer', () => {
     expect(() => make([gridNote()], { length: 0 })).toThrow(RangeError);
   });
 
-  it('reconfigures live: the held note and the skip stream carry on, a new sampler re-pitches (#603)', () => {
+  it('reconfigures live: the held note and the variation stream carry on, a new sampler re-pitches (#603)', () => {
     const line = Array.from({ length: 8 }, (_, i) => gridNote(i % 3));
-    const uninterrupted = run(make(line, { skipChance: 0.5, seed: 3 }), 4);
+    const varied = { randomness: 1, probability: 0.5, restsSound: true, seed: 3 };
+    const uninterrupted = run(make(line, varied), 4);
     // The same line, with a mid-run reconfigure that changes nothing audible.
-    const seq = make(line, { skipChance: 0.5, seed: 3 });
+    const seq = make(line, varied);
     const transport = new TickTransport(120);
     const events: NoteEvent[] = [];
     seq.onNote = (e) => events.push(e);
@@ -272,7 +250,8 @@ describe('GridSequencer', () => {
     expect(() => make([gridNote(-1)])).toThrow(RangeError);
     expect(() => make([gridNote(0, { octave: 3 })])).toThrow(RangeError);
     expect(() => make([gridNote()], { divisor: 5 })).toThrow(RangeError);
-    expect(() => make([gridNote()], { skipChance: 1.5 })).toThrow(RangeError);
+    expect(() => make([gridNote()], { randomness: 1.5 })).toThrow(RangeError);
+    expect(() => make([gridNote()], { probability: -0.1 })).toThrow(RangeError);
     expect(() => make([gridNote()], { accentVelocity: -0.1 })).toThrow(RangeError);
     expect(() => make([gridNote()], { accentMod: 2 })).toThrow(RangeError);
     expect(defaultGridSteps()).toHaveLength(16);

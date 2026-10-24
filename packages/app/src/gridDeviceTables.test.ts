@@ -14,10 +14,7 @@ describe('the Grid device’s columns (windsor#368)', () => {
     expect(new Set(placed).size).toBe(placed.length);
   });
 
-  it('puts Vel, Acc vel and Acc mod together, then Skip alone', () => {
-    expect(GRID_KNOB_COLUMNS).toEqual([
-      ['velocity', 'accentVelocity', 'accentMod'],
-      ['skipChance'],
-    ]);
+  it('puts Vel, Acc vel and Acc mod together', () => {
+    expect(GRID_KNOB_COLUMNS).toEqual([['velocity', 'accentVelocity', 'accentMod']]);
   });
 });

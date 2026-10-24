@@ -171,6 +171,9 @@ describe('a song without region patterns (windsor#74)', () => {
   });
 });
 
-/** Read on main at c0b2776, before windsor#74. */
-const PINNED_CALLS = 478;
-const PINNED_DIGEST = '2bc8041ea1ca2609425d64823ed828a946e0b1dae079357a8d288bb868b9c1d8';
+/**
+ * Read on main at c0b2776, before windsor#74; re-read for windsor#935, when
+ * step variation replaced the fixture Grid's Skip.
+ */
+const PINNED_CALLS = 515;
+const PINNED_DIGEST = 'e131c78f707eb24775036cec32df327bcefb84dd992c1243655836c310a7ebb5';

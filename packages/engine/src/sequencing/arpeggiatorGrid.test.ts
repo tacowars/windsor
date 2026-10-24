@@ -1,8 +1,8 @@
 /**
  * The Arpeggiator playing its step grid (windsor#129, epic windsor#126):
- * accent over the style's cycle, the octave shift, tie, slide, rest, skip
- * chance and its own stream, the lanes, the cell across a chord change with
- * and without retrigger, and `stepAt`. Driven tick by tick as the region
+ * accent over the style's cycle, the octave shift, tie, slide, rest, the
+ * lanes, the cell across a chord change with and without retrigger, and
+ * `stepAt`. Step variation is `arpeggiatorVariation.test.ts`. Driven tick by tick as the region
  * gate would, over a C-minor triad at one octave (L = 3) unless it says
  * otherwise. The cell rules alone are `arpCellPlay.test.ts`.
  */
@@ -85,7 +85,7 @@ const CM = [0, 3, 7].map((o) => c4 + o);
 const HALF_GATE = QUARTER / 2;
 
 describe('unchanged by default', () => {
-  it('default cells, no lanes and skip 0 play the walk: an off then an on at each onset, off at gate', () => {
+  it('default cells, no lanes and no variation play the walk: an off then an on at each onset, off at gate', () => {
     const events = run({ style: 'up' }, 6);
     const expected: NoteEvent[] = [];
     for (let s = 0; s < 6; s++) {
@@ -191,29 +191,6 @@ describe('rest', () => {
       const rested = pitchByStep(run({ style, seed: 11, octaves: 2, steps: cells({ 1: REST }) }));
       expect(rested, style).toEqual(plain.map((n, s) => (s % 6 === 1 ? null : n)));
     }
-  });
-});
-
-describe('skip chance', () => {
-  it('at 1 every note cell rests; a tie after one plays nothing either', () => {
-    expect(onsOf(run({ skipChance: 1, steps: cells({ 1: TIE }) }))).toEqual([]);
-  });
-
-  it('at 0.5 some notes rest, and the walk under random plays the same pitches as at 0', () => {
-    const at0 = pitchByStep(run({ style: 'random', seed: 3, octaves: 2 }, 32), 32);
-    const half = pitchByStep(
-      run({ style: 'random', seed: 3, octaves: 2, skipChance: 0.5 }, 32),
-      32,
-    );
-    const skipped = half.filter((n) => n === null).length;
-    expect(skipped).toBeGreaterThan(4);
-    expect(skipped).toBeLessThan(28);
-    expect(half).toEqual(at0.map((n, s) => (half[s] === null ? null : n)));
-  });
-
-  it('draws the same skips for the same seed and region', () => {
-    const over = { skipChance: 0.5, seed: 4 };
-    expect(pitchByStep(run(over, 32), 32)).toEqual(pitchByStep(run(over, 32), 32));
   });
 });
 

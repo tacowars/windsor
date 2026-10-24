@@ -1,8 +1,10 @@
 /**
  * The arp's step grid through the document normaliser (windsor#127): absent
  * fields are the plain grid, silently; a cell, a list or a lane the grid
- * would correct is corrected and reported the same way; and a region's own
- * arp pattern carries and normalises the same fields.
+ * would correct is corrected and reported the same way; step variation's
+ * four fields (windsor#935) are filled, clamped and reported, and Skip is
+ * dropped; and a region's own arp pattern carries and normalises the same
+ * fields.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -42,7 +44,7 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
     expect(corrections).toEqual([]);
     expect(spec).toStrictEqual({ kind: 'arp', ...DEFAULT_ARP_CONFIG });
     expect(spec.steps).toEqual(defaultArpSteps());
-    expect(spec).toMatchObject({ lanes: [], accentVelocity: 0.2, accentMod: 1, skipChance: 0 });
+    expect(spec).toMatchObject({ lanes: [], accentVelocity: 0.2, accentMod: 1, randomness: 0 });
   });
 
   it('keeps a written grid exactly', () => {
@@ -53,7 +55,8 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
       arpNote({ octave: 1, slide: true }),
     ]);
     const lanes = [{ param: 'filter.cutoff', values: zeros().map((_, i) => (i % 2) * 0.5) }];
-    const written = { steps, lanes, accentVelocity: 0.7, accentMod: 0.3, skipChance: 0.25 };
+    const variation = { randomness: 0.25, probability: 0.5, restsSound: true, octaveMode: true };
+    const written = { steps, lanes, accentVelocity: 0.7, accentMod: 0.3, ...variation };
     const { spec, corrections } = arp(written);
     expect(corrections).toEqual([]);
     expect(spec).toStrictEqual({ kind: 'arp', ...DEFAULT_ARP_CONFIG, ...written });
@@ -132,14 +135,32 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
     expect(lanes[0]?.values).toEqual([0.5, ...zeros().slice(1)]);
   });
 
-  it('clamps the accent and skip amounts to 0–1, reported', () => {
-    const { spec, corrections } = arp({ accentVelocity: 2, accentMod: -1, skipChance: 'often' });
+  it('clamps the accent amounts to 0–1, reported', () => {
+    const { spec, corrections } = arp({ accentVelocity: 2, accentMod: -1 });
     expect(corrections).toEqual([
       `${PATH}.accentVelocity: clamped 2 to 1`,
       `${PATH}.accentMod: clamped -1 to 0`,
-      `${PATH}.skipChance: "often" is not a number — using 0`,
     ]);
-    expect(spec).toMatchObject({ accentVelocity: 1, accentMod: 0, skipChance: 0 });
+    expect(spec).toMatchObject({ accentVelocity: 1, accentMod: 0 });
+  });
+
+  it('fills step variation’s fields, clamps and reports junk, and drops Skip (windsor#935)', () => {
+    const { spec, corrections } = arp({
+      randomness: 1.5,
+      probability: 'often',
+      restsSound: 'yes',
+      skipChance: 0.5,
+    });
+    expect(spec).toMatchObject({
+      randomness: 1,
+      probability: 0,
+      restsSound: false,
+      octaveMode: false,
+    });
+    expect(spec).not.toHaveProperty('skipChance');
+    expect(corrections).toHaveLength(4);
+    expect(corrections.join('\n')).toMatch(/skipChance: unknown key dropped/);
+    expect(corrections.join('\n')).toMatch(/randomness: clamped 1.5 to 1/);
   });
 });
 
@@ -194,7 +215,8 @@ describe("a region's arp pattern carries the grid (windsor#127)", () => {
       steps,
       lanes,
       accentMod: 0.5,
-      skipChance: 0.1,
+      randomness: 0.1,
+      probability: 0.9,
     };
     delete good.seed;
     const regions = [
@@ -214,7 +236,8 @@ describe("a region's arp pattern carries the grid (windsor#127)", () => {
       steps: padded([{ kind: 'tie' }]),
       lanes: [],
       accentVelocity: DEFAULT_ARP_CONFIG.accentVelocity,
-      skipChance: 0,
+      randomness: 0,
+      probability: 0,
     });
     const again = makeArrangement(JSON.parse(JSON.stringify(result.document)));
     expect(again.corrections).toEqual([]);

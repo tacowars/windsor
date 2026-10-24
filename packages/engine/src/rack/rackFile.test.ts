@@ -267,7 +267,7 @@ describe('what refuses a rack file', () => {
 
   it('leaves a format that is not an integer to the validator', () => {
     expect(() => loadRackFile('bad', { ...file(), format: '1' })).toThrow(
-      /format: expected 1, got "1"/,
+      new RegExp(`format: expected ${RACK_FILE_FORMAT}, got "1"`),
     );
     expect(() => loadRackFile('bad', { ...file(), patchFormat: 4.5 })).toThrow(
       /patchFormat: expected 4, got 4.5/,

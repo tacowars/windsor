@@ -20,6 +20,7 @@ import type { RecordingPart } from '../__fixtures__/recordingPart';
 import { PRESETS } from '../patch/presets';
 import { gridNote } from '../sequencing/gridSequencer';
 import { DIVISORS, Scheduler, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import type { Arrangement, GridSpec, MusicPart, SongLoop } from './arrangement';
 import { ArrangementPlayer } from './arrangementPlayer';
 
@@ -35,7 +36,7 @@ const ladder = (degrees: number[]): Omit<GridSpec, 'seed'> => ({
   divisor: EIGHTH,
   steps: degrees.map((degree) => gridNote(degree)),
   length: degrees.length,
-  skipChance: 0,
+  ...STEP_VARIATION_DEFAULTS,
   accentVelocity: 0.2,
   accentMod: 1,
   register: { octave: 3 },

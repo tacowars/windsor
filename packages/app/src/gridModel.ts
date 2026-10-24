@@ -21,6 +21,8 @@ import {
   gridNote,
   pitchClassName,
   scaleOffsets,
+  variationFlipsRests,
+  variationMovesPitch,
 } from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 import type { StepSlide } from './stepModLaneModel';
@@ -254,18 +256,22 @@ function relativePitch(step: GridNoteStep, key: Key): number {
  * read the way `GridSequencer.noteStep` decides it. `kind` is what a Slide
  * does once a note is held: `none` for a rest, a tie, a note without Slide
  * or a Slide after a rest; `retarget` onto a different pitch; `same` onto
- * the pitch already held. The held note is the latest note before the
+ * the pitch already held; `either` when step variation may move a pitch
+ * (`variationMovesPitch`: a borrow with Octave off, an octave shift with it
+ * on), since the run then decides whether the two pitches differ, as a
+ * random Arp style's does. The held note is the latest note before the
  * step, walking back over ties (a rest holds nothing).
  *
  * `when` says whether the run can change that. The engine holds nothing on
  * a region's entry, so a Slide whose held note comes from wrapping round
  * the loop (step 1 among them) plays its own values on entry and is held
- * only once the loop wraps: `wrap`. Skip drops a note step as a rest, which
- * releases the held note, so with Skip above 0 a Slide after a note may
- * play too: `skip`. Otherwise the line decides it alone: `always`.
+ * only once the loop wraps: `wrap`. Step variation with Rests sound on may
+ * drop a note step as a rest, which releases the held note, so then a
+ * Slide after a note may play too (`variationFlipsRests`): `skip`.
+ * Otherwise the line decides it alone: `always`.
  */
 export function slideAt(
-  spec: Pick<GridSpec, 'steps' | 'length' | 'skipChance'>,
+  spec: Pick<GridSpec, 'steps' | 'length' | 'randomness' | 'probability' | 'restsSound'>,
   index: number,
   key: Key,
 ): StepSlide {
@@ -278,8 +284,12 @@ export function slideAt(
     const prev = steps[(((index - back) % n) + n) % n];
     if (!prev || prev.kind === 'rest') return none;
     if (prev.kind === 'tie') continue;
-    const kind = relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
-    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    const kind = variationMovesPitch(spec)
+      ? 'either'
+      : relativePitch(prev, key) === relativePitch(step, key)
+        ? 'same'
+        : 'retarget';
+    const when = back > index ? 'wrap' : variationFlipsRests(spec) ? 'skip' : 'always';
     return { kind, when };
   }
   return none;

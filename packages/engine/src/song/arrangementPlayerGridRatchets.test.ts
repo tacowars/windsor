@@ -15,6 +15,7 @@ import type { Arrangement, GridSpec, PartRegion, Transport } from './arrangement
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import { gridNote, type GridStep } from '../sequencing/gridSequencer';
 import { DIVISORS, PPQ } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 
 const BPM = 120;
@@ -41,7 +42,7 @@ function song(steps: readonly GridStep[], over: GridSong = {}): Arrangement {
     divisor: SIXTEENTH,
     steps,
     length: steps.length,
-    skipChance: 0,
+    ...STEP_VARIATION_DEFAULTS,
     ...over.grid,
   };
   const base = {
@@ -132,7 +133,7 @@ describe('Grid ratchets through the player (windsor#366)', () => {
     ]);
   });
 
-  it('skips the same steps with and without ratchets, and a skipped step plays no hit', () => {
+  it('silences the same steps with and without ratchets, and a silenced step plays no hit', () => {
     const plain = Array.from({ length: 16 }, (_, i) => gridNote(i % 5));
     const ratcheted = plain.map((step, i) => ({ ...step, ratchet: 2 + (i % 3) }));
     const startsOf = (calls: readonly Call[]): number[] => [
@@ -140,14 +141,14 @@ describe('Grid ratchets through the player (windsor#366)', () => {
     ];
     const hitsIn = (calls: readonly Call[], step: number): Call[] =>
       sounding(calls).filter(inStep(step));
-    const grid = { skipChance: 0.5 };
+    const grid = { randomness: 1, probability: 1, restsSound: true };
     const without = play(song(plain, { grid }), 4);
     const withRatchets = play(song(ratcheted, { grid }), 4);
     const steps = startsOf(without);
     expect(steps.length).toBeGreaterThan(16);
     expect(steps.length).toBeLessThan(48);
     expect(startsOf(withRatchets)).toEqual(steps);
-    // Every sounding step rolls its whole ratchet; the skipped ones play nothing.
+    // Every sounding step rolls its whole ratchet; the silenced ones play nothing.
     for (const step of steps) {
       expect(hitsIn(withRatchets, step), `step ${step}`).toHaveLength(2 + ((step % 16) % 3));
     }

@@ -92,7 +92,11 @@ const ARP: MusicPart & { sequencer: GridSpec } = {
     divisor: 12,
     steps: [0, 2, 4, 2, 5, 4, 2, 1].map((degree) => gridNote(degree)),
     length: 8,
-    skipChance: 0.3,
+    // Step variation (windsor#935) in place of the Skip of 0.3 it carried.
+    randomness: 0.5,
+    probability: 0.6,
+    restsSound: true,
+    octaveMode: false,
     accentVelocity: 0.2,
     accentMod: 0.5,
     // D4 = 62: the same notes the fixture sounded when the register was root-relative.

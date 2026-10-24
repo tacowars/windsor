@@ -42,17 +42,22 @@ function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
     pulses: { min: 8, max: 24, start: 12 },
     density: { kind: 'walk', stepChance: 0.9 },
   });
-  // The two pitched parts are grids whose only draw is the seeded skip (#704:
-  // the arpeggiator and step sequencer that held these slots are gone).
+  // The two pitched parts are grids whose only draws are step variation's
+  // (#704: the arpeggiator and step sequencer that held these slots are gone;
+  // windsor#935: step variation replaced the seeded skip).
   const arp = new GridSequencer(sampler, {
     ...DEFAULT_GRID_CONFIG,
-    skipChance: 0.5,
+    randomness: 1,
+    probability: 0.5,
+    restsSound: true,
     seed: seeds.arp,
   });
   const drone = new GridSequencer(sampler, {
     ...DEFAULT_GRID_CONFIG,
     divisor: 24,
-    skipChance: 0.5,
+    randomness: 1,
+    probability: 0.5,
+    restsSound: true,
     seed: seeds.drone,
   });
   kick.onOnset = (e) => out.kick.push(e);

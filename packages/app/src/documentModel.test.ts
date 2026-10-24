@@ -231,7 +231,7 @@ describe('grid parts (#603)', () => {
             seed: 7,
             steps: long,
             length: 24,
-            skipChance: 0.1,
+            randomness: 0.1,
             accentMod: 0.8,
           },
         },

@@ -43,9 +43,9 @@ export const ARP_RANDOM: ArpRandomTable = {
 /**
  * The device's table knobs after Octave, Octaves and Rotate (windsor#370
  * decision 2; the mockup's order), in columns of three, named by the field
- * each writes: the dynamics, then Gate and Skip.
+ * each writes: the dynamics, then Gate.
  */
 export const ARP_KNOB_COLUMNS: readonly (readonly SequencerKnobEntry['f'][])[] = [
   ['velocity', 'accentVelocity', 'accentMod'],
-  ['gate', 'skipChance'],
+  ['gate'],
 ];

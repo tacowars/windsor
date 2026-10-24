@@ -7,10 +7,16 @@
  *
  * The arp's step grid (windsor#127) takes the grid's rules: a cell as a grid
  * step without its degree, its ratchet included (windsor#366), plus a gate
- * of its own (windsor#933), and the grid's lanes, accent and skip ranges. Its
+ * of its own (windsor#933), and the grid's lanes and accent ranges. Its
  * cells are always exactly `ARP_STEPS_MAX`: an absent list is every cell a
  * plain note, silently; a short, long or junk one is padded with plain notes
  * or trimmed, reported.
+ *
+ * Step variation's four fields (windsor#935, `stepVariationFields`), which
+ * the Grid's normaliser reads too: Randomness and Probability in 0–1, Rests
+ * sound and Octave booleans, each its default when absent and reported when
+ * junk. Skip is gone from both kinds, so a `skipChance` is dropped as an
+ * unknown key.
  *
  * Basslead's step strip (windsor#367) takes the same cell, its gate
  * dropped as an unknown key, and the Grid's list rules: 1–`GRID_STEPS_MAX` steps, a `length` within them, lanes one
@@ -26,6 +32,8 @@ import {
 } from '../audioConstants';
 import { CHORD_VOICING_DEFAULT, CHORD_VOICING_IDS } from '../harmony/chordTables';
 import { ARP_STYLES, DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
+import type { StepVariationConfig } from '../sequencing/stepVariation';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
 import { arpNote, defaultArpSteps, type ArpStep } from '../sequencing/arpSteps';
 import {
@@ -46,6 +54,24 @@ import {
   unpitchedStep,
 } from './sequencerFields';
 
+/** The keys step variation adds to a Grid or an Arp (windsor#935). */
+export const STEP_VARIATION_KEYS = ['randomness', 'probability', 'restsSound', 'octaveMode'];
+
+/** A Grid's or an Arp's step variation fields: each its default when absent, clamped or reported when junk. */
+export function stepVariationFields(
+  o: Record<string, unknown>,
+  path: string,
+  n: FieldNormaliser,
+): StepVariationConfig {
+  const d = STEP_VARIATION_DEFAULTS;
+  return {
+    randomness: n.num(o.randomness, d.randomness, 0, 1, `${path}.randomness`),
+    probability: n.num(o.probability, d.probability, 0, 1, `${path}.probability`),
+    restsSound: n.bool(o.restsSound, d.restsSound, `${path}.restsSound`),
+    octaveMode: n.bool(o.octaveMode, d.octaveMode, `${path}.octaveMode`),
+  };
+}
+
 const ARP_KEYS = [
   'style',
   'divisor',
@@ -58,7 +84,7 @@ const ARP_KEYS = [
   'lanes',
   'accentVelocity',
   'accentMod',
-  'skipChance',
+  ...STEP_VARIATION_KEYS,
   'seed',
 ];
 
@@ -78,7 +104,7 @@ export function arpDriver(raw: unknown, path: string, n: FieldNormaliser): ArpDr
     lanes: stepModLanes(o.lanes, ARP_STEPS_MAX, `${path}.lanes`, n),
     accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
     accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
-    skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
+    ...stepVariationFields(o, path, n),
     seed: seed(o.seed, `${path}.seed`, n),
   };
 }

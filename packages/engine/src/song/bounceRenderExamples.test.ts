@@ -1,7 +1,8 @@
 /**
  * Bounce to Roll's render against the record's worked examples (windsor#740,
  * `docs/log/2026-10-11-bounce-to-roll.md`): the velocity table, the Acid
- * Saw bar and its slide over the bar line, and the Arp's skip take. Since
+ * Saw bar and its slide over the bar line, and the Arp's varied take (the
+ * record's skip take until windsor#935 replaced Skip). Since
  * windsor#755 (record `2026-10-12-roll-note-accent-and-ratchet` decision
  * 11) an accent is written as `accent` at its level without the bump, which
  * its region's roll plays back, so nothing is baked or lost.
@@ -18,7 +19,7 @@ import { TICKS_PER_BAR } from '../sequencing/scheduler';
 /**
  * The Acid Saw line of
  * `docs/research/2026-10-04-acid-ladder-filter/audition/acid-audition.song.json`:
- * 16 steps at 1/16 in A natural minor at register octave 1, skip chance 0.
+ * 16 steps at 1/16 in A natural minor at register octave 1, nothing varied.
  */
 const ACID_SAW: readonly GridStep[] = [
   gridNote(0, { accent: true }),
@@ -145,10 +146,11 @@ describe('the velocity table (decision 4), its accents written as `accent` (wind
 });
 
 describe('the Arp that never repeats (decision 5’s second example)', () => {
-  it('skips the record’s fifteen onsets of 64 and plays the 49 others', () => {
-    const arp: ArpSpec = { kind: 'arp', ...DEFAULT_ARP_CONFIG, skipChance: 0.25, seed: 0 };
+  it('rests seventeen onsets of 64 and plays the 47 others', () => {
+    const varied = { randomness: 1, probability: 0.5, restsSound: true };
+    const arp: ArpSpec = { kind: 'arp', ...DEFAULT_ARP_CONFIG, ...varied, seed: 0 };
     const { notes } = render(bounceSong(arp));
-    expect(notes).toHaveLength(49);
+    expect(notes).toHaveLength(47);
     const onsets = new Set(notes.map((note) => note.tick));
     const bars = [0, 1, 2, 3].map((bar) =>
       Array.from({ length: 16 }, (_, i) =>
@@ -156,7 +158,7 @@ describe('the Arp that never repeats (decision 5’s second example)', () => {
       ).join(''),
     );
     expect(bars.join('   ')).toBe(
-      'xx..........x...   x....x......x...   .....x...xx.x.xx   .......x....x.x.',
+      'xx......xx......   xxx...x....x.xxx   .x....x.......xx   ..........x.....',
     );
   });
 });

@@ -33,6 +33,8 @@ import {
   chordName,
   eventChord,
   scaleOffsets,
+  variationFlipsRests,
+  variationMovesPitch,
 } from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
 import {
@@ -185,15 +187,19 @@ export function randomArpCells(
  * the shown chord: `retarget` when they differ, `same` when they meet, as
  * a two-octave list can make two cells land an octave apart and a shift
  * close the gap. A random style draws its pitch in the run, so a slide
- * there is `either`, which the lanes show as playing only if it moves.
+ * there is `either`, which the lanes show as playing only if it moves, and
+ * so is any slide while step variation may move a pitch
+ * (`variationMovesPitch`: a borrow from the list with Octave off, an octave
+ * shift with it on).
  *
  * `when`: a slide whose held note comes from wrapping round the cycle
  * (cell 1 among them) is held only once the cycle wraps, as a region's
- * entry and a retrigger reset strike it plain: `wrap`. With Skip above 0
- * the note before it may rest: `skip`. Otherwise `always`.
+ * entry and a retrigger reset strike it plain: `wrap`. When step variation
+ * may flip a note to a rest (`variationFlipsRests`) the note before it may
+ * rest: `skip`. Otherwise `always`.
  */
 export function arpSlideAt(
-  spec: Pick<ArpSpec, 'steps' | 'skipChance' | 'style'>,
+  spec: Pick<ArpSpec, 'steps' | 'style' | 'randomness' | 'probability' | 'restsSound'>,
   index: number,
   list: readonly number[],
 ): StepSlide {
@@ -208,8 +214,9 @@ export function arpSlideAt(
     if (prev.kind === 'tie') continue;
     const held = arpCellPitch(style, at, list, prev.octave);
     const next = arpCellPitch(style, index, list, step.octave);
-    const kind = held === null || next === null ? 'either' : held === next ? 'same' : 'retarget';
-    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    const drawn = held === null || next === null || variationMovesPitch(spec);
+    const kind = drawn ? 'either' : held === next ? 'same' : 'retarget';
+    const when = back > index ? 'wrap' : variationFlipsRests(spec) ? 'skip' : 'always';
     return { kind, when };
   }
   return NO_SLIDE;

@@ -2,9 +2,10 @@
  * A song with no `ratchet` anywhere plays exactly what it played before Grid
  * and Arp ratchets (windsor#366, decision 7): every call a Grid part and an
  * Arp part make over eight bars of a swung, looping song with rests, ties,
- * slides, accents, skips, a lane and a region gap, digested. The digests
- * were read from `main` before the ratchet change, so any drift in what a
- * plain step plays fails here.
+ * slides, accents, step variation, a lane and a region gap, digested. The
+ * digests were read from `main` before the ratchet change, so any drift in
+ * what a plain step plays fails here; windsor#935 re-read them when step
+ * variation replaced the skips the song carried.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -42,7 +43,9 @@ const GRID: GridSpec = {
   divisor: 6,
   steps: GRID_STEPS,
   length: 11,
-  skipChance: 0.25,
+  randomness: 0.5,
+  probability: 0.4,
+  restsSound: true,
   lanes: [{ param: 'filter.cutoff', values: GRID_STEPS.map((_, i) => (i % 3) / 3) }],
 };
 
@@ -65,7 +68,9 @@ const ARP: ArpSpec = {
   gate: 0.5,
   octaves: 2,
   retrigger: true,
-  skipChance: 0.2,
+  randomness: 0.5,
+  probability: 0.4,
+  restsSound: true,
   seed: 7,
   steps: DEFAULT_ARP_CONFIG.steps.map((cell, i) => ARP_CELLS[i % ARP_CELLS.length] ?? cell),
 };
@@ -113,10 +118,12 @@ describe('a song with no ratchet plays as before (windsor#366)', () => {
     // a Ratio row per operator (codes 10, 16, 22 and 28), so a note-on's step
     // array carries four more zeros; with them taken out, the calls hash to
     // the old `d00c74d8db900434`.
-    expect(play(GRID)).toEqual({ count: 84, digest: '9229d9fbc99166f2' });
+    // Re-pinned for windsor#935: step variation replaced the Grid's Skip.
+    expect(play(GRID)).toEqual({ count: 118, digest: 'e29635ce74c7eeb6' });
   });
 
   it('an Arp part', () => {
-    expect(play(ARP)).toEqual({ count: 146, digest: 'db9e2f35e3ffb29b' });
+    // Re-pinned for windsor#935: step variation replaced the Arp's Skip.
+    expect(play(ARP)).toEqual({ count: 162, digest: 'e2d52bea94c348ab' });
   });
 });
