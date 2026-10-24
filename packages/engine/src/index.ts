@@ -97,6 +97,14 @@ export type { DrumSequencerConfig } from './sequencing/drumSequencer';
 export { DRUM_STEP_KINDS, defaultDrumSteps, drumHit } from './sequencing/drumSteps';
 export type { DrumHitStep, DrumStep, DrumStepKind } from './sequencing/drumSteps';
 export { DRUM_GATE_DEFAULT, DRUM_PITCH_MAX } from './sequencing/drumConstants';
+// Its pattern bank (windsor#950): thirty one-bar presets in the picker's groups.
+export {
+  DRUM_PATTERN_GROUPS,
+  DRUM_PATTERNS,
+  applyDrumPattern,
+  drumPatternOf,
+} from './sequencing/drumPatterns';
+export type { DrumPattern, DrumPatternGroup } from './sequencing/drumPatterns';
 // Step variation on the Grid and the Arp (windsor#935): its fields, defaults and tunables.
 export { variationFlipsRests, variationMovesPitch } from './sequencing/stepVariation';
 export type { StepVariationConfig } from './sequencing/stepVariation';

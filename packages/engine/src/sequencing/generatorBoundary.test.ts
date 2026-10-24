@@ -87,6 +87,15 @@ const PURE_FILES = [
   'drumSequencer.ts',
   'drumSteps.ts',
   'drumConstants.ts',
+  // Its pattern bank (windsor#950): the presets, their notation and a table per group.
+  'drumPatterns.ts',
+  'drumPatternTables.ts',
+  'drumPatternTablesKick.ts',
+  'drumPatternTablesSnare.ts',
+  'drumPatternTablesClap.ts',
+  'drumPatternTablesHat.ts',
+  'drumPatternTablesOpenHat.ts',
+  'drumPatternTablesPerc.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',
