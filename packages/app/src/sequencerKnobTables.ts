@@ -26,6 +26,7 @@ import {
   DEFAULT_ARP_CONFIG,
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
+  DEFAULT_DRUM_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_FIGURE_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -80,6 +81,23 @@ export type CardKnobSpec = SeqKnobOpts & Pick<KnobSpec, 'label'>;
 
 const fmtSignedInt = (v: number): string => (v > 0 ? `+${v.toFixed(0)}` : v.toFixed(0));
 
+/**
+ * Acc vel and Acc mod: what an accented hit adds to the velocity and sends
+ * as mod, 0 to 1, over the kind's own defaults.
+ */
+const accentKnobs = (
+  defaults: Readonly<Record<'accentVelocity' | 'accentMod', number>>,
+): readonly DriverKnobEntry[] =>
+  (['accentVelocity', 'accentMod'] as const).map((f) => ({
+    kind: 'driver',
+    f,
+    label: { accentVelocity: 'Acc vel', accentMod: 'Acc mod' }[f],
+    o: { min: 0, max: 1, def: defaults[f], fmt: fmt2 },
+  }));
+
+/** The engine's accent amounts, for a kind whose `DEFAULT_*_CONFIG` leaves them out. */
+const ACCENT_DEFAULTS = { accentVelocity: ACCENT_VELOCITY_DEFAULT, accentMod: ACCENT_MOD_DEFAULT };
+
 /** The part's velocity, on every card. */
 export const VELOCITY_KNOB: SectionKnobEntry = {
   kind: 'section',
@@ -119,20 +137,7 @@ export const EUCLID_KNOBS: readonly SequencerKnobEntry[] = [
  * engine's `ACCENT_VELOCITY_DEFAULT` and `ACCENT_MOD_DEFAULT`, which
  * `DEFAULT_EUCLIDEAN_CONFIG` leaves out, so they are their own table.
  */
-export const EUCLID_ACCENT_KNOBS: readonly DriverKnobEntry[] = [
-  {
-    kind: 'driver',
-    f: 'accentVelocity',
-    label: 'Acc vel',
-    o: { min: 0, max: 1, def: ACCENT_VELOCITY_DEFAULT, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
-    f: 'accentMod',
-    label: 'Acc mod',
-    o: { min: 0, max: 1, def: ACCENT_MOD_DEFAULT, fmt: fmt2 },
-  },
-];
+export const EUCLID_ACCENT_KNOBS: readonly DriverKnobEntry[] = accentKnobs(ACCENT_DEFAULTS);
 
 export const EUCLID_STEPS_KNOB: CardKnobSpec = {
   label: 'Steps n',
@@ -183,18 +188,7 @@ const variationKnobs = (
 export const GRID_KNOBS: readonly SequencerKnobEntry[] = [
   VELOCITY_KNOB,
   ...variationKnobs(DEFAULT_GRID_CONFIG),
-  {
-    kind: 'driver',
-    f: 'accentVelocity',
-    label: 'Acc vel',
-    o: { min: 0, max: 1, def: DEFAULT_GRID_CONFIG.accentVelocity, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
-    f: 'accentMod',
-    label: 'Acc mod',
-    o: { min: 0, max: 1, def: DEFAULT_GRID_CONFIG.accentMod, fmt: fmt2 },
-  },
+  ...accentKnobs(DEFAULT_GRID_CONFIG),
 ];
 
 export const GRID_LENGTH_KNOB: CardKnobSpec = {
@@ -256,18 +250,24 @@ export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
  */
 export const ARP_GRID_KNOBS: readonly SequencerKnobEntry[] = [
   ...variationKnobs(DEFAULT_ARP_CONFIG),
+  ...accentKnobs(DEFAULT_ARP_CONFIG),
+];
+
+/**
+ * The Drum device's table knobs (windsor#948, ready for the device in
+ * windsor#951): Vel, Gate, step variation's Vary and Chance, and Acc vel and
+ * Acc mod, built as the Arp's are over the drum's own defaults.
+ */
+export const DRUM_KNOBS: readonly SequencerKnobEntry[] = [
+  VELOCITY_KNOB,
   {
     kind: 'driver',
-    f: 'accentVelocity',
-    label: 'Acc vel',
-    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.accentVelocity, fmt: fmt2 },
+    f: 'gate',
+    label: 'Gate',
+    o: { min: GATE_MIN, max: 1, def: DEFAULT_DRUM_CONFIG.gate, fmt: fmt2 },
   },
-  {
-    kind: 'driver',
-    f: 'accentMod',
-    label: 'Acc mod',
-    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.accentMod, fmt: fmt2 },
-  },
+  ...variationKnobs(DEFAULT_DRUM_CONFIG),
+  ...accentKnobs(DEFAULT_DRUM_CONFIG),
 ];
 
 /** The Arp card's Rotate: the grid's, ±`GRID_ROTATE_MAX` cells, and like it never stored. */
@@ -320,18 +320,7 @@ export const BASS_KNOBS: readonly SequencerKnobEntry[] = [
     o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.density, fmt: fmt2 },
   },
   VELOCITY_KNOB,
-  {
-    kind: 'driver',
-    f: 'accentVelocity',
-    label: 'Acc vel',
-    o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.accentVelocity, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
-    f: 'accentMod',
-    label: 'Acc mod',
-    o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.accentMod, fmt: fmt2 },
-  },
+  ...accentKnobs(DEFAULT_BASS_CONFIG),
 ];
 
 /** The Basslead strip's Length (windsor#371): the Grid's range over the bass's own default, one bar. */
@@ -365,20 +354,7 @@ export const ROLL_KNOBS: readonly SequencerKnobEntry[] = [VELOCITY_KNOB];
  * `ACCENT_MOD_DEFAULT`, which `DEFAULT_ROLL_CONFIG` leaves out, so they are
  * their own table, beside Vel in the device's Velocity row.
  */
-export const ROLL_ACCENT_KNOBS: readonly DriverKnobEntry[] = [
-  {
-    kind: 'driver',
-    f: 'accentVelocity',
-    label: 'Acc vel',
-    o: { min: 0, max: 1, def: ACCENT_VELOCITY_DEFAULT, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
-    f: 'accentMod',
-    label: 'Acc mod',
-    o: { min: 0, max: 1, def: ACCENT_MOD_DEFAULT, fmt: fmt2 },
-  },
-];
+export const ROLL_ACCENT_KNOBS: readonly DriverKnobEntry[] = accentKnobs(ACCENT_DEFAULTS);
 
 /** The Figure's Length: the Grid's range over the Figure's own default, one bar. */
 export const FIGURE_LENGTH_KNOB: CardKnobSpec = {

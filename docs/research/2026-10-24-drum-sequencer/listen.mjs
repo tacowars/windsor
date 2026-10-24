@@ -29,7 +29,8 @@
  *
  * It prints each file's hits per bar, `step:velocity:note` with the played
  * velocity (the part's, the hit's, any variation and the accent) and the
- * played note's name, `×n` after a ratchet's first hit, and writes the
+ * played note's name, `+m<mod>` on an accented hit (the per-note mod it
+ * sends, as in play), `×n` after a ratchet's first hit, and writes the
  * same to `hits.txt` beside the WAVs.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -59,6 +60,9 @@ async function engineModules() {
         export { DRUM_REST, drumHit } from './sequencing/drumSteps';
         export { DIVISORS, TICKS_PER_BAR, PPQ } from './sequencing/scheduler';
         export { partNoteOn } from './song/partNoteOn';
+        export { PLAIN_HIT, pitchedRollShape, playPitched } from './song/pitchedRoll';
+        export { rollHits } from './song/rollSpan';
+        export { STRAIGHT_SWING } from './sequencing/swingTables';
         export { PRESETS } from './patch/presets';
         export { loadProcessor, render } from './__fixtures__/workletHarness';
         export { encodeWav } from './render/wavEncoder';`,
@@ -138,44 +142,94 @@ const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A�
 /** MIDI note 60 is C4. */
 const noteName = (note) => `${NAMES[note % 12]}${Math.floor(note / 12) - 1}`;
 
-/** Four bars of the Drum: the processor's scheduled events and each bar's hits. */
+/**
+ * A part as the processor hears it: `AudioPart`'s `noteOn`, `trigger` and
+ * `noteOffByNote` written as the harness's scheduled events, the extras
+ * forwarded as `AudioPart.noteOn` forwards them (a nonzero `mod`, `slide`,
+ * `stepMod`), so an accented hit's mod reaches the patch as it does in play.
+ */
+function recordingPart(frame) {
+  const events = [];
+  const held = new Map();
+  let id = 0;
+  const noteOn = (note, velocity, time, extras) => {
+    const message = { type: 'noteOn', id: ++id, note, velocity, frame: frame(time) };
+    if (extras?.mod !== undefined && extras.mod !== 0) message.mod = extras.mod;
+    if (extras?.slide) message.slide = true;
+    if (extras?.stepMod) message.stepMod = extras.stepMod;
+    events.push(message);
+    held.set(note, [...(held.get(note) ?? []), id]);
+    return id;
+  };
+  const release = (ids, at) => {
+    for (const handle of ids) events.push({ type: 'noteOff', id: handle, frame: frame(at) });
+  };
+  return {
+    events,
+    noteOn,
+    trigger(note, velocity, duration, time, extras) {
+      const handle = noteOn(note, velocity, time, extras);
+      const rest = held.get(note).filter((h) => h !== handle);
+      if (rest.length) held.set(note, rest);
+      else held.delete(note);
+      release([handle], time + duration);
+      return handle;
+    },
+    noteOffByNote(note, time) {
+      release(held.get(note) ?? [], time);
+      held.delete(note);
+    },
+    releaseAll(time) {
+      for (const ids of held.values()) release(ids, time);
+      held.clear();
+    },
+  };
+}
+
+/**
+ * Four bars of the Drum: the processor's scheduled events and each bar's
+ * hits. Each note-on plays through the player's own `playPitched` and
+ * `rollHits`, over one region spanning the song, straight and unlooped, as
+ * `ArrangementPlayer.pitched` plays it, so the velocity, the extras and a
+ * ratchet's hits and holds are the player's.
+ */
 function perform(m, drum, sampleRate) {
   const secondsPerTick = 60 / BPM / m.PPQ;
   const bar = m.TICKS_PER_BAR;
+  const songTicks = BARS * bar;
   const step = drum.config.divisor;
-  const frame = (seconds) => Math.round(seconds * sampleRate);
-  const events = [];
-  const held = new Map();
+  const part = recordingPart((seconds) => Math.round(seconds * sampleRate));
   const bars = Array.from({ length: BARS }, () => []);
-  let id = 0;
-  for (let tick = 0; tick < BARS * bar; tick++) {
+  for (let tick = 0; tick < songTicks; tick++) {
     const time = tick * secondsPerTick;
     const base = { tick, step: tick, bar: Math.floor(tick / bar), tickInBar: tick % bar };
     for (const e of drum.handleTick({ ...base, seconds: time, secondsPerTick, time })) {
       if (e.kind === 'noteOff') {
-        const at = held.get(e.note);
-        if (at !== undefined) events.push({ type: 'noteOff', id: at, frame: frame(e.time) });
-        held.delete(e.note);
+        part.noteOffByNote(e.note, e.time);
         continue;
       }
-      const { velocity } = m.partNoteOn(e, PART_VELOCITY);
-      const roll = e.roll;
-      const hits = roll ? roll.hits : 1;
-      const spacing = (step * secondsPerTick) / hits;
-      for (let j = 0; j < hits; j++) {
-        const on = e.time + j * spacing;
-        events.push({ type: 'noteOn', id: ++id, note: e.note, velocity, frame: frame(on) });
-        if (roll) events.push({ type: 'noteOff', id, frame: frame(on + roll.gate * spacing) });
-        else held.set(e.note, id);
-      }
-      const label = `${(e.tick % bar) / step}:${velocity.toFixed(2)}:${noteName(e.note)}`;
-      bars[Math.floor(e.tick / bar)].push(hits > 1 ? `${label}×${hits}` : label);
+      const hits = e.roll
+        ? m.rollHits({
+            ...m.pitchedRollShape(e.roll),
+            tick,
+            regions: [{ start: 0, duration: songTicks }],
+            songTicks,
+            loop: null,
+            secondsPerTick: e.roll.secondsPerTick,
+            swing: m.STRAIGHT_SWING,
+          })
+        : m.PLAIN_HIT;
+      m.playPitched(part, e, hits, PART_VELOCITY);
+      const { velocity, extras } = m.partNoteOn(e, PART_VELOCITY);
+      const mod = extras?.mod ? `+m${extras.mod.toFixed(2)}` : '';
+      const label = `${(e.tick % bar) / step}:${velocity.toFixed(2)}${mod}:${noteName(e.note)}`;
+      bars[Math.floor(e.tick / bar)].push(hits.length > 1 ? `${label}×${hits.length}` : label);
     }
   }
-  const end = frame(BARS * bar * secondsPerTick);
-  for (const at of held.values()) events.push({ type: 'noteOff', id: at, frame: end });
-  events.sort((a, b) => a.frame - b.frame);
-  return { events, bars, seconds: BARS * bar * secondsPerTick };
+  const seconds = songTicks * secondsPerTick;
+  part.releaseAll(seconds);
+  const events = part.events.sort((a, b) => a.frame - b.frame);
+  return { events, bars, seconds };
 }
 
 const m = await engineModules();

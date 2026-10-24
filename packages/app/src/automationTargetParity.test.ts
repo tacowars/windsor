@@ -12,6 +12,7 @@ import {
   ARP_GRID_KNOBS,
   ARP_KNOBS,
   BASS_KNOBS,
+  DRUM_KNOBS,
   FIGURE_KNOBS,
   GRID_KNOBS,
   type SequencerKnobEntry,
@@ -24,6 +25,7 @@ const KNOBS_OF: Partial<Record<SequencerKind, readonly SequencerKnobEntry[]>> = 
   grid: GRID_KNOBS,
   arp: [...ARP_KNOBS, ...ARP_GRID_KNOBS],
   bass: BASS_KNOBS,
+  drum: DRUM_KNOBS,
 };
 
 describe('the sequencer lane rows and their knobs', () => {
