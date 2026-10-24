@@ -82,7 +82,7 @@ describe('rackDifferences (decision 14)', () => {
     const { model, diff } = loaded(BARE);
     model.merge(
       raw({
-        parts: { [arp]: { strip: { lowCut: 120 }, sequencer: { skipChance: 0.9 } } },
+        parts: { [arp]: { strip: { lowCut: 120 }, sequencer: { randomness: 0.9 } } },
       }),
     );
     expect(diff()).toEqual([]);

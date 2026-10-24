@@ -29,11 +29,21 @@
  * the current list's cycle, so the cell restarts wherever the walk does and
  * with `retrigger` off carries on modulo the new cycle. What a cell does —
  * octave, accent, slide, tie, rest, the lanes, the cell's gate
- * (windsor#933), the gate's look-ahead and skip chance — is
+ * (windsor#933), the gate's look-ahead and step variation — is
  * `arpCellPlay.ts`. The walk advances and a random style draws at every
- * onset whatever its cell plays, so a rest, a tie or a skip never moves the
- * pitches of the cells after it; skip chance draws from its own stream,
- * minted beside the walk's at region entry.
+ * onset whatever its cell plays, so a rest, a tie or a varied step never
+ * moves the pitches of the cells after it.
+ *
+ * **Step variation** (windsor#935, record `2026-10-24-step-variation`,
+ * `stepVariation.ts`) draws from its own stream (`arpVariationRng`), minted
+ * beside the walk's at region entry. With Randomness and Probability both
+ * above 0, every onset makes its fixed draws whatever its cell plays. A
+ * varied note plays a velocity under the part's, a gate about its played
+ * one, and a pitch either moved by whole octaves (Octave on) or the list
+ * neighbour a normal offset from the walked one. The walk and `previous`
+ * keep the walked pitch, so later pitches never move. With Rests sound on
+ * a varied note may rest and a varied rest sound the walked pitch, plain;
+ * a tie never flips.
  *
  * **The gate's look-ahead across a chord change.** The gate is decided at
  * the onset, and it reads the next cell in the current list's cycle
@@ -75,9 +85,9 @@
  * (`arpPlayedGate`, windsor#933) of its slice. Where a plain note would
  * run to the next onset (a tie or slide next, or a played gate covering the
  * step), the last hit is held open and the next onset releases it;
- * otherwise the roll leaves nothing held. The walk and the skip draw once
- * per onset, before the roll, so a skipped cell plays no hit. A slide to
- * the pitch held is still a tie, its ratchet unheard.
+ * otherwise the roll leaves nothing held. The walk and step variation draw
+ * once per onset, before the roll, so a silenced cell plays no hit. A slide
+ * to the pitch held is still a tie, its ratchet unheard.
  *
  * Pure: it reads the chord and local tick the gate forwards, never the
  * transport, and emits note events on the tick grid.
@@ -87,14 +97,14 @@ import { voiceChord } from '../harmony/chordVoicing';
 import { chordIdentity, type HarmonyChord } from '../harmony/harmonyTimeline';
 import {
   arpCellIndex,
-  arpPlayedGate,
-  arpSkipRng,
+  arpVariationRng,
   type ArpCellOutcome,
+  flipCell,
   holdsToNext,
   playArpCell,
   shiftOctave,
-  skipCell,
   strikeCell,
+  variedCell,
 } from './arpCellPlay';
 import { assertArpConfig, type ArpSequencerConfig, type ArpStyle } from './arpSequencer';
 import { arpCycleLength, arpNote } from './arpSteps';
@@ -103,6 +113,8 @@ import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import { withSeqOverrides, type PartTickEvent, type PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import type { Unsubscribe } from './scheduler';
+import { flips, variationAt } from './stepVariation';
+import { STEP_VARIATION_TABLE, type StepVariationTable } from './stepVariationConstants';
 
 /** What the arp voices a chord with: the key's offsets and its root note at a register. */
 export type ArpPitchSource = Pick<ScaleSampler, 'offsets' | 'rootNote'>;
@@ -258,17 +270,21 @@ export class Arpeggiator {
   private held: number | null = null;
   /** The local tick a gated note's off goes out on; null while it runs to the next onset. */
   private releaseTick: number | null = null;
-  /** Skip chance's own stream (`arpSkipRng`), minted with the walk's and never drawn by it. */
-  private skipRng: Rng;
+  /** Step variation's own stream (`arpVariationRng`), minted with the walk's and never drawn by it. */
+  private variationRng: Rng;
   /** The length of the list the last onset walked: 0 since entry, with no chord, or over an empty list. */
   private listLength = 0;
 
-  constructor(pitch: ArpPitchSource, config: ArpSequencerConfig) {
+  constructor(
+    pitch: ArpPitchSource,
+    config: ArpSequencerConfig,
+    private readonly variation: StepVariationTable = STEP_VARIATION_TABLE,
+  ) {
     assertArpConfig(config);
     this.pitch = pitch;
     this.current = config;
     this.rng = streamRng(config.seed, 0);
-    this.skipRng = arpSkipRng(config.seed, 0);
+    this.variationRng = arpVariationRng(config.seed, 0);
   }
 
   get config(): ArpSequencerConfig {
@@ -293,7 +309,7 @@ export class Arpeggiator {
   /** The region gate entered a region: the walk restarts and the stream is minted afresh. */
   enter(regionIndex: number): void {
     this.rng = streamRng(this.current.seed, regionIndex);
-    this.skipRng = arpSkipRng(this.current.seed, regionIndex);
+    this.variationRng = arpVariationRng(this.current.seed, regionIndex);
     this.base = 0;
     this.listLength = 0;
     this.lastChord = null;
@@ -350,8 +366,8 @@ export class Arpeggiator {
 
   /**
    * One onset: walk the list, then play the cell for this step over what is
-   * held, at the gate and skip chance the part's lanes hold on this tick
-   * (windsor#488), the config's where none does.
+   * held, at the gate, Randomness and Probability the part's lanes hold on
+   * this tick (windsor#488), the config's where none does.
    */
   private onset(event: PartTickEvent, step: number): NoteEvent[] {
     const config = withSeqOverrides(this.current, event.overrides);
@@ -363,17 +379,20 @@ export class Arpeggiator {
     if (!chord || list.length === 0) return this.releaseHeld(event.tick, event.time);
     const i = step - this.base;
     // The walk draws whatever the cell plays, so a rest never moves a later pitch.
-    const pitch = list[this.pick(i, list)] as number;
-    this.previous = pitch;
-    const { steps, skipChance } = config;
+    const at = this.pick(i, list);
+    this.previous = list[at] as number;
+    // So does step variation, from its own stream.
+    const draw = variationAt(this.variationRng, config, this.variation);
+    const { steps } = config;
     const cycle = arpCycleLength(config.style, list.length);
     const index = arpCellIndex(i, cycle);
     // Every cycle fits the stored cells (`ARP_STEPS_MAX`); a plain note stands in for safety.
     const written = steps[index] ?? PLAIN_CELL;
-    const played = skipCell(written, skipChance, this.skipRng);
+    const flipped = draw && flips(draw, config, step, this.variation) ? flipCell(written) : written;
     // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
-    const cell = reset ? strikeCell(played) : played;
-    const gate = arpPlayedGate(config.gate, cell);
+    const played = reset ? strikeCell(flipped) : flipped;
+    const context = { list, at, config, table: this.variation };
+    const { cell, pitch, gate, velocity } = variedCell(played, draw, context);
     const outcome = playArpCell(
       {
         tick: event.tick,
@@ -385,6 +404,7 @@ export class Arpeggiator {
         held: this.held,
         holdsOn: holdsToNext(steps, i, cycle),
         gate,
+        velocity,
       },
       config,
     );

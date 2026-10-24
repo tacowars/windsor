@@ -23,6 +23,7 @@ import { ArrangementPlayer } from './arrangementPlayer';
 import { makePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 import { gridNote } from '../sequencing/gridSequencer';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import { DIVISORS, PPQ, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 
@@ -295,11 +296,10 @@ describe('grid parts (#602)', () => {
                 gridNote(4, { slide: true }),
               ],
               length: 6,
-              skipChance: 0,
+              ...STEP_VARIATION_DEFAULTS,
               accentVelocity: 0.2,
               accentMod: 1,
               register: { octave: 3 },
-              // The skip-edit case below turns skipChance to 0.01: this seed's stream skips nothing in bar 2.
               seed: 204,
               lanes: [],
             },
@@ -366,11 +366,11 @@ describe('grid parts (#602)', () => {
     ).toEqual([53, 58, 48, 63]);
   });
 
-  it('a skip, step or accent edit reconfigures the grid live: no all-notes-off, no stream restart', () => {
+  it('a Randomness, step or accent edit reconfigures the grid live: no all-notes-off, no stream restart', () => {
     const { parts, player, run, transport } = rig(LINE);
     run(1);
     const before = parts.drone.calls.length;
-    expect(player.apply({ parts: { [drone]: { sequencer: { skipChance: 0.01 } } } }, {}).ok).toBe(
+    expect(player.apply({ parts: { [drone]: { sequencer: { randomness: 0.01 } } } }, {}).ok).toBe(
       true,
     );
     expect(player.apply({ parts: { [drone]: { sequencer: { accentMod: 0.5 } } } }, {}).ok).toBe(

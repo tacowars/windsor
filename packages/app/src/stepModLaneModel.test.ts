@@ -288,9 +288,11 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
     steps: GridStep[],
     index: number,
     param: VoiceTargetPath,
-    skipChance = 0,
-  ): LaneHold =>
-    heldBySlide(slideAt({ steps, length: steps.length, skipChance }, index, KEY), param);
+    randomness = 0,
+  ): LaneHold => {
+    const spec = { steps, length: steps.length, randomness, probability: 1, restsSound: true };
+    return heldBySlide(slideAt(spec, index, KEY), param);
+  };
 
   it('holds feedback on a slide to a new pitch, but not the cutoff on the same step', () => {
     expect(hold(line, 1, 'ops.0.feedback')).toBe('held');
@@ -316,7 +318,7 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
     expect(hold([slide(0), gridNote(3)], 0, 'filter.cutoff')).toBe('plays');
   });
 
-  it('leaves a slide after a note Skip can drop to the run', () => {
+  it('leaves a slide after a note Rests sound can drop to the run', () => {
     expect(hold(line, 2, 'filter.cutoff', 0.1)).toBe('depends');
     expect(hold(line, 1, 'ops.0.feedback', 0.1)).toBe('depends');
     expect(hold(line, 3, 'ops.0.feedback', 0.1)).toBe('plays');

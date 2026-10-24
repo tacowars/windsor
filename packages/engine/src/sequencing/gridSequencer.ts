@@ -1,8 +1,8 @@
 /**
  * The grid sequencer (#602, record `2026-09-17-602-grid-sequencer-degrees-accent-slide`):
  * a written line of 1–32 steps, the classic programmable step sequencer
- * of the key. Nothing here is drawn from the scale; the only random draw is
- * `skipChance`.
+ * of the key. Nothing here is drawn from the scale; the only random draws
+ * are step variation's (windsor#935).
  *
  * A step is a rest, a tie, or a note `{ degree, octave, accent, slide }`:
  *
@@ -23,9 +23,19 @@
  * position in the bar: a 12-step line at sixteenths drifts polymetrically
  * against the bar, and a live rebuild recomputes its place from the clock.
  * Since #705 the ticks arrive through the part's region gate, so the count
- * restarts when the playhead enters a region and the skip stream is minted
- * there from `hashSeed(seed, regionIndex)` (`enter`); a single ∞ region
- * free-runs. A skipped step (one draw per note step) is a rest.
+ * restarts when the playhead enters a region and the variation stream is
+ * minted there from `hashSeed(seed, regionIndex)` (`enter`); a single ∞
+ * region free-runs.
+ *
+ * Step variation (windsor#935, record `2026-10-24-step-variation`,
+ * `stepVariation.ts`): with Randomness and Probability both above 0, every
+ * step makes its fixed draws, tie and rest included, and a step whose gate
+ * draw falls under Probability varies. A varied note plays a velocity under
+ * the part's, and a pitch either moved by whole octaves (Octave on) or
+ * borrowed from the step a normal offset away, wrapping over `length`, the
+ * nearest note step when that one is a rest or a tie. With Rests sound on it
+ * may flip: a note rests, and a rest sounds the nearest note step's degree
+ * and octave with no accent, slide or ratchet. A tie never varies.
  *
  * Step modulation lanes (windsor#17, `stepModLanes.ts`): a note step's
  * note-on carries the lanes' offsets at that step, held for the note's life;
@@ -39,9 +49,9 @@
  * and carries a `roll` the player spends on the later hits (`rollSpan.ts`),
  * each the previous hit's note-off then a note-on with the step's accent and
  * offsets and no slide. The last hit is held as a plain note is, until the
- * next note or rest and through a tie. The skip draw is made once, before
- * the roll, so a skipped step plays no hit and the stream never moves. A
- * slide to the pitch held is still a tie, its ratchet unheard.
+ * next note or rest and through a tie. The variation draws are made once,
+ * before the roll, so a silenced step plays no hit. A slide to the pitch
+ * held is still a tie, its ratchet unheard.
  */
 import {
   ACCENT_MOD_DEFAULT,
@@ -56,9 +66,27 @@ import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
-import type { PartTickEvent } from './regionGate';
+import { withSeqOverrides, type PartTickEvent } from './regionGate';
 import type { ScaleSampler } from './scaleSampler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
+import {
+  assertStepVariation,
+  flips,
+  jumpOffset,
+  nearestIndex,
+  octaveShift,
+  shiftOctaveWithin,
+  variationAt,
+  variedVelocity,
+  wrapIndex,
+  type StepDraw,
+  type StepVariationConfig,
+} from './stepVariation';
+import {
+  STEP_VARIATION_DEFAULTS,
+  STEP_VARIATION_TABLE,
+  type StepVariationTable,
+} from './stepVariationConstants';
 import {
   DIVISORS,
   isNoteDivisor,
@@ -84,7 +112,7 @@ export type GridStep = { readonly kind: 'rest' } | { readonly kind: 'tie' } | Gr
 export const GRID_STEP_KINDS = ['rest', 'tie', 'note'] as const;
 export type GridStepKind = (typeof GRID_STEP_KINDS)[number];
 
-export interface GridSequencerConfig {
+export interface GridSequencerConfig extends StepVariationConfig {
   /** Ticks per step: a note value that divides the whole note (see `DIVISORS`). */
   divisor: number;
   /** 1–`GRID_STEPS_MAX` written steps; the line loops over the first `length` of them. */
@@ -95,8 +123,6 @@ export interface GridSequencerConfig {
    * it again brings them back.
    */
   length: number;
-  /** Chance a note step rests instead, drawn from the part's stream. */
-  skipChance: number;
   /** The bump an accented step adds to the part's velocity. */
   accentVelocity: number;
   /** The per-note mod an accented step sends; a plain step sends 0. */
@@ -130,7 +156,7 @@ export const DEFAULT_GRID_CONFIG: GridSequencerConfig = {
   divisor: DIVISORS.sixteenth,
   steps: defaultGridSteps(),
   length: GRID_DEFAULT_STEP_COUNT,
-  skipChance: 0,
+  ...STEP_VARIATION_DEFAULTS,
   accentVelocity: ACCENT_VELOCITY_DEFAULT,
   accentMod: ACCENT_MOD_DEFAULT,
   register: { octave: GRID_REGISTER_OCTAVE_DEFAULT },
@@ -177,9 +203,7 @@ export function assertGridConfig(config: GridSequencerConfig): void {
   ) {
     throw new RangeError(`length must be 1..${config.steps.length}, got ${config.length}`);
   }
-  if (!(config.skipChance >= 0 && config.skipChance <= 1)) {
-    throw new RangeError(`skipChance must be in [0, 1], got ${config.skipChance}`);
-  }
+  assertStepVariation(config);
   if (!(config.accentVelocity >= 0 && config.accentVelocity <= 1)) {
     throw new RangeError(`accentVelocity must be in [0, 1], got ${config.accentVelocity}`);
   }
@@ -188,6 +212,39 @@ export function assertGridConfig(config: GridSequencerConfig): void {
   }
   if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
   assertStepModLanes(config.lanes);
+}
+
+const REST: GridStep = { kind: 'rest' };
+
+/** The note step nearest index `from` inside the loop, wrapping over `length`; null in a line with none. */
+function nearestNote(
+  config: Pick<GridSequencerConfig, 'steps' | 'length'>,
+  from: number,
+): GridNoteStep | null {
+  const at = nearestIndex(from, config.length, (i) => config.steps[i]?.kind === 'note');
+  return at < 0 ? null : (config.steps[at] as GridNoteStep);
+}
+
+/**
+ * A rest or note step as it plays once Rests sound has flipped it
+ * (windsor#935): a note rests, and a rest sounds the nearest note step's
+ * degree and octave with no accent, slide or ratchet. A line with no note
+ * step keeps its rests.
+ */
+function flippedStep(
+  config: Pick<GridSequencerConfig, 'steps' | 'length'>,
+  index: number,
+  step: GridStep,
+): GridStep {
+  if (step.kind === 'note') return REST;
+  const near = nearestNote(config, index);
+  return near ? gridNote(near.degree, { octave: near.octave }) : step;
+}
+
+/** The pitch a note-on plays: its MIDI note and the degree it carries. */
+interface GridPitch {
+  readonly note: number;
+  readonly degree: number;
 }
 
 export class GridSequencer {
@@ -199,14 +256,18 @@ export class GridSequencer {
   /** The note sounding into the next step, if any. */
   private held: number | null = null;
 
-  constructor(sampler: ScaleSampler, config: GridSequencerConfig) {
+  constructor(
+    sampler: ScaleSampler,
+    config: GridSequencerConfig,
+    private readonly variation: StepVariationTable = STEP_VARIATION_TABLE,
+  ) {
     assertGridConfig(config);
     this.sampler = sampler;
     this.current = config;
     this.rng = streamRng(config.seed, 0);
   }
 
-  /** The region gate entered `regionIndex` from outside: the skip stream restarts (#705). */
+  /** The region gate entered `regionIndex` from outside: the variation stream restarts (#705). */
   enter(regionIndex: number): void {
     this.rng = streamRng(this.current.seed, regionIndex);
   }
@@ -217,7 +278,7 @@ export class GridSequencer {
 
   /**
    * Take a new line, and optionally a new sampler, without a rebuild (#603):
-   * the held note and the skip stream carry on, so turning Skip, editing a
+   * the held note and the variation stream carry on, so moving Randomness, editing a
    * step or moving the Harmony tab's root never cuts the sounding note or
    * restarts the stream. The divisor is the subscription and needs a rebuild;
    * so does a seed change, which is what a stream restart is for (#705: the
@@ -256,26 +317,64 @@ export class GridSequencer {
   }
 
   /**
-   * One step. Returns the events it emitted; an empty array is a tie. The
-   * skip chance is the part's lane's on this tick where one plays (windsor#488).
+   * One step. Returns the events it emitted; an empty array is a tie.
+   * Randomness and Probability are the part's lanes' on this tick where one
+   * plays (windsor#488).
    */
   handleTick(event: TickEvent & Pick<PartTickEvent, 'overrides'>): NoteEvent[] {
+    const config = withSeqOverrides(this.current, event.overrides);
     const index = this.stepAt(event.step);
-    const step = this.current.steps[index];
-    if (!step || step.kind === 'tie') return [];
-    if (step.kind === 'rest') return this.restStep(event);
-    // One draw per note step, whatever the rest of the line does, so an edit
-    // to a rest never moves the skip pattern of the notes around it.
-    const skipChance = event.overrides?.skipChance ?? this.current.skipChance;
-    if (skipChance > 0 && this.rng() < skipChance) return this.restStep(event);
-    return this.noteStep(event, step, index);
+    // Every step draws, whatever it plays, so an edit to one never moves another's draws.
+    const draw = variationAt(this.rng, config, this.variation);
+    const written = config.steps[index];
+    if (!written || written.kind === 'tie') return [];
+    const step =
+      draw && flips(draw, config, event.step, this.variation)
+        ? flippedStep(config, index, written)
+        : written;
+    if (step.kind !== 'note') return this.restStep(event);
+    const pitch = draw ? this.variedPitch(config, step, index, draw) : this.pitchOf(step);
+    const velocity = draw ? variedVelocity(draw, config.randomness, this.variation) : undefined;
+    return this.noteStep(event, step, index, pitch, velocity);
   }
 
-  private noteStep(event: TickEvent, step: GridNoteStep, index: number): NoteEvent[] {
-    const note = this.sampler.noteForFolded(
-      step.degree,
-      this.current.register.octave + step.octave,
-    );
+  /** A note step's own pitch, at the part's register. */
+  private pitchOf(step: GridNoteStep): GridPitch {
+    const octave = this.current.register.octave + step.octave;
+    return { note: this.sampler.noteForFolded(step.degree, octave), degree: step.degree };
+  }
+
+  /**
+   * A varied note step's pitch (windsor#935): with Octave on, its own moved
+   * by whole octaves, kept inside MIDI; otherwise the degree and octave of
+   * the step a normal offset away over the loop, the nearest note step when
+   * that one is a rest or a tie.
+   */
+  private variedPitch(
+    config: GridSequencerConfig,
+    step: GridNoteStep,
+    index: number,
+    draw: StepDraw,
+  ): GridPitch {
+    const { randomness, length } = config;
+    if (config.octaveMode) {
+      const own = this.pitchOf(step);
+      const octaves = octaveShift(draw, randomness, this.variation);
+      return { note: shiftOctaveWithin(own.note, octaves), degree: own.degree };
+    }
+    const offset = jumpOffset(draw, randomness, length, this.variation.stepJumpSigma);
+    if (offset === 0) return this.pitchOf(step);
+    return this.pitchOf(nearestNote(config, wrapIndex(index + offset, length)) ?? step);
+  }
+
+  private noteStep(
+    event: TickEvent,
+    step: GridNoteStep,
+    index: number,
+    pitch: GridPitch,
+    velocity: number | undefined,
+  ): NoteEvent[] {
+    const { note } = pitch;
     const slide = step.slide && this.held !== null;
     if (slide && note === this.held) return [];
 
@@ -284,8 +383,9 @@ export class GridSequencer {
       tick: event.tick,
       time: event.time,
       note,
-      degree: step.degree,
+      degree: pitch.degree,
     };
+    if (velocity !== undefined) on.velocity = velocity;
     if (step.accent) {
       on.accent = { velocity: this.current.accentVelocity, mod: this.current.accentMod };
     }
@@ -313,7 +413,7 @@ export class GridSequencer {
     return events;
   }
 
-  /** A rest, written or drawn: release whatever is held, play nothing. */
+  /** A rest, written or flipped: release whatever is held, play nothing. */
   private restStep(event: TickEvent): NoteEvent[] {
     const released = this.release(event.tick, event.time);
     return released ? [released] : [];

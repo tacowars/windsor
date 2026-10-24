@@ -29,6 +29,7 @@ import { voiceHit, type ChordHitStep } from '../sequencing/chordSequencer';
 import { gridNote } from '../sequencing/gridSequencer';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 
 const BAR = TICKS_PER_BAR;
 const { harmony } = FULL_ARRANGEMENT;
@@ -53,7 +54,7 @@ const gridLine = (divisor: number, length: number): RegionPattern => ({
   divisor,
   steps: Array.from({ length }, (_, degree) => gridNote(degree)),
   length,
-  skipChance: 0,
+  ...STEP_VARIATION_DEFAULTS,
 });
 
 describe('a chord part whose two regions carry their own patterns', () => {

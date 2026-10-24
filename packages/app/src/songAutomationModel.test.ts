@@ -202,7 +202,10 @@ describe("the picker's Sequencer group (windsor#491)", () => {
   it("comes after the voice's, with the fields the part's kind offers", () => {
     expect(seqGroup(GRID_PART)).toEqual({
       label: 'Sequencer',
-      options: [{ target: 'seq.skipChance', label: 'Skip', disabled: false }],
+      options: [
+        { target: 'seq.randomness', label: 'Randomness', disabled: false },
+        { target: 'seq.probability', label: 'Probability', disabled: false },
+      ],
     });
     expect(seqGroup(BASS_PART)?.options.map((o) => o.label)).toEqual(['Gate', 'Density']);
   });
@@ -215,8 +218,8 @@ describe("the picker's Sequencer group (windsor#491)", () => {
   });
 
   it('disables a field that already has a lane', () => {
-    const part = { ...GRID_PART, automation: [flat('seq.skipChance')] };
-    expect(seqGroup(part)?.options[0]?.disabled).toBe(true);
+    const part = { ...GRID_PART, automation: [flat('seq.randomness')] };
+    expect(seqGroup(part)?.options.map((o) => o.disabled)).toEqual([true, false]);
   });
 });
 

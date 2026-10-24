@@ -203,7 +203,7 @@ describe('sequencer lanes (windsor#488)', () => {
     const lanesBySlot: Record<number, unknown[]> = {
       [kick]: [flat('seq.gate')],
       [hat]: [flat('seq.gate'), flat('seq.density')],
-      [arp]: [flat('seq.density'), flat('seq.skipChance')],
+      [arp]: [flat('seq.density'), flat('seq.randomness')],
       [drone]: [flat('seq.gate')],
     };
     const document = {
@@ -219,7 +219,7 @@ describe('sequencer lanes (windsor#488)', () => {
       doc.parts.find((part) => part.slot === slot)!.automation?.map((l) => l.target);
     expect(targets(result.document, kick)).toBeUndefined();
     expect(targets(result.document, hat)).toEqual(['seq.gate', 'seq.density']);
-    expect(targets(result.document, arp)).toEqual(['seq.skipChance']);
+    expect(targets(result.document, arp)).toEqual(['seq.randomness']);
     expect(targets(result.document, drone)).toBeUndefined();
     expect(result.corrections).toEqual([
       'parts[0].automation[0].target: a euclidean part has no seq.gate lane — lane dropped',

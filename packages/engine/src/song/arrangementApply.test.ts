@@ -100,11 +100,11 @@ describe('apply', () => {
     expect(kinds(a.parts.hat, 'trigger').at(-1)?.note).toBe(44);
   });
 
-  it('applies a driver change live: skipChance 0 plays every grid step', () => {
+  it('applies a driver change live: Randomness 0 plays every grid step', () => {
     const { player, parts, run } = rig();
     run(1);
     expect(
-      player.apply({ parts: { [arp]: { sequencer: { kind: 'grid', skipChance: 0 } } } }).ok,
+      player.apply({ parts: { [arp]: { sequencer: { kind: 'grid', randomness: 0 } } } }).ok,
     ).toBe(true);
     const before = kinds(parts.arp, 'noteOn').length;
     run(4);

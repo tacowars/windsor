@@ -18,12 +18,14 @@ import { ticksPerBar } from '../sequencing/meter';
 import { ROLL_LOOP_TICKS_MAX } from '../sequencing/rollSequencer';
 import { DIVISORS, TICKS_PER_BAR } from '../sequencing/scheduler';
 
-/** An Arp at `divisor` that skips at random, so no region of it repeats. */
-const randomArp = (divisor: number, skipChance: number): ArpSpec => ({
+/** An Arp at `divisor` whose step variation rests at random, so no region of it repeats. */
+const randomArp = (divisor: number, probability: number): ArpSpec => ({
   kind: 'arp',
   ...DEFAULT_ARP_CONFIG,
   divisor,
-  skipChance,
+  randomness: 1,
+  probability,
+  restsSound: true,
   seed: 7,
 });
 

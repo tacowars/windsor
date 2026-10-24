@@ -1,7 +1,7 @@
 /**
  * Sequencer lanes through the player (windsor#488): a `seq.` lane's value is
  * read by the part's region gate on the tick it issues and handed to the
- * generator's onset. A falling skip lane on a Grid draws the unlaned stream,
+ * generator's onset. A falling Probability lane on a Grid draws the unlaned stream,
  * a gate lane on an Arp sets each note's length from its onset, a lane
  * turned off or deleted hands the config back on the next tick, a lane flat
  * at the config's value plays exactly what no lane plays, and a kind change
@@ -22,6 +22,8 @@ import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import { DEFAULT_FIGURE_CONFIG } from '../sequencing/figureSequencer';
 import { streamRng } from '../sequencing/generatorSeed';
 import { gridNote } from '../sequencing/gridSequencer';
+import type { SeqField } from '../sequencing/regionGate';
+import { STEP_VARIATION_DRAWS, STEP_VARIATION_TABLE } from '../sequencing/stepVariationConstants';
 import { DEFAULT_CHORD_CONFIG } from '../sequencing/chordSequencer';
 import { DIVISORS, PPQ, TICKS_PER_BAR, type Scheduler } from '../sequencing/scheduler';
 import type { PartStrip } from '../mixer/channelStrip';
@@ -62,7 +64,7 @@ const perBar = (ticks: number[], bars: number): number[] =>
   Array.from({ length: bars }, (_, bar) => ticks.filter((t) => Math.floor(t / BAR) === bar).length);
 
 describe('sequencer lanes in the player', () => {
-  it('plays a falling skip lane on a Grid from the unlaned stream: silent, rising, then whole', () => {
+  it('plays a falling Probability lane on a Grid from the unlaned stream: thinned, then whole', () => {
     const bars = 12;
     const points = [point(0, 1), point(BAR, 1), point(8 * BAR, 0)];
     const grid: SequencerSpec = {
@@ -71,28 +73,34 @@ describe('sequencer lanes in the player', () => {
       divisor: EIGHTH,
       steps: Array.from({ length: 8 }, (_, i) => gridNote(i % 5)),
       length: 8,
-      skipChance: 0,
+      randomness: 1,
+      probability: 0,
+      restsSound: true,
+      octaveMode: false,
       accentVelocity: 0,
       accentMod: 0,
       register: { octave: 4 },
       lanes: [],
     };
-    const r = rig(song(grid, [lane('seq.skipChance', points)], bars));
+    const r = rig(song(grid, [lane('seq.probability', points)], bars));
     r.run(bars);
-    // The stream the unlaned Grid draws, one draw per note step while the chance is above 0.
-    const row = requireCatalogRow('seq.skipChance');
+    // The stream the unlaned Grid draws: a step's fixed draws while Probability
+    // is above 0, the first its gate and the second its flip.
+    const row = requireCatalogRow('seq.probability');
     const rng = streamRng(7, 0);
+    const T = STEP_VARIATION_TABLE;
     const expected: number[] = [];
     for (let tick = 0; tick < bars * BAR; tick += EIGHTH) {
       const chance = valueAt(row, points, tick);
-      if (!(chance > 0 && rng() < chance)) expected.push(tick);
+      const draws = chance > 0 ? Array.from({ length: STEP_VARIATION_DRAWS }, rng) : [1, 1];
+      const flipAt = (tick / EIGHTH) % T.onBeatEvery === 0 ? T.flipOnbeat : T.flipOffbeat;
+      if (!(draws[0]! < chance && draws[1]! < flipAt)) expected.push(tick);
     }
     const heard = onTicks(r.parts.arp);
     expect(heard).toEqual(expected);
     const counts = perBar(heard, bars);
-    expect(counts[0]).toBe(0);
+    expect(counts[0]).toBeLessThan(8);
     expect(counts.slice(8)).toEqual([8, 8, 8, 8]);
-    for (let bar = 1; bar < 8; bar++) expect(counts[bar]).toBeGreaterThanOrEqual(counts[bar - 1]!);
   });
 
   it('sets each Arp note from the gate on the tick it starts; a note sounding keeps its own', () => {
@@ -120,13 +128,14 @@ describe('sequencer lanes in the player', () => {
   });
 
   it('plays exactly what no lane plays with every lane flat at the config value', () => {
-    const flat = (field: 'gate' | 'skipChance' | 'density', value: number): AutomationLane =>
+    const flat = (field: SeqField, value: number): AutomationLane =>
       lane(`seq.${field}`, [point(0, value)]);
+    const varied = { randomness: 0.4, probability: 0.5, restsSound: true };
     const cases: Array<[SequencerSpec, AutomationLane[]]> = [
-      [FULL_ARRANGEMENT.parts[2]!.sequencer, [flat('skipChance', 0.3)]],
+      [FULL_ARRANGEMENT.parts[2]!.sequencer, [flat('randomness', 0.5), flat('probability', 0.6)]],
       [
-        { kind: 'arp', ...DEFAULT_ARP_CONFIG, skipChance: 0.4 },
-        [flat('gate', 0.5), flat('skipChance', 0.4)],
+        { kind: 'arp', ...DEFAULT_ARP_CONFIG, ...varied },
+        [flat('gate', 0.5), flat('randomness', 0.4), flat('probability', 0.5)],
       ],
       [
         { kind: 'bass', ...DEFAULT_BASS_CONFIG, density: 0.6 },
@@ -150,7 +159,7 @@ describe('sequencer lanes in the player', () => {
   it('drops a lane live on a kind change that does not offer it: Grid to Chord to Figure', () => {
     const grid = FULL_ARRANGEMENT.parts[2]!.sequencer;
     expect(grid.kind).toBe('grid');
-    const r = rig(song(grid, [lane('seq.skipChance', [point(0, 1)])], 2));
+    const r = rig(song(grid, [lane('seq.probability', [point(0, 1)])], 2));
     const document = r.player.arrangement as unknown as ArrangementDocument;
     const slot = document.parts.find((p) => p.sequencer.kind === 'grid')!.slot;
     const strip = { nextInsertSpecs: [] } as unknown as PartStrip;
@@ -164,11 +173,11 @@ describe('sequencer lanes in the player', () => {
       live.apply(partial, () => r.player.arrangement, r.player);
     };
     r.run(1);
+    const gridOns = onTicks(r.parts.arp).length;
     change({ kind: 'chord', ...DEFAULT_CHORD_CONFIG });
     change({ kind: 'figure', ...DEFAULT_FIGURE_CONFIG });
-    expect(onTicks(r.parts.arp)).toEqual([]);
     expect(live.lanesOf(partOwner(slot))).toEqual([]);
     r.run(1);
-    expect(onTicks(r.parts.arp).length).toBeGreaterThan(0);
+    expect(onTicks(r.parts.arp).length).toBeGreaterThan(gridOns);
   });
 });

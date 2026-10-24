@@ -19,7 +19,7 @@ import { bounceSong, gridNote, REST, TIE, type BounceSong } from './bounceRig';
 /**
  * The Acid Saw line of
  * `docs/research/2026-10-04-acid-ladder-filter/audition/acid-audition.song.json`:
- * 16 steps at 1/16 in A natural minor at register octave 1, skip chance 0.
+ * 16 steps at 1/16 in A natural minor at register octave 1, nothing varied.
  */
 export const ACID_SAW: readonly GridStep[] = [
   gridNote(0, { accent: true }),

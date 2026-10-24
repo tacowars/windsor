@@ -11,6 +11,7 @@ import {
   ARRANGEMENT_VERSION,
   RATCHET_MAX,
   DEFAULT_ARP_CONFIG,
+  STEP_VARIATION_DEFAULTS,
   VOICE_TARGET_PATHS,
   arpCellPitch,
   arpNote,
@@ -276,8 +277,9 @@ describe("a cell's slide over the shown cycle", () => {
   const slide = arpNote({ slide: true });
   /** Up over three notes a fifth apart, so every pair of cells differs. */
   const WIDE = [48, 55, 62];
-  const at = (steps: ArpStep[], index: number, list = WIDE, skipChance = 0) =>
-    arpSlideAt({ steps, skipChance, style: 'up' }, index, list);
+  /** `randomness` above 0 flips rests (Probability 1, Rests sound on), as Skip did. */
+  const at = (steps: ArpStep[], index: number, list = WIDE, randomness = 0) =>
+    arpSlideAt({ steps, randomness, probability: 1, restsSound: true, style: 'up' }, index, list);
 
   it('hands the voice over after a note, walking back over ties', () => {
     expect(at([arpNote(), slide, arpNote()], 1)).toEqual({ kind: 'retarget', when: 'always' });
@@ -305,7 +307,7 @@ describe("a cell's slide over the shown cycle", () => {
     expect([pitch(2), pitch(3), pitch(2, 1)]).toEqual([e, e + 12, e + 12]);
     const steps = [arpNote(), arpNote(), arpNote({ octave: 1 }), slide, arpNote(), arpNote()];
     const slideOf = (cells: ArpStep[], index: number): StepSlide =>
-      arpSlideAt({ ...spec, steps: cells, skipChance: 0 }, index, list);
+      arpSlideAt({ ...spec, steps: cells, ...STEP_VARIATION_DEFAULTS }, index, list);
     expect(slideOf(steps, 3)).toEqual({ kind: 'same', when: 'always' });
     // Unshifted it moves up the octave: a retarget.
     expect(slideOf(withStep(steps, 2, arpNote()), 3)).toEqual({ kind: 'retarget', when: 'always' });
@@ -318,13 +320,15 @@ describe("a cell's slide over the shown cycle", () => {
   it('under a random style, leaves whether the slide moves to the run', () => {
     const steps = [arpNote(), slide, arpNote()];
     for (const style of ['random', 'randomOther', 'randomOnce'] as const) {
-      const drawn = arpSlideAt({ steps, skipChance: 0, style }, 1, WIDE);
+      const drawn = arpSlideAt({ steps, ...STEP_VARIATION_DEFAULTS, style }, 1, WIDE);
       expect(drawn, style).toEqual({ kind: 'either', when: 'always' });
       expect(heldBySlide(drawn, 'filter.cutoff')).toBe('depends');
       expect(heldBySlide(drawn, 'ops.0.feedback')).toBe('held');
     }
     // Over one note every draw is that note: a slide onto it is a sustain.
-    expect(arpSlideAt({ steps: [slide], skipChance: 0, style: 'random' }, 0, [48])).toEqual({
+    expect(
+      arpSlideAt({ steps: [slide], ...STEP_VARIATION_DEFAULTS, style: 'random' }, 0, [48]),
+    ).toEqual({
       kind: 'same',
       when: 'wrap',
     });
@@ -339,11 +343,7 @@ describe("the grid's knobs on the Arp card", () => {
     });
     const sequencer = partAt(bare.doc, 0)!.sequencer;
     if (sequencer.kind !== 'arp') throw new Error('not an arp');
-    expect(ARP_GRID_KNOBS.map((entry) => entry.f)).toEqual([
-      'skipChance',
-      'accentVelocity',
-      'accentMod',
-    ]);
+    expect(ARP_GRID_KNOBS.map((entry) => entry.f)).toEqual(['accentVelocity', 'accentMod']);
     for (const entry of ARP_GRID_KNOBS) {
       expect(entry.o.def, entry.f).toBe(Reflect.get(sequencer, entry.f));
       expect([entry.o.min, entry.o.max]).toEqual([0, 1]);

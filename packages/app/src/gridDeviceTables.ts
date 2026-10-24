@@ -6,8 +6,7 @@
  */
 import type { SequencerKnobEntry } from './sequencerKnobTables';
 
-/** The table knobs' columns, top down: the dynamics, then Skip. */
+/** The table knobs' columns, top down: the dynamics. */
 export const GRID_KNOB_COLUMNS: readonly (readonly SequencerKnobEntry['f'][])[] = [
   ['velocity', 'accentVelocity', 'accentMod'],
-  ['skipChance'],
 ];

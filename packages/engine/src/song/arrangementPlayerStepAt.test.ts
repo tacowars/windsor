@@ -38,6 +38,7 @@ import { EuclideanSequencer } from '../sequencing/euclideanSequencer';
 import { gridNote } from '../sequencing/gridSequencer';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import { DIVISORS, PPQ, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 
 const { kick, arp, drone } = FULL_SLOT;
 const BARS = 4;
@@ -63,7 +64,7 @@ const LADDER: Arrangement = {
             divisor: DIVISORS.eighth,
             steps: LADDER_DEGREES.map((degree) => gridNote(degree)),
             length: LADDER_DEGREES.length,
-            skipChance: 0,
+            ...STEP_VARIATION_DEFAULTS,
             accentVelocity: 0.2,
             accentMod: 1,
             register: { octave: 3 },

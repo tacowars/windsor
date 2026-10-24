@@ -19,6 +19,7 @@ import type { BounceRegion } from '../song/bounceRenderTypes';
 import { PRESETS } from '../patch/presets';
 import { gridNote, type GridStep } from '../sequencing/gridSequencer';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
+import { STEP_VARIATION_DEFAULTS } from '../sequencing/stepVariationConstants';
 import { recordingPart, type Call } from './recordingPart';
 
 /** The slot the rig's part plays on. */
@@ -62,14 +63,14 @@ export function bounceSong(sequencer: SequencerSpec, over: BounceSong = {}): Arr
   };
 }
 
-/** A Grid line at `divisor`, nothing skipped, accents of 0.2 with mod 1, at register octave 1. */
+/** A Grid line at `divisor`, nothing varied, accents of 0.2 with mod 1, at register octave 1. */
 export function gridSpec(steps: readonly GridStep[], over: Partial<GridSpec> = {}): GridSpec {
   return {
     kind: 'grid',
     divisor: DIVISORS.sixteenth,
     steps,
     length: steps.length,
-    skipChance: 0,
+    ...STEP_VARIATION_DEFAULTS,
     accentVelocity: 0.2,
     accentMod: 1,
     register: { octave: 1 },

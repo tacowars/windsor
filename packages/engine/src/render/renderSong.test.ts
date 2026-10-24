@@ -135,22 +135,30 @@ describe('renderSong', () => {
   });
 
   it('renders a seq. lane as the live pump plays it (windsor#488)', async () => {
-    // The grid's skip chance held at 1 by its lane: offline and live, it never plays.
-    const skipAll = {
-      target: 'seq.skipChance',
+    // The grid's Probability held at 0 by its lane: offline and live, its
+    // line of notes plays as written, so it strikes more than the varied
+    // grid, whose Rests sound silences some.
+    const gridIndex = FULL_DOCUMENT.parts.findIndex((part) => part.slot === FULL_SLOT.arp);
+    const noteOnsOf = (index: number): number => {
+      const { options, node } = built[index]!;
+      const posted = [...(options.events ?? []), ...(node.posted as { type?: string }[])];
+      return posted.filter((m) => m.type === 'noteOn').length;
+    };
+    await expectLiveMatch(FULL_DOCUMENT);
+    const varied = noteOnsOf(gridIndex);
+    const asWritten = {
+      target: 'seq.probability',
       on: true,
-      points: [{ tick: 0, value: 1, bend: 0 }],
+      points: [{ tick: 0, value: 0, bend: 0 }],
     };
     const laned: ArrangementDocument = {
       ...FULL_DOCUMENT,
       parts: FULL_DOCUMENT.parts.map((part) =>
-        part.slot === FULL_SLOT.arp ? { ...part, automation: [skipAll] } : part,
+        part.slot === FULL_SLOT.arp ? { ...part, automation: [asWritten] } : part,
       ),
     } as ArrangementDocument;
     await expectLiveMatch(laned);
-    const grid = built[FULL_DOCUMENT.parts.findIndex((part) => part.slot === FULL_SLOT.arp)]!;
-    const noteOns = [...(grid.options.events ?? []), ...(grid.node.posted as { type?: string }[])];
-    expect(noteOns.filter((m) => m.type === 'noteOn')).toEqual([]);
+    expect(noteOnsOf(gridIndex)).toBeGreaterThan(varied);
   });
 
   it('renders a Roll part as the live pump plays it (windsor#600)', async () => {

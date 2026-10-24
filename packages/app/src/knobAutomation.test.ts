@@ -229,8 +229,8 @@ describe('a patch knob', () => {
 });
 
 describe('a sequencer knob (windsor#491)', () => {
-  const skip: AutomationLane = {
-    target: 'seq.skipChance',
+  const randomness: AutomationLane = {
+    target: 'seq.randomness',
     on: true,
     points: [
       { tick: 0, value: 0.25, bend: 0 },
@@ -240,30 +240,34 @@ describe('a sequencer knob (windsor#491)', () => {
   const grid: DocumentPart = {
     ...AUTOMATION_PART,
     sequencer: { kind: 'grid', ...DEFAULT_GRID_CONFIG },
-    automation: [skip],
+    automation: [randomness],
   };
 
   it('locks on its field while the part’s kind offers it, in the sequencer colour', () => {
-    expect(seqKnobAutomation(grid, 'skipChance', 0, COLORS)).toEqual({
+    expect(seqKnobAutomation(grid, 'randomness', 0, COLORS)).toEqual({
       color: 'rose',
       value: 0.25,
     });
-    expect(seqKnobAutomation(grid, 'skipChance', BAR)?.value).toBeCloseTo(0.5);
-    expect(seqKnobAutomation(grid, 'skipChance', 0)?.color).toBe(LANE_KIND_COLOR.seq);
+    expect(seqKnobAutomation(grid, 'randomness', BAR)?.value).toBeCloseTo(0.5);
+    expect(seqKnobAutomation(grid, 'randomness', 0)?.color).toBe(LANE_KIND_COLOR.seq);
   });
 
   it('is free while its lane is off, and under a kind that offers the field none', () => {
-    const off = { ...grid, automation: [{ ...skip, on: false }] };
-    expect(seqKnobAutomation(off, 'skipChance', 0)).toBeNull();
+    const off = { ...grid, automation: [{ ...randomness, on: false }] };
+    expect(seqKnobAutomation(off, 'randomness', 0)).toBeNull();
     const chord: DocumentPart = { ...grid, sequencer: { kind: 'chord', ...DEFAULT_CHORD_CONFIG } };
-    expect(seqKnobAutomation(chord, 'skipChance', 0)).toBeNull();
+    expect(seqKnobAutomation(chord, 'randomness', 0)).toBeNull();
     expect(seqKnobAutomation(grid, 'gate', 0)).toBeNull();
+    expect(seqKnobAutomation(grid, 'skipChance', 0)).toBeNull();
   });
 
-  it('knows the three sequencer fields and no others', () => {
-    expect(['gate', 'skipChance', 'density', 'accentVelocity'].filter(isSeqField)).toEqual([
+  it('knows the five sequencer fields and no others', () => {
+    const fields = ['gate', 'skipChance', 'randomness', 'probability', 'density', 'accentVelocity'];
+    expect(fields.filter(isSeqField)).toEqual([
       'gate',
       'skipChance',
+      'randomness',
+      'probability',
       'density',
     ]);
   });

@@ -14,7 +14,12 @@ import type {
   SequencerKind,
   SequencerSpec,
 } from './arrangement';
-import { arpDriver, bassDriver } from './performerNormalise';
+import {
+  arpDriver,
+  bassDriver,
+  STEP_VARIATION_KEYS,
+  stepVariationFields,
+} from './performerNormalise';
 import { figureDriver } from './figureNormalise';
 import { rollDriver } from './rollNormalise';
 import {
@@ -282,7 +287,7 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     'divisor',
     'steps',
     'length',
-    'skipChance',
+    ...STEP_VARIATION_KEYS,
     'accentVelocity',
     'accentMod',
     'register',
@@ -296,7 +301,7 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     steps,
     // The whole line unless the document says shorter (#603); never past the steps written.
     length: n.int(o.length, steps.length, 1, steps.length, `${path}.length`),
-    skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
+    ...stepVariationFields(o, path, n),
     accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
     accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
     register: registerOctave(o.register, d.register.octave, `${path}.register`, n),

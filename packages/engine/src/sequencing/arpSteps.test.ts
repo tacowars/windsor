@@ -77,7 +77,7 @@ describe('arpCycleLength (epic windsor#126 decision 2)', () => {
 });
 
 describe('the arp cells (windsor#127)', () => {
-  it('a new arp carries ARP_STEPS_MAX plain notes, no lanes, the grid accents and no skip', () => {
+  it('a new arp carries ARP_STEPS_MAX plain notes, no lanes, the grid accents and no variation', () => {
     expect(defaultArpSteps()).toHaveLength(ARP_STEPS_MAX);
     for (const cell of defaultArpSteps()) {
       expect(cell).toEqual({ kind: 'note', octave: 0, accent: false, slide: false });
@@ -87,7 +87,10 @@ describe('the arp cells (windsor#127)', () => {
       lanes: [],
       accentVelocity: 0.2,
       accentMod: 1,
-      skipChance: 0,
+      randomness: 0,
+      probability: 0,
+      restsSound: false,
+      octaveMode: false,
     });
     expect(() => assertArpConfig(DEFAULT_ARP_CONFIG)).not.toThrow();
   });
@@ -111,7 +114,9 @@ describe('the arp cells (windsor#127)', () => {
       { lanes: [lane(new Array<number>(ARP_STEPS_MAX).fill(2))] },
       { accentVelocity: 1.5 },
       { accentMod: -0.1 },
-      { skipChance: Number.NaN },
+      { randomness: Number.NaN },
+      { probability: 1.5 },
+      { restsSound: 1 as unknown as boolean },
     ];
     for (const over of refused) {
       expect(
@@ -129,7 +134,10 @@ describe('the arp cells (windsor#127)', () => {
         arpNote({ gate: 1 }),
       ]),
       lanes: [lane(new Array<number>(ARP_STEPS_MAX).fill(-1))],
-      skipChance: 1,
+      randomness: 1,
+      probability: 1,
+      restsSound: true,
+      octaveMode: true,
     };
     expect(() => assertArpConfig(edited)).not.toThrow();
   });

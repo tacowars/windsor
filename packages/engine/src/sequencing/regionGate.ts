@@ -50,13 +50,19 @@ import { ticksPerBar } from './meter';
 import type { Meter } from './meterTables';
 import type { TickEvent, TickSource, Unsubscribe } from './scheduler';
 
-/** A sequencer field a song lane may move (windsor#488). */
-export type SeqField = 'gate' | 'skipChance' | 'density';
+/** A sequencer field a song lane may move (windsor#488; Randomness and Probability, windsor#935). */
+export type SeqField = 'gate' | 'skipChance' | 'density' | 'randomness' | 'probability';
 
 /** The sequencer fields the part's lanes hold at a tick; a field no lane moves is absent. */
 export type SeqOverrides = { readonly [F in SeqField]?: number };
 
-const SEQ_FIELDS: readonly SeqField[] = ['gate', 'skipChance', 'density'];
+const SEQ_FIELDS: readonly SeqField[] = [
+  'gate',
+  'skipChance',
+  'density',
+  'randomness',
+  'probability',
+];
 
 /**
  * `config` with each field `overrides` moves that the config has, or

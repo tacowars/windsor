@@ -63,11 +63,17 @@ export const BOUNCE_COUNT_LINES: readonly (readonly [BounceCount, CountWords])[]
   ['silenced', { one: 'note at velocity 0 silenced', many: 'notes at velocity 0 silenced' }],
 ];
 
-/** The sequencer lanes a bounce bakes, named as their knobs are, in the record's order ("Skip and Gate"). */
+/**
+ * The sequencer lanes a bounce bakes, named as their knobs are, in the
+ * record's order ("Skip and Gate"), Randomness and Probability (windsor#935)
+ * after them.
+ */
 export const BOUNCE_LANE_NAMES: readonly (readonly [SeqField, string])[] = [
   ['skipChance', 'Skip'],
   ['gate', 'Gate'],
   ['density', 'Density'],
+  ['randomness', 'Randomness'],
+  ['probability', 'Probability'],
 ];
 
 /** The meter the loop cap is stated in: "256 bars of 4/4" (decision 6). */

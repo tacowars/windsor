@@ -22,6 +22,8 @@ import {
 import { assertArpGrid, defaultArpSteps, type ArpStep } from './arpSteps';
 import { DIVISORS, isNoteDivisor } from './scheduler';
 import type { StepModLane } from './stepModLanes';
+import type { StepVariationConfig } from './stepVariation';
+import { STEP_VARIATION_DEFAULTS } from './stepVariationConstants';
 
 export const ARP_STYLES = [
   'up',
@@ -37,7 +39,8 @@ export const ARP_STYLES = [
 ] as const;
 export type ArpStyle = (typeof ARP_STYLES)[number];
 
-export interface ArpSequencerConfig {
+/** Step variation's four fields (windsor#935, `stepVariation.ts`) come with `StepVariationConfig`. */
+export interface ArpSequencerConfig extends StepVariationConfig {
   style: ArpStyle;
   /** Ticks per arp step. Must divide the bar. */
   divisor: number;
@@ -62,8 +65,6 @@ export interface ArpSequencerConfig {
   accentVelocity: number;
   /** The per-note mod an accented cell sends; a plain cell sends 0. */
   accentMod: number;
-  /** Chance a note cell rests instead, 0–1. */
-  skipChance: number;
   seed: number;
 }
 
@@ -79,7 +80,7 @@ export const DEFAULT_ARP_CONFIG: ArpSequencerConfig = {
   lanes: [],
   accentVelocity: ACCENT_VELOCITY_DEFAULT,
   accentMod: ACCENT_MOD_DEFAULT,
-  skipChance: 0,
+  ...STEP_VARIATION_DEFAULTS,
   seed: 0,
 };
 

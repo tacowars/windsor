@@ -33,6 +33,7 @@ import {
   chordName,
   eventChord,
   scaleOffsets,
+  variationFlipsRests,
 } from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
 import {
@@ -189,11 +190,12 @@ export function randomArpCells(
  *
  * `when`: a slide whose held note comes from wrapping round the cycle
  * (cell 1 among them) is held only once the cycle wraps, as a region's
- * entry and a retrigger reset strike it plain: `wrap`. With Skip above 0
- * the note before it may rest: `skip`. Otherwise `always`.
+ * entry and a retrigger reset strike it plain: `wrap`. When step variation
+ * may flip a note to a rest (`variationFlipsRests`) the note before it may
+ * rest: `skip`. Otherwise `always`.
  */
 export function arpSlideAt(
-  spec: Pick<ArpSpec, 'steps' | 'skipChance' | 'style'>,
+  spec: Pick<ArpSpec, 'steps' | 'style' | 'randomness' | 'probability' | 'restsSound'>,
   index: number,
   list: readonly number[],
 ): StepSlide {
@@ -209,7 +211,7 @@ export function arpSlideAt(
     const held = arpCellPitch(style, at, list, prev.octave);
     const next = arpCellPitch(style, index, list, step.octave);
     const kind = held === null || next === null ? 'either' : held === next ? 'same' : 'retarget';
-    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    const when = back > index ? 'wrap' : variationFlipsRests(spec) ? 'skip' : 'always';
     return { kind, when };
   }
   return NO_SLIDE;

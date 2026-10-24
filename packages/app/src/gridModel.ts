@@ -21,6 +21,7 @@ import {
   gridNote,
   pitchClassName,
   scaleOffsets,
+  variationFlipsRests,
 } from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 import type { StepSlide } from './stepModLaneModel';
@@ -260,12 +261,13 @@ function relativePitch(step: GridNoteStep, key: Key): number {
  * `when` says whether the run can change that. The engine holds nothing on
  * a region's entry, so a Slide whose held note comes from wrapping round
  * the loop (step 1 among them) plays its own values on entry and is held
- * only once the loop wraps: `wrap`. Skip drops a note step as a rest, which
- * releases the held note, so with Skip above 0 a Slide after a note may
- * play too: `skip`. Otherwise the line decides it alone: `always`.
+ * only once the loop wraps: `wrap`. Step variation with Rests sound on may
+ * drop a note step as a rest, which releases the held note, so then a
+ * Slide after a note may play too (`variationFlipsRests`): `skip`.
+ * Otherwise the line decides it alone: `always`.
  */
 export function slideAt(
-  spec: Pick<GridSpec, 'steps' | 'length' | 'skipChance'>,
+  spec: Pick<GridSpec, 'steps' | 'length' | 'randomness' | 'probability' | 'restsSound'>,
   index: number,
   key: Key,
 ): StepSlide {
@@ -279,7 +281,7 @@ export function slideAt(
     if (!prev || prev.kind === 'rest') return none;
     if (prev.kind === 'tie') continue;
     const kind = relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
-    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    const when = back > index ? 'wrap' : variationFlipsRests(spec) ? 'skip' : 'always';
     return { kind, when };
   }
   return none;

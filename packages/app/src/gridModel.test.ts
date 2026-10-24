@@ -229,9 +229,9 @@ describe('how a step meets the note before it (windsor#31)', () => {
     steps: GridStep[],
     index: number,
     length = steps.length,
-    skipChance = 0,
+    randomness = 0,
     key = MINOR,
-  ) => slideAt({ steps, length, skipChance }, index, key);
+  ) => slideAt({ steps, length, randomness, probability: 1, restsSound: true }, index, key);
 
   it('reads a slide onto a new pitch as a retarget, and onto the held pitch as nothing new', () => {
     const steps = [gridNote(0), slide(2), slide(2), gridNote(4)];
@@ -255,7 +255,7 @@ describe('how a step meets the note before it (windsor#31)', () => {
     expect(at([slide(0), REST], 0).kind).toBe('none');
   });
 
-  it('leaves a slide after a note Skip may drop to the run', () => {
+  it('leaves a slide after a note Rests sound may drop to the run', () => {
     const steps = [gridNote(0), TIE, slide(2)];
     expect(at(steps, 2, 3, 0.25)).toEqual({ kind: 'retarget', when: 'skip' });
     expect(at(steps, 2, 3, 0)).toEqual({ kind: 'retarget', when: 'always' });

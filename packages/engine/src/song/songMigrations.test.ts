@@ -12,7 +12,9 @@
  * `songRetroSizeUpgrade.test.ts`), 9 → 10 (windsor#728: bloom's Scale
  * values renamed to Windsor's, pinned here) and 15 → 16 (windsor#818: the
  * Tape's Wow, Flutter and Wear on a square law, an identity step pinned
- * here, read through a stand-in 16 → 17); versions 2 (#705), 3 (record
+ * here, read through a stand-in 16 → 17), with 17 → 18 (the Dub delay,
+ * `delayUpgrade.test.ts`) and 18 → 19 (windsor#935: Skip deleted from the
+ * Grid and the Arp, `songMigrationsStepVariation.test.ts`) after it; versions 2 (#705), 3 (record
  * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
  * changed meaning) are refused. None ships from 10 to 11 (windsor#748, the
  * plate's Decay in seconds), from 11 to 12 (windsor#761, the plate's
@@ -79,8 +81,8 @@ const PAST_TEN = {
 };
 
 describe('upgradeSong', () => {
-  it('ships seven upgrades, 5 → 6 to 9 → 10, 15 → 16 and 17 → 18, and none to 11, 12, 13, 14, 15 or 17: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15', '17']);
+  it('ships eight upgrades, 5 → 6 to 9 → 10, 15 → 16, 17 → 18 and 18 → 19, and none to 11, 12, 13, 14, 15 or 17: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15', '17', '18']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {

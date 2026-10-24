@@ -24,8 +24,9 @@
  *   part's gate. The note runs to the next onset instead when the played
  *   gate covers the step, or when the next cell in the cycle is a tie or a
  *   slide (`holdsToNext`), whatever the gate. The look-ahead reads the
- *   next cell's kind only, so a skip drawn there later is a rest that
- *   releases the note at its own onset. It reads the current cycle, so at a
+ *   next cell's kind as written, so a slide that step variation silences
+ *   there later is a rest that releases the note at its own onset. It
+ *   reads the current cycle, so at a
  *   chord change the next onset may play another cell (`arpeggiator.ts`,
  *   "The gate's look-ahead across a chord change").
  * - **A retrigger reset** (decided by tacowars, windsor#129): when a chord
@@ -35,24 +36,33 @@
  *   (`strikeCell`). So every chord change starts on a sounding note. A tie
  *   or slide on cell 0 when the cycle wraps with no chord change plays as
  *   written.
- * - **Skip chance:** a note cell becomes a rest with probability
- *   `skipChance`, drawn from a stream of its own (`arpSkipRng`), never the
- *   walk's, and nothing is drawn at 0 (`skipCell`).
+ * - **Step variation** (windsor#935, `stepVariation.ts`) draws from a
+ *   stream of its own (`arpVariationRng`), never the walk's. The
+ *   arpeggiator resolves it before the cell plays: the onset arrives with
+ *   the cell as it plays, its pitch and gate, and a velocity under the
+ *   part's when the step varied one.
  *
  * Pure: no clock, no graph. `generatorBoundary.test.ts` holds it there.
  */
 import { GATE_MIN, MIDI_NOTE_MAX } from '../audioConstants';
 import type { ArpSequencerConfig } from './arpSequencer';
-import { ARP_SKIP_STREAM_SALT, UINT32_SPAN } from './arpStepConstants';
+import { ARP_VARIATION_STREAM_SALT, UINT32_SPAN } from './arpStepConstants';
 import { arpNote, type ArpStep } from './arpSteps';
 import { hashSeed, streamRng, type Rng } from './generatorSeed';
 import { mulberry32 } from './mulberry32';
 import type { NoteEvent, NoteOnEvent } from './noteEvent';
 import { SEMITONES_PER_OCTAVE } from './scaleSampler';
 import { stepModAt } from './stepModLanes';
-
-/** A rest: what a written rest and a skipped note both play. */
-const REST: ArpStep = { kind: 'rest' };
+import {
+  jumpOffset,
+  octaveShift,
+  shiftOctaveWithin,
+  variedGate,
+  variedVelocity,
+  wrapIndex,
+  type StepDraw,
+} from './stepVariation';
+import { STEP_VARIATION_TABLE, type StepVariationTable } from './stepVariationConstants';
 
 /** The cell traversal index `i` lands on over a cycle of `cycle` ≥ 1 cells. */
 export function arpCellIndex(i: number, cycle: number): number {
@@ -72,28 +82,23 @@ export function shiftOctave(pitch: number, octave: number): number {
 }
 
 /**
- * The skip stream's seed for `seed` in `regionIndex`: the walk stream's seed
- * salted and put through one mulberry32 draw. Every mulberry32 stream is an
- * offset along one sequence, so a seed only added to would make the skip
- * stream the walk's (or another region's) shifted; the draw scrambles that.
+ * The variation stream's seed for `seed` in `regionIndex`: the walk stream's
+ * seed salted and put through one mulberry32 draw. Every mulberry32 stream
+ * is an offset along one sequence, so a seed only added to would make the
+ * variation stream the walk's (or another region's) shifted; the draw
+ * scrambles that.
  */
-export function arpSkipSeed(
+export function arpVariationSeed(
   seed: number,
   regionIndex: number,
-  salt = ARP_SKIP_STREAM_SALT,
+  salt = ARP_VARIATION_STREAM_SALT,
 ): number {
   return Math.floor(mulberry32(hashSeed(seed, regionIndex) ^ salt)() * UINT32_SPAN);
 }
 
-/** The skip-chance stream for one arp in one region, apart from the walk's `streamRng(seed, regionIndex)`. */
-export function arpSkipRng(seed: number, regionIndex: number): Rng {
-  return streamRng(arpSkipSeed(seed, regionIndex), 0);
-}
-
-/** The cell as it plays: a note cell becomes a rest with chance `skipChance`, one draw per note cell, none at 0. */
-export function skipCell(cell: ArpStep, skipChance: number, rng: Rng): ArpStep {
-  if (cell.kind !== 'note' || skipChance <= 0) return cell;
-  return rng() < skipChance ? REST : cell;
+/** Step variation's stream for one arp in one region, apart from the walk's `streamRng(seed, regionIndex)`. */
+export function arpVariationRng(seed: number, regionIndex: number): Rng {
+  return streamRng(arpVariationSeed(seed, regionIndex), 0);
 }
 
 /** A cell as it plays at a retrigger reset: a tie or a slide becomes a plain note, keeping a note's octave and accent. */
@@ -101,6 +106,67 @@ export function strikeCell(cell: ArpStep): ArpStep {
   if (cell.kind === 'tie') return arpNote();
   if (cell.kind === 'note' && cell.slide) return { ...cell, slide: false };
   return cell;
+}
+
+/**
+ * A cell as it plays once Rests sound has flipped it (windsor#935): a note
+ * rests, a rest sounds as a plain note (the walked pitch, no accent, slide
+ * or ratchet), and a tie never flips.
+ */
+export function flipCell(cell: ArpStep): ArpStep {
+  if (cell.kind === 'note') return { kind: 'rest' };
+  return cell.kind === 'rest' ? arpNote() : cell;
+}
+
+/** What a cell plays with once step variation has had its say: the cell, its pitch, gate and velocity. */
+export interface ArpVariedCell {
+  readonly cell: ArpStep;
+  /** The pitch `playArpCell` shifts by the cell's octave. */
+  readonly pitch: number;
+  readonly gate: number;
+  /** A fraction of the part's velocity; absent is 1. */
+  readonly velocity?: number | undefined;
+}
+
+/** Where a cell's pitch and gate come from: the walked list and index, and the part's settings. */
+export interface ArpVariationContext {
+  readonly list: readonly number[];
+  /** The list index the walk picked. */
+  readonly at: number;
+  readonly config: Pick<ArpSequencerConfig, 'gate' | 'randomness' | 'octaveMode'>;
+  readonly table?: StepVariationTable;
+}
+
+/**
+ * A note cell's pitch, gate and velocity on a step that varies
+ * (windsor#935): a velocity under the part's, a gate moved about the played
+ * one, and a pitch either moved by whole octaves of the cell's own note
+ * (Octave on, the cell's shift folded into the pitch) or the list neighbour
+ * a normal offset from the walked one, wrapping over the list. Any other
+ * cell, or a step that plays as written (`draw` null), keeps the walked
+ * pitch and the played gate.
+ */
+export function variedCell(
+  cell: ArpStep,
+  draw: StepDraw | null,
+  context: ArpVariationContext,
+): ArpVariedCell {
+  const { list, at, config, table = STEP_VARIATION_TABLE } = context;
+  const walked = list[at] as number;
+  const gate = arpPlayedGate(config.gate, cell);
+  if (!draw || cell.kind !== 'note') return { cell, pitch: walked, gate };
+  const { randomness } = config;
+  const varied = {
+    gate: variedGate(gate, draw, randomness, table),
+    velocity: variedVelocity(draw, randomness, table),
+  };
+  if (config.octaveMode) {
+    const own = shiftOctave(walked, cell.octave);
+    const pitch = shiftOctaveWithin(own, octaveShift(draw, randomness, table));
+    return { cell: { ...cell, octave: 0 }, pitch, ...varied };
+  }
+  const offset = jumpOffset(draw, randomness, list.length, table.listJumpSigma);
+  return { cell, pitch: list[wrapIndex(at + offset, list.length)] as number, ...varied };
 }
 
 /**
@@ -112,13 +178,13 @@ export function arpPlayedGate(partGate: number, cell: ArpStep, floor = GATE_MIN)
   return Math.max(floor, partGate * cell.gate);
 }
 
-/** One onset as the arpeggiator hands it over, the walk and the skip already resolved. */
+/** One onset as the arpeggiator hands it over, the walk and step variation already resolved. */
 export interface ArpOnset {
   readonly tick: number;
   readonly time: number;
   /** The chord's degree, which the note-on carries. */
   readonly degree: number;
-  /** The cell as it plays: a note skip chance turned into a rest arrives as a rest. */
+  /** The cell as it plays: a note step variation silenced arrives as a rest. */
   readonly cell: ArpStep;
   /** Its index in the cycle, which the lanes are read at. */
   readonly index: number;
@@ -130,6 +196,8 @@ export interface ArpOnset {
   readonly holdsOn: boolean;
   /** The gate the note sounding after this onset plays at (`arpPlayedGate`); absent is the config's. */
   readonly gate?: number;
+  /** A varied step's velocity, a fraction of the part's (windsor#935); absent is 1. */
+  readonly velocity?: number | undefined;
 }
 
 /** What an onset emits and leaves sounding: the held note and the local tick its gate releases it, null to run to the next onset. */
@@ -178,6 +246,7 @@ export function playArpCell(onset: ArpOnset, config: ArpCellConfig): ArpCellOutc
     note,
     degree: onset.degree,
   };
+  if (onset.velocity !== undefined) on.velocity = onset.velocity;
   if (cell.accent) on.accent = { velocity: config.accentVelocity, mod: config.accentMod };
   if (slide) on.slide = true;
   const stepMod = stepModAt(config.lanes, onset.index);

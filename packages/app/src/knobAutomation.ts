@@ -190,7 +190,7 @@ export function seqKnobAutomation(
   return catalogKnobAutomation(part, seqTargetId(field), tick, colors);
 }
 
-/** Whether a sequencer knob's field is one a lane can hold (`gate`, `skipChance`, `density`). */
+/** Whether a sequencer knob's field is one a lane can hold (`gate`, `skipChance`, `density`, `randomness`, `probability`). */
 export const isSeqField = (field: string): field is SeqField =>
   SEQ_AUTOMATION_ROWS.some((row) => row.field === field);
 

@@ -31,11 +31,8 @@ describe('the Arp device’s columns (windsor#370 decision 2)', () => {
     expect(new Set(placed).size).toBe(placed.length);
   });
 
-  it('puts Vel, Acc vel and Acc mod together, then Gate and Skip', () => {
-    expect(ARP_KNOB_COLUMNS).toEqual([
-      ['velocity', 'accentVelocity', 'accentMod'],
-      ['gate', 'skipChance'],
-    ]);
+  it('puts Vel, Acc vel and Acc mod together, then Gate', () => {
+    expect(ARP_KNOB_COLUMNS).toEqual([['velocity', 'accentVelocity', 'accentMod'], ['gate']]);
   });
 });
 

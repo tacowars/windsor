@@ -19,6 +19,7 @@ import { ARP_BOUNCE_STYLES, ARP_STEPS_MAX } from './arpStepConstants';
 import type { ArpStyle } from './arpSequencer';
 import { GRID_STEP_KINDS, assertRatchet } from './gridSequencer';
 import { assertStepModLanes, type StepModLane } from './stepModLanes';
+import { assertStepVariation, type StepVariationConfig } from './stepVariation';
 
 export interface ArpNoteStep {
   readonly kind: 'note';
@@ -64,12 +65,11 @@ export function arpCycleLength(
 }
 
 /** The grid fields of an arp's config: what `assertArpGrid` checks. */
-export interface ArpGridFields {
+export interface ArpGridFields extends StepVariationConfig {
   readonly steps: readonly ArpStep[];
   readonly lanes: readonly StepModLane[];
   readonly accentVelocity: number;
   readonly accentMod: number;
-  readonly skipChance: number;
 }
 
 /** One cell: a known kind, and a note's octave, ratchet and gate in range. Basslead's steps share it (windsor#367). */
@@ -95,8 +95,9 @@ function assertUnit(value: number, name: string): void {
 
 /**
  * Exactly `ARP_STEPS_MAX` valid cells, the lanes the grid allows with one
- * value per cell, and the accent and skip amounts in 0–1: the bounds the
- * normaliser (`performerNormalise.ts`) makes a document meet.
+ * value per cell, the accent amounts in 0–1 and step variation's fields
+ * (`assertStepVariation`): the bounds the normaliser
+ * (`performerNormalise.ts`) makes a document meet.
  */
 export function assertArpGrid(config: ArpGridFields): void {
   if (config.steps.length !== ARP_STEPS_MAX) {
@@ -111,5 +112,5 @@ export function assertArpGrid(config: ArpGridFields): void {
   });
   assertUnit(config.accentVelocity, 'accentVelocity');
   assertUnit(config.accentMod, 'accentMod');
-  assertUnit(config.skipChance, 'skipChance');
+  assertStepVariation(config);
 }

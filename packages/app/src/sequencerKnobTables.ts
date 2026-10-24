@@ -167,12 +167,6 @@ export const GRID_KNOBS: readonly SequencerKnobEntry[] = [
   VELOCITY_KNOB,
   {
     kind: 'driver',
-    f: 'skipChance',
-    label: 'Skip',
-    o: { min: 0, max: 1, def: DEFAULT_GRID_CONFIG.skipChance, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
     f: 'accentVelocity',
     label: 'Acc vel',
     o: { min: 0, max: 1, def: DEFAULT_GRID_CONFIG.accentVelocity, fmt: fmt2 },
@@ -238,17 +232,11 @@ export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
 ];
 
 /**
- * The Arp card's step-grid knobs (windsor#137): Skip, Acc vel and Acc mod,
- * the grid's ranges and readouts over the arp's own defaults. They follow
- * Reg in the card's row.
+ * The Arp card's step-grid knobs (windsor#137): Acc vel and Acc mod, the
+ * grid's ranges and readouts over the arp's own defaults. They follow Reg
+ * in the card's row.
  */
 export const ARP_GRID_KNOBS: readonly SequencerKnobEntry[] = [
-  {
-    kind: 'driver',
-    f: 'skipChance',
-    label: 'Skip',
-    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.skipChance, fmt: fmt2 },
-  },
   {
     kind: 'driver',
     f: 'accentVelocity',

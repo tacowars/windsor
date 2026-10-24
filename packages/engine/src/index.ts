@@ -89,6 +89,11 @@ export type {
   GridStep,
   GridStepKind,
 } from './sequencing/gridSequencer';
+// Step variation on the Grid and the Arp (windsor#935): its fields, defaults and tunables.
+export { variationFlipsRests } from './sequencing/stepVariation';
+export type { StepVariationConfig } from './sequencing/stepVariation';
+export { STEP_VARIATION_DEFAULTS, STEP_VARIATION_TABLE } from './sequencing/stepVariationConstants';
+export type { StepVariationTable } from './sequencing/stepVariationConstants';
 // Per-step parameter modulation (windsor#17): the lanes, over the voice target table.
 export { STEP_MOD_LANES_MAX, isVoiceTargetPath, stepModAt } from './sequencing/stepModLanes';
 export { stepModAtCycle } from './sequencing/stepModLanes';

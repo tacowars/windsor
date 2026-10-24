@@ -3,8 +3,8 @@
  * `2026-10-01-sequencer-rack-devices` decision 6): a roll of N hits of the
  * walked note evenly across the step, each held the gate times its slice;
  * the last hit held open into a tie, or to the next onset at gate 1; one
- * walk and one skip draw per step, so the pitches and the skipped steps are
- * those of the same arp without ratchets; and the hits past a region end
+ * walk and one set of step variation draws per step, so the pitches and the
+ * silenced steps are those of the same arp without ratchets; and the hits past a region end
  * dropped.
  */
 import { describe, expect, it } from 'vitest';
@@ -101,8 +101,9 @@ describe('Arp ratchets through the player (windsor#366)', () => {
     ]);
   });
 
-  it('walks and skips exactly as without ratchets, and a skipped cell plays no hit', () => {
-    const over = { gate: 0.5, skipChance: 0.5, style: 'random' as const, seed: 3 };
+  it('walks and varies exactly as without ratchets, and a silenced cell plays no hit', () => {
+    const varied = { randomness: 1, probability: 1, restsSound: true };
+    const over = { gate: 0.5, ...varied, style: 'random' as const, seed: 3 };
     const without = sounding(play(song(over), 4));
     const withRatchets = sounding(
       play(song({ ...over, steps: steps(arpNote({ ratchet: 3 })) }), 4),
