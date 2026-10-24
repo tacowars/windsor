@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- The Arp device's Gate bar (windsor#934, step variation 2/4, over the engine
+     field ArpNoteStep.gate of windsor#933). Today is the real thing: screenshots
+     of main (1a71af2) taken on 2026-10-24 from `npm run dev` in the project's
+     headless Chrome at CSS 1440 x 900 with a mouse, and at 1366 x 1024 and
+     1024 x 1366 with touch, with a two-part song in A minor at 128 BPM (harmony
+     A min7, F maj7, C maj7, G 7, one bar each): Arp on Saw Arp (Up, 1/16,
+     Octaves 3, Gate 0.80, two lanes, Cutoff and Resonance) and Bass on Silt
+     Pulse Bass (Basslead, Follow Root, 1/8, Gate 0.60). They are saved beside
+     this file as arp-gate-bar-today-*.jpg. Proposed draws the Gate row over
+     those screenshots at the places and sizes measured there: the step columns
+     32 px wide on a 38 px pitch from x 594, the held rows 20 px high and 4 px
+     apart (index 12, then ♪ — ·, Oct, A, S at 20, the ratchet at 14: a 126 px
+     head), the strip's scroller 548 x 218 px from x 496 (y 358.9 on the desktop
+     and in landscape, 392.9 in portrait, where the rack clips the device at
+     x 1010), and the Gate knob's 52 x 56 px box at x 426. The Gate row goes in
+     between Oct and A, so the head grows by one row and one gap, 24 px, to 150
+     px: everything in the strip below Oct moves 24 px down inside the same
+     scroller. That was checked by putting a 20 px cell under Oct in each live
+     column and setting the head to 150 px: the A row moved from 422.9 to 446.9,
+     the first lane from 486.9 to 510.9, and the scroller's content from 214 to
+     238 px of its 218. The bar's look is the Figure's Vel bar
+     (packages/app/src/figureCells.ts and console.css's .figure-device
+     .gcell.vel), in the Arp's 20 px cell. What works: the frame picker, Today |
+     Proposed, the Gate knob (drawn over the screenshot's, and a slider above),
+     a vertical drag on a bar (written on release), a double-click on a bar
+     (back to 1), and the look toggles. Nothing makes sound. -->
+  <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+  <title>Windsor Arp Gate Bar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+  />
+  <style>
+    /* Tokens copied from packages/app/src/console.css. The app is dark only. */
+    :root {
+      --ground: #171b1e;
+      --panel: #1f2529;
+      --panel-hi: #262d32;
+      --inset: #121618;
+      --line: #2c3439;
+      --line-bright: #3d4950;
+      --ink: #dce3e3;
+      --ink-dim: #8b9a9e;
+      --ink-faint: #5e6b70;
+      --carrier: #e0a44e;
+      --modulator: #5fa8a0;
+      --return: #9c7bd0;
+      --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+      --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+      --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r: 3px;
+      /* The Arp's cell colour on this song (the cells' --kc, measured). */
+      --kc: #5fa8a0;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ground);
+      color: var(--ink);
+      font: 13px/1.4 var(--f-ui);
+    }
+    button,
+    select {
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    /* ---------- the mockup's own controls (not the console) ---------- */
+    .mock-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      align-items: center;
+      padding: 7px 16px;
+      background: #2a2140;
+      border-bottom: 1px dashed var(--return);
+      font: 11px var(--f-ui);
+      color: #cbbfe6;
+    }
+    .mock-bar b {
+      font: 600 10px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--return);
+    }
+    .mock-bar label,
+    .mock-bar .grp {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .mock-bar select,
+    .mock-bar .mb {
+      background: var(--inset);
+      color: var(--ink);
+      border: 1px solid var(--line-bright);
+      border-radius: var(--r);
+      padding: 3px 7px;
+      font: 11px var(--f-ui);
+    }
+    .mock-bar .mb[aria-pressed='true'] {
+      background: var(--return);
+      border-color: var(--return);
+      color: #17121f;
+    }
+    .mock-bar input[type='range'] {
+      width: 140px;
+      accent-color: var(--return);
+    }
+    .mock-bar .readout {
+      min-width: 34px;
+      font: 11px var(--f-num);
+      color: var(--ink);
+    }
+    body.marks .new {
+      outline: 1px dashed var(--return);
+      outline-offset: 2px;
+    }
+    .stage-wrap {
+      padding: 16px;
+      overflow-x: auto;
+    }
+    /* `bare` in the link: the frame alone at the page's corner, for the rendered pictures. */
+    body.bare .mock-bar,
+    body.bare .caption,
+    body.bare .notes {
+      display: none;
+    }
+    body.bare .stage-wrap {
+      padding: 0;
+    }
+    body.bare.marks .new {
+      outline: 0;
+    }
+    body.bare .frame {
+      outline: 0;
+    }
+    .caption {
+      margin: 0 0 8px;
+      font: 11px var(--f-num);
+      color: var(--ink-dim);
+    }
+
+    /* ---------- the frame: a device's screen at its CSS size, today's screenshot behind ---------- */
+    .frame {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      outline: 1px dashed var(--return);
+      background: var(--ground) var(--shot) no-repeat 0 0 / 100% 100%;
+    }
+    .ov {
+      position: absolute;
+    }
+    /* The strip below Oct, today's pixels moved down by the new row: the same
+       screenshot, offset, clipped to the scroller as the app clips it. */
+    .shift {
+      background-image: var(--shot);
+      background-repeat: no-repeat;
+      background-size: var(--w) var(--h);
+    }
+
+    /* ---------- the step cell, copied from console.css (.gcell, .seq-strip .gcell, .arp-device) ---------- */
+    .gcell {
+      height: 20px;
+      padding: 0;
+      overflow: hidden;
+      background: var(--inset);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      color: var(--ink-dim);
+      font: 600 9.5px/18px var(--f-panel);
+      letter-spacing: 0.02em;
+      text-align: center;
+      white-space: nowrap;
+    }
+    /* The Gate bar: the Figure's Vel bar (.figure-device .gcell.vel), in the Arp's 20 px cell. */
+    .gcell.gate {
+      color: var(--ink);
+      font: 400 8.5px/18px var(--f-num);
+      cursor: ns-resize;
+      touch-action: none;
+      user-select: none;
+    }
+    .gcell.gate i {
+      position: absolute;
+      inset: 0 auto 0 0;
+      background: color-mix(in srgb, var(--kc) 45%, transparent);
+    }
+    .gcell.gate span {
+      position: relative;
+    }
+    /* A cell at 1 (no gate written): its text faint, as the Vel bar's at full.
+       Its fill still shows the played gate, fainter (To decide 1). */
+    .gcell.gate.full {
+      color: var(--ink-faint);
+    }
+    .gcell.gate.full i {
+      background: color-mix(in srgb, var(--kc) 20%, transparent);
+    }
+    body.full-none .gcell.gate.full i {
+      display: none;
+    }
+    /* To decide 2's other look: a note that runs on to the next onset filled to the end, hatched. */
+    .gcell.gate.held i {
+      width: 100% !important;
+      background: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--kc) 45%, transparent) 0 3px,
+        color-mix(in srgb, var(--kc) 20%, transparent) 3px 6px
+      );
+    }
+
+    /* ---------- the Gate knob, copied from console.css (.knob, .dial-*) ---------- */
+    .knob {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1px 0;
+      background: var(--panel);
+      cursor: ns-resize;
+      touch-action: none;
+      user-select: none;
+    }
+    .knob #knobDial,
+    .knob svg {
+      display: block;
+      width: 30px;
+      height: 30px;
+      overflow: visible;
+    }
+    .dial-face {
+      fill: var(--inset);
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+    .dial-track,
+    .dial-arc {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+    .dial-track {
+      stroke: var(--line-bright);
+    }
+    .dial-arc {
+      stroke: var(--kc);
+    }
+    .dial-pin {
+      stroke: var(--ink);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+    .knob-val {
+      height: 13px;
+      color: var(--ink);
+      font: 10px/13px var(--f-num);
+    }
+    .knob-label {
+      color: var(--ink-faint);
+      font: 600 8.5px/11px var(--f-panel);
+      letter-spacing: 0.85px;
+      text-transform: uppercase;
+    }
+    .unchanged {
+      padding: 2px 6px;
+      background: #2a2140;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      color: var(--return);
+      font: 600 9px var(--f-panel);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    body.bare .unchanged {
+      display: none;
+    }
+
+    /* ---------- notes ---------- */
+    .notes {
+      margin: 4px 16px 40px;
+      padding: 12px 14px;
+      border: 1px dashed var(--return);
+      border-radius: var(--r);
+      background: rgba(156, 123, 208, 0.06);
+      max-width: 1040px;
+    }
+    .notes[hidden] {
+      display: none;
+    }
+    .notes h2 {
+      font: 600 11px var(--f-panel);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--return);
+      margin: 14px 0 8px;
+    }
+    .notes h2:first-child {
+      margin-top: 0;
+    }
+    .notes ol,
+    .notes ul,
+    .notes p {
+      margin: 0 0 12px;
+      color: var(--ink-dim);
+      font-size: 12px;
+    }
+    .notes li {
+      margin-bottom: 6px;
+    }
+    .notes b {
+      color: var(--ink);
+    }
+    .notes code {
+      font: 11px var(--f-num);
+      color: var(--ink);
+    }
+    .notes table {
+      border-collapse: collapse;
+      margin: 0 0 12px;
+      font-size: 12px;
+      color: var(--ink-dim);
+    }
+    .notes th,
+    .notes td {
+      padding: 3px 10px 3px 0;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+    .notes th {
+      font: 600 9.5px var(--f-panel);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .notes td.num {
+      font: 11px var(--f-num);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+  </style>
+
+  <body class="marks">
+    <div class="mock-bar">
+      <b>Mockup</b>
+      <label
+        >Frame
+        <select id="mFrame"></select>
+      </label>
+      <span class="grp"
+        ><button class="mb" id="mToday">Today</button
+        ><button class="mb" id="mProposed">Proposed</button></span
+      >
+      <label
+        >Part Gate
+        <input type="range" id="mGate" min="0.01" max="1" step="0.01" />
+        <span class="readout" id="mGateVal"></span
+      ></label>
+      <label
+        >Cell at 1
+        <select id="mFull">
+          <option value="faint">faint fill (proposed)</option>
+          <option value="none">no fill, as Vel</option>
+        </select></label
+      >
+      <label
+        >Held to next
+        <select id="mHeld">
+          <option value="rule">Gate × cell (proposed)</option>
+          <option value="full">full, hatched</option>
+        </select></label
+      >
+      <button class="mb" id="mReset">Reset cells</button>
+      <label><input type="checkbox" id="mMarks" checked /> Mark new</label>
+      <label><input type="checkbox" id="mFit" /> Fit to window</label>
+      <label><input type="checkbox" id="mNotes" checked /> Notes</label>
+      <span>Drag a bar up or down, double-click it for 1. It plays nothing.</span>
+    </div>
+
+    <div class="stage-wrap">
+      <p class="caption"><span id="caption"></span> · <span id="tag"></span></p>
+      <div id="fit">
+        <div class="frame" id="frame"></div>
+      </div>
+    </div>
+
+    <div class="notes" id="notes">
+      <h2>What changes</h2>
+      <ol>
+        <li>
+          <b>A Gate row</b> in the Arp's step cells, between Oct and A. A note cell draws a bar: a
+          horizontal fill and the cell's own gate as text (<code>1</code>, <code>.5</code>,
+          <code>.25</code>, <code>.01</code>), as the Figure's Vel bar draws velocity. A rest or a
+          tie draws a blank cell, as for Oct, A and S.
+        </li>
+        <li>
+          <b>The fill is the played gate</b>: the part's Gate (the knob, or the
+          <code>seq.gate</code> lane where one plays) times the cell's gate, floored at
+          <code>GATE_MIN</code> (0.01, <code>audioConstants.ts</code>). Move the Gate knob in the
+          frame, or the slider above: every fill repaints and every text stays put.
+        </li>
+        <li>
+          <b>The text is the cell's gate</b>, faint at 1 (no gate written, as the normaliser writes
+          it). A drag sweeps 0 to 1 over 80 px in steps of 0.05, floored at 0.01, previews on the
+          bar and writes once on release; a double-click puts the cell back to 1 (the field
+          removed). The table below follows the cells as you drag.
+        </li>
+        <li>
+          <b>The head grows by 24 px</b> (one 20 px row and its 4 px gap), from 126 to 150 px,
+          inside the same 244 px device. Everything in the strip below Oct moves down 24 px: A, S,
+          the ratchet, the lane names' corner (+ Lane, the lane count, Ratchet) and the lanes. The
+          lanes' window shrinks from 90 to 66 px of the 218 px scroller: with this song's two lanes
+          the first shows whole and 22 of the second's 42 px, and the strip scrolls, as it does
+          today past two lanes.
+        </li>
+        <li>
+          <b>Basslead is unchanged.</b> It draws the same cells (<code>arpStepCells.ts</code>), and
+          the cell builder takes an option that leaves the row out, so its strip stays at five held
+          rows (the Basslead frames show it, Today and Proposed alike).
+        </li>
+      </ol>
+
+      <h2>The example cells, worked through the engine's rule</h2>
+      <p>
+        Played gate = max(<code>GATE_MIN</code>, part Gate × cell gate), with
+        <code>GATE_MIN</code> = 0.01 (windsor#933 decision 2). The cell gates are example values
+        written for the mockup; today's song has none, since the field is new. The table reads the
+        Gate knob as it is now (<span id="tGate"></span>) and the cells as you have left them.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Cell</th>
+            <th>Kind</th>
+            <th>Text</th>
+            <th>Cell gate</th>
+            <th>Played</th>
+            <th>Fill</th>
+            <th>How it plays</th>
+          </tr>
+        </thead>
+        <tbody id="tBody"></tbody>
+      </table>
+      <p>
+        At the song's Gate of 0.80 the table reads: cell 2 (0.5) plays 0.40, the issue's own case;
+        cell 9 (0.01) gives 0.008 and is floored to 0.01; cell 10 (0.05) plays 0.04. At Gate 1 every
+        played gate is the cell's own; at Gate 0.01 every one is 0.01.
+      </p>
+
+      <h2>To decide</h2>
+      <ol>
+        <li>
+          <b>A cell at 1.</b> Decision 2 draws a cell at 1 faint, as the Vel bar draws full
+          velocity, and also has every fill show the played gate. The Vel bar at full hides its
+          fill, which would leave a cell at 1 blank whatever the Gate knob says. Proposed: the text
+          faint and the fill still drawn at the played gate, fainter (20% of the cell colour instead
+          of 45%). The other look is under <b>Cell at 1</b> above.
+        </li>
+        <li>
+          <b>A note that runs on.</b> A note followed by a tie or a slide runs to the next onset
+          whatever its gate (windsor#933 decision 3): here cell 3, before the tie, and cell 7,
+          before cell 8's slide. Decision 2 still fills them to Gate × cell. The other look, under
+          <b>Held to next</b> above, fills them to the end, hatched, so the bar shows what plays.
+        </li>
+        <li>
+          <b>The lanes' window.</b> The device stays 244 px, so the new row takes 24 px from the
+          lanes: one lane and 22 px of the next show where two showed. Proposed: accept it, as the
+          lanes already scroll past two.
+        </li>
+      </ol>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const GATE_MIN = 0.01; // audioConstants.ts
+      const GATE_DEFAULT = 0.5; // ARP_GATE_DEFAULT: what a double-click on the knob puts back
+      const VEL = { step: 0.05, dragPx: 80, thresholdPx: 3 }; // FIGURE_VEL, figureConstants.ts
+      const KNOB_DRAG_PX = 190; // DRAG_RANGE_PX, knobConstants.ts
+      const SONG_GATE = 0.8;
+
+      // Measured on the desktop and landscape screenshots; portrait sits 34 px lower (its
+      // header wraps), and the rack clips the device at x 1010 there.
+      const DEVICES = {
+        desktop: { w: 1440, h: 900, dy: 0, clip: 1044, label: 'desktop, 1440 × 900' },
+        landscape: { w: 1366, h: 1024, dy: 0, clip: 1044, label: 'tablet landscape, 1366 × 1024' },
+        portrait: { w: 1024, h: 1366, dy: 34, clip: 1010, label: 'tablet portrait, 1024 × 1366' },
+      };
+      const G = {
+        scrollX: 492, // 4 px into the section's flat padding, left of the scroller at 496
+        scrollTop: 358.9,
+        scrollH: 218,
+        octBottom: 418.9,
+        colX: 594,
+        pitch: 38,
+        colW: 32,
+        cellH: 20,
+        row: 24,
+        knob: { x: 426, y: 366.6, w: 52, h: 56 },
+      };
+      const FRAMES = [];
+      for (const d of ['desktop', 'landscape', 'portrait'])
+        for (const [part, name] of [
+          ['arp', 'Arp device'],
+          ['bass', 'Basslead device'],
+        ])
+          FRAMES.push({
+            id: `${d}-${part}`,
+            device: d,
+            part,
+            label: `${DEVICES[d].label} · ${name}`,
+          });
+
+      // The song's Arp line (12 cells: Up over a seventh chord × 3 octaves), as imported for the
+      // screenshots, with example cell gates.
+      const SONG_CELLS = [
+        { kind: 'note', note: 'accent', gate: 1 },
+        { kind: 'note', note: '', gate: 0.5 },
+        { kind: 'note', note: 'Oct +1', gate: 0.25 },
+        { kind: 'tie' },
+        { kind: 'note', note: 'ratchet ×3', gate: 0.75 },
+        { kind: 'rest' },
+        { kind: 'note', note: '', gate: 1 },
+        { kind: 'note', note: 'slide', slide: true, gate: 0.5 },
+        { kind: 'note', note: 'Oct −1', gate: 0.01 },
+        { kind: 'note', note: 'accent', gate: 0.05 },
+        { kind: 'rest' },
+        { kind: 'note', note: 'ratchet ×2', gate: 1 },
+      ];
+
+      const state = {
+        frame: FRAMES[0],
+        mode: 'proposed',
+        gate: SONG_GATE,
+        cells: SONG_CELLS.map((c) => ({ ...c })),
+      };
+
+      /** What the bar reads: `1` at full, else the value without its leading zero (velocityLabel). */
+      function gateLabel(v) {
+        if (v >= 1) return '1';
+        return String(Number(v.toFixed(2))).replace(/^0/, '');
+      }
+      /** A drag's value: 0..1 on the 0.05 grid (snapVelocity), floored at GATE_MIN. */
+      function dragGate(from, dy) {
+        const v = Math.max(0, Math.min(1, from - dy / VEL.dragPx));
+        const snapped = Number((Math.round(v / VEL.step) * VEL.step).toFixed(2));
+        return Math.max(GATE_MIN, snapped);
+      }
+      /** The played gate: the part's Gate times the cell's, floored at GATE_MIN (windsor#933 decision 2). */
+      const played = (cellGate) => Math.max(GATE_MIN, state.gate * cellGate);
+      /** Whether the note at `i` runs to the next onset: the next cell is a tie or a slide (holdsToNext). */
+      function holds(i) {
+        const next = state.cells[(i + 1) % state.cells.length];
+        return next.kind === 'tie' || (next.kind === 'note' && !!next.slide);
+      }
+      const num = (v, places) => String(Number(v.toFixed(places)));
+
+      /* ---------- the Gate bar ---------- */
+      function paintBar(node, i, cellGate) {
+        const p = played(cellGate);
+        node.querySelector('i').style.width = `${p * 100}%`;
+        node.querySelector('span').textContent = gateLabel(cellGate);
+        node.classList.toggle('full', cellGate >= 1);
+        node.classList.toggle('held', $('mHeld').value === 'full' && holds(i));
+        node.setAttribute('aria-valuenow', String(cellGate));
+        node.title = `gate ${cellGate.toFixed(2)} (plays ${num(p, 4)}): drag up or down, double-click for 1`;
+      }
+      function barHtml(d) {
+        return state.cells
+          .map((c, i) => {
+            if (c.kind !== 'note') return '';
+            const x = G.colX + i * G.pitch;
+            if (x >= d.clip) return '';
+            const y = G.octBottom + 4 + d.dy;
+            return `<button type="button" class="ov gcell gate new" data-cell="${i}" role="slider" aria-label="Cell ${i + 1} gate" aria-valuemin="${GATE_MIN}" aria-valuemax="1" style="left:${x}px;top:${y}px;width:${G.colW}px;height:${G.cellH}px"><i></i><span></span></button>`;
+          })
+          .join('');
+      }
+      function wireBar(node) {
+        const i = Number(node.dataset.cell);
+        let press = null;
+        node.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return;
+          press = { id: e.pointerId, y: e.clientY, moved: false, value: state.cells[i].gate };
+          node.setPointerCapture(e.pointerId);
+        });
+        node.addEventListener('pointermove', (e) => {
+          if (!press || e.pointerId !== press.id) return;
+          const dy = e.clientY - press.y;
+          if (!press.moved && Math.abs(dy) < VEL.thresholdPx) return;
+          press.moved = true;
+          press.value = dragGate(state.cells[i].gate, dy);
+          paintBar(node, i, press.value);
+        });
+        const end = (commit) => {
+          const done = press;
+          press = null;
+          if (!done) return;
+          if (commit && done.moved) state.cells[i].gate = done.value;
+          paintAll();
+        };
+        node.addEventListener('pointerup', () => end(true));
+        node.addEventListener('pointercancel', () => end(false));
+        node.addEventListener('dblclick', () => {
+          state.cells[i].gate = 1;
+          paintAll();
+        });
+      }
+
+      /* ---------- the Gate knob, drawn as knob.ts draws it (270°, linear over GATE_MIN..1) ---------- */
+      const polar = (deg) => {
+        const a = (deg * Math.PI) / 180;
+        return `${(19 + 15 * Math.sin(a)).toFixed(2)} ${(19 - 15 * Math.cos(a)).toFixed(2)}`;
+      };
+      function knobSvg(v) {
+        const f = (v - GATE_MIN) / (1 - GATE_MIN);
+        const end = -135 + 270 * f;
+        const arc =
+          f > 0
+            ? `<path class="dial-arc" d="M ${polar(-135)} A 15 15 0 ${270 * f > 180 ? 1 : 0} 1 ${polar(end)}"></path>`
+            : '';
+        return `<svg viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"></circle><path class="dial-track" d="M ${polar(-135)} A 15 15 0 1 1 ${polar(135)}"></path>${arc}<line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(${end} 19 19)"></line></svg>`;
+      }
+      function knobHtml(d) {
+        const k = G.knob;
+        return `<div class="ov knob" id="knob" role="slider" aria-label="Gate" title="Gate - drag, double-click to reset" style="left:${k.x}px;top:${k.y + d.dy}px;width:${k.w}px;height:${k.h}px"><span id="knobDial"></span><span class="knob-val" id="knobVal"></span><span class="knob-label">Gate</span></div>`;
+      }
+      function wireKnob(node) {
+        let press = null;
+        node.addEventListener('pointerdown', (e) => {
+          press = { id: e.pointerId, y: e.clientY, from: state.gate };
+          node.setPointerCapture(e.pointerId);
+        });
+        node.addEventListener('pointermove', (e) => {
+          if (!press || e.pointerId !== press.id) return;
+          const f = (press.from - GATE_MIN) / (1 - GATE_MIN) - (e.clientY - press.y) / KNOB_DRAG_PX;
+          setGate(GATE_MIN + Math.max(0, Math.min(1, f)) * (1 - GATE_MIN));
+        });
+        node.addEventListener('pointerup', () => (press = null));
+        node.addEventListener('pointercancel', () => (press = null));
+        node.addEventListener('dblclick', () => setGate(GATE_DEFAULT));
+      }
+      function setGate(v) {
+        state.gate = Number(v.toFixed(2));
+        paintAll();
+      }
+
+      /* ---------- render ---------- */
+      function render() {
+        const { device, part } = state.frame;
+        const d = DEVICES[device];
+        const f = $('frame');
+        f.style.setProperty('--w', `${d.w}px`);
+        f.style.setProperty('--h', `${d.h}px`);
+        f.style.setProperty('--shot', `url('arp-gate-bar-today-${device}-${part}.jpg')`);
+        let html = '';
+        if (state.mode === 'proposed' && part === 'arp') {
+          // Whole pixels, so the moved screenshot is not resampled against the one behind it.
+          const top = Math.round(G.octBottom + d.dy);
+          const height = Math.round(G.scrollTop + d.dy + G.scrollH) - top;
+          html += `<div class="ov shift" style="left:${G.scrollX}px;top:${top}px;width:${d.clip - G.scrollX}px;height:${height}px;background-position:-${G.scrollX}px -${top - G.row}px"></div>`;
+          html += barHtml(d) + knobHtml(d);
+        } else if (state.mode === 'proposed') {
+          html += `<span class="ov unchanged" style="left:${G.colX}px;top:${G.scrollTop + d.dy + G.scrollH - 18}px">Basslead: unchanged, no Gate row</span>`;
+        }
+        f.innerHTML = html;
+        f.querySelectorAll('.gcell.gate').forEach(wireBar);
+        const knob = $('knob');
+        if (knob) wireKnob(knob);
+        $('fit').style.zoom = $('mFit').checked
+          ? String(Math.min(1, (innerWidth - 32) / d.w))
+          : '1';
+        paintAll();
+      }
+      function paintAll() {
+        $('frame')
+          .querySelectorAll('.gcell.gate')
+          .forEach((node) => {
+            const i = Number(node.dataset.cell);
+            paintBar(node, i, state.cells[i].gate);
+          });
+        if ($('knobDial')) {
+          $('knobDial').innerHTML = knobSvg(state.gate);
+          $('knobVal').textContent = state.gate.toFixed(2);
+          $('knob').setAttribute('aria-valuenow', String(state.gate));
+        }
+        $('mGate').value = String(state.gate);
+        $('mGateVal').textContent = state.gate.toFixed(2);
+        $('tGate').textContent = state.gate.toFixed(2);
+        $('mToday').setAttribute('aria-pressed', String(state.mode === 'today'));
+        $('mProposed').setAttribute('aria-pressed', String(state.mode === 'proposed'));
+        document.body.classList.toggle('full-none', $('mFull').value === 'none');
+        document.body.classList.toggle('marks', $('mMarks').checked);
+        $('notes').hidden = !$('mNotes').checked;
+        paintTable();
+        paintCaption();
+      }
+      function paintTable() {
+        $('tBody').innerHTML = state.cells
+          .map((c, i) => {
+            if (c.kind !== 'note')
+              return `<tr><td class="num">${i + 1}</td><td>${c.kind}</td><td>blank</td><td></td><td></td><td></td><td>${c.kind === 'tie' ? 'carries the note before it on' : 'releases, plays nothing'}</td></tr>`;
+            const raw = state.gate * c.gate;
+            const p = played(c.gate);
+            const how = [
+              c.note,
+              holds(i)
+                ? `runs to cell ${((i + 1) % state.cells.length) + 1}'s onset (${state.cells[(i + 1) % state.cells.length].kind === 'tie' ? 'a tie' : 'a slide'}) whatever its gate`
+                : '',
+              raw < GATE_MIN
+                ? `${num(state.gate, 2)} × ${num(c.gate, 2)} = ${num(raw, 4)}, floored at 0.01`
+                : '',
+              /ratchet/.test(c.note) ? 'each hit held at the played gate' : '',
+            ]
+              .filter(Boolean)
+              .join('; ');
+            return `<tr><td class="num">${i + 1}</td><td>note</td><td class="num">${gateLabel(c.gate)}${c.gate >= 1 ? ' (faint)' : ''}</td><td class="num">${c.gate.toFixed(2)}${c.gate >= 1 ? ', absent' : ''}</td><td class="num">${num(p, 4)}</td><td class="num">${num(p * 100, 2)}%</td><td>${how}</td></tr>`;
+          })
+          .join('');
+      }
+      function paintCaption() {
+        const { part, label } = state.frame;
+        $('caption').textContent = `${state.mode === 'today' ? 'Today' : 'Proposed'} · ${label}`;
+        const proposed = state.mode === 'proposed';
+        $('tag').textContent =
+          part === 'bass'
+            ? 'Basslead: five held rows (126 px head), the same Today and Proposed'
+            : proposed
+              ? `Gate ${state.gate.toFixed(2)} · head 150 px (126 + 24) · lanes 66 of 218 px: one lane and 22 px of the next`
+              : 'head 126 px · lanes 90 of 218 px: both lanes whole';
+      }
+
+      /* ---------- the bar ---------- */
+      for (const f of FRAMES) $('mFrame').append(new Option(f.label, f.id));
+      $('mFrame').onchange = () => {
+        state.frame = FRAMES.find((f) => f.id === $('mFrame').value);
+        render();
+      };
+      $('mToday').onclick = () => {
+        state.mode = 'today';
+        render();
+      };
+      $('mProposed').onclick = () => {
+        state.mode = 'proposed';
+        render();
+      };
+      $('mGate').oninput = () => setGate(Number($('mGate').value));
+      $('mReset').onclick = () => {
+        state.cells = SONG_CELLS.map((c) => ({ ...c }));
+        state.gate = SONG_GATE;
+        paintAll();
+      };
+      for (const id of ['mFull', 'mHeld', 'mMarks', 'mNotes']) $(id).onchange = paintAll;
+      $('mFit').onchange = render;
+      addEventListener('resize', () => $('mFit').checked && render());
+
+      // `#frame=portrait-arp&mode=today&gate=0.5&bare` opens a state, for the rendered pictures.
+      const hash = new URLSearchParams(location.hash.slice(1));
+      state.frame = FRAMES.find((f) => f.id === hash.get('frame')) ?? FRAMES[0];
+      if (hash.get('mode') === 'today') state.mode = 'today';
+      if (hash.has('gate')) state.gate = Math.max(GATE_MIN, Math.min(1, Number(hash.get('gate'))));
+      if (hash.has('bare')) document.body.classList.add('bare');
+      $('mFrame').value = state.frame.id;
+      render();
+    </script>
+  </body>
+</html>
