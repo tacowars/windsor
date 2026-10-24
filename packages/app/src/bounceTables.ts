@@ -7,9 +7,10 @@
 import type { Meter, SeqField, SequencerKind } from '@windsor/engine';
 
 /**
- * The kinds the button shows on (decision 1): the six that generate their
- * notes, never `roll` or `none`. The engine's own list is not in its index;
- * `bounceButtonModel.test.ts` pins this one to it.
+ * The kinds the button shows on (decision 1): the seven that generate their
+ * notes (the Drum since windsor#958), never `roll` or `none`. The engine's
+ * own list is not in its index; `bounceButtonModel.test.ts` pins this one
+ * to it.
  */
 export const BOUNCE_KINDS: readonly SequencerKind[] = [
   'euclidean',
@@ -18,6 +19,7 @@ export const BOUNCE_KINDS: readonly SequencerKind[] = [
   'arp',
   'bass',
   'figure',
+  'drum',
 ];
 
 /** The button's label and titles, and the undo step's name (decision 2). */

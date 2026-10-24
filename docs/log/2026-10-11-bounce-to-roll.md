@@ -9,6 +9,8 @@
   `2026-09-29-each-region-plays-its-own-pattern` · clip envelopes in
   `2026-10-11-roll-envelope-format` · format rules in
   `2026-09-28-format-versions-refuse-never-destroy`
+- **Amended:** windsor#958 (2026-10-24): the Drum
+  (`2026-10-24-drum-sequencer`) bounces too, a seventh kind in decision 1.
 
 ## Context
 

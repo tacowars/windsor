@@ -159,6 +159,10 @@ line to change if tacowars hears otherwise.
   (Randomize, Reverse, Reseed) on the Song lane's menu: both come with the
   device, windsor#951, and the engine's and the app's `BOUNCE_KINDS` leave
   it out until then.
+- **The Drum bounces to a Roll** (windsor#958): `drum` is in both
+  `BOUNCE_KINDS`, and the bounce's own capture writes its hits, ratchets,
+  varied steps, baked `seq.*` lanes and step-mod envelopes, with nothing
+  Drum-specific added.
 - **A rest that sounds then varies like any varied hit**, as on the Grid:
   its pitch may borrow or move by octaves, and its velocity and gate vary.
 - **The new part's four hits sit on steps 0, 4, 8 and 12** whatever the

@@ -17,7 +17,7 @@ describe('the Bounce to Roll button', () => {
   it('shows on exactly the kinds the engine bounces', () => {
     expect(BOUNCE_KINDS).toEqual(ENGINE_BOUNCE_KINDS);
     const shown = SEQUENCER_KINDS.filter((kind) => bounceButtonState(part(kind, 1)) !== null);
-    expect(shown).toEqual(['euclidean', 'grid', 'chord', 'arp', 'bass', 'figure']);
+    expect(shown).toEqual(['euclidean', 'grid', 'chord', 'arp', 'bass', 'figure', 'drum']);
   });
 
   it('is enabled on a part with regions and disabled, with its reason, on one with none', () => {

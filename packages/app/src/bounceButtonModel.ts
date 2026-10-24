@@ -1,7 +1,7 @@
 /**
  * Whether the Song view's pane header shows Bounce to Roll for a part, and
  * how (windsor#742, record `2026-10-11-bounce-to-roll` decision 1): on the
- * six generating kinds, disabled with its reason on a part with no regions,
+ * seven generating kinds, disabled with its reason on a part with no regions,
  * and absent on a Roll or a part with no sequencer.
  */
 import type { MusicPart } from '@windsor/engine';
