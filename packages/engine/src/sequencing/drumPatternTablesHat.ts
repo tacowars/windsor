@@ -33,4 +33,25 @@ export const DRUM_PATTERNS_HAT: readonly DrumPatternRows[] = [
     half: '..+...+...+...+.',
     ratchet: '.......2...2...3',
   },
+  {
+    id: 'hat-trap',
+    name: 'Trap hats',
+    velocity: '9.7.9.7.9.7.9.7.',
+    half: '+.+.+.+.+.+.+.+.',
+    ratchet: '......2.......3.',
+  },
+  {
+    id: 'hat-trap-rolls',
+    name: 'Trap hats with rolls',
+    velocity: '9.7.9.7.9.769678',
+    half: '+.+.+.+.+.+.++..',
+    ratchet: '............2344',
+  },
+  {
+    id: 'hat-trap-sparse',
+    name: 'Trap hats, sparse',
+    velocity: '9.7.9.7.9.7.9575',
+    half: '..............++',
+    ratchet: '..............22',
+  },
 ];
