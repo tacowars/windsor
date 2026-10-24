@@ -17,15 +17,19 @@
      (Grid: 96 px wide column, 52 px knob columns, 2 px apart, from x 54; Arp:
      112 px field columns 13 px apart from x 58, the knob strip from x 308 with
      a 1 px rule and 9 px padding), a knob at 52 x 56 px (67 px locked) with a
-     30 px dial, the 22 px controls, the lane row's name at 11 px, and the
-     region menu's 32 px items. The Steps and Cycle sections are today's
-     pixels, moved right by the width the Play section gains. Sizes and colors
-     are copied from packages/app/src/console.css (the tokens, .seq-section,
-     .seq-col, .knob, .knob.locked, .arp-device .seg, .arp-seed, .seq-icon,
-     .context-menu) and sequencerDeviceTables.ts. What works: the frame picker,
-     Today | Proposed, the label pickers (To decide 1 to 4), dragging a knob
-     (double-click resets it to 0), the switches, Reseed (a new seed number),
-     the Arp's lane on or off, and the look toggles. Nothing makes sound. -->
+     30 px dial, the 22 px controls, the rail's 18 px icon buttons, the lane
+     row's name at 11 px, and the region menu's 32 px items. The Steps and
+     Cycle sections are today's pixels, moved right by the width the Play
+     section gains. Sizes and colors are copied from
+     packages/app/src/console.css (the tokens, .seq-section, .seq-col, .knob,
+     .knob.locked, .seq-rail, .seq-icon, .seq-icon[aria-pressed], .arp-seed,
+     .seq-icon.arp-reseed, .context-menu) and sequencerDeviceTables.ts. Revised
+     on 2026-10-24 after tacowars's picks: the knobs are Vary and Chance, and
+     Rests sound and Octave are toggled glyph buttons with a tooltip. What
+     works: the frame picker, Today | Proposed, the placement and glyph
+     pickers, dragging a knob (double-click resets it to 0), the glyph buttons
+     (click to toggle, hover for the tooltip), Reseed (a new seed number), the
+     Arp's lane on or off, and the look toggles. Nothing makes sound. -->
   <!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
      Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
      Google Fonts (fonts.google.com/specimen/Chakra+Petch,
@@ -204,12 +208,10 @@
       justify-items: center;
       width: 52px;
     }
-    /* Proposed: the switches' column, three rows like the knobs', so each switch sits level with a knob. */
-    .seq-col.wide.rows3 {
-      display: grid;
-      grid-template-rows: repeat(3, 1fr);
-      grid-template-columns: 100%;
-      align-items: center;
+    /* Proposed on the Grid: the glyph pair side by side, 3 px apart as .arp-seed's field and icon. */
+    .glyph-pair {
+      display: flex;
+      gap: 3px;
     }
     .field-label {
       display: block;
@@ -246,6 +248,7 @@
       font: 11px/20px var(--f-ui);
       color: var(--ink);
     }
+    /* .seq-icon at the Play section's size (.seq-icon.arp-reseed: 22 px, its border always drawn). */
     .seq-icon {
       flex: none;
       width: 22px;
@@ -260,6 +263,29 @@
     }
     .seq-icon:hover {
       color: var(--ink);
+    }
+    /* .seq-icon[aria-pressed='true']: the device's accent (--kc, the pitch teal on a Grid or an Arp) on the inset. */
+    .seq-icon[aria-pressed='true'] {
+      color: var(--modulator);
+      border-color: var(--line-bright);
+      background: var(--inset);
+    }
+    /* The rail's own 18 px .seq-icon: no border until hover or pressed. */
+    .seq-icon.rail {
+      width: 18px;
+      height: 18px;
+      border-color: transparent;
+    }
+    .seq-icon.rail:hover,
+    .seq-icon.rail[aria-pressed='true'] {
+      border-color: var(--line-bright);
+    }
+    .rail-patch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      background: var(--panel-hi);
     }
     .seq-icon svg {
       display: block;
@@ -282,35 +308,6 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       white-space: nowrap;
-    }
-    /* The Arp's Retrigger switch (.arp-device .seg): the same 22 px off | on for the new switches. */
-    .sw {
-      display: flex;
-      height: 22px;
-      background: var(--line);
-      border: 1px solid var(--line-bright);
-      border-radius: var(--r);
-      overflow: hidden;
-    }
-    .sw button {
-      flex: 1;
-      min-width: 0;
-      padding: 0;
-      border: 0;
-      background: var(--inset);
-      color: var(--ink-dim);
-      font: 500 11px/20px var(--f-ui);
-    }
-    .sw button + button {
-      border-left: 1px solid var(--line-bright);
-    }
-    .sw button:hover {
-      background: var(--panel-hi);
-      color: var(--ink);
-    }
-    .sw button[aria-pressed='true'] {
-      background: var(--modulator);
-      color: #111416;
     }
     .knob {
       width: 52px;
@@ -544,40 +541,27 @@
       ><button class="mb" data-mode="proposed">Proposed</button></span
     >
     <label
-      >Randomness label
-      <select id="mRand">
-        <option>Randomness</option>
-        <option>Stray</option>
-        <option>Drift</option>
-        <option>Vary</option>
+      >Glyph buttons
+      <select id="mPlace">
+        <option value="knobs">By the knobs (recommended)</option>
+        <option value="rail">On the rail</option>
       </select></label
     >
     <label
-      >Probability label
-      <select id="mProb">
-        <option>Probability</option>
-        <option>Chance</option>
-        <option>Often</option>
-        <option>Odds</option>
+      >Rests sound glyph
+      <select id="mRestsGlyph">
+        <option value="rest">Rest sign (recommended)</option>
+        <option value="hitgap">Hit and gap</option>
       </select></label
     >
     <label
-      >Rests sound label
-      <select id="mRests">
-        <option>Rests sound</option>
-        <option>Rhythm</option>
-        <option>Flip rests</option>
+      >Octave glyph
+      <select id="mOctGlyph">
+        <option value="oct8">8 and arrows (recommended)</option>
+        <option value="span">Octave span</option>
       </select></label
     >
-    <label
-      >Octave label
-      <select id="mOct">
-        <option>Octave</option>
-        <option>By octave</option>
-        <option>Oct jumps</option>
-      </select></label
-    >
-    <label><input type="checkbox" id="mLane" checked /> Arp Probability lane on</label>
+    <label><input type="checkbox" id="mLane" checked /> Arp Chance lane on</label>
     <label><input type="checkbox" id="mMarks" checked /> Mark new</label>
     <label><input type="checkbox" id="mFit" /> Fit to window</label>
     <label><input type="checkbox" id="mNotes" checked /> Notes</label>
@@ -600,25 +584,50 @@
         lanes). The Figure keeps its Skip.
       </li>
       <li>
-        <b>Randomness and Probability</b> are two knobs of today's kind (the 52 × 56 px sequencer
-        knob, 30 px dial, the part's teal), 0 to 1 shown as 0% to 100%, default 0%. They take the
-        column Skip had: on the Grid, rows 1 and 2 of the last knob column; on the Arp, rows 2 and 3
-        under Gate. Each knob writes its field into the selected region's pattern, as Skip did.
+        <b>Vary and Chance</b> are two knobs of today's kind (the 52 × 56 px sequencer knob, 30 px
+        dial, the part's teal), 0 to 1 shown as 0% to 100%, default 0%. Vary is the engine's
+        <code>randomness</code>, how far a step that varies strays; Chance is its
+        <code>probability</code>, how often a step varies. They take the column Skip had: on the
+        Grid, rows 1 and 2 of the last knob column; on the Arp, rows 2 and 3 under Gate. Each knob
+        writes its field into the selected region's pattern, as Skip did.
       </li>
       <li>
         <b>Lanes.</b> Both are automatable: <code>seq.randomness</code> and
         <code>seq.probability</code> join the Song tab's <b>+ Add lane</b> list under Sequencer, on
-        a Grid or an Arp part. A knob whose lane is on is drawn locked as Skip is today: the
-        sequencer-lane pink arc and pin, the AUTO tag, the lane's value at the playhead, no input.
-        The Arp frames show the example song's Skip lane as a Probability lane (30% to 60%, read 30%
-        at bar 1). Untick <b>Arp Probability lane on</b> above to see the knob free.
+        a Grid or an Arp part, named Vary and Chance there and in the lane row. A knob whose lane is
+        on is drawn locked as Skip is today: the sequencer-lane pink arc and pin, the AUTO tag, the
+        lane's value at the playhead, no input. Every frame shows the Arp part's Skip lane as a
+        Chance lane (30% to 60%, read 30% at bar 1), and the Arp frames its locked knob. Untick
+        <b>Arp Chance lane on</b> above to see the knob free.
       </li>
       <li>
-        <b>Rests sound and Octave</b> are two switches of the Arp's Retrigger kind (a 22 px
-        <b>off | on</b>, labelled above), both off by default, in one column of their own after the
-        knobs. The column has three rows like a knob column, so each switch sits level with a knob:
-        rows 1 and 2 on the Grid (beside Randomness and Probability), rows 2 and 3 on the Arp. Click
-        them.
+        <b>Rests sound and Octave</b> are two glyph buttons that toggle, both off by default. They
+        are drawn as the app draws a toggled icon button (<code>.seq-icon</code> with
+        <code>aria-pressed</code>, as the Euclid rail's lane-view buttons): off, a faint glyph on
+        the panel; on, the glyph in the part's teal on the inset. In the Play section they take
+        Reseed's 22 px size and its always-drawn border. Each has a tooltip of one sentence, and its
+        name as its accessible name. Hover a button for its tooltip, click it to toggle. The example
+        has the Grid's Octave on and the Arp's Rests sound on.
+        <ul>
+          <li>
+            <b>Rests sound</b>: "Rests sound: a varied step may also go silent or sound where a rest
+            was written".
+          </li>
+          <li>
+            <b>Octave</b>: "Octave: pitch strays by whole octaves of the step's own note instead of
+            borrowing another step's".
+          </li>
+        </ul>
+      </li>
+      <li>
+        <b>Where the glyph buttons sit</b> (recommended, <b>By the knobs</b>): on the Grid, side by
+        side at the foot of the Vary and Chance column, in its third row, which is empty today, so
+        the Grid keeps today's width. On the Arp that column is full (Gate, Vary, Chance), so the
+        two buttons take a 22 px column beside it, Rests sound level with Vary and Octave level with
+        Chance. The other way, <b>On the rail</b> in the picker above, puts them on the device's
+        rail between its name and the region badge, the place the Euclid's lane-view toggle has, at
+        the rail's 18 px: no width on either device, but a smaller target and away from the knobs
+        they shape.
       </li>
       <li>
         <b>Reseed on the Grid.</b> The Grid's first column gains the Arp's Seed field with Reseed as
@@ -640,109 +649,81 @@
 
     <h2>The numbers</h2>
     <p>
-      Measured in the app, in place: the knob label and the field label at 8.5 px Chakra Petch with
-      0.1 em letter spacing, the lane row's name at 11 px. A sequencer knob is 52 px wide, its
-      column pitch is 54 px, and today's widest knob label, Acc mod, is 42.9 px. Today's lane name
-      box is 78 px wide; with a 30% readout in place of 0.30 it gains about 6 px.
+      Measured in the app, in place, on the portrait tablet: the knob label at 8.5 px Chakra Petch
+      with 0.1 em letter spacing, set to each name on the Grid's Skip knob.
+      <b>Vary is 24.3 px and Chance 38.3 px</b>, both inside the 52 px knob; today's widest knob
+      label, Acc mod, is 42.9 px. Chance leaves 15 px to Acc vel's label beside it, so
+      <b>no knob column widens</b>. In the lane row, at 11 px, Vary is 29.7 px and Chance 47.0 px,
+      inside today's 78 px name box.
     </p>
-    <table>
-      <tr>
-        <th class="l">Label</th>
-        <th>Knob label px</th>
-        <th class="l">In a 52 px knob</th>
-        <th>Lane name px</th>
-      </tr>
-      <tr>
-        <td class="l">Randomness</td>
-        <td class="over">65.5</td>
-        <td class="l over">runs 6.8 px past each side: the column widens to 70 px</td>
-        <td>80.3</td>
-      </tr>
-      <tr>
-        <td class="l">Probability</td>
-        <td class="over">62.4</td>
-        <td class="l over">runs 5.2 px past each side</td>
-        <td>75.9</td>
-      </tr>
-      <tr>
-        <td class="l">Stray / Drift / Vary</td>
-        <td>29.9 / 27.7 / 24.3</td>
-        <td class="l">fits</td>
-        <td>36.5 / 33.6 / 29.7</td>
-      </tr>
-      <tr>
-        <td class="l">Chance / Often / Odds</td>
-        <td>38.3 / 30.8 / 26.2</td>
-        <td class="l">fits</td>
-        <td>47.0 / 37.7 / 32.1</td>
-      </tr>
-    </table>
     <p>
-      In a 52 px column, Randomness would come within 1.4 px of Acc vel's label and run 4.8 px into
-      the Rests sound switch beside it on the Grid; Probability would come within 1.4 px of Acc
-      mod's. So the mockup widens that knob column to its widest label plus 4 px, and the tag above
-      the frame reports what the frame draws. Field labels all fit their columns: Rests sound 66.3
-      px, By octave 51.4, Oct jumps 54.3, Flip rests 53.9, Rhythm 39.4, Octave 35.8 (Retrigger, for
-      scale, 53.3).
+      The width each placement costs was measured the same way: a pair of 22 px buttons 3 px apart
+      put in the third row of the Grid's Skip column left the device at its 965 px box, and a 22 px
+      column put after the Arp's Gate and Skip column grew that device by 24 px (its 2 px gap and
+      the column).
     </p>
     <table>
       <tr>
         <th class="l">Device width, px</th>
         <th>Today</th>
-        <th>Short labels</th>
-        <th>Randomness, Probability</th>
+        <th>By the knobs</th>
+        <th>On the rail</th>
       </tr>
       <tr>
         <td class="l">Grid, 16 steps</td>
         <td>939</td>
-        <td>1037 (+98)</td>
-        <td>1055 (+116)</td>
+        <td>939 (+0)</td>
+        <td>939 (+0)</td>
       </tr>
       <tr>
         <td class="l">Arp, 10 cells</td>
         <td>926</td>
-        <td>1051 (+125)</td>
-        <td>1069 (+143)</td>
+        <td>950 (+24)</td>
+        <td>926 (+0)</td>
       </tr>
     </table>
     <p>
       The rack's inner width is 1410 px on the desktop and 1336 px on the landscape tablet, so both
-      devices fit. On the portrait tablet it is 994 px: today the 16-step Grid fills it exactly and
-      the Arp leaves 13 px. Proposed, both scroll sideways inside the rack, as a 32-step Grid
-      already does today: the Grid by 98 px (116 px with the long labels), the Arp by 112 px (130
-      px). The portrait frames clip at the rack's edge and draw its scroll bar.
+      devices fit either way. On the portrait tablet it is 994 px: today the 16-step Grid fills it
+      exactly and the Arp leaves 13 px. Proposed, <b>the Grid still fits</b>, filling the rack as
+      today, with either placement. <b>The Arp scrolls 11 px sideways</b> with the buttons by the
+      knobs, and fits with 13 px to spare with them on the rail. The portrait Arp frame clips at the
+      rack's edge and draws its scroll bar.
+    </p>
+
+    <h2>Decided</h2>
+    <p>
+      tacowars's picks on this mockup's first round, recorded in
+      <code>docs/log/2026-10-24-step-variation-controls.md</code>: the knobs and their lanes are
+      <b>Vary</b> and <b>Chance</b>, and Rests sound and Octave are
+      <b>glyph buttons that toggle</b>, with the tooltips above, not switches.
     </p>
 
     <h2>To decide</h2>
     <ol>
       <li>
-        <b>The name for Randomness.</b> Randomize already sits on both cards and rerolls the written
-        pattern once; "Randomness" beside it reads like its amount. Alternatives: <b>Stray</b> (how
-        far a step strays, the engine's own word), <b>Drift</b>, <b>Vary</b>. Recommended: Stray. It
-        fits the knob, and it says the step moves away from what is written.
+        <b>Where the glyph buttons sit.</b> Recommended: <b>by the knobs</b>, as drawn, so each sits
+        beside the amounts it shapes; on the Grid it costs no width. The other way:
+        <b>on the rail</b>, no width on either device, at 18 px.
       </li>
       <li>
-        <b>The name for Probability.</b> Alternatives: <b>Chance</b>, <b>Often</b>, <b>Odds</b>.
-        Recommended: Chance, which fits the knob and reads with Stray as "how far, how often".
+        <b>The glyphs</b>, switched with the pickers above.
+        <ul>
+          <li>
+            Rests sound: <b>Rest sign</b> (recommended: the eighth-rest sign, which names what the
+            button is about) or <b>Hit and gap</b> (a solid bar beside a dashed one: a hit and a
+            rest that may trade places).
+          </li>
+          <li>
+            Octave: <b>8 and arrows</b> (recommended: the octave's 8 with an arrow up and an arrow
+            down) or <b>Octave span</b> (an arrow both ways between two lines, an interval).
+          </li>
+        </ul>
       </li>
       <li>
-        <b>The name for Rests sound.</b> Alternatives: <b>Rhythm</b>, <b>Flip rests</b>.
-        Recommended: Rests sound, since it says what turning it on allows.
-      </li>
-      <li>
-        <b>The name for the Octave switch.</b> Both devices already have an <b>Octave</b> knob, the
-        register, and the Arp has <b>Octaves</b> too, so a third "Octave" is ambiguous.
-        Alternatives: <b>By octave</b>, <b>Oct jumps</b>. Recommended: By octave.
-      </li>
-      <li>
-        <b>Where the switches sit.</b> Drawn: one column of their own after the knobs, the two
-        switches one above the other and level with the two amount knobs. A row of two 112 px
-        switches would cost 237 px of width instead of 98 to 125.
-      </li>
-      <li>
-        <b>The portrait tablet's sideways scroll</b> (see The numbers). Proposed as drawn, since the
-        rack already scrolls a long Grid. The other way is to fold the switches under the Step
-        picker on narrow screens, which is a second layout to build and test.
+        <b>The portrait tablet's sideways scroll</b> (see The numbers). The Grid no longer scrolls.
+        The Arp scrolls 11 px with the buttons by the knobs. Proposed as drawn, since the rack
+        already scrolls a long Grid; putting the buttons on the rail removes it.
       </li>
       <li>
         <b>The lane readout</b> for both amounts shows a percent (30%), as the knob does. Today's
@@ -796,11 +777,24 @@
     const RAIL = 26;
     const RACK_EXTRA = 29;
     const KNOB_W = 52;
-    const LABEL_PAD = 4;
+    // The Arp's glyph column: 22 px wide, 2 px after the knob column (measured: the device grows 24 px).
+    const SLIM_W = 22;
+    const SLIM_GROWTH = 24;
+    // The rail (x 22, 24 px wide): its first tool button's top under the device's top, above the region
+    // badge (181.7 px) by two 18 px buttons, the rail's 3 px gaps and its 6 px tool gap.
+    const RAIL_X = 22;
+    const RAIL_TOOLS_TOP = 130.7;
     // The menu: the item below Reverse starts 363 px under the menu's top, and the menu is 220 px wide.
     const MENU_BELOW_REVERSE = 363;
     const MENU_W = 220;
     const ICON_RESEED = '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>';
+    // The glyphs proposed for the two buttons (To decide 2), drawn on the app's 12 px icon grid.
+    const GLYPHS = {
+      rest: '<circle cx="4.6" cy="3.4" r="1.3" fill="currentColor" stroke="none"/><path d="M4.6 4.7c1.7.6 3.1.1 3.9-1.5L5.4 10.5"/>',
+      hitgap: '<path d="M3.5 2v8"/><path d="M8.5 2v8" stroke-dasharray="1.4 1.7"/>',
+      oct8: '<circle cx="4" cy="3.4" r="1.6"/><circle cx="4" cy="8.3" r="1.9"/><path d="M9.5 1.8v8.4M8 3.3l1.5-1.5L11 3.3M8 8.7l1.5 1.5L11 8.7"/>',
+      span: '<path d="M2 1.5h8M2 10.5h8M6 3.3v5.4M4.4 4.9 6 3.3l1.6 1.6M4.4 7.1 6 8.7l1.6-1.6"/>',
+    };
 
     const FRAMES = [];
     for (const d of ['desktop', 'landscape', 'portrait'])
@@ -816,24 +810,37 @@
           label: `${DEVICES[d].label} · ${name}`,
         });
 
-    // The example values: a Grid varying half way on a quarter of its steps; an Arp under a Probability lane.
+    // The example values: a Grid varying half way on a quarter of its steps by octaves; an Arp under a
+    // Chance lane whose rests may sound.
     const state = {
       frame: FRAMES[0],
       mode: 'proposed',
-      grid: { randomness: 0.5, probability: 0.25, restsSound: false, octaveMode: false, seed: 7 },
-      arp: { randomness: 0.4, probability: 0.2, restsSound: false, octaveMode: false, seed: 3 },
+      grid: { randomness: 0.5, probability: 0.25, restsSound: false, octaveMode: true, seed: 7 },
+      arp: { randomness: 0.4, probability: 0.2, restsSound: true, octaveMode: false, seed: 3 },
       laneValue: 0.3,
     };
     const $ = (id) => document.getElementById(id);
     const pct = (v) => `${Math.round(v * 100)}%`;
-    const labels = () => ({
-      randomness: $('mRand').value,
-      probability: $('mProb').value,
-      restsSound: $('mRests').value,
-      octaveMode: $('mOct').value,
-    });
+    // tacowars's names (decided): the knobs, their lanes, and the buttons' accessible names.
+    const NAMES = {
+      randomness: 'Vary',
+      probability: 'Chance',
+      restsSound: 'Rests sound',
+      octaveMode: 'Octave',
+    };
+    const TITLES = {
+      randomness:
+        'How far a step that varies strays: its velocity, its pitch and, on the Arp, its gate',
+      probability: 'How often a step varies; the others play as written',
+      restsSound: 'Rests sound: a varied step may also go silent or sound where a rest was written',
+      octaveMode:
+        "Octave: pitch strays by whole octaves of the step's own note instead of borrowing another step's",
+    };
+    const placement = () => $('mPlace').value;
+    const glyphOf = (field) =>
+      GLYPHS[field === 'restsSound' ? $('mRestsGlyph').value : $('mOctGlyph').value];
 
-    /* ---------- the controls, as knob.ts, dom.ts's seg and arpCard.ts build them ---------- */
+    /* ---------- the controls, as knob.ts, sequencerRail.ts and arpCard.ts build them ---------- */
     // The dial: a 270° sweep from -135°, radius 15 on a 38 px box, as knob.ts draws it.
     function dial(v) {
       const a = (-135 + 270 * v) * (Math.PI / 180);
@@ -844,21 +851,14 @@
         v > 0 ? `<path class="dial-arc" d="M 8.39 29.61 A 15 15 0 ${large} 1 ${x} ${y}"/>` : '';
       return `<svg viewBox="0 0 38 38" aria-hidden="true"><circle class="dial-face" cx="19" cy="19" r="11.5"/><path class="dial-track" d="M 8.39 29.61 A 15 15 0 1 1 29.61 29.61"/>${arc}<line class="dial-pin" x1="19" y1="19" x2="19" y2="9" transform="rotate(${-135 + 270 * v} 19 19)"/></svg>`;
     }
-    const TITLES = {
-      randomness:
-        'How far a step that varies strays: its velocity, its pitch and, on the Arp, its gate',
-      probability: 'How often a step varies; the others play as written',
-      restsSound: 'On: a note may go silent and a rest may sound. Off: the rhythm stays as written',
-      octaveMode: "On: pitch varies by whole octaves of the step's own note",
-    };
     function knob(card, field, locked) {
       const v = locked ? state.laneValue : state[card][field];
-      const name = labels()[field];
+      const name = NAMES[field];
       return `<div class="knob new${locked ? ' locked' : ''}" data-card="${card}" data-field="${field}" title="${name} - ${locked ? 'held by its lane' : 'drag, double-click to reset'}. ${TITLES[field]}">${dial(v)}<span class="knob-val">${pct(v)}</span><span class="knob-auto">AUTO</span><span class="knob-label">${name}</span></div>`;
     }
-    function toggle(card, field) {
-      const on = state[card][field];
-      return `<div class="new" title="${TITLES[field]}"><span class="field-label">${labels()[field]}</span><div class="sw"><button data-card="${card}" data-field="${field}" data-on="0" aria-pressed="${!on}">off</button><button data-card="${card}" data-field="${field}" data-on="1" aria-pressed="${on}">on</button></div></div>`;
+    // A glyph button that toggles: railIcon's title and aria-label, aria-pressed for its state.
+    function glyphButton(card, field, rail) {
+      return `<button type="button" class="seq-icon new${rail ? ' rail' : ''}" data-card="${card}" data-field="${field}" aria-pressed="${state[card][field]}" aria-label="${NAMES[field]}" title="${TITLES[field]}"><svg viewBox="0 0 12 12" aria-hidden="true">${glyphOf(field)}</svg></button>`;
     }
     function seedField(card, isNew) {
       return `<div class="${isNew ? 'new' : ''}"><span class="field-label">Seed</span><div class="seed-row"><div class="seed-field">${state[card].seed}</div><button class="seq-icon" data-reseed="${card}" title="A new seed: the part restarts its random stream now" aria-label="Reseed"><svg viewBox="0 0 12 12">${ICON_RESEED}</svg></button></div></div>`;
@@ -866,49 +866,43 @@
     const field = (label, inner) => `<div><span class="field-label">${label}</span>${inner}</div>`;
     const sel = (text) => `<div class="sel">${text}</div>`;
 
-    // The widest of a column's labels, measured in the page's own font, so a long name widens its column.
-    function labelWidth(text) {
-      const probe = document.createElement('span');
-      probe.className = 'knob-label';
-      probe.style.cssText = 'position:absolute;visibility:hidden';
-      probe.textContent = text;
-      document.body.appendChild(probe);
-      const w = probe.getBoundingClientRect().width;
-      probe.remove();
-      return w;
-    }
-    const amountColumnW = () => {
-      const l = labels();
-      return Math.max(
-        KNOB_W,
-        Math.ceil(Math.max(labelWidth(l.randomness), labelWidth(l.probability)) + LABEL_PAD),
-      );
-    };
-
     // Today's pixels as a block inside a column: a knob that stays (the Arp's Gate) keeps its exact look.
     const pixels = (x, y, w, h) =>
       `<div class="slice" style="width:${w}px;height:${h}px;background-position:${-x}px ${-y}px"></div>`;
-    // The Play section's width: today's plus the switches' column, plus what a long label adds to the knob column.
-    const growth = (card) => (card === 'grid' ? 96 + 2 : 112 + 13) + (amountColumnW() - KNOB_W);
+    // The Play section's width gain: only the Arp's glyph column, when the buttons sit by the knobs.
+    const growth = (card) => (card === 'arp' && placement() === 'knobs' ? SLIM_GROWTH : 0);
     // How far the device scrolls inside the rack: the rack's content is the device plus 29 px (padding, border, gap).
     const scrollOf = (device, card) =>
       Math.max(0, CARD[card].width + RACK_EXTRA + growth(card) - (DEVICES[device].rack[2] - 2));
 
     /* ---------- a frame ---------- */
-    // The Grid: column 1 redrawn (Step, Seed, Randomize, Reverse); Octave to Acc mod stay as they are; then the new columns.
+    // On the rail: the two buttons above the region badge, where sequencerRail puts a device's tools.
+    function railHtml(d, card, x0, y0) {
+      if (placement() !== 'rail') return '';
+      return `<div class="ov rail-patch" style="left:${RAIL_X - x0}px;top:${d.top + RAIL_TOOLS_TOP - y0}px;width:24px">${glyphButton(card, 'restsSound', true)}${glyphButton(card, 'octaveMode', true)}</div>`;
+    }
+    // The Grid: column 1 redrawn (Step, Seed, Randomize, Reverse); Octave to Acc mod stay as they are;
+    // the last knob column takes Vary, Chance and, by the knobs, the glyph pair in its third row.
     function gridCover(d, x0, y0) {
-      const w = amountColumnW();
       const bodyTop = d.top + BODY_TOP;
       const col1 = `<div class="ov play" style="left:${54 - x0}px;top:${bodyTop - y0}px;width:96px;height:${BODY_H}px"><div class="seq-col wide" style="height:100%">${field('Step', sel('1/16'))}${seedField('grid', true)}<button class="seq-btn">Randomize</button><button class="seq-btn">Reverse</button></div></div>`;
-      const cols = `<div class="ov play" style="left:${258 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.grid.steps + growth('grid') - 258}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 8px 0 2px"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${w}px">${knob('grid', 'randomness')}${knob('grid', 'probability')}</div><div class="seq-col wide rows3">${toggle('grid', 'restsSound')}${toggle('grid', 'octaveMode')}</div></div></div>`;
-      return col1 + cols;
+      const pair =
+        placement() === 'knobs'
+          ? `<div class="glyph-pair">${glyphButton('grid', 'restsSound')}${glyphButton('grid', 'octaveMode')}</div>`
+          : '';
+      const cols = `<div class="ov play" style="left:${258 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.grid.steps + growth('grid') - 258}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 8px 0 2px"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${KNOB_W}px">${knob('grid', 'randomness')}${knob('grid', 'probability')}${pair}</div></div></div>`;
+      return col1 + cols + railHtml(d, 'grid', x0, y0);
     }
-    // The Arp: the last knob column keeps Gate and takes the two amounts; the switches follow inside the knob strip.
+    // The Arp: the last knob column keeps Gate and takes the two amounts; by the knobs, a 22 px column
+    // beside it holds the glyph buttons, each level with a knob.
     function arpCover(d, x0, y0) {
-      const w = amountColumnW();
       const locked = $('mLane').checked;
       const gate = pixels(426, d.top + GATE_TOP, KNOB_W, 56);
-      return `<div class="ov play" style="left:${426 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.arp.steps + growth('arp') - 426}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 9px 0 0"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${w}px">${gate}${knob('arp', 'randomness')}${knob('arp', 'probability', locked)}</div><div class="seq-col wide rows3" style="width:112px;margin-left:11px"><div></div>${toggle('arp', 'restsSound')}${toggle('arp', 'octaveMode')}</div></div></div>`;
+      const slim =
+        placement() === 'knobs'
+          ? `<div class="seq-col k3" style="width:${SLIM_W}px"><div></div>${glyphButton('arp', 'restsSound')}${glyphButton('arp', 'octaveMode')}</div>`
+          : '';
+      return `<div class="ov play" style="left:${426 - x0}px;top:${d.top + 1 - y0}px;width:${CARD.arp.steps + growth('arp') - 426}px;height:${DEVICE_H - 2}px;padding:${BODY_TOP - 1}px 9px 0 0"><div class="seq-sec-body" style="height:${BODY_H}px"><div class="seq-col k3" style="width:${KNOB_W}px">${gate}${knob('arp', 'randomness')}${knob('arp', 'probability', locked)}</div>${slim}</div></div>${railHtml(d, 'arp', x0, y0)}`;
     }
     // `from` names the screenshot the moved Steps come from: the menu frame takes the Grid frame's, which has no menu over them.
     function cardHtml(device, card, from) {
@@ -928,12 +922,11 @@
         : '';
       return `<div class="ov rack-clip" style="left:${clip.left}px;top:${clip.top}px;width:${clip.width}px;height:${clip.height}px">${moved}${cover}${hint}</div>`;
     }
-    // The lane row: today's Skip lane, renamed. Off, its value goes gray and its ● button unlit, as .lane-auto.off.
+    // The lane row: today's Skip lane, renamed, its name 4 px in as today's. Off, its value goes gray and its ● button unlit, as .lane-auto.off.
     function laneHtml(device) {
       const d = DEVICES[device];
       const on = $('mLane').checked;
-      const name = labels().probability;
-      return `<div class="ov lane-patch lane-name new" style="left:47px;top:${d.lane + 14}px;width:86px;height:28px"><b>${name}</b><small>Sequencer</small></div><div class="ov lane-patch lane-val new" style="left:138px;top:${d.lane + 8}px;width:41px;height:15px;${on ? '' : 'color:var(--ink-faint)'}">${pct(state.laneValue)}</div>${on ? '' : `<div class="ov auto-btn" style="left:135px;top:${d.lane + 27}px">●</div>`}`;
+      return `<div class="ov lane-patch lane-name new" style="left:47px;top:${d.lane + 14}px;width:86px;height:28px;padding-left:4px"><b>${NAMES.probability}</b><small>Sequencer</small></div><div class="ov lane-patch lane-val new" style="left:138px;top:${d.lane + 8}px;width:41px;height:15px;${on ? '' : 'color:var(--ink-faint)'}">${pct(state.laneValue)}</div>${on ? '' : `<div class="ov auto-btn" style="left:135px;top:${d.lane + 27}px">●</div>`}`;
     }
     function menuHtml(device) {
       const [x, y] = DEVICES[device].menu;
@@ -950,12 +943,14 @@
       f.style.setProperty('--shot', `url('step-variation-controls-today-${device}-${view}.jpg')`);
       let html = '';
       if (state.mode === 'proposed') {
-        if (view === 'arp') html = cardHtml(device, 'arp') + laneHtml(device);
+        // The Arp's lane row shows in every frame: its Skip lane becomes a Chance lane in all of them.
+        if (view === 'arp') html = cardHtml(device, 'arp');
         else if (view === 'menu')
           html =
             cardHtml(device, 'grid', `step-variation-controls-today-${device}-grid.jpg`) +
             menuHtml(device);
         else html = cardHtml(device, 'grid');
+        html += laneHtml(device);
       }
       f.innerHTML = html;
       wire(f);
@@ -973,9 +968,8 @@
       const today = CARD[card].width - RAIL;
       const grow = growth(card);
       const scroll = scrollOf(device, card);
-      const w = amountColumnW();
       $('tag').textContent =
-        `${card === 'grid' ? 'Grid' : 'Arp'} ${today} → ${today + grow} px · amount column ${w} px${w > KNOB_W ? ' (widened for its label)' : ''} · ${scroll ? `scrolls ${scroll} px in the rack` : 'fits the rack'}`;
+        `${card === 'grid' ? 'Grid' : 'Arp'} ${today} → ${today + grow} px · glyph buttons ${placement() === 'knobs' ? 'by the knobs' : 'on the rail'} · ${scroll ? `scrolls ${scroll} px in the rack` : 'fits the rack'}`;
     }
     function wire(f) {
       for (const k of f.querySelectorAll('.knob[data-field]:not(.locked)')) {
@@ -1002,9 +996,9 @@
           render();
         };
       }
-      for (const b of f.querySelectorAll('.sw button[data-field]'))
+      for (const b of f.querySelectorAll('button.seq-icon[data-field]'))
         b.onclick = () => {
-          state[b.dataset.card][b.dataset.field] = b.dataset.on === '1';
+          state[b.dataset.card][b.dataset.field] = !state[b.dataset.card][b.dataset.field];
           render();
         };
       for (const b of f.querySelectorAll('[data-reseed]'))
@@ -1037,11 +1031,11 @@
       $('notes').hidden = !$('mNotes').checked;
       render();
     };
-    for (const id of ['mRand', 'mProb', 'mRests', 'mOct', 'mLane', 'mMarks', 'mFit', 'mNotes'])
+    for (const id of ['mPlace', 'mRestsGlyph', 'mOctGlyph', 'mLane', 'mMarks', 'mFit', 'mNotes'])
       $(id).onchange = look;
     addEventListener('resize', () => $('mFit').checked && render());
 
-    // `#frame=portrait-arp&mode=proposed&rand=Stray&prob=Chance&bare` opens a state, for the rendered pictures.
+    // `#frame=portrait-arp&mode=proposed&place=rail&rests=hitgap&oct=span&bare` opens a state, for the rendered pictures.
     const hash = new URLSearchParams(location.hash.slice(1));
     const start = Math.max(
       0,
@@ -1051,10 +1045,9 @@
     state.frame = FRAMES[start];
     if (hash.get('mode')) state.mode = hash.get('mode');
     for (const [key, id] of [
-      ['rand', 'mRand'],
-      ['prob', 'mProb'],
-      ['rests', 'mRests'],
-      ['oct', 'mOct'],
+      ['place', 'mPlace'],
+      ['rests', 'mRestsGlyph'],
+      ['oct', 'mOctGlyph'],
     ])
       if (hash.get(key)) $(id).value = hash.get(key);
     if (hash.has('bare')) document.body.classList.add('bare');
