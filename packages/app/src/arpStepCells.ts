@@ -12,7 +12,7 @@
  * The Gate bar is the Figure's Vel bar (`figureCells.ts`) over the cell's
  * gate (`docs/design/arp-gate-bar-mockup.html`): its text is the cell's own
  * gate, faint at 1, and its fill the gate the cell plays, the part's Gate
- * times the cell's (`arpPlayedGateOf`), fainter at 1. A vertical drag
+ * times the cell's (`arpPlayedGateAt`), fainter at 1. A vertical drag
  * previews the value and writes it on release; a double-click puts it back
  * to 1. `paintGateFills` repaints every fill when the part's gate moves,
  * leaving the text alone.
@@ -31,7 +31,7 @@ import {
   arpGateTitle,
   arpKindLabel,
   arpOctaveLabel,
-  arpPlayedGateOf,
+  arpPlayedGateAt,
   dragArpGate,
   nextArpKind,
   setArpGate,
@@ -70,7 +70,7 @@ function octaveCell(step: ArpStep, edit: StepEdit): HTMLElement {
 
 /** The fill at the gate cell gate `cellGate` plays under `partGate`, and the title that names both. */
 function paintGateFill(node: HTMLElement, cellGate: number, partGate: number): void {
-  const played = arpPlayedGateOf(partGate, cellGate);
+  const played = arpPlayedGateAt(partGate, cellGate);
   const fill = node.querySelector<HTMLElement>('i');
   if (fill) fill.style.width = `${played * ARP_GATE_BAR.fullPct}%`;
   node.title = arpGateTitle(cellGate, played);
