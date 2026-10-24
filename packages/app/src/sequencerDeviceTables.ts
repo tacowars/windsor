@@ -22,6 +22,9 @@ export const stripHeadPx = (
   gap = STRIP_ROW_GAP_PX,
 ): number => rows.reduce((sum, row) => sum + row, 0) + gap * Math.max(0, rows.length - 1);
 
+/** A step column's width (`--step-w`), and the Drum's square hit pad's height. */
+export const STEP_COLUMN_PX = 32;
+
 /** The Arp's step cells' height (windsor#370): roomier than the Grid's 18, as tacowars asked of the Chord. */
 export const ARP_CELL_PX = 20;
 
@@ -43,6 +46,20 @@ export const ARP_HEAD_ROWS_PX: readonly number[] = [
 export const BASS_HEAD_ROWS_PX: readonly number[] = [
   12,
   ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  14,
+];
+
+/**
+ * The Drum's step rows (windsor#951, record `2026-10-24-drum-device`
+ * decision 6): the step number, the hit pad as tall as the step column is
+ * wide, then the Arp's Vel, Pitch and A cells and the ratchet.
+ */
+export const DRUM_HEAD_ROWS_PX: readonly number[] = [
+  12,
+  STEP_COLUMN_PX,
   ARP_CELL_PX,
   ARP_CELL_PX,
   ARP_CELL_PX,
@@ -81,7 +98,7 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   /** The side rail: dot, name, the device's own buttons, the region, Split and Delete. */
   '--seq-rail': 24,
   /** A step column's width. */
-  '--step-w': 32,
+  '--step-w': STEP_COLUMN_PX,
   /* The Chord's own sizes (windsor#369), measured off tacowars's mockup of
      the device at 244 px: its Play section and its strip, never the Grid's. */
   /** A Chord step column's width: the Grid's and a third, for its bigger dials. */
@@ -130,6 +147,8 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--arp-strip-head-h': stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
   /** Basslead's held step rows: the Arp's cells without the Gate row. */
   '--bass-strip-head-h': stripHeadPx(BASS_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
+  /** The Drum's held step rows (windsor#951): the Arp's cells under a square hit pad. */
+  '--drum-strip-head-h': stripHeadPx(DRUM_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
   /* The Euclid's own sizes (windsor#393), off tacowars's mockup
      (euclid.html) and laid out as the Arp's: Play inset from the rail, its
      columns apart, a knob strip behind a rule; the rows' cells 22 px. */

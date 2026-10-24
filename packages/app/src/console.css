@@ -2976,6 +2976,75 @@ body.chord-dragging {
   border-top: 1px solid var(--line-bright);
 }
 
+/* ---------- the Drum device (windsor#951) ---------- */
+/* Record `2026-10-24-drum-device`; the look is
+   docs/design/drum-device-mockup.html, approved on windsor#953. The Drum is
+   laid out as the Arp (it carries .arp-device, so the rules above apply);
+   these are its own: the held rows under a square hit pad (decision 6), the
+   Grid's 2 px column gap, the hit pad's dot (a ghost's dimmed, decision 3),
+   the Figure's Vel bar filling across (decision 5) and the Pitch cell. */
+.drum-device {
+  --strip-head-h: var(--drum-strip-head-h);
+}
+.drum-device .seq-strip > .grid-strip {
+  gap: 2px;
+}
+.drum-device .seq-strip .gcell.drum-hit {
+  height: var(--step-w);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.drum-device .gcell.drum-hit i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--kc);
+}
+.drum-device .gcell.drum-hit.rest i {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-bright);
+}
+.drum-device .gcell.drum-hit.ghost i {
+  background: color-mix(in srgb, var(--kc) 40%, transparent);
+}
+.drum-device .seq-strip .gcell.vel {
+  position: relative;
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: 8.5px;
+  font-weight: 400;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+}
+.drum-device .gcell.vel i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--kc) 45%, transparent);
+}
+.drum-device .gcell.vel span {
+  position: relative;
+}
+.drum-device .seq-strip .gcell.vel.full {
+  color: var(--ink-faint);
+}
+.drum-device .gcell.vel.full i {
+  display: none;
+}
+.drum-device .seq-strip .gcell.pitch {
+  font-family: var(--f-num);
+  font-size: 9px;
+  letter-spacing: 0;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.drum-device .seq-strip .gcell.pitch.flat {
+  color: var(--ink-faint);
+}
+
 /* ---------- the Figure device (windsor#490) ---------- */
 /* Record `2026-10-03-figure-sequencer`; the look is
    docs/research/2026-10-03-figure-sequencer/figure.html, approved in

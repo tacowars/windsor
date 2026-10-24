@@ -51,7 +51,7 @@ const run = (model: DocumentModel, action: PatternAction, over: Partial<ActionRe
 
 describe('what each card offers', () => {
   it('lists the cards’ buttons in their order, and none on Chord or no sequencer', () => {
-    for (const kind of ['grid', 'arp', 'bass', 'figure'] as const) {
+    for (const kind of ['grid', 'arp', 'bass', 'figure', 'drum'] as const) {
       expect(offeredActions(kind), kind).toEqual(['randomize', 'reverse', 'reseed']);
     }
     expect(offeredActions('euclidean')).toEqual(['capture']);
@@ -79,7 +79,7 @@ describe('the writes', () => {
   });
 
   it('Reseed writes a new seed to the part', () => {
-    for (const kind of ['grid', 'arp', 'bass', 'figure'] as const) {
+    for (const kind of ['grid', 'arp', 'bass', 'figure', 'drum'] as const) {
       const model = songWith(kind);
       const before = partAt(model.doc, 0)?.sequencer;
       const edit = run(model, 'reseed');

@@ -270,6 +270,15 @@ export const DRUM_KNOBS: readonly SequencerKnobEntry[] = [
   ...accentKnobs(DEFAULT_DRUM_CONFIG),
 ];
 
+/** The Drum's Length (windsor#951): the Grid's range over the Drum's own default, one bar. */
+export const DRUM_LENGTH_KNOB: CardKnobSpec = {
+  ...GRID_LENGTH_KNOB,
+  def: DEFAULT_DRUM_CONFIG.length,
+};
+
+/** The Drum's Rotate: the Grid's, and like it never stored. */
+export const DRUM_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
+
 /** The Arp card's Rotate: the grid's, ±`GRID_ROTATE_MAX` cells, and like it never stored. */
 export const ARP_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
 

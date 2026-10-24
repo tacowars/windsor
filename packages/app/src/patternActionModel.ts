@@ -11,8 +11,9 @@
  * Which actions a kind offers is the keys of its entry in `PATTERN_ACTIONS`,
  * in the order the cards and the menu list them: Chord has none at all. The
  * Grid's Reseed came with step variation (windsor#936), whose draws its seed
- * shapes. The Roll's Quantize here acts on every note, as the card's
- * does with nothing selected; the card's own press also reads its selection
+ * shapes; the Drum's three came with its device (windsor#951). The Roll's
+ * Quantize here acts on every note, as the card's does with nothing
+ * selected; the card's own press also reads its selection
  * (`rollEditing.ts`), over the same `quantiseNotes`.
  */
 import type {
@@ -26,6 +27,7 @@ import { scaleOffsets } from '@windsor/engine';
 import { arpCellCount, randomArpCells, reverseArp } from './arpGridModel';
 import { arpSeedChange, freshSeed } from './arpModel';
 import { randomBassSteps, reverseBass } from './bassGridModel';
+import { randomDrumSteps, reverseDrum } from './drumGridModel';
 import { reseedChange } from './bassModel';
 import type { Figure } from './euclidModel';
 import { FIGURE_SUMMARY_STACK } from './figureConstants';
@@ -119,8 +121,16 @@ const borrowed = (spec: SpecOf<'figure'>): string | null =>
 export const PATTERN_ACTIONS: KindActions = {
   none: {},
   chord: {},
-  // The Drum's actions come with its device (windsor#948's plan, ticket 4/4).
-  drum: {},
+  drum: {
+    randomize: {
+      edit: (spec, at) =>
+        fields(at, {
+          steps: randomDrumSteps(spec.steps, spec.length, () => at.reads.random()),
+        }),
+    },
+    reverse: { edit: (spec, at) => fields(at, reverseDrum(spec)) },
+    reseed: { edit: seedEdit },
+  },
   grid: {
     randomize: {
       edit: (spec, at) =>
