@@ -1,5 +1,5 @@
 /**
- * Step variation's controls on the Grid and Arp devices (windsor#936; record
+ * Step variation's controls on the Grid, Arp and Drum devices (windsor#936; record
  * `2026-10-24-step-variation-controls`, the approved mockup
  * `docs/design/step-variation-controls-mockup.html`): the names the console
  * gives the engine's five fields (windsor#935, windsor#945), each control's
@@ -32,13 +32,13 @@ export const STEP_VARIATION_NAMES: Readonly<Record<keyof StepVariationConfig, st
 /** Each control's tooltip, after its name (decision 3 for the switches; the mockup's for the knobs). */
 export const STEP_VARIATION_TITLES: Readonly<Record<keyof StepVariationConfig, string>> = {
   randomness:
-    'How far a step that varies strays: its velocity up or down, its pitch and, on the Arp, its gate',
+    'How far a step that varies strays: its velocity up or down, its pitch and, on the Arp and the Drum, its gate',
   probability: 'How often a step varies; the others play as written',
   restsSound: 'Rests sound: a varied step may also go silent or sound where a rest was written',
   octaveMode:
     "Octave: pitch strays by whole octaves of the step's own note instead of borrowing another step's",
   chancePerEffect:
-    "Per effect: Chance rolls separately for velocity, pitch, the Arp's gate and, with Rests sound on, a rest or note flip, instead of once for the whole step",
+    "Per effect: Chance rolls separately for velocity, pitch, the Arp's and the Drum's gate and, with Rests sound on, a rest or note flip, instead of once for the whole step",
 };
 
 /**
