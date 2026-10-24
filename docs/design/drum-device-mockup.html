@@ -1080,23 +1080,24 @@
   </style>
   <style id="drum-rules">
     /* ---------- new: the Drum's own rules (the build adds them to console.css) ---------- */
-    /* Its held rows are Basslead's count: the step number, hit, Vel, Pitch, A (20 px each) and the ratchet. */
+    /* Its held rows: the step number, the square hit pad (the step's width), Vel, Pitch, A (the Arp's 20 px) and the ratchet. */
     .drum-device {
-      --strip-head-h: var(--bass-strip-head-h);
+      --strip-head-h: var(--drum-strip-head-h);
     }
     /* Its columns the Grid's 2 px apart (not the Arp's 6), the beats set off by the meter's gaps. */
     .drum-device .seq-strip > .grid-strip {
       gap: 2px;
     }
-    /* The hit cell: a filled dot for a hit in the part's accent, an empty ring for a rest. */
+    /* The hit cell, a square pad: a filled dot for a hit in the part's accent, an empty ring for a rest. */
     .drum-device .seq-strip .gcell.drum-hit {
+      height: var(--step-w);
       display: grid;
       place-items: center;
       padding: 0;
     }
     .drum-device .gcell.drum-hit i {
-      width: 8px;
-      height: 8px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       background: var(--kc);
     }
@@ -1104,7 +1105,7 @@
       background: transparent;
       box-shadow: inset 0 0 0 1px var(--line-bright);
     }
-    /* To decide 3, recommended: a hit under 0.5 dims its dot. */
+    /* Decision 3: a hit under 0.5 dims its dot. */
     .drum-device.ghost-dim .gcell.drum-hit.ghost i {
       background: color-mix(in srgb, var(--kc) 40%, transparent);
     }
@@ -1147,7 +1148,7 @@
     .drum-device .seq-strip .gcell.pitch.flat {
       color: var(--ink-faint);
     }
-    /* The Pattern picker on the rail (To decide 2's other way): an 18 px rail icon over a picker. */
+    /* The Pattern picker on the rail (decision 2's other way, kept selectable): an 18 px rail icon over a picker. */
     .seq-icon.drum-pattern {
       position: relative;
     }
@@ -1172,35 +1173,35 @@
     <label
       >1 Pitch
       <select id="mPitch">
-        <option value="name">Note name (recommended)</option>
+        <option value="name">Note name (chosen)</option>
         <option value="offset">Offset</option>
       </select></label
     >
     <label
       >2 Pattern
       <select id="mPlace">
-        <option value="play">Head of Play (recommended)</option>
+        <option value="play">Head of Play (chosen)</option>
         <option value="rail">On the rail</option>
       </select></label
     >
     <label
       >3 Ghost hit
       <select id="mGhost">
-        <option value="dim">Dims below 0.5 (recommended)</option>
+        <option value="dim">Dims below 0.5 (chosen)</option>
         <option value="solid">Solid</option>
       </select></label
     >
     <label
       >4 Randomize
       <select id="mRandom">
-        <option value="count">Hit count kept (recommended)</option>
+        <option value="count">Hit count kept (chosen)</option>
         <option value="density">8 of 16</option>
       </select></label
     >
     <label
       >5 Vel fill
       <select id="mVel">
-        <option value="across">Across, the Figure's (recommended)</option>
+        <option value="across">Across, the Figure's (chosen)</option>
         <option value="up">Up</option>
       </select></label
     >
@@ -1267,15 +1268,19 @@
         <b>Steps.</b> A column per step at the Grid's 32 px, <b>2 px apart as the Grid's</b> (the
         Arp's are 6), each beat set off by the meter's 4 px and each bar by 10
         (<code>meterGrid.ts</code>); steps past Length greyed as the Grid's (drag Length down to see
-        it, up to add rests to 32). Rows, top down: the step number; the <b>hit</b>; the
-        <b>Vel bar</b>; <b>Pitch</b>; <b>A</b>; the ratchet at 14 px. The cells are the Arp's 20 px
-        with its 4 px row gap, so the held rows are Basslead's 126 px. Then + Lane and the lane
-        count in the corner, the Ratchet label, and one step lane (Op A Decay: the ghosts shorter,
-        the backbeat longer) at 42 px. The playhead ring is on step 5.
+        it, up to add rests to 32). Rows, top down: the step number; the <b>hit</b>, a square pad 32
+        × 32 px (the step's width), the device's main control; the <b>Vel bar</b>; <b>Pitch</b>;
+        <b>A</b>; the ratchet at 14 px. The other cells are the Arp's 20 px with its 4 px row gap,
+        so the held rows are 138 px, 12 more than Basslead's 126. What gives is the lane area: under
+        the 244 px device the strip is 218 px high, so two 42 px step lanes showed in full before
+        the lanes scroll and now one does, with 34 px of the second (the Arp shows one and 22 px). A
+        tighter row gap would need 1.6 px in place of 4 to win the 12 px back. Then + Lane and the
+        lane count in the corner, the Ratchet label, and one step lane (Op A Decay: the ghosts
+        shorter, the backbeat longer) at 42 px. The playhead ring is on step 5.
       </li>
       <li>
-        <b>The hit cell</b>: a filled dot in the part's accent for a hit, an empty ring for a rest.
-        A click toggles; a new hit plays at 1.
+        <b>The hit cell</b>: a square pad, a 12 px filled dot in the part's accent for a hit, an
+        empty ring for a rest. A click toggles; a new hit plays at 1.
       </li>
       <li>
         <b>The Vel bar</b> is the Figure's (<code>figureCells.ts</code>): the value written on it
@@ -1323,8 +1328,8 @@
       <li>
         <b>Picker 5, the Vel bar's fill</b>, is an addition: the issue reads the Figure's bar as
         filling upward (<q>a velocity bar's height is the velocity</q>), but the Figure's bar, and
-        the Arp's Gate bar after it, fill across, dragged up or down. Recommended: across, the real
-        bar. <b>Up</b> draws the fill from the cell's foot.
+        the Arp's Gate bar after it, fill across, dragged up or down. Decided: across, the real bar.
+        <b>Up</b> draws the fill from the cell's foot.
       </li>
     </ul>
 
@@ -1446,33 +1451,37 @@
       (windsor#949 decisions 2 to 4, over windsor#948's fields).
     </p>
 
-    <h2>To decide</h2>
+    <h2>Decided on PR windsor#953 (2026-10-24)</h2>
+    <p>
+      tacowars took every recommended option and made the hit cells square pads. The pickers open on
+      the choice; the other ways stay selectable.
+    </p>
     <ol>
       <li>
-        <b>Pitch display.</b> Recommended: <b>the played note's name</b> (C4, D#4): what sounds, and
-        a tom roll reads as notes. The other way, <b>Offset</b>, writes +3 and -2 (0 faint), with
-        the note in the tooltip.
+        <b>Pitch display.</b> Chosen: <b>the played note's name</b> (C4, D#4): what sounds, and a
+        tom roll reads as notes. The other way, <b>Offset</b>, writes +3 and -2 (0 faint), with the
+        note in the tooltip.
       </li>
       <li>
-        <b>Where Pattern sits.</b> Recommended: <b>at the head of Play</b>, the first thing a new
-        part needs, showing its name. The other way puts it <b>on the rail</b> between the name and
-        the region, as an 18 px button (a new glyph, steps with hits) that opens the same grouped
-        list, the chosen name in its tooltip. Neither changes the width: Rate and Note keep the
-        field column.
+        <b>Where Pattern sits.</b> Chosen: <b>at the head of Play</b>, the first thing a new part
+        needs, showing its name. The other way puts it <b>on the rail</b> between the name and the
+        region, as an 18 px button (a new glyph, steps with hits) that opens the same grouped list,
+        the chosen name in its tooltip. Neither changes the width: Rate and Note keep the field
+        column.
       </li>
       <li>
-        <b>A ghost hit's look.</b> Recommended: <b>the dot dims below 0.5</b>, so the ghosts read in
-        the hit row. The other way keeps every dot <b>solid</b> and the Vel bar alone shows it.
+        <b>A ghost hit's look.</b> Chosen: <b>the dot dims below 0.5</b>, so the ghosts read in the
+        hit row. The other way keeps every dot <b>solid</b> and the Vel bar alone shows it.
       </li>
       <li>
-        <b>Randomize's rule</b> (its tooltip; the button works). Recommended:
-        <b>the hit count kept</b>, the hits at new places, each at a velocity from 0.3 to 1. The
-        other way draws <b>8 of 16</b> (half the Length) at the same velocities. Here a new hit has
-        no accent, pitch or ratchet; the build's ticket says what Randomize does to those.
+        <b>Randomize's rule</b> (its tooltip; the button works). Chosen: <b>the hit count kept</b>,
+        the hits at new places, each at a velocity from 0.3 to 1. The other way draws
+        <b>8 of 16</b> (half the Length) at the same velocities. Here a new hit has no accent, pitch
+        or ratchet; the build's ticket says what Randomize does to those.
       </li>
       <li>
-        <b>The Vel bar's fill</b> (an addition, above). Recommended: <b>across</b>, the Figure's bar
-        as it is; the other way fills <b>up</b>.
+        <b>The Vel bar's fill</b> (an addition, above). Chosen: <b>across</b>, the Figure's bar as
+        it is; the other way fills <b>up</b>.
       </li>
     </ol>
   </div>
@@ -1502,6 +1511,8 @@
         '--arp-step-gap': 6,
         '--arp-strip-head-h': 150,
         '--bass-strip-head-h': 126,
+        // New: the Drum's held rows, the 32 px square hit pad in place of a 20 px cell.
+        '--drum-strip-head-h': 138,
         '--beat-gap': 4,
         '--bar-gap': 10,
         '--lane-h': 42,
