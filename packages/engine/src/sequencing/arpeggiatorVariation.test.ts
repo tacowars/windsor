@@ -1,6 +1,6 @@
 /**
- * The Arp's step variation (windsor#935, record `2026-10-24-step-variation`):
- * parity at either amount 0, the stream per region, the groove kept with
+ * The Arp's step variation (windsor#935, record `2026-10-24-step-variation`;
+ * windsor#945, Chance per effect): parity at either amount 0, the stream per region, the groove kept with
  * Rests sound off and the beat-weighted flip with it on, a walk that never
  * moves, the list borrow, a one-note list, the retrigger strike, the gate's
  * look-ahead and ties, the varied gate, and Octave's pitch classes. Driven
@@ -83,10 +83,32 @@ describe('parity and the stream', () => {
   it('at Randomness 0 or Probability 0 emits exactly what a plain arp does, event for event', () => {
     for (const style of ['up', 'random'] as const) {
       const plain = run({ style, steps: WRITTEN, seed: 3 });
-      const switches = { style, steps: WRITTEN, seed: 3, restsSound: true, octaveMode: true };
-      expect(run({ ...switches, randomness: 0, probability: 1 })).toEqual(plain);
-      expect(run({ ...switches, randomness: 1, probability: 0 })).toEqual(plain);
+      for (const chancePerEffect of [false, true]) {
+        const switches = { style, steps: WRITTEN, seed: 3, restsSound: true, octaveMode: true };
+        const over = { ...switches, chancePerEffect };
+        expect(run({ ...over, randomness: 0, probability: 1 })).toEqual(plain);
+        expect(run({ ...over, randomness: 1, probability: 0 })).toEqual(plain);
+      }
     }
+  });
+
+  it('with Chance per effect on, an onset can vary its velocity and keep its pitch, or the reverse', () => {
+    const plain = byStep(run({ seed: 5 }, 2000), 2000);
+    const one = { randomness: 1, probability: 0.3, seed: 5 };
+    const sorts = (over: Partial<ArpSequencerConfig>) => {
+      const varied = byStep(run(over, 2000), 2000);
+      const moved = (on: NoteOnEvent | null, s: number) => on!.note !== plain[s]!.note;
+      const louder = (on: NoteOnEvent | null) => on!.velocityOffset !== undefined;
+      return {
+        velocityOnly: varied.filter((on, s) => louder(on) && !moved(on, s)).length,
+        pitchOnly: varied.filter((on, s) => !louder(on) && moved(on, s)).length,
+      };
+    };
+    // One roll: a moved pitch always comes with an offset.
+    expect(sorts(one).pitchOnly).toBe(0);
+    const perEffect = sorts({ ...one, chancePerEffect: true });
+    expect(perEffect.velocityOnly).toBeGreaterThan(200);
+    expect(perEffect.pitchOnly).toBeGreaterThan(100);
   });
 
   it('plays the same for the same seed and region, and replays on re-entry', () => {
@@ -138,7 +160,7 @@ describe('the rhythm', () => {
   });
 
   it('editing one cell, or turning Rests sound on, leaves every other onset as it played', () => {
-    const traits = (on: NoteOnEvent | null) => on && { note: on.note, velocity: on.velocity };
+    const traits = (on: NoteOnEvent | null) => on && { note: on.note, offset: on.velocityOffset };
     const over = { ...FULL, octaveMode: true, seed: 6 };
     const a = byStep(run(over, 600), 600);
     const edited = byStep(run({ ...over, steps: cells({ 2: REST }) }, 600), 600);

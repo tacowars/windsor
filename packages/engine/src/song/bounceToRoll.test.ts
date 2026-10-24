@@ -7,7 +7,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { BOUNCE_SLOT, gridNote, gridSpec, REST } from '../__fixtures__/bounceRig';
+import {
+  BOUNCE_SLOT,
+  bounceSong,
+  gridNote,
+  gridSpec,
+  render,
+  REST,
+} from '../__fixtures__/bounceRig';
 import { ACID_SAW, applyBounce, bounceDocument } from '../__fixtures__/bounceToRollRig';
 import type { AutomationLane } from '../automation/automationLane';
 import type { FigureSpec, MusicPart, RollSpec } from './arrangement';
@@ -79,14 +86,29 @@ describe('the record’s worked examples', () => {
     expect(roll.notes).toHaveLength(48);
   });
 
-  it('unrolls the Arp’s varied take to a 4-bar loop of its 47 notes', () => {
+  it('unrolls the Arp’s varied take to a 4-bar loop of its 48 notes', () => {
     const varied = { randomness: 1, probability: 0.5, restsSound: true };
     const doc = bounceDocument({ kind: 'arp', ...DEFAULT_ARP_CONFIG, ...varied, seed: 0 });
     const result = bounceToRoll(doc, BOUNCE_SLOT);
     const roll = rollOf(bounced(doc, result));
     expect(roll.loopTicks).toBe(4 * TICKS_PER_BAR);
-    expect(roll.notes).toHaveLength(47);
-    expect(result.ok && result.summary.notes).toBe(47);
+    expect(roll.notes).toHaveLength(48);
+    expect(result.ok && result.summary.notes).toBe(48);
+  });
+
+  it('writes each note of a varied Grid line at the velocity it played, louder and quieter (windsor#945)', () => {
+    const line = [0, 2, 4, 6].map((degree) => gridNote(degree));
+    const grid = gridSpec(line, { randomness: 1, probability: 1, seed: 945 });
+    const played = render(bounceSong(grid, { velocity: 0.5 })).notes;
+    expect(played.some((note) => note.velocity > 0.5)).toBe(true);
+    expect(played.some((note) => note.velocity < 0.5)).toBe(true);
+    const doc = bounceDocument(grid, { velocity: 0.5 });
+    const part = bounced(doc, bounceToRoll(doc, BOUNCE_SLOT));
+    const notes = rollOf(part).notes;
+    expect(notes.map((note) => note.tick)).toEqual(played.map((note) => note.tick));
+    notes.forEach((note, i) => {
+      expect((note.velocity ?? 1) * part.velocity).toBeCloseTo(played[i]!.velocity, 9);
+    });
   });
 });
 

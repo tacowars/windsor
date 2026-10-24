@@ -1,5 +1,6 @@
 /**
- * Step variation's tunables (windsor#935, record `2026-10-24-step-variation`):
+ * Step variation's tunables (windsor#935, record `2026-10-24-step-variation`;
+ * windsor#945, record `2026-10-24-step-variation-velocity-and-chance`):
  * how far a varied Grid step or Arp onset strays at full Randomness, how
  * often a beat flips with Rests sound on, and the bound on a normal draw.
  * They are values for tacowars to listen to, not settled ones. The logic is
@@ -7,9 +8,12 @@
  */
 
 export interface StepVariationTable {
-  /** The velocity offset's σ at Randomness 1, as a fraction of the step's velocity. */
+  /**
+   * The velocity offset's σ at Randomness 1, in the part's velocity units:
+   * 0.2 is a fifth of the full velocity range, up or down (windsor#945).
+   */
   readonly velocitySigma: number;
-  /** The quietest a varied step plays: a varied note never goes silent. */
+  /** The quietest a note with a velocity offset plays: a varied note never goes silent. */
   readonly velocityFloor: number;
   /** The Grid's pitch borrow: σ of the step offset at Randomness 1, per step of the loop's length. */
   readonly stepJumpSigma: number;
@@ -46,12 +50,13 @@ export const STEP_VARIATION_TABLE: StepVariationTable = {
   zTail: 1 / 254,
 };
 
-/** The four per-part fields, as a new Grid or Arp starts: nothing varies. */
+/** The five per-part fields, as a new Grid or Arp starts: nothing varies, and one roll decides a step. */
 export const STEP_VARIATION_DEFAULTS = {
   randomness: 0,
   probability: 0,
   restsSound: false,
   octaveMode: false,
+  chancePerEffect: false,
 } as const;
 
 /**
@@ -78,5 +83,10 @@ export const INVERSE_NORMAL_COEFFICIENTS = {
   low: 0.02425,
 } as const;
 
-/** Draws a step makes whenever Randomness and Probability are both above 0, whatever it plays. */
-export const STEP_VARIATION_DRAWS = 5;
+/**
+ * Draws a step makes whenever Randomness and Probability are both above 0,
+ * whatever it plays and whatever `chancePerEffect` says (windsor#945): the
+ * first roll, the flip value, the velocity, pitch and gate values, then the
+ * velocity, pitch and gate rolls.
+ */
+export const STEP_VARIATION_DRAWS = 8;

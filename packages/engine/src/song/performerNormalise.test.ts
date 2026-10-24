@@ -55,7 +55,13 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
       arpNote({ octave: 1, slide: true }),
     ]);
     const lanes = [{ param: 'filter.cutoff', values: zeros().map((_, i) => (i % 2) * 0.5) }];
-    const variation = { randomness: 0.25, probability: 0.5, restsSound: true, octaveMode: true };
+    const variation = {
+      randomness: 0.25,
+      probability: 0.5,
+      restsSound: true,
+      octaveMode: true,
+      chancePerEffect: true,
+    };
     const written = { steps, lanes, accentVelocity: 0.7, accentMod: 0.3, ...variation };
     const { spec, corrections } = arp(written);
     expect(corrections).toEqual([]);
@@ -144,11 +150,12 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
     expect(spec).toMatchObject({ accentVelocity: 1, accentMod: 0 });
   });
 
-  it('fills step variation’s fields, clamps and reports junk, and drops Skip (windsor#935)', () => {
+  it('fills step variation’s fields, clamps and reports junk, and drops Skip (windsor#935, windsor#945)', () => {
     const { spec, corrections } = arp({
       randomness: 1.5,
       probability: 'often',
       restsSound: 'yes',
+      chancePerEffect: 1,
       skipChance: 0.5,
     });
     expect(spec).toMatchObject({
@@ -156,9 +163,11 @@ describe('the arp step grid through the normaliser (windsor#127)', () => {
       probability: 0,
       restsSound: false,
       octaveMode: false,
+      chancePerEffect: false,
     });
     expect(spec).not.toHaveProperty('skipChance');
-    expect(corrections).toHaveLength(4);
+    expect(corrections).toHaveLength(5);
+    expect(corrections.join('\n')).toMatch(/chancePerEffect/);
     expect(corrections.join('\n')).toMatch(/skipChance: unknown key dropped/);
     expect(corrections.join('\n')).toMatch(/randomness: clamped 1.5 to 1/);
   });

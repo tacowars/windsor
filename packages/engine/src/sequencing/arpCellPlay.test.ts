@@ -79,7 +79,7 @@ describe('the octave shift', () => {
   });
 });
 
-describe('step variation on a cell (windsor#935)', () => {
+describe('step variation on a cell (windsor#935, windsor#945)', () => {
   const DRAW: StepDraw = { flip: 0, velocity: -1, pitch: 1, gate: 1 };
   const LIST = [48, 52, 55, 60];
   const context = (over: Partial<ArpVariationContext['config']> = {}): ArpVariationContext => ({
@@ -102,9 +102,9 @@ describe('step variation on a cell (windsor#935)', () => {
 
   it('borrows the list neighbour a normal offset away, wrapping, and keeps the cell', () => {
     const cell = arpNote({ octave: 1 });
-    // z = 1: σ = 0.25 × 4 notes = 1 place up; the gate moves up 0.25 and the velocity down 0.2.
+    // z = 1: σ = 0.25 × 4 notes = 1 place up; the gate moves up 0.25 and the velocity offset is −0.2.
     const varied = variedCell(cell, DRAW, context());
-    expect(varied).toEqual({ cell, pitch: 55, gate: 0.75, velocity: 0.8 });
+    expect(varied).toEqual({ cell, pitch: 55, gate: 0.75, velocityOffset: -0.2 });
     const wrapped = variedCell(cell, { ...DRAW, pitch: 2.5 }, { ...context(), at: 3 });
     expect(wrapped.pitch).toBe(LIST[(3 + 3) % 4]);
   });
@@ -131,10 +131,26 @@ describe('step variation on a cell (windsor#935)', () => {
     expect(arpVariationSeed(7, 1)).not.toBe(arpVariationSeed(7, 0));
   });
 
-  it('a varied velocity reaches the note-on, and a plain onset sends none', () => {
+  it('an effect whose roll failed plays as written while the others vary', () => {
+    const cell = arpNote();
+    const pitchOnly = variedCell(cell, { pitch: 1 }, context());
+    expect(pitchOnly).toEqual({ cell, pitch: 55, gate: 0.5, velocityOffset: undefined });
+    const gateAndVelocity = variedCell(cell, { velocity: 1, gate: -1 }, context());
+    expect(gateAndVelocity).toEqual({ cell, pitch: 52, gate: 0.25, velocityOffset: 0.2 });
+    const octaveFolded = variedCell(
+      arpNote({ octave: 1 }),
+      { gate: 1 },
+      context({ octaveMode: true }),
+    );
+    expect(octaveFolded.pitch).toBe(52 + 12);
+  });
+
+  it('a varied velocity offset reaches the note-on, and a plain onset sends none', () => {
     const on = (o: ReturnType<typeof playArpCell>) => o.events.find((e) => e.kind === 'noteOn');
-    expect(on(playArpCell(onset({ velocity: 0.6 }), CONFIG))).toMatchObject({ velocity: 0.6 });
-    expect(on(playArpCell(onset(), CONFIG))).not.toHaveProperty('velocity');
+    const varied = on(playArpCell(onset({ velocityOffset: 0.15 }), CONFIG));
+    expect(varied).toMatchObject({ velocityOffset: 0.15 });
+    expect(varied).not.toHaveProperty('velocity');
+    expect(on(playArpCell(onset(), CONFIG))).not.toHaveProperty('velocityOffset');
   });
 });
 

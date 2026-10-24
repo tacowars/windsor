@@ -205,7 +205,11 @@ export const FIGURE_TRANSPOSE_MAX = 24;
  */
 export const ROLL_NOTES_MAX = 2048;
 /**
- * A document's document-format version: 19 since step variation replaced
+ * A document's document-format version: 20 since a varied step's velocity
+ * became an offset that strays both ways and every varied step makes eight
+ * draws (windsor#945, record `2026-10-24-step-variation-velocity-and-chance`:
+ * `SONG_MIGRATIONS[19]` adds `chancePerEffect: false` to every Grid and Arp),
+ * after 19 since step variation replaced
  * Skip on the Grid and the Arp (windsor#935, record
  * `2026-10-24-step-variation`: `SONG_MIGRATIONS[18]` deletes their
  * `skipChance` and drops their `seq.skipChance` lanes), after 18 since the
@@ -232,7 +236,7 @@ export const ROLL_NOTES_MAX = 2048;
  * carries the steps 5 → 6 to 9 → 10 and 15 → 16, which no longer reach this
  * one.
  */
-export const ARRANGEMENT_VERSION = 19;
+export const ARRANGEMENT_VERSION = 20;
 /** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
 export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

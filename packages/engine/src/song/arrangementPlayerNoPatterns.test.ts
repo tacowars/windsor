@@ -173,7 +173,9 @@ describe('a song without region patterns (windsor#74)', () => {
 
 /**
  * Read on main at c0b2776, before windsor#74; re-read for windsor#935, when
- * step variation replaced the fixture Grid's Skip.
+ * step variation replaced the fixture Grid's Skip, and for windsor#945, when
+ * a varied velocity became an offset both ways and a step's draws went to
+ * eight.
  */
-const PINNED_CALLS = 515;
-const PINNED_DIGEST = 'e131c78f707eb24775036cec32df327bcefb84dd992c1243655836c310a7ebb5';
+const PINNED_CALLS = 525;
+const PINNED_DIGEST = '486a51f7e76c85924ce25bf4aeb154ddeb0db8ea3e8a0a3cc23aae2ae0d6ce92';

@@ -34,16 +34,18 @@
  * onset whatever its cell plays, so a rest, a tie or a varied step never
  * moves the pitches of the cells after it.
  *
- * **Step variation** (windsor#935, record `2026-10-24-step-variation`,
+ * **Step variation** (windsor#935, record `2026-10-24-step-variation`;
+ * windsor#945, record `2026-10-24-step-variation-velocity-and-chance`;
  * `stepVariation.ts`) draws from its own stream (`arpVariationRng`), minted
  * beside the walk's at region entry. With Randomness and Probability both
- * above 0, every onset makes its fixed draws whatever its cell plays. A
- * varied note plays a velocity under the part's, a gate about its played
- * one, and a pitch either moved by whole octaves (Octave on) or the list
- * neighbour a normal offset from the walked one. The walk and `previous`
- * keep the walked pitch, so later pitches never move. With Rests sound on
- * a varied note may rest and a varied rest sound the walked pitch, plain;
- * a tie never flips.
+ * above 0, every onset makes its fixed draws whatever its cell plays, and
+ * one roll decides every effect, or with `chancePerEffect` on each effect
+ * rolls on its own. A varied note carries a velocity offset about the
+ * part's velocity, up or down, a gate about its played one, and a pitch
+ * either moved by whole octaves (Octave on) or the list neighbour a normal
+ * offset from the walked one. The walk and `previous` keep the walked
+ * pitch, so later pitches never move. With Rests sound on a varied note may
+ * rest and a varied rest sound the walked pitch, plain; a tie never flips.
  *
  * **The gate's look-ahead across a chord change.** The gate is decided at
  * the onset, and it reads the next cell in the current list's cycle
@@ -392,7 +394,7 @@ export class Arpeggiator {
     // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
     const played = reset ? strikeCell(flipped) : flipped;
     const context = { list, at, config, table: this.variation };
-    const { cell, pitch, gate, velocity } = variedCell(played, draw, context);
+    const { cell, pitch, gate, velocityOffset } = variedCell(played, draw, context);
     const outcome = playArpCell(
       {
         tick: event.tick,
@@ -404,7 +406,7 @@ export class Arpeggiator {
         held: this.held,
         holdsOn: holdsToNext(steps, i, cycle),
         gate,
-        velocity,
+        velocityOffset,
       },
       config,
     );

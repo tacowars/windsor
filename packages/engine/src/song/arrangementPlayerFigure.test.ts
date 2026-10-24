@@ -147,7 +147,8 @@ describe('the other kinds beside the Figure (windsor#485)', () => {
     });
     const digest = createHash('sha256').update(JSON.stringify(calls)).digest('hex');
     // Read on origin/main before the Figure performer landed; re-read for
-    // windsor#935, when step variation replaced the fixture Grid's Skip.
-    expect(digest).toBe('b1a975755f3b23ce854c7b5273ed0ab6d99aca79769956119faab78e294c4c2c');
+    // windsor#935, when step variation replaced the fixture Grid's Skip, and
+    // for windsor#945, when the fixture Grid's variation stream changed.
+    expect(digest).toBe('ccaef60ac2b4f2f6e5ed77045eeca3c0cddf5ff64bfa66c66ca8a9431ce68d4b');
   });
 });

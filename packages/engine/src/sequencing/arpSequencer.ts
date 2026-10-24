@@ -39,7 +39,7 @@ export const ARP_STYLES = [
 ] as const;
 export type ArpStyle = (typeof ARP_STYLES)[number];
 
-/** Step variation's four fields (windsor#935, `stepVariation.ts`) come with `StepVariationConfig`. */
+/** Step variation's five fields (windsor#935, windsor#945, `stepVariation.ts`) come with `StepVariationConfig`. */
 export interface ArpSequencerConfig extends StepVariationConfig {
   style: ArpStyle;
   /** Ticks per arp step. Must divide the bar. */

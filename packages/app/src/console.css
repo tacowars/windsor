@@ -2898,10 +2898,13 @@ body.chord-dragging {
   border-color: var(--line-bright);
 }
 /* Step variation's Rests sound and Octave toggles side by side under the
-   Grid's Vary and Chance (windsor#936), 3 px apart as the seed and Reseed. */
+   Grid's Vary and Chance (windsor#936), 3 px apart as the seed and Reseed;
+   Per effect wraps under Rests sound at the pair's width (windsor#945). */
 .variation-pair {
   display: flex;
+  flex-wrap: wrap;
   gap: 3px;
+  width: calc(2 * var(--arp-reseed) + 3px);
 }
 /* The strip: roomier cells than the Grid's, the ratchet row kept at its 14 px. */
 .arp-device .seq-strip > .grid-strip,

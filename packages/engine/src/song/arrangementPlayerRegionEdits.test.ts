@@ -113,6 +113,16 @@ function perform(song: (b: RegionPattern) => Arrangement, c: Case, bars: number)
   return { plain: plain.parts[c.id], edited: edited.parts[c.id], written: written.parts[c.id] };
 }
 
+/**
+ * Region 1's second pass, without the release on the loop's first tick: that
+ * lets go of region 2's last note, which is the edit's to change (with step
+ * variation on the fixture Grid it can be another pitch, windsor#945).
+ */
+const secondPass = (part: Parameters<typeof windowOf>[0]): string[] =>
+  windowOf(part, SONG, SONG + HALF).filter(
+    (call) => !call.startsWith(`@${SONG} {"kind":"noteOffByNote"`),
+  );
+
 describe.each(CASES)('editing region 2 of a $kind part live', (c) => {
   const song = (b: RegionPattern): Arrangement => twoRegionSong(c.id, c.a, b, 7);
 
@@ -120,7 +130,7 @@ describe.each(CASES)('editing region 2 of a $kind part live', (c) => {
     const { plain, edited, written } = perform(song, c, 1);
     expect(kinds(edited, 'allNotesOff')).toEqual([]);
     expect(windowOf(edited, 0, HALF)).toEqual(windowOf(plain, 0, HALF));
-    expect(windowOf(edited, SONG, SONG + HALF)).toEqual(windowOf(plain, SONG, SONG + HALF));
+    expect(secondPass(edited)).toEqual(secondPass(plain));
     expect(windowOf(edited, HALF, SONG)).not.toEqual(windowOf(plain, HALF, SONG));
     expect(windowOf(edited, HALF, SONG)).toEqual(windowOf(written, HALF, SONG));
   });
@@ -128,7 +138,7 @@ describe.each(CASES)('editing region 2 of a $kind part live', (c) => {
   it('from inside region 2: region 1’s next pass is identical, region 2’s next pass is the edit', () => {
     const { plain, edited, written } = perform(song, c, 3);
     expect(kinds(edited, 'allNotesOff')).toEqual([]);
-    expect(windowOf(edited, SONG, SONG + HALF)).toEqual(windowOf(plain, SONG, SONG + HALF));
+    expect(secondPass(edited)).toEqual(secondPass(plain));
     const next = [SONG + HALF, 2 * SONG] as const;
     expect(windowOf(edited, ...next)).toEqual(windowOf(written, ...next));
   });

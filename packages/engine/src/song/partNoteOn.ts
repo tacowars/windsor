@@ -1,7 +1,8 @@
 /**
  * A pitched generator's note-on as its part plays it (#602, windsor#17): a
  * grid accent bumps the part's velocity and rides in as per-note mod, a
- * slide flags the legato hand-over, and a step's parameter offsets ride
+ * slide flags the legato hand-over, a varied step's velocity offset moves
+ * the level up or down (windsor#945), and a step's parameter offsets ride
  * along when the step has any. A plain note carries no extras, so its call
  * is exactly what it was before either. A Euclid hit (windsor#355) takes the
  * same rule from its lanes, its note moved by the pitch lane. Pure;
@@ -10,6 +11,7 @@
 import { MIDI_NOTE_MAX } from '../audioConstants';
 import type { EuclidHitRead } from '../sequencing/euclidLanes';
 import type { NoteOnEvent } from '../sequencing/noteEvent';
+import { STEP_VARIATION_TABLE } from '../sequencing/stepVariationConstants';
 import type { NoteExtras } from '../synth/audioPart';
 
 /** The velocity and extras a part's `noteOn` takes for one event. */
@@ -20,18 +22,28 @@ export interface PartNoteOn {
 
 /** What a note-on carries beyond its pitch: a `NoteOnEvent` is one, a Euclid hit's read another. */
 export type NoteOnMarks = {
-  readonly [K in 'accent' | 'slide' | 'stepMod' | 'velocity']?: NoteOnEvent[K] | undefined;
+  readonly [K in 'accent' | 'slide' | 'stepMod' | 'velocity' | 'velocityOffset']?:
+    NoteOnEvent[K] | undefined;
 };
 
 /**
  * `event` as its part plays it, over the part's own `velocity`: scaled by
  * the event's own velocity when it carries one (a Figure cell's,
- * windsor#485), then the accent's bump, at most 1.
+ * windsor#485), moved by its velocity offset when it carries one (a varied
+ * Grid or Arp step's, windsor#945) and held in `[floor, 1]`, then the
+ * accent's bump, at most 1. Only an offset brings the floor, so a Figure
+ * cell written at velocity 0 stays silent.
  */
-export function partNoteOn(event: NoteOnMarks, velocity: number): PartNoteOn {
-  const { accent, slide, stepMod } = event;
+export function partNoteOn(
+  event: NoteOnMarks,
+  velocity: number,
+  floor = STEP_VARIATION_TABLE.velocityFloor,
+): PartNoteOn {
+  const { accent, slide, stepMod, velocityOffset } = event;
   const scaled = event.velocity === undefined ? velocity : velocity * event.velocity;
-  const played = accent ? Math.min(1, scaled + accent.velocity) : scaled;
+  const level =
+    velocityOffset === undefined ? scaled : Math.min(1, Math.max(floor, scaled + velocityOffset));
+  const played = accent ? Math.min(1, level + accent.velocity) : level;
   if (!accent && !slide && !stepMod) return { velocity: played, extras: undefined };
   const extras: NoteExtras = { mod: accent?.mod ?? 0, slide: slide === true };
   if (stepMod) extras.stepMod = stepMod;

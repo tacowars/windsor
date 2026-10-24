@@ -3,8 +3,10 @@
  * step variation replaced Skip on the Grid and the Arp, so a version-18
  * song loses their `skipChance`, on the part and on a region's own pattern,
  * and their `seq.skipChance` lanes, and loads at this build's version with
- * no correction. The Figure keeps its Skip. A current song round-trips the
- * four new fields.
+ * no correction. The Figure keeps its Skip. Version 19 → 20 (windsor#945,
+ * record `2026-10-24-step-variation-velocity-and-chance`): every Grid and
+ * Arp gains `chancePerEffect: false`. A current song round-trips the five
+ * fields.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -66,10 +68,11 @@ describe('a version-18 song (windsor#935)', () => {
     expect(refused).toBeUndefined();
     expect(raw).toEqual(before);
     const [g, a, f] = partsOf(document);
-    expect(g!.sequencer).toEqual({ kind: 'grid', seed: 3 });
-    expect(g!.regions[1]!.pattern).toEqual({ kind: 'grid' });
+    // Then 19 → 20 adds the switch, off.
+    expect(g!.sequencer).toEqual({ kind: 'grid', seed: 3, chancePerEffect: false });
+    expect(g!.regions[1]!.pattern).toEqual({ kind: 'grid', chancePerEffect: false });
     expect(g!.automation).toEqual([lane('strip.level')]);
-    expect(a!.sequencer).toEqual({ kind: 'arp', seed: 4 });
+    expect(a!.sequencer).toEqual({ kind: 'arp', seed: 4, chancePerEffect: false });
     expect(a!.automation).toEqual([lane('seq.gate')]);
     expect(f!.sequencer).toEqual({ kind: 'figure', seed: 5, skipChance: 0.3 });
     expect(f!.automation).toEqual([lane('seq.skipChance')]);
@@ -88,13 +91,20 @@ describe('a version-18 song (windsor#935)', () => {
         probability: 0,
         restsSound: false,
         octaveMode: false,
+        chancePerEffect: false,
       });
     }
     expect(g!.regions[1]!.pattern).not.toHaveProperty('skipChance');
   });
 
-  it('round-trips the four fields at this version', () => {
-    const variation = { randomness: 0.4, probability: 0.8, restsSound: true, octaveMode: true };
+  it('round-trips the five fields at this version', () => {
+    const variation = {
+      randomness: 0.4,
+      probability: 0.8,
+      restsSound: true,
+      octaveMode: true,
+      chancePerEffect: true,
+    };
     const raw = song([
       {
         slot: 0,
@@ -115,5 +125,55 @@ describe('a version-18 song (windsor#935)', () => {
     expect(twice.corrections).toEqual([]);
     expect(twice.document).toEqual(once.document);
     for (const part of twice.document.parts) expect(part.sequencer).toMatchObject(variation);
+  });
+});
+
+describe('a version-19 song (windsor#945)', () => {
+  const vary = { randomness: 0.6, probability: 0.5, restsSound: true };
+  const versionNineteen = (): Doc => ({
+    ...song([
+      {
+        slot: 0,
+        name: 'grid',
+        preset: 'saw-arp',
+        regions: [
+          { start: 0, duration: BAR },
+          { start: BAR, duration: BAR, pattern: { kind: 'grid', randomness: 0.2 } },
+        ],
+        sequencer: { kind: 'grid', seed: 3, ...vary },
+      },
+      { slot: 1, name: 'arp', preset: 'saw-arp', sequencer: { kind: 'arp', seed: 4, ...vary } },
+      { slot: 2, name: 'figure', preset: 'drone-sqr', sequencer: { kind: 'figure', seed: 5 } },
+    ]),
+    version: 19,
+  });
+
+  it('gains chancePerEffect off on the Grid, the Arp and a region’s pattern, nothing else', () => {
+    const raw = versionNineteen();
+    const before = structuredClone(raw);
+    const { document, refused } = upgradeSong(raw);
+    expect(refused).toBeUndefined();
+    expect(raw).toEqual(before);
+    const [g, a, f] = partsOf(document);
+    expect(g!.sequencer).toEqual({ kind: 'grid', seed: 3, ...vary, chancePerEffect: false });
+    expect(g!.regions[0]).toEqual({ start: 0, duration: BAR });
+    expect(g!.regions[1]!.pattern).toEqual({
+      kind: 'grid',
+      randomness: 0.2,
+      chancePerEffect: false,
+    });
+    expect(a!.sequencer).toEqual({ kind: 'arp', seed: 4, ...vary, chancePerEffect: false });
+    expect(f!.sequencer).toEqual({ kind: 'figure', seed: 5 });
+  });
+
+  it("loads at this build's version with the switch off and no correction", () => {
+    const result = makeArrangement(versionNineteen());
+    expect(result.refused).toBeUndefined();
+    expect(result.corrections).toEqual([]);
+    expect(result.document.version).toBe(ARRANGEMENT_VERSION);
+    const [g, a] = result.document.parts;
+    for (const sequencer of [g!.sequencer, a!.sequencer]) {
+      expect(sequencer).toMatchObject({ ...vary, octaveMode: false, chancePerEffect: false });
+    }
   });
 });

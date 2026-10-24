@@ -39,7 +39,8 @@ import {
 } from './sequencerKnobTables';
 import { seedField } from './seedField';
 import { specOf } from './stepStrip';
-import { isVariationAmount, titleVariationKnob, variationToggles } from './stepVariationControls';
+import { isVariationAmount, titleVariationKnob, variationToggle } from './stepVariationControls';
+import { ARP_VARIATION_ROWS } from './stepVariationTables';
 
 export { ICON_RESEED } from './seedField';
 
@@ -123,8 +124,10 @@ function knobStrip(target: ArpTarget, rotate: HTMLElement): HTMLElement {
   strip.append(
     column('k3', [octave(target), ...knob('octaves'), rotate]),
     ...ARP_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),
-    // Rests sound level with Vary, Octave with Chance (windsor#936).
-    column('k3 variation-col', [el('div'), ...variationToggles(target)]),
+    column(
+      'k3 variation-col',
+      ARP_VARIATION_ROWS.map((field) => variationToggle(target, field)),
+    ),
   );
   return strip;
 }

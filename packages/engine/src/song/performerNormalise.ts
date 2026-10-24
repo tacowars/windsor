@@ -12,10 +12,10 @@
  * plain note, silently; a short, long or junk one is padded with plain notes
  * or trimmed, reported.
  *
- * Step variation's four fields (windsor#935, `stepVariationFields`), which
- * the Grid's normaliser reads too: Randomness and Probability in 0–1, Rests
- * sound and Octave booleans, each its default when absent and reported when
- * junk. Skip is gone from both kinds, so a `skipChance` is dropped as an
+ * Step variation's five fields (windsor#935 and windsor#945,
+ * `stepVariationFields`), which the Grid's normaliser reads too: Randomness
+ * and Probability in 0–1, Rests sound, Octave and Chance per effect
+ * booleans, each its default when absent and reported when junk. Skip is gone from both kinds, so a `skipChance` is dropped as an
  * unknown key.
  *
  * Basslead's step strip (windsor#367) takes the same cell, its gate
@@ -54,8 +54,14 @@ import {
   unpitchedStep,
 } from './sequencerFields';
 
-/** The keys step variation adds to a Grid or an Arp (windsor#935). */
-export const STEP_VARIATION_KEYS = ['randomness', 'probability', 'restsSound', 'octaveMode'];
+/** The keys step variation adds to a Grid or an Arp (windsor#935, windsor#945). */
+export const STEP_VARIATION_KEYS = [
+  'randomness',
+  'probability',
+  'restsSound',
+  'octaveMode',
+  'chancePerEffect',
+];
 
 /** A Grid's or an Arp's step variation fields: each its default when absent, clamped or reported when junk. */
 export function stepVariationFields(
@@ -69,6 +75,7 @@ export function stepVariationFields(
     probability: n.num(o.probability, d.probability, 0, 1, `${path}.probability`),
     restsSound: n.bool(o.restsSound, d.restsSound, `${path}.restsSound`),
     octaveMode: n.bool(o.octaveMode, d.octaveMode, `${path}.octaveMode`),
+    chancePerEffect: n.bool(o.chancePerEffect, d.chancePerEffect, `${path}.chancePerEffect`),
   };
 }
 

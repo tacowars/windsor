@@ -1,8 +1,9 @@
 /**
  * Step variation's controls on the Grid and Arp devices (windsor#936; record
  * `2026-10-24-step-variation-controls`, the approved mockup
- * `docs/design/step-variation-controls-mockup.html`): the Rests sound and
- * Octave glyph buttons, and the tooltip Vary and Chance carry after the
+ * `docs/design/step-variation-controls-mockup.html`): the Rests sound,
+ * Octave and Per effect (windsor#945, `chance-per-effect-mockup.html`) glyph
+ * buttons, and the tooltip Vary and Chance carry after the
  * knob's own. Vary and Chance themselves are table knobs
  * (`sequencerKnobTables.ts`), so they lock under their lanes as Gate does.
  *
@@ -52,7 +53,7 @@ export function variationToggle(target: VariationTarget, field: VariationSwitch)
   return button;
 }
 
-/** Rests sound, then Octave. */
+/** Rests sound, Octave, then Per effect. */
 export const variationToggles = (target: VariationTarget): HTMLElement[] =>
   VARIATION_SWITCHES.map((field) => variationToggle(target, field));
 
