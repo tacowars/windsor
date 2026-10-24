@@ -46,8 +46,8 @@ export interface BounceMarks {
  */
 export interface BounceNote extends RollNote {
   /**
-   * What the part played: its Vel × the event's velocity, plus an accent's
-   * bump, at most 1. A note carrying `accent` holds its level without the
+   * What the part played: its Vel × the event's velocity, moved by a varied
+   * step's velocity offset (windsor#945), plus an accent's bump, at most 1. A note carrying `accent` holds its level without the
    * bump, which the Roll adds back as it plays.
    */
   readonly velocity: number;
@@ -105,7 +105,7 @@ export interface PlayedNote {
   /** Where it is released: a `trigger`'s hold, or the note-off that let it go; null while held. */
   off: number | null;
   readonly velocity: number;
-  /** What it would have played without its accent: the part's Vel × `own`. */
+  /** What it would have played without its accent: the part's Vel × `own`, moved by any velocity offset. */
   readonly plain: number;
   readonly own: number;
   /** Its accent's bump and mod, as its event carried them; undefined unaccented. */

@@ -39,8 +39,8 @@
  * - **Step variation** (windsor#935, `stepVariation.ts`) draws from a
  *   stream of its own (`arpVariationRng`), never the walk's. The
  *   arpeggiator resolves it before the cell plays: the onset arrives with
- *   the cell as it plays, its pitch and gate, and a velocity under the
- *   part's when the step varied one.
+ *   the cell as it plays, its pitch and gate, and a velocity offset about
+ *   the part's velocity when the step varied one (windsor#945).
  *
  * Pure: no clock, no graph. `generatorBoundary.test.ts` holds it there.
  */
@@ -118,14 +118,14 @@ export function flipCell(cell: ArpStep): ArpStep {
   return cell.kind === 'rest' ? arpNote() : cell;
 }
 
-/** What a cell plays with once step variation has had its say: the cell, its pitch, gate and velocity. */
+/** What a cell plays with once step variation has had its say: the cell, its pitch, gate and velocity offset. */
 export interface ArpVariedCell {
   readonly cell: ArpStep;
   /** The pitch `playArpCell` shifts by the cell's octave. */
   readonly pitch: number;
   readonly gate: number;
-  /** A fraction of the part's velocity; absent is 1. */
-  readonly velocity?: number | undefined;
+  /** An offset in the part's velocity units, up or down (windsor#945); absent is none. */
+  readonly velocityOffset?: number | undefined;
 }
 
 /** Where a cell's pitch and gate come from: the walked list and index, and the part's settings. */
@@ -139,12 +139,13 @@ export interface ArpVariationContext {
 
 /**
  * A note cell's pitch, gate and velocity on a step that varies
- * (windsor#935): a velocity under the part's, a gate moved about the played
- * one, and a pitch either moved by whole octaves of the cell's own note
- * (Octave on, the cell's shift folded into the pitch) or the list neighbour
- * a normal offset from the walked one, wrapping over the list. Any other
- * cell, or a step that plays as written (`draw` null), keeps the walked
- * pitch and the played gate.
+ * (windsor#935, windsor#945): a velocity offset up or down, a gate moved
+ * about the played one, and a pitch either moved by whole octaves of the
+ * cell's own note (Octave on, the cell's shift folded into the pitch) or the
+ * list neighbour a normal offset from the walked one, wrapping over the
+ * list. An effect `draw` lacks (its own roll failed) plays as written. Any
+ * other cell, or a step that plays as written (`draw` null), keeps the
+ * walked pitch and the played gate.
  */
 export function variedCell(
   cell: ArpStep,
@@ -158,7 +159,7 @@ export function variedCell(
   const { randomness } = config;
   const varied = {
     gate: variedGate(gate, draw, randomness, table),
-    velocity: variedVelocity(draw, randomness, table),
+    velocityOffset: variedVelocity(draw, randomness, table),
   };
   if (config.octaveMode) {
     const own = shiftOctave(walked, cell.octave);
@@ -196,8 +197,8 @@ export interface ArpOnset {
   readonly holdsOn: boolean;
   /** The gate the note sounding after this onset plays at (`arpPlayedGate`); absent is the config's. */
   readonly gate?: number;
-  /** A varied step's velocity, a fraction of the part's (windsor#935); absent is 1. */
-  readonly velocity?: number | undefined;
+  /** A varied step's velocity offset, in the part's velocity units (windsor#945); absent is none. */
+  readonly velocityOffset?: number | undefined;
 }
 
 /** What an onset emits and leaves sounding: the held note and the local tick its gate releases it, null to run to the next onset. */
@@ -246,7 +247,7 @@ export function playArpCell(onset: ArpOnset, config: ArpCellConfig): ArpCellOutc
     note,
     degree: onset.degree,
   };
-  if (onset.velocity !== undefined) on.velocity = onset.velocity;
+  if (onset.velocityOffset !== undefined) on.velocityOffset = onset.velocityOffset;
   if (cell.accent) on.accent = { velocity: config.accentVelocity, mod: config.accentMod };
   if (slide) on.slide = true;
   const stepMod = stepModAt(config.lanes, onset.index);

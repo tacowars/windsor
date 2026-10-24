@@ -5,7 +5,8 @@
  * slides, accents, step variation, a lane and a region gap, digested. The
  * digests were read from `main` before the ratchet change, so any drift in
  * what a plain step plays fails here; windsor#935 re-read them when step
- * variation replaced the skips the song carried.
+ * variation replaced the skips the song carried, and windsor#945 when its
+ * stream changed.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -118,12 +119,14 @@ describe('a song with no ratchet plays as before (windsor#366)', () => {
     // a Ratio row per operator (codes 10, 16, 22 and 28), so a note-on's step
     // array carries four more zeros; with them taken out, the calls hash to
     // the old `d00c74d8db900434`.
-    // Re-pinned for windsor#935: step variation replaced the Grid's Skip.
-    expect(play(GRID)).toEqual({ count: 118, digest: 'e29635ce74c7eeb6' });
+    // Re-pinned for windsor#935: step variation replaced the Grid's Skip; and
+    // for windsor#945: a varied velocity became an offset, eight draws a step.
+    expect(play(GRID)).toEqual({ count: 118, digest: '4982c8052f61b948' });
   });
 
   it('an Arp part', () => {
-    // Re-pinned for windsor#935: step variation replaced the Arp's Skip.
-    expect(play(ARP)).toEqual({ count: 162, digest: 'e2d52bea94c348ab' });
+    // Re-pinned for windsor#935: step variation replaced the Arp's Skip; and
+    // for windsor#945: a varied velocity became an offset, eight draws a step.
+    expect(play(ARP)).toEqual({ count: 160, digest: '0a6bfda1137d9cf7' });
   });
 });

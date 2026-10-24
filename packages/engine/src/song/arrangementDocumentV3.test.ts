@@ -70,6 +70,7 @@ describe('the version-3 document (#705)', () => {
       probability: 0.7,
       restsSound: true,
       octaveMode: true,
+      chancePerEffect: true,
       seed: 31,
     };
     const bass = {

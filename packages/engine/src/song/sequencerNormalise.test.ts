@@ -75,6 +75,7 @@ describe('grid sequencer normalisation (#602)', () => {
       probability: 0.6,
       restsSound: true,
       octaveMode: false,
+      chancePerEffect: false,
       accentVelocity: 0.5,
       accentMod: 0.4,
       register: { octave: 5 },
@@ -90,6 +91,7 @@ describe('grid sequencer normalisation (#602)', () => {
       probability: 0.6,
       restsSound: true,
       octaveMode: false,
+      chancePerEffect: false,
       accentVelocity: 0.5,
       accentMod: 0.4,
       register: { octave: 5 },
@@ -240,6 +242,7 @@ describe('arp sequencer normalisation (#705)', () => {
       probability: 1,
       restsSound: false,
       octaveMode: true,
+      chancePerEffect: true,
       seed: 9,
     };
     const full = sequencer(written);

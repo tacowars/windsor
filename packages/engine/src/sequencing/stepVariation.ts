@@ -1,23 +1,27 @@
 /**
- * Step variation (windsor#935, record `2026-10-24-step-variation`): the pure
- * maths the Grid and the Arp run to vary a step, and the check their configs
- * run over its four fields. The sequencers own what a step plays; this file
- * owns the draws and what they mean.
+ * Step variation (windsor#935, record `2026-10-24-step-variation`; windsor#945,
+ * record `2026-10-24-step-variation-velocity-and-chance`): the pure maths the
+ * Grid and the Arp run to vary a step, and the check their configs run over
+ * its five fields. The sequencers own what a step plays; this file owns the
+ * draws and what they mean.
  *
  * - **The draws.** Whenever Randomness and Probability are both above 0,
  *   each step makes `STEP_VARIATION_DRAWS` draws from the part's variation
- *   stream, whatever it plays, so an edit to one step, either switch or
- *   either knob never moves another step's draws. At either amount 0 nothing
- *   is drawn.
- * - **The gate.** The first draw: under Probability the step varies at
- *   strength Randomness (`variationAt` hands back its draws), otherwise it
- *   plays as written (null).
+ *   stream, whatever it plays, so an edit to one step, any switch or either
+ *   knob never moves another step's draws. At either amount 0 nothing is
+ *   drawn.
+ * - **The rolls against Chance.** With `chancePerEffect` off, the first draw
+ *   decides: under Probability every effect varies at strength Randomness
+ *   (`variationAt` hands back its draws), otherwise the step plays as
+ *   written (null). With it on, the flip, velocity, pitch and gate each roll
+ *   on a draw of their own, and an effect whose roll fails is left out of
+ *   the step's draws, so it plays as written.
  * - **A normal value** is one uniform draw through the inverse normal CDF
  *   (`inverseNormalCdf`, Acklam's rational approximation), the draw first
  *   mapped into `[zTail, 1 − zTail]` (`boundedNormal`), so `|z|` stays under
  *   about 2.66: a bounded bell, never a rare far-out value.
  * - **What a varied step does with them** is in the helpers below: a
- *   velocity under 1 (`variedVelocity`), an octave shift (`octaveShift`,
+ *   velocity offset, up or down (`variedVelocity`), an octave shift (`octaveShift`,
  *   `shiftOctaveWithin`), a borrow offset (`jumpOffset`), a gate
  *   (`variedGate`) and, with Rests sound on, a flip between note and rest
  *   (`flips`).
@@ -33,7 +37,7 @@ import {
   type StepVariationTable,
 } from './stepVariationConstants';
 
-/** The four per-part fields a Grid and an Arp carry. */
+/** The five per-part fields a Grid and an Arp carry. */
 export interface StepVariationConfig {
   /** How far a varied step strays, 0–1. */
   readonly randomness: number;
@@ -43,9 +47,14 @@ export interface StepVariationConfig {
   readonly restsSound: boolean;
   /** Whether a varied pitch moves by whole octaves of its own note rather than borrowing another's. */
   readonly octaveMode: boolean;
+  /** Whether each effect rolls Probability on its own draw rather than one roll deciding them all (windsor#945). */
+  readonly chancePerEffect: boolean;
 }
 
-/** Both amounts in 0–1 and both switches booleans: what the normaliser makes a document meet. */
+/** The switches: each a boolean. */
+const SWITCHES = ['restsSound', 'octaveMode', 'chancePerEffect'] as const;
+
+/** Both amounts in 0–1 and every switch a boolean: what the normaliser makes a document meet. */
 export function assertStepVariation(config: StepVariationConfig): void {
   for (const field of ['randomness', 'probability'] as const) {
     const value = config[field];
@@ -53,7 +62,7 @@ export function assertStepVariation(config: StepVariationConfig): void {
       throw new RangeError(`${field} must be in [0, 1], got ${value}`);
     }
   }
-  for (const field of ['restsSound', 'octaveMode'] as const) {
+  for (const field of SWITCHES) {
     if (typeof config[field] !== 'boolean') throw new RangeError(`${field} must be a boolean`);
   }
 }
@@ -111,31 +120,47 @@ export function boundedNormal(u: number, tail = STEP_VARIATION_TABLE.zTail): num
   return inverseNormalCdf(tail + u * (1 - 2 * tail));
 }
 
-/** One varied step's draws: the flip's uniform value and three normal values. */
+/**
+ * One varied step's draws: the flip's uniform value and three normal values,
+ * each absent where that effect's roll failed (`chancePerEffect` on), so it
+ * plays as written.
+ */
 export interface StepDraw {
-  readonly flip: number;
-  readonly velocity: number;
-  readonly pitch: number;
-  readonly gate: number;
+  readonly flip?: number | undefined;
+  readonly velocity?: number | undefined;
+  readonly pitch?: number | undefined;
+  readonly gate?: number | undefined;
 }
 
 /**
- * One step's draws. Both amounts above 0: the step draws its fixed set and
- * hands back its draws when the first fell under Probability, null when it
- * plays as written. Either amount 0: nothing is drawn, and null.
+ * One step's draws. Both amounts above 0: the step draws its fixed set, in
+ * `STEP_VARIATION_DRAWS`'s order, and hands back what varies. With
+ * `chancePerEffect` off that is every value when the first draw fell under
+ * Probability; with it on, each value whose own roll did (the flip's is the
+ * first draw). Null when nothing varies; either amount 0 draws nothing, and
+ * null.
  */
 export function variationAt(
   rng: Rng,
-  config: Pick<StepVariationConfig, 'randomness' | 'probability'>,
+  config: Pick<StepVariationConfig, 'randomness' | 'probability' | 'chancePerEffect'>,
   table: StepVariationTable = STEP_VARIATION_TABLE,
 ): StepDraw | null {
   if (!(config.randomness > 0 && config.probability > 0)) return null;
-  const varies = rng() < config.probability;
+  const passes = (u: number): boolean => u < config.probability;
+  const first = passes(rng());
   const flip = rng();
   const velocity = boundedNormal(rng(), table.zTail);
   const pitch = boundedNormal(rng(), table.zTail);
   const gate = boundedNormal(rng(), table.zTail);
-  return varies ? { flip, velocity, pitch, gate } : null;
+  const rolls = { velocity: passes(rng()), pitch: passes(rng()), gate: passes(rng()) };
+  if (!config.chancePerEffect) return first ? { flip, velocity, pitch, gate } : null;
+  if (!(first || rolls.velocity || rolls.pitch || rolls.gate)) return null;
+  return {
+    flip: first ? flip : undefined,
+    velocity: rolls.velocity ? velocity : undefined,
+    pitch: rolls.pitch ? pitch : undefined,
+    gate: rolls.gate ? gate : undefined,
+  };
 }
 
 /** `x` rounded to the nearest whole, halves away from 0, so a shift up and one down are mirror images. */
@@ -155,32 +180,33 @@ export function flips(
   localStep: number,
   table: StepVariationTable = STEP_VARIATION_TABLE,
 ): boolean {
-  if (!config.restsSound) return false;
+  if (!config.restsSound || draw.flip === undefined) return false;
   const onBeat = ((localStep % table.onBeatEvery) + table.onBeatEvery) % table.onBeatEvery === 0;
   return draw.flip < (onBeat ? table.flipOnbeat : table.flipOffbeat) * config.randomness;
 }
 
-/** A varied step's velocity, a fraction of the part's: `1 + z·σ` within `[velocityFloor, 1]`; undefined at 1. */
+/**
+ * A varied step's velocity offset, in the part's velocity units, up or down:
+ * `z × velocitySigma × randomness`; undefined at 0 or where velocity's roll
+ * failed. The part adds it to its velocity and holds the sum in
+ * `[velocityFloor, 1]` (`partNoteOn`).
+ */
 export function variedVelocity(
   draw: StepDraw,
   randomness: number,
   table: StepVariationTable = STEP_VARIATION_TABLE,
 ): number | undefined {
-  const velocity = clamp(
-    1 + draw.velocity * table.velocitySigma * randomness,
-    table.velocityFloor,
-    1,
-  );
-  return velocity < 1 ? velocity : undefined;
+  if (draw.velocity === undefined) return undefined;
+  return draw.velocity * table.velocitySigma * randomness || undefined;
 }
 
-/** With Octave on, the whole octaves a varied pitch moves by: `z × octaveSigma × randomness`, rounded. */
+/** With Octave on, the whole octaves a varied pitch moves by: `z × octaveSigma × randomness`, rounded; 0 where pitch's roll failed. */
 export function octaveShift(
   draw: StepDraw,
   randomness: number,
   table: StepVariationTable = STEP_VARIATION_TABLE,
 ): number {
-  return roundSymmetric(draw.pitch * table.octaveSigma * randomness);
+  return roundSymmetric((draw.pitch ?? 0) * table.octaveSigma * randomness);
 }
 
 /** `note` moved by `octaves`, or by the nearest number of octaves that keeps it inside MIDI 0–`max`. */
@@ -192,8 +218,9 @@ export function shiftOctaveWithin(note: number, octaves: number, max = MIDI_NOTE
 
 /**
  * With Octave off, how many places along a line of `count` a varied pitch
- * borrows from: `z × sigma × count × randomness`, rounded. `sigma` is the
- * Grid's `stepJumpSigma` or the Arp's `listJumpSigma`.
+ * borrows from: `z × sigma × count × randomness`, rounded; 0 where pitch's
+ * roll failed. `sigma` is the Grid's `stepJumpSigma` or the Arp's
+ * `listJumpSigma`.
  */
 export function jumpOffset(
   draw: StepDraw,
@@ -201,10 +228,10 @@ export function jumpOffset(
   count: number,
   sigma: number,
 ): number {
-  return roundSymmetric(draw.pitch * sigma * count * randomness);
+  return roundSymmetric((draw.pitch ?? 0) * sigma * count * randomness);
 }
 
-/** A varied Arp gate: `gate + z × gateSigma × randomness` within `[floor, 1]`. */
+/** A varied Arp gate: `gate + z × gateSigma × randomness` within `[floor, 1]`; `gate` itself where gate's roll failed. */
 export function variedGate(
   gate: number,
   draw: StepDraw,
@@ -212,6 +239,7 @@ export function variedGate(
   table: StepVariationTable = STEP_VARIATION_TABLE,
   floor = GATE_MIN,
 ): number {
+  if (draw.gate === undefined) return gate;
   return clamp(gate + draw.gate * table.gateSigma * randomness, floor, 1);
 }
 

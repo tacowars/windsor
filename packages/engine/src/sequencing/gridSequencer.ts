@@ -27,15 +27,19 @@
  * minted there from `hashSeed(seed, regionIndex)` (`enter`); a single ∞
  * region free-runs.
  *
- * Step variation (windsor#935, record `2026-10-24-step-variation`,
- * `stepVariation.ts`): with Randomness and Probability both above 0, every
- * step makes its fixed draws, tie and rest included, and a step whose gate
- * draw falls under Probability varies. A varied note plays a velocity under
- * the part's, and a pitch either moved by whole octaves (Octave on) or
- * borrowed from the step a normal offset away, wrapping over `length`, the
- * nearest note step when that one is a rest or a tie. With Rests sound on it
- * may flip: a note rests, and a rest sounds the nearest note step's degree
- * and octave with no accent, slide or ratchet. A tie never varies.
+ * Step variation (windsor#935, record `2026-10-24-step-variation`; windsor#945,
+ * record `2026-10-24-step-variation-velocity-and-chance`; `stepVariation.ts`):
+ * with Randomness and Probability both above 0, every step makes its fixed
+ * draws, tie and rest included, and a step whose roll falls under
+ * Probability varies: one roll for everything, or with `chancePerEffect` on
+ * one roll per effect, an effect whose roll fails playing as written. A
+ * varied note carries a velocity offset about the part's velocity, up or
+ * down, and a pitch either moved by whole octaves (Octave on) or borrowed
+ * from the step a normal offset away, wrapping over `length`, the nearest
+ * note step when that one is a rest or a tie. With Rests sound on it may
+ * flip: a note rests, and a rest sounds the nearest note step's degree and
+ * octave with no accent, slide or ratchet. A tie never varies. The Grid has
+ * no gate to vary, so it draws a gate value and roll it never reads.
  *
  * Step modulation lanes (windsor#17, `stepModLanes.ts`): a note step's
  * note-on carries the lanes' offsets at that step, held for the note's life;
@@ -334,8 +338,8 @@ export class GridSequencer {
         : written;
     if (step.kind !== 'note') return this.restStep(event);
     const pitch = draw ? this.variedPitch(config, step, index, draw) : this.pitchOf(step);
-    const velocity = draw ? variedVelocity(draw, config.randomness, this.variation) : undefined;
-    return this.noteStep(event, step, index, pitch, velocity);
+    const offset = draw ? variedVelocity(draw, config.randomness, this.variation) : undefined;
+    return this.noteStep(event, step, index, pitch, offset);
   }
 
   /** A note step's own pitch, at the part's register. */
@@ -372,7 +376,7 @@ export class GridSequencer {
     step: GridNoteStep,
     index: number,
     pitch: GridPitch,
-    velocity: number | undefined,
+    velocityOffset: number | undefined,
   ): NoteEvent[] {
     const { note } = pitch;
     const slide = step.slide && this.held !== null;
@@ -385,7 +389,7 @@ export class GridSequencer {
       note,
       degree: pitch.degree,
     };
-    if (velocity !== undefined) on.velocity = velocity;
+    if (velocityOffset !== undefined) on.velocityOffset = velocityOffset;
     if (step.accent) {
       on.accent = { velocity: this.current.accentVelocity, mod: this.current.accentMod };
     }

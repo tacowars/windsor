@@ -19,10 +19,18 @@ export interface NoteOnEvent {
   degree: number;
   /**
    * A Figure cell's velocity (windsor#485): the fraction of the part's
-   * velocity the note plays at, before an accent's bump. Absent is 1, which
-   * every other generator sends.
+   * velocity the note plays at, before an accent's bump. Absent is 1. The
+   * Grid and the Arp never send it: a varied step sends `velocityOffset`.
    */
   velocity?: number;
+  /**
+   * A varied Grid or Arp step's velocity offset (windsor#945, record
+   * `2026-10-24-step-variation-velocity-and-chance`), in the part's velocity
+   * units, up or down: the part plays its velocity plus the offset, held in
+   * `[velocityFloor, 1]`, before an accent's bump (`partNoteOn`). Absent is
+   * 0, with no floor.
+   */
+  velocityOffset?: number;
   /**
    * A grid accent (#602): the bump to add to the part's velocity, and the
    * per-note mod value the voice adds to the wheel. Absent on a plain note.

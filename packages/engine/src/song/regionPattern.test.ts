@@ -36,6 +36,7 @@ const GRID_PATTERN: RegionPattern = {
   probability: 0.5,
   restsSound: true,
   octaveMode: true,
+  chancePerEffect: true,
   accentVelocity: 0.8,
   accentMod: 0.2,
   register: { octave: 3 },

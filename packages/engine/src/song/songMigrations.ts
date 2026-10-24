@@ -163,15 +163,15 @@ const tapeMotionOnSquareLaw = (doc: RawDocument): RawDocument => doc;
  */
 const delayLoopRebuilt = (doc: RawDocument): RawDocument => everyInsert(doc, upgradeDelayEntry);
 
-/** The sequencer kinds whose Skip step variation replaced (windsor#935). */
-const SKIPLESS_KINDS: readonly unknown[] = ['grid', 'arp'];
+/** The sequencer kinds that carry step variation, whose Skip it replaced (windsor#935). */
+const VARIATION_KINDS: readonly unknown[] = ['grid', 'arp'];
 
-const isSkipless = (spec: unknown): spec is Record<string, unknown> =>
-  isRecord(spec) && SKIPLESS_KINDS.includes(spec['kind']);
+const isVariationKind = (spec: unknown): spec is Record<string, unknown> =>
+  isRecord(spec) && VARIATION_KINDS.includes(spec['kind']);
 
 /** A Grid or Arp spec without its `skipChance`; any other value as it is. A rack's sequencer upgrades through it too (`rackMigrations.ts`). */
 export function withoutSkip(spec: unknown): unknown {
-  if (!isSkipless(spec) || !Object.hasOwn(spec, 'skipChance')) return spec;
+  if (!isVariationKind(spec) || !Object.hasOwn(spec, 'skipChance')) return spec;
   const out = { ...spec };
   delete out['skipChance'];
   return out;
@@ -179,7 +179,7 @@ export function withoutSkip(spec: unknown): unknown {
 
 /** A region with its own Grid or Arp pattern's `skipChance` deleted. */
 const regionWithoutSkip = (region: unknown): unknown =>
-  isRecord(region) && isSkipless(region['pattern'])
+  isRecord(region) && isVariationKind(region['pattern'])
     ? { ...region, pattern: withoutSkip(region['pattern']) }
     : region;
 
@@ -191,7 +191,7 @@ const isSkipLane = (lane: unknown): boolean =>
 function partWithoutSkip(part: unknown): unknown {
   if (!isRecord(part)) return part;
   const out: Record<string, unknown> = { ...part };
-  if (isSkipless(part['sequencer'])) {
+  if (isVariationKind(part['sequencer'])) {
     out['sequencer'] = withoutSkip(part['sequencer']);
     if (Array.isArray(part['automation'])) {
       out['automation'] = part['automation'].filter((lane) => !isSkipLane(lane));
@@ -215,8 +215,46 @@ const skipReplacedByVariation = (doc: RawDocument): RawDocument =>
     ? { ...doc, parts: eachOf(doc['parts'], partWithoutSkip) }
     : doc;
 
+/** A Grid or Arp spec with `chancePerEffect` off where it has none; any other value as it is. A rack's sequencer upgrades through it too (`rackMigrations.ts`). */
+export const withOneRoll = (spec: unknown): unknown =>
+  isVariationKind(spec) && !Object.hasOwn(spec, 'chancePerEffect')
+    ? { ...spec, chancePerEffect: false }
+    : spec;
+
+/** A region with `chancePerEffect` off on its own Grid or Arp pattern. */
+const regionWithOneRoll = (region: unknown): unknown =>
+  isRecord(region) && isVariationKind(region['pattern'])
+    ? { ...region, pattern: withOneRoll(region['pattern']) }
+    : region;
+
+/** One part with `chancePerEffect` off on its Grid or Arp sequencer and its regions' patterns of either kind. */
+function partWithOneRoll(part: unknown): unknown {
+  if (!isRecord(part)) return part;
+  const out: Record<string, unknown> = { ...part };
+  if (isVariationKind(part['sequencer'])) out['sequencer'] = withOneRoll(part['sequencer']);
+  if (Array.isArray(part['regions'])) out['regions'] = part['regions'].map(regionWithOneRoll);
+  return out;
+}
+
 /**
- * Eight upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10, 15 → 16, 17 → 18 and 18 → 19, and none from
+ * Version 19 → 20 (windsor#945, record
+ * `2026-10-24-step-variation-velocity-and-chance`): a varied step's velocity
+ * became an offset in the part's velocity units, which strays up as well as
+ * down, and every varied step makes eight draws where it made five, so a
+ * version-19 song with Vary and Chance above 0 plays a different, still
+ * repeatable, variation. No upgrade can replay the old one. Every Grid or
+ * Arp sequencer, and every region pattern of either kind, gains
+ * `chancePerEffect: false`, one roll deciding a step as before; nothing else
+ * changes. A version-19 snapshot already holds the current patch format, so
+ * `patches` is not touched.
+ */
+const oneRollPerStep = (doc: RawDocument): RawDocument =>
+  Array.isArray(doc['parts']) || isRecord(doc['parts'])
+    ? { ...doc, parts: eachOf(doc['parts'], partWithOneRoll) }
+    : doc;
+
+/**
+ * Nine upgrades ship, 5 → 6, 6 → 7, 7 → 8, 8 → 9, 9 → 10, 15 → 16, 17 → 18, 18 → 19 and 19 → 20, and none from
  * 16 to 17 (windsor#842: operator feedback runs to 10 and a feedback step's
  * span is 5, so an old song's step offsets on feedback play five times
  * deeper; tacowars keeps no song to carry, record
@@ -246,6 +284,7 @@ export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {
   15: tapeMotionOnSquareLaw,
   17: delayLoopRebuilt,
   18: skipReplacedByVariation,
+  19: oneRollPerStep,
 };
 
 /** The tables `upgradeSong` runs; a test hands its own. */

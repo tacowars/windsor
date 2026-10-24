@@ -146,11 +146,11 @@ describe('the velocity table (decision 4), its accents written as `accent` (wind
 });
 
 describe('the Arp that never repeats (decision 5’s second example)', () => {
-  it('rests seventeen onsets of 64 and plays the 47 others', () => {
+  it('rests sixteen onsets of 64 and plays the 48 others', () => {
     const varied = { randomness: 1, probability: 0.5, restsSound: true };
     const arp: ArpSpec = { kind: 'arp', ...DEFAULT_ARP_CONFIG, ...varied, seed: 0 };
     const { notes } = render(bounceSong(arp));
-    expect(notes).toHaveLength(47);
+    expect(notes).toHaveLength(48);
     const onsets = new Set(notes.map((note) => note.tick));
     const bars = [0, 1, 2, 3].map((bar) =>
       Array.from({ length: 16 }, (_, i) =>
@@ -158,7 +158,7 @@ describe('the Arp that never repeats (decision 5’s second example)', () => {
       ).join(''),
     );
     expect(bars.join('   ')).toBe(
-      'xx......xx......   xxx...x....x.xxx   .x....x.......xx   ..........x.....',
+      'xx...x....x..x..   ...x......x.....   ..xxx..........x   ...x...x....xx.x',
     );
   });
 });

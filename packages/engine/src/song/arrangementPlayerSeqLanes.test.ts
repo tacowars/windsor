@@ -77,6 +77,7 @@ describe('sequencer lanes in the player', () => {
       probability: 0,
       restsSound: true,
       octaveMode: false,
+      chancePerEffect: false,
       accentVelocity: 0,
       accentMod: 0,
       register: { octave: 4 },

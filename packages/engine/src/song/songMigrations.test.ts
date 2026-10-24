@@ -81,8 +81,8 @@ const PAST_TEN = {
 };
 
 describe('upgradeSong', () => {
-  it('ships eight upgrades, 5 → 6 to 9 → 10, 15 → 16, 17 → 18 and 18 → 19, and none to 11, 12, 13, 14, 15 or 17: versions 2, 3 and 4 were retired without one', () => {
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15', '17', '18']);
+  it('ships nine upgrades, 5 → 6 to 9 → 10, 15 → 16, 17 → 18, 18 → 19 and 19 → 20, and none to 11, 12, 13, 14, 15 or 17: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5', '6', '7', '8', '9', '15', '17', '18', '19']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {

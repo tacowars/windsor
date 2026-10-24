@@ -75,9 +75,11 @@ const PLAIN = [0, 1, 2, 3, 4, 5, 6, 7].map((d) => gridNote(d));
 describe('parity and the stream', () => {
   it('at Randomness 0 or Probability 0 emits exactly what a plain line does, event for event', () => {
     const plain = drive(make(LINE), 64);
-    const switches = { restsSound: true, octaveMode: true, seed: 5 };
-    expect(drive(make(LINE, { ...switches, randomness: 0, probability: 1 }), 64)).toEqual(plain);
-    expect(drive(make(LINE, { ...switches, randomness: 1, probability: 0 }), 64)).toEqual(plain);
+    for (const chancePerEffect of [false, true]) {
+      const switches = { restsSound: true, octaveMode: true, chancePerEffect, seed: 5 };
+      expect(drive(make(LINE, { ...switches, randomness: 0, probability: 1 }), 64)).toEqual(plain);
+      expect(drive(make(LINE, { ...switches, randomness: 1, probability: 0 }), 64)).toEqual(plain);
+    }
   });
 
   it('plays the same for the same seed and region, and replays on re-entry', () => {
@@ -138,7 +140,7 @@ describe('the rhythm', () => {
 });
 
 describe('the draws never move with an edit', () => {
-  const traits = (on: NoteOnEvent | null) => on && { note: on.note, velocity: on.velocity };
+  const traits = (on: NoteOnEvent | null) => on && { note: on.note, offset: on.velocityOffset };
 
   it('editing one step leaves every other step as it played', () => {
     const over = { ...FULL, octaveMode: true, seed: 6 };
@@ -147,6 +149,31 @@ describe('the draws never move with an edit', () => {
     const b = byStep(drive(make(edited, over), 800), 800);
     for (let s = 0; s < 800; s++) {
       if (s % 8 !== 3) expect(traits(b[s]!), `step ${s}`).toEqual(traits(a[s]!));
+    }
+  });
+
+  it('at Chance 1 every roll passes, so Chance per effect on plays as off', () => {
+    const over = { ...FULL, restsSound: true, seed: 6 };
+    const off = drive(make(LINE, over), 400);
+    expect(drive(make(LINE, { ...over, chancePerEffect: true }), 400)).toEqual(off);
+  });
+
+  it('toggling Chance per effect or moving a knob mid-run leaves every later step as it would play', () => {
+    const settled = { ...FULL, chancePerEffect: true, seed: 6 };
+    const whole = byStep(drive(make(PLAIN, settled), 800), 800);
+    for (const before of [{ chancePerEffect: false }, { randomness: 0.3, probability: 0.4 }]) {
+      const seq = make(PLAIN, { ...settled, ...before });
+      drive(seq, 400);
+      seq.reconfigure({ ...seq.config, ...settled });
+      const events: NoteEvent[] = [];
+      for (let step = 400; step < 800; step++) {
+        const tick = step * STEP;
+        const at = { tick, step, bar: 0, tickInBar: 0, seconds: 0, secondsPerTick: 0, time: 0 };
+        events.push(...seq.handleTick(at));
+      }
+      const later = byStep(events, 800);
+      for (let s = 400; s < 800; s++)
+        expect(traits(later[s]!), `step ${s}`).toEqual(traits(whole[s]!));
     }
   });
 
@@ -163,7 +190,8 @@ describe('the borrow, Octave off', () => {
   it('a line of one step plays its own pitch, at a varied velocity', () => {
     const ons = onsOf(drive(make([gridNote(2)], { ...FULL, seed: 3 }), 64));
     expect(new Set(ons.map((e) => e.note))).toEqual(new Set([51]));
-    expect(ons.some((e) => e.velocity !== undefined)).toBe(true);
+    expect(ons.some((e) => e.velocityOffset !== undefined)).toBe(true);
+    expect(ons.every((e) => e.velocity === undefined)).toBe(true);
   });
 
   it('a line with no note steps keeps its rests', () => {

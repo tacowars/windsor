@@ -97,6 +97,7 @@ const ARP: MusicPart & { sequencer: GridSpec } = {
     probability: 0.6,
     restsSound: true,
     octaveMode: false,
+    chancePerEffect: true,
     accentVelocity: 0.2,
     accentMod: 0.5,
     // D4 = 62: the same notes the fixture sounded when the register was root-relative.

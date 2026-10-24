@@ -13,7 +13,7 @@
 import type { FormatRefusal, MigrationTable } from '../song/formatUpgrade';
 import { formatRefusal, runUpgrades } from '../song/formatUpgrade';
 import { PATCH_FILE_FORMAT, upgradePatch } from '../patch/patchMigrations';
-import { withoutSkip } from '../song/songMigrations';
+import { withOneRoll, withoutSkip } from '../song/songMigrations';
 import { RACK_FILE_FORMAT } from './rackConstants';
 
 type RawFile = Record<string, unknown>;
@@ -35,9 +35,23 @@ const integerOrNull = (value: unknown): number | null =>
 const skipReplacedByVariation = (file: RawFile): RawFile =>
   Object.hasOwn(file, 'sequencer') ? { ...file, sequencer: withoutSkip(file['sequencer']) } : file;
 
+/**
+ * Format 2 → 3 (windsor#945, record
+ * `2026-10-24-step-variation-velocity-and-chance`): a varied step's velocity
+ * became an offset that strays up as well as down, and every varied step
+ * makes eight draws where it made five, so a format-2 rack with Vary and
+ * Chance above 0 plays a different, still repeatable, variation, which no
+ * upgrade can replay. A rack's Grid or Arp sequencer gains
+ * `chancePerEffect: false`, one roll deciding a step as before, as
+ * `SONG_MIGRATIONS[19]` does for a song's; nothing else changes.
+ */
+const oneRollPerStep = (file: RawFile): RawFile =>
+  Object.hasOwn(file, 'sequencer') ? { ...file, sequencer: withOneRoll(file['sequencer']) } : file;
+
 /** `table[n]` upgrades a rack file at format `n` to `n + 1`. No entry is ever required. */
 export const RACK_MIGRATIONS: MigrationTable<RawFile> = {
   1: skipReplacedByVariation,
+  2: oneRollPerStep,
 };
 
 /** A rack file refused for its format; the message names the file, the format found and the one read. */

@@ -7,7 +7,7 @@
  *
  * A file is
  *
- *     { "format": 2, "kind": "rack", "name", "category", "tags": [],
+ *     { "format": 3, "kind": "rack", "name", "category", "tags": [],
  *       "description", "patchFormat": 4, "patch": { … }, "patchSource"?,
  *       "lowCut"?, "sequencer"?: { "kind", … }, "inserts": [ … ] }
  *
