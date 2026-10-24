@@ -5,8 +5,8 @@
  *
  * Cell `k` shapes the `k`-th note of the style's cycle, not a fixed pitch,
  * so a cell has no degree: it is a rest, a tie, or a note with an octave
- * shift, an accent, a slide and a ratchet (windsor#366), as a grid step is
- * without its degree. The
+ * shift, an accent, a slide, a ratchet (windsor#366) and a gate
+ * (windsor#933), as a grid step is without its degree. The
  * grid always stores `ARP_STEPS_MAX` cells; the cycle over the chord under
  * the playhead reads the first `arpCycleLength(style, L)` of them, and the
  * cells past it wait, as the grid keeps steps past its length.
@@ -14,7 +14,7 @@
  * The arpeggiator plays the cells (windsor#129, `arpCellPlay.ts`); a new
  * arp, every cell a plain note, sounds as it did before the grid.
  */
-import { GRID_STEP_OCTAVE_MAX } from '../audioConstants';
+import { GATE_MIN, GRID_STEP_OCTAVE_MAX } from '../audioConstants';
 import { ARP_BOUNCE_STYLES, ARP_STEPS_MAX } from './arpStepConstants';
 import type { ArpStyle } from './arpSequencer';
 import { GRID_STEP_KINDS, assertRatchet } from './gridSequencer';
@@ -28,6 +28,13 @@ export interface ArpNoteStep {
   readonly slide: boolean;
   /** Hits the cell's roll plays, 1 to `RATCHET_MAX` (windsor#366); absent is one. */
   readonly ratchet?: number;
+  /**
+   * The cell's gate (windsor#933), in `[GATE_MIN, 1]`: it scales the part's
+   * gate as a Figure cell's velocity scales the part's velocity
+   * (`arpPlayedGate`). Absent is 1. Basslead's steps share the type and
+   * ignore it.
+   */
+  readonly gate?: number;
 }
 
 export type ArpStep = { readonly kind: 'rest' } | { readonly kind: 'tie' } | ArpNoteStep;
@@ -65,7 +72,7 @@ export interface ArpGridFields {
   readonly skipChance: number;
 }
 
-/** One cell: a known kind, and a note's octave and ratchet in range. Basslead's steps share it (windsor#367). */
+/** One cell: a known kind, and a note's octave, ratchet and gate in range. Basslead's steps share it (windsor#367). */
 export function assertCell(step: ArpStep, index: number): void {
   if (!(GRID_STEP_KINDS as readonly string[]).includes(step.kind)) {
     throw new RangeError(`steps[${index}].kind must be one of ${GRID_STEP_KINDS.join('|')}`);
@@ -77,6 +84,9 @@ export function assertCell(step: ArpStep, index: number): void {
     );
   }
   assertRatchet(step.ratchet, `steps[${index}]`);
+  if (step.gate !== undefined && !(step.gate >= GATE_MIN && step.gate <= 1)) {
+    throw new RangeError(`steps[${index}].gate must be in [${GATE_MIN}, 1], got ${step.gate}`);
+  }
 }
 
 function assertUnit(value: number, name: string): void {

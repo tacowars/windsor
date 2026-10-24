@@ -16,9 +16,14 @@
  * - **Tie:** no note-on; the held note carries on through the step. With
  *   nothing held it plays nothing.
  * - **Rest:** releases the held note and plays nothing.
- * - **Gate:** the note sounding after an onset releases at `gate` of this
- *   step, unless the next cell in the cycle is a tie or a slide
- *   (`holdsToNext`); then it runs to that onset. The look-ahead reads the
+ * - **Gate:** the note sounding after an onset releases at its played gate
+ *   of this step: the part's gate (the Gate knob, or the `seq.gate` lane
+ *   where one plays) times the cell's own `gate` (windsor#933), floored at
+ *   `GATE_MIN` (`arpPlayedGate`). It reaches `playArpCell` on the onset, so
+ *   the Figure, which plays its cells here too and sets none, keeps the
+ *   part's gate. The note runs to the next onset instead when the played
+ *   gate covers the step, or when the next cell in the cycle is a tie or a
+ *   slide (`holdsToNext`), whatever the gate. The look-ahead reads the
  *   next cell's kind only, so a skip drawn there later is a rest that
  *   releases the note at its own onset. It reads the current cycle, so at a
  *   chord change the next onset may play another cell (`arpeggiator.ts`,
@@ -36,7 +41,7 @@
  *
  * Pure: no clock, no graph. `generatorBoundary.test.ts` holds it there.
  */
-import { MIDI_NOTE_MAX } from '../audioConstants';
+import { GATE_MIN, MIDI_NOTE_MAX } from '../audioConstants';
 import type { ArpSequencerConfig } from './arpSequencer';
 import { ARP_SKIP_STREAM_SALT, UINT32_SPAN } from './arpStepConstants';
 import { arpNote, type ArpStep } from './arpSteps';
@@ -98,6 +103,15 @@ export function strikeCell(cell: ArpStep): ArpStep {
   return cell;
 }
 
+/**
+ * The gate a cell plays at (windsor#933): the part's gate times the cell's,
+ * floored at `floor`. A cell with no gate plays the part's gate as it is.
+ */
+export function arpPlayedGate(partGate: number, cell: ArpStep, floor = GATE_MIN): number {
+  if (cell.kind !== 'note' || cell.gate === undefined) return partGate;
+  return Math.max(floor, partGate * cell.gate);
+}
+
 /** One onset as the arpeggiator hands it over, the walk and the skip already resolved. */
 export interface ArpOnset {
   readonly tick: number;
@@ -114,6 +128,8 @@ export interface ArpOnset {
   readonly held: number | null;
   /** The next cell in the cycle is a tie or a slide (`holdsToNext`). */
   readonly holdsOn: boolean;
+  /** The gate the note sounding after this onset plays at (`arpPlayedGate`); absent is the config's. */
+  readonly gate?: number;
 }
 
 /** What an onset emits and leaves sounding: the held note and the local tick its gate releases it, null to run to the next onset. */
@@ -128,9 +144,10 @@ export type ArpCellConfig = Pick<
   'gate' | 'divisor' | 'accentVelocity' | 'accentMod' | 'lanes'
 >;
 
-/** Where the note sounding after `onset` releases: `gate` of its step, or the next onset when a tie or slide follows. */
+/** Where the note sounding after `onset` releases: its gate of the step, or the next onset when a tie or slide follows. */
 function releaseAt(onset: ArpOnset, config: ArpCellConfig): number | null {
-  const gateTicks = Math.max(1, Math.round(config.gate * config.divisor));
+  const gate = onset.gate ?? config.gate;
+  const gateTicks = Math.max(1, Math.round(gate * config.divisor));
   return onset.holdsOn || gateTicks >= config.divisor ? null : onset.tick + gateTicks;
 }
 

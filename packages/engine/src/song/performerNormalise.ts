@@ -6,13 +6,14 @@
  * / `assertBassConfig` by construction.
  *
  * The arp's step grid (windsor#127) takes the grid's rules: a cell as a grid
- * step without its degree, its ratchet included (windsor#366), the grid's lanes, accent and skip ranges. Its
+ * step without its degree, its ratchet included (windsor#366), plus a gate
+ * of its own (windsor#933), and the grid's lanes, accent and skip ranges. Its
  * cells are always exactly `ARP_STEPS_MAX`: an absent list is every cell a
  * plain note, silently; a short, long or junk one is padded with plain notes
  * or trimmed, reported.
  *
- * Basslead's step strip (windsor#367) takes the same cell and the Grid's
- * list rules: 1–`GRID_STEPS_MAX` steps, a `length` within them, lanes one
+ * Basslead's step strip (windsor#367) takes the same cell, its gate
+ * dropped as an unknown key, and the Grid's list rules: 1–`GRID_STEPS_MAX` steps, a `length` within them, lanes one
  * value per step. A bass written without steps gets one bar of plain notes
  * at its divisor, silently, and plays as it did before the strip.
  */
@@ -97,13 +98,37 @@ function arpSteps(raw: unknown, path: string, n: FieldNormaliser): ArpStep[] {
   );
 }
 
-/** A grid step without its degree: a rest, a tie, or a note with octave, accent, slide and ratchet. */
-function arpStep(raw: unknown, path: string, n: FieldNormaliser): ArpStep {
+/** The keys a note cell carries: Basslead's steps take no gate (windsor#933). */
+const BASS_NOTE_KEYS = ['kind', ...STEP_NOTE_KEYS];
+const ARP_NOTE_KEYS = [...BASS_NOTE_KEYS, 'gate'];
+
+/**
+ * A grid step without its degree: a rest, a tie, or a note with octave,
+ * accent, slide and ratchet, and with `gated` its gate. Basslead's steps
+ * are read without, so a gate on one is dropped as an unknown key.
+ */
+function arpStep(raw: unknown, path: string, n: FieldNormaliser, gated = true): ArpStep {
   const o = n.section(raw, path);
   const kind = n.pick(o.kind, GRID_STEP_KINDS, 'note', `${path}.kind`);
   if (kind !== 'note') return unpitchedStep(o, kind, path, n);
-  n.dropUnknown(o, ['kind', ...STEP_NOTE_KEYS], path);
-  return arpNote(stepNoteFields(o, path, n));
+  n.dropUnknown(o, gated ? ARP_NOTE_KEYS : BASS_NOTE_KEYS, path);
+  const fields = stepNoteFields(o, path, n);
+  return arpNote(gated ? { ...fields, ...cellGate(o.gate, `${path}.gate`, n) } : fields);
+}
+
+/**
+ * An arp cell's gate (windsor#933): absent or 1 leaves no key, so an export
+ * carries no default. A number is clamped to `[GATE_MIN, 1]`, reported, and
+ * anything else is dropped, reported.
+ */
+function cellGate(raw: unknown, path: string, n: FieldNormaliser): { gate?: number } {
+  if (raw === undefined) return {};
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a number — gate dropped`);
+    return {};
+  }
+  const gate = n.num(raw, 1, GATE_MIN, 1, path);
+  return gate < 1 ? { gate } : {};
 }
 
 const BASS_KEYS = [
@@ -178,5 +203,5 @@ function bassSteps(raw: unknown, divisor: number, path: string, n: FieldNormalis
   if (capped.length !== raw.length) {
     n.correction(`${path}: ${raw.length} steps capped to ${GRID_STEPS_MAX}`);
   }
-  return capped.map((step, i) => arpStep(step, `${path}[${i}]`, n));
+  return capped.map((step, i) => arpStep(step, `${path}[${i}]`, n, false));
 }

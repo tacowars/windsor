@@ -7,8 +7,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
+import { GATE_MIN } from '../audioConstants';
 import {
   arpCellIndex,
+  arpPlayedGate,
   arpSkipRng,
   arpSkipSeed,
   holdsToNext,
@@ -115,6 +117,18 @@ describe('skip chance', () => {
   });
 });
 
+describe('arpPlayedGate, a cell’s gate over the part’s (windsor#933)', () => {
+  it('scales the part’s gate by the cell’s, floored at GATE_MIN', () => {
+    expect(arpPlayedGate(0.8, arpNote({ gate: 0.5 }))).toBe(0.4);
+    expect(arpPlayedGate(1, arpNote({ gate: 1 }))).toBe(1);
+    expect(arpPlayedGate(0.02, arpNote({ gate: 0.1 }))).toBe(GATE_MIN);
+  });
+
+  it('a cell with no gate, a tie and a rest play the part’s gate as it is', () => {
+    for (const cell of [arpNote(), TIE, REST]) expect(arpPlayedGate(0.7, cell)).toBe(0.7);
+  });
+});
+
 describe('strikeCell, a cell at a retrigger reset', () => {
   it('turns a tie into a plain note and drops a slide, keeping octave and accent', () => {
     expect(strikeCell({ kind: 'tie' })).toStrictEqual(arpNote());
@@ -145,6 +159,12 @@ describe('playArpCell', () => {
   it('a tie or a slide next holds the note to that onset; gate 1 always runs to it', () => {
     expect(playArpCell(onset({ holdsOn: true }), CONFIG).releaseTick).toBeNull();
     expect(playArpCell(onset(), { ...CONFIG, gate: 1 }).releaseTick).toBeNull();
+  });
+
+  it('the onset’s gate, where it carries one, stands in for the config’s (windsor#933)', () => {
+    expect(playArpCell(onset({ gate: 0.25 }), CONFIG).releaseTick).toBe(24 + 3);
+    expect(playArpCell(onset({ gate: 1 }), CONFIG).releaseTick).toBeNull();
+    expect(playArpCell(onset({ gate: 0.25, holdsOn: true }), CONFIG).releaseTick).toBeNull();
   });
 
   it('an accent carries the part’s accent velocity and mod; an octave shifts the pitch', () => {

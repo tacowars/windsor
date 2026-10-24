@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ARP_OCTAVES_MAX, GRID_STEP_OCTAVE_MAX } from '../audioConstants';
+import { ARP_OCTAVES_MAX, GATE_MIN, GRID_STEP_OCTAVE_MAX } from '../audioConstants';
 import { CHORD_VOICINGS, CHORD_VOICING_IDS } from '../harmony/chordTables';
 import { CHORD_SIZES } from '../harmony/chordTheory';
 import { ARP_STYLES, DEFAULT_ARP_CONFIG, assertArpConfig, type ArpStyle } from './arpSequencer';
@@ -104,6 +104,9 @@ describe('the arp cells (windsor#127)', () => {
       { steps: steps([arpNote({ octave: GRID_STEP_OCTAVE_MAX + 1 })]) },
       { steps: steps([arpNote({ octave: 0.5 })]) },
       { steps: steps([{ kind: 'hold' } as unknown as ArpStep]) },
+      { steps: steps([arpNote({ gate: 0 })]) },
+      { steps: steps([arpNote({ gate: 1.5 })]) },
+      { steps: steps([arpNote({ gate: Number.NaN })]) },
       { lanes: [lane(new Array<number>(ARP_STEPS_MAX - 1).fill(0))] },
       { lanes: [lane(new Array<number>(ARP_STEPS_MAX).fill(2))] },
       { accentVelocity: 1.5 },
@@ -118,7 +121,13 @@ describe('the arp cells (windsor#127)', () => {
     }
     const edited = {
       ...DEFAULT_ARP_CONFIG,
-      steps: steps([{ kind: 'rest' }, { kind: 'tie' }, arpNote({ octave: -2, accent: true })]),
+      steps: steps([
+        { kind: 'rest' },
+        { kind: 'tie' },
+        arpNote({ octave: -2, accent: true }),
+        arpNote({ gate: GATE_MIN }),
+        arpNote({ gate: 1 }),
+      ]),
       lanes: [lane(new Array<number>(ARP_STEPS_MAX).fill(-1))],
       skipChance: 1,
     };
