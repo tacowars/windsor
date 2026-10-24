@@ -1,9 +1,10 @@
 /**
  * The Arp device's tables (windsor#137, epic windsor#126 decision 8; the
- * device, windsor#370): what Randomize draws for each shown cell, and the
- * order of the knob columns. The logic is `arpGridModel.ts`'s
- * `randomArpCells`, which takes the draw table as a parameter defaulting to
- * it, and `arpCard.ts`, which lays the knobs out.
+ * device, windsor#370): what Randomize draws for each shown cell, the Gate
+ * bar's drag (windsor#934), and the order of the knob columns. The logic is
+ * `arpGridModel.ts`'s `randomArpCells` and `dragArpGate`, which take their
+ * table as a parameter defaulting to it, and `arpCard.ts`, which lays the
+ * knobs out.
  */
 import type { SequencerKnobEntry } from './sequencerKnobTables';
 
@@ -38,6 +39,36 @@ export const ARP_RANDOM: ArpRandomTable = {
   octaveDown: 0.5,
   octaveSpan: 1,
   ratchet: 0.125,
+};
+
+/**
+ * The Gate bar's drag (windsor#934 decision 1): the Figure's Vel bar's
+ * (`FIGURE_VEL`).
+ */
+export interface ArpGateBarTable {
+  /** A drag lands on multiples of this. */
+  readonly step: number;
+  /** Pixels of vertical drag from 0 to 1. */
+  readonly dragPx: number;
+  /** Under this many pixels a press is a click, not a drag. */
+  readonly thresholdPx: number;
+  /** The fill's width at a played gate of 1, in percent of the cell. */
+  readonly fullPct: number;
+  /** The places the bar's title reads the played gate to, trailing zeros dropped (0.4, 0.595). */
+  readonly playedPlaces: number;
+}
+
+/**
+ * The Gate bar as the approved mockup draws it
+ * (`docs/design/arp-gate-bar-mockup.html`): an 80 px drag sweeps 0 to 1 in
+ * steps of 0.05, floored at the engine's `GATE_MIN` where it lands.
+ */
+export const ARP_GATE_BAR: ArpGateBarTable = {
+  step: 0.05,
+  dragPx: 80,
+  thresholdPx: 3,
+  fullPct: 100,
+  playedPlaces: 4,
 };
 
 /**

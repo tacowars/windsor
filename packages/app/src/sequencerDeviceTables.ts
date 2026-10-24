@@ -28,8 +28,19 @@ export const ARP_CELL_PX = 20;
 /** The gap between an Arp step column's held rows, in px. */
 export const ARP_ROW_GAP_PX = 4;
 
-/** The Arp's step rows, top down, in px: the step number, `♪ — ·`, Oct, A, S, ratchet. */
+/** The Arp's step rows, top down, in px: the step number, `♪ — ·`, Oct, Gate (windsor#934), A, S, ratchet. */
 export const ARP_HEAD_ROWS_PX: readonly number[] = [
+  12,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  14,
+];
+
+/** Basslead's step rows (windsor#371): the Arp's without Gate, which it does not play (windsor#934 decision 3). */
+export const BASS_HEAD_ROWS_PX: readonly number[] = [
   12,
   ARP_CELL_PX,
   ARP_CELL_PX,
@@ -109,7 +120,7 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--arp-knob-pad': 9,
   /** The Reseed icon button beside the seed field, square. */
   '--arp-reseed': 22,
-  /** An Arp step cell's height: `♪ — ·`, Oct, A and S. */
+  /** An Arp step cell's height: `♪ — ·`, Oct, Gate, A and S. */
   '--arp-cell-h': ARP_CELL_PX,
   /** The space between an Arp step's held rows. */
   '--arp-row-gap': ARP_ROW_GAP_PX,
@@ -117,6 +128,8 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--arp-step-gap': 6,
   /** The Arp's held step rows, which its lane names' corner matches. */
   '--arp-strip-head-h': stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
+  /** Basslead's held step rows: the Arp's cells without the Gate row. */
+  '--bass-strip-head-h': stripHeadPx(BASS_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
   /* The Euclid's own sizes (windsor#393), off tacowars's mockup
      (euclid.html) and laid out as the Arp's: Play inset from the rail, its
      columns apart, a knob strip behind a rule; the rows' cells 22 px. */

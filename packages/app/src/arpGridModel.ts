@@ -15,6 +15,7 @@
  * alone.
  */
 import type {
+  ArpNoteStep,
   ArpSpec,
   ArpStep,
   ArpStyle,
@@ -24,6 +25,7 @@ import type {
 } from '@windsor/engine';
 import {
   ARP_STEPS_MAX,
+  GATE_MIN,
   RATCHET_MAX,
   ScaleSampler,
   arpCellPitch,
@@ -36,7 +38,13 @@ import {
   variationFlipsRests,
   variationMovesPitch,
 } from '@windsor/engine';
-import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
+import {
+  ARP_GATE_BAR,
+  ARP_RANDOM,
+  type ArpGateBarTable,
+  type ArpRandomTable,
+} from './arpGridConstants';
+import { velocityLabel } from './figureModel';
 import {
   type Draw,
   cycleKind,
@@ -109,6 +117,56 @@ export function arpOctaveLabel(octave: number): string {
   if (octave === 0) return 'oct';
   return octave > 0 ? `+${octave}` : `${octave}`;
 }
+
+/** A cell's own gate (windsor#934): a note's, absent is 1; a rest or a tie reads 1. */
+export const arpCellGate = (step: ArpStep): number => (step.kind === 'note' ? (step.gate ?? 1) : 1);
+
+/**
+ * The gate a cell at `cellGate` plays at, as the engine's `arpPlayedGate`
+ * rules it (windsor#933): the part's gate times the cell's, floored at
+ * `GATE_MIN`; a cell at 1 (no gate written) plays the part's gate as it is.
+ * What the Gate bar's fill shows (windsor#934 decision 2).
+ */
+export const arpPlayedGateOf = (partGate: number, cellGate: number, floor = GATE_MIN): number =>
+  cellGate >= 1 ? partGate : Math.max(floor, partGate * cellGate);
+
+/** A gate on the bar's grid: 0 to 1 in steps of `step`, floored at `GATE_MIN`. */
+export function snapArpGate(value: number, table: ArpGateBarTable = ARP_GATE_BAR): number {
+  const snapped = Math.round(Math.max(0, Math.min(1, value)) / table.step) * table.step;
+  return Math.max(GATE_MIN, Number(snapped.toFixed(2)));
+}
+
+/** The gate a vertical drag of `dy` px (up is negative) reaches from `from`. */
+export const dragArpGate = (
+  from: number,
+  dy: number,
+  table: ArpGateBarTable = ARP_GATE_BAR,
+): number => snapArpGate(from - dy / table.dragPx, table);
+
+/**
+ * The cell at gate `gate`, snapped (windsor#934 decision 1); at 1 it
+ * carries no `gate`, as the normaliser writes it. A rest or a tie is
+ * returned as it is.
+ */
+export function setArpGate(step: ArpStep, gate: number): ArpStep {
+  if (step.kind !== 'note') return step;
+  const g = snapArpGate(gate);
+  if (g < 1) return { ...step, gate: g };
+  const full: { -readonly [K in keyof ArpNoteStep]: ArpNoteStep[K] } = { ...step };
+  delete full.gate;
+  return full;
+}
+
+/** What the Gate bar reads: as the Vel bar, `1` at full, else `.5`, `.25`, `.01`. */
+export const arpGateLabel = velocityLabel;
+
+/** The Gate bar's title: the cell's gate, the gate it plays, and the gestures. */
+export const arpGateTitle = (
+  cellGate: number,
+  played: number,
+  table: ArpGateBarTable = ARP_GATE_BAR,
+): string =>
+  `gate ${cellGate.toFixed(2)} (plays ${Number(played.toFixed(table.playedPlaces))}): drag up or down, double-click for 1`;
 
 /**
  * The cells and lanes after Rotate: the first `count` turned `by` places,

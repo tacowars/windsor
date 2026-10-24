@@ -1,8 +1,8 @@
 /**
  * The Arp device's tables (windsor#370 decisions 2, 3 and 5): every knob
- * stands in one column in the mockup's order, and the held step rows leave
- * room for two lanes in the device's one height, so nothing scrolls until a
- * third lane is added.
+ * stands in one column in the mockup's order, and the held step rows, with
+ * the Gate row (windsor#934), leave room for one lane whole in the
+ * device's one height, so the strip scrolls from the second.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -36,21 +36,22 @@ describe('the Arp device’s columns (windsor#370 decision 2)', () => {
   });
 });
 
-describe('the Arp strip’s height (decisions 3 and 5)', () => {
+describe('the Arp strip’s height (decisions 3 and 5; windsor#934 To decide 3)', () => {
   /** The strip's room: the device less its border, the section's padding and its label. */
   const room = px('--seq-h') - 2 - 4 - 6 - 14;
   const lanes = (n: number): number => n * (px('--lane-h') + STRIP_ROW_GAP_PX);
 
-  it('holds the step number, ♪ — ·, Oct, A, S and the 14 px ratchet', () => {
-    expect(ARP_HEAD_ROWS_PX).toHaveLength(6);
+  it('holds the step number, ♪ — ·, Oct, Gate, A, S and the 14 px ratchet', () => {
+    expect(ARP_HEAD_ROWS_PX).toHaveLength(7);
     expect(ARP_HEAD_ROWS_PX.at(-1)).toBe(GRID_HEAD_ROWS_PX.at(-1));
     expect(px('--arp-strip-head-h')).toBe(stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX));
     expect(px('--arp-cell-h')).toBe(ARP_HEAD_ROWS_PX[1]);
   });
 
-  it('fits two lanes under the step rows, and not three', () => {
+  it('fits one lane under the step rows, and not two: the Gate row takes 24 px of the lanes', () => {
     const head = px('--arp-strip-head-h');
-    expect(head + lanes(2)).toBeLessThanOrEqual(room);
-    expect(head + lanes(3)).toBeGreaterThan(room);
+    expect(head).toBe(150);
+    expect(head + lanes(1)).toBeLessThanOrEqual(room);
+    expect(head + lanes(2)).toBeGreaterThan(room);
   });
 });

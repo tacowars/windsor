@@ -2,10 +2,11 @@
  * The Arp device's Cycle section (windsor#137, epic windsor#126; the device,
  * windsor#370, look `docs/research/2026-09-30-sequencer-rack/arp.html`):
  * one column per cell of the arp's cycle, each a note, tie or rest with its
- * octave shift, accent, slide and ratchet held at the top of the strip, the
- * modulation lanes under them, their names, × and readout in a column at the
- * left with **+ Lane** in its corner, the Rotate knob, the Randomize and
- * Reverse buttons and a playhead. `arpCard.ts` places the pieces.
+ * octave shift, Gate bar (windsor#934), accent, slide and ratchet held at
+ * the top of the strip, the modulation lanes under them, their names, ×
+ * and readout in a column at the left with **+ Lane** in its corner, the
+ * Rotate knob, the Randomize and Reverse buttons and a playhead.
+ * `arpCard.ts` places the pieces.
  *
  * The strip shows `arpListCount` cells (`arpGridModel.ts`): one cycle of the
  * style over the chord the card reads, so the device grows and shrinks with
@@ -29,17 +30,19 @@ import type { ArpSpec, ArpStep } from '@windsor/engine';
 import {
   ARP_STEPS_MAX,
   STEP_MOD_LANES_MAX,
+  partAt,
   variationFlipsRests,
   variationMovesPitch,
 } from '@windsor/engine';
 import { arpCycleLabel, arpListCount, arpShownList, arpSlideAt, rotateArp } from './arpGridModel';
-import { arpStepCells } from './arpStepCells';
+import { arpStepCells, paintGateFills } from './arpStepCells';
 import { regionChord } from './chordRegionChord';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { GRID_TURN_REBASED, withStep } from './gridModel';
 import { type KnobElement, makeKnob } from './knob';
+import { knobSongTick, seqKnobAutomation } from './knobAutomation';
 import { changePattern } from './partEdits';
 import { runPatternAction } from './patternActionRun';
 import { regionPlayheadAt } from './regionPlayhead';
@@ -77,6 +80,8 @@ interface ArpStrip extends Strip<ArpSpec> {
   lanes: LaneHost;
   list: readonly number[];
   count: number;
+  /** The part's gate the Gate bars' fills last drew at (`partGateOf`). */
+  gate: number;
 }
 
 /** The pieces `arpCard.ts` places: Rotate, Randomize and Reverse in the controls, the Cycle section. */
@@ -124,8 +129,22 @@ function editCell(strip: ArpStrip, index: number, edit: (step: ArpStep) => ArpSt
   });
 }
 
+/**
+ * The part's gate now, which every Gate bar's fill multiplies (windsor#934
+ * decision 2): the `seq.gate` lane's value at the playhead while one is on
+ * (what the Gate knob shows locked), else the region's Gate.
+ */
+function partGateOf(strip: Strip<ArpSpec>): number {
+  const { ctx, slot } = strip;
+  const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
+  const lane = seqKnobAutomation(partAt(ctx.model.doc, slot), 'gate', tick);
+  return lane?.value ?? strip.spec()?.gate ?? 1;
+}
+
 function column(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  const head = arpStepCells(index, step, (edit) => editCell(strip, index, edit));
+  const head = arpStepCells(index, step, (edit) => editCell(strip, index, edit), {
+    partGate: () => strip.gate,
+  });
   return stripHeadColumn(index, true, head, laneCells(strip.lanes, index, step.kind === 'note'));
 }
 
@@ -135,6 +154,7 @@ function repaint(strip: ArpStrip): void {
   const spec = strip.spec();
   strip.list = listOf(strip);
   strip.count = spec ? arpListCount(spec.style, strip.list) : 0;
+  strip.gate = partGateOf(strip);
   paintLaneNames(strip.names, strip.lanes);
   paintStrip(strip, (spec) =>
     spec.steps.slice(0, strip.count).map((step, index) => column(strip, index, step)),
@@ -153,7 +173,9 @@ function repaint(strip: ArpStrip): void {
  * which slides land on the held pitch, or step variation has started or
  * stopped flipping rests (`variationFlipsRests`) or moving pitches
  * (`variationMovesPitch`), which decide whether a slide's hold on a lane is
- * certain; then the playhead.
+ * certain. Else, when the part's gate has moved (the Gate knob, or a
+ * `seq.gate` lane playing), every Gate bar's fill repaints and its text
+ * stays put (windsor#934). Then the playhead.
  */
 function watch(strip: ArpStrip): void {
   const signature = (): string => {
@@ -170,9 +192,15 @@ function watch(strip: ArpStrip): void {
     mark: markStep(strip),
     repaintIf: () => {
       const now = signature();
-      if (now === drawn) return;
-      drawn = now;
-      strip.repaint();
+      if (now !== drawn) {
+        drawn = now;
+        strip.repaint();
+        return;
+      }
+      const gate = partGateOf(strip);
+      if (gate === strip.gate) return;
+      strip.gate = gate;
+      paintGateFills(strip.root, gate);
     },
   });
 }
@@ -294,6 +322,7 @@ export function arpGrid(ctx: AppCtx, slot: number, region: number | undefined): 
     lanes,
     list: [],
     count: 0,
+    gate: 1,
   };
   const section = cycleSection(strip);
   repaint(strip);
