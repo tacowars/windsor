@@ -26,7 +26,12 @@
  * region keeps its own cells.
  */
 import type { ArpSpec, ArpStep } from '@windsor/engine';
-import { ARP_STEPS_MAX, STEP_MOD_LANES_MAX, variationFlipsRests } from '@windsor/engine';
+import {
+  ARP_STEPS_MAX,
+  STEP_MOD_LANES_MAX,
+  variationFlipsRests,
+  variationMovesPitch,
+} from '@windsor/engine';
 import { arpCycleLabel, arpListCount, arpShownList, arpSlideAt, rotateArp } from './arpGridModel';
 import { arpStepCells } from './arpStepCells';
 import { regionChord } from './chordRegionChord';
@@ -146,14 +151,16 @@ function repaint(strip: ArpStrip): void {
  * notes it walks have moved (a Style, Octaves, Voicing or Octave edit, or
  * the playhead in another chord), which move the shown count, the label and
  * which slides land on the held pitch, or step variation has started or
- * stopped flipping rests (`variationFlipsRests`), which decides whether a
- * slide's hold on a lane is certain; then the playhead.
+ * stopped flipping rests (`variationFlipsRests`) or moving pitches
+ * (`variationMovesPitch`), which decide whether a slide's hold on a lane is
+ * certain; then the playhead.
  */
 function watch(strip: ArpStrip): void {
   const signature = (): string => {
     const spec = strip.spec();
     const flipping = spec ? variationFlipsRests(spec) : false;
-    return `${spec?.style}|${listOf(strip).join(',')}|${flipping}`;
+    const moving = spec ? variationMovesPitch(spec) : false;
+    return `${spec?.style}|${listOf(strip).join(',')}|${flipping}|${moving}`;
   };
   let drawn = signature();
   watchPlayhead({

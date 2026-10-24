@@ -131,7 +131,10 @@ lanes.
     pattern, and drops a Grid or Arp part's `seq.skipChance` lanes; a
     version-18 song then loads with the four new fields at their defaults,
     nothing varied. Neither song in `songs/` sets a non-zero skip or holds a
-    skip lane, so nothing audible is lost there.
+    skip lane, so nothing audible is lost there. A rack carries a sequencer
+    too, so `RACK_FILE_FORMAT` goes to 2, and `RACK_MIGRATIONS[1]` deletes
+    `skipChance` from a rack's Grid or Arp sequencer the same way (a rack
+    holds no lanes). A Figure's Skip is kept in both.
 
 ## Choices made in the build
 
@@ -161,7 +164,10 @@ line to change if tacowars hears otherwise.
   the note held is a tie, as a written one is.
 - **The console** shows a slide's hold as uncertain (`skip`) while step
   variation can flip a rest (`variationFlipsRests`), as it did while Skip
-  was above 0. The Grid and Arp devices lose their Skip knob; Randomness,
+  was above 0. While it can move a pitch (`variationMovesPitch`: both
+  amounts above 0, a borrow with Octave off or an octave shift with it on)
+  a slide's kind is `either`, as under a random Arp style, since the run
+  decides whether the two pitches meet. The Grid and Arp devices lose their Skip knob; Randomness,
   Probability, Rests sound and Octave controls come with the next step.
 
 ## The listen

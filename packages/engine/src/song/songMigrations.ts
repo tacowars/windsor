@@ -169,8 +169,8 @@ const SKIPLESS_KINDS: readonly unknown[] = ['grid', 'arp'];
 const isSkipless = (spec: unknown): spec is Record<string, unknown> =>
   isRecord(spec) && SKIPLESS_KINDS.includes(spec['kind']);
 
-/** A Grid or Arp spec without its `skipChance`; any other value as it is. */
-function withoutSkip(spec: unknown): unknown {
+/** A Grid or Arp spec without its `skipChance`; any other value as it is. A rack's sequencer upgrades through it too (`rackMigrations.ts`). */
+export function withoutSkip(spec: unknown): unknown {
   if (!isSkipless(spec) || !Object.hasOwn(spec, 'skipChance')) return spec;
   const out = { ...spec };
   delete out['skipChance'];

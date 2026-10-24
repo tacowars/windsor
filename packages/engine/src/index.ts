@@ -90,7 +90,7 @@ export type {
   GridStepKind,
 } from './sequencing/gridSequencer';
 // Step variation on the Grid and the Arp (windsor#935): its fields, defaults and tunables.
-export { variationFlipsRests } from './sequencing/stepVariation';
+export { variationFlipsRests, variationMovesPitch } from './sequencing/stepVariation';
 export type { StepVariationConfig } from './sequencing/stepVariation';
 export { STEP_VARIATION_DEFAULTS, STEP_VARIATION_TABLE } from './sequencing/stepVariationConstants';
 export type { StepVariationTable } from './sequencing/stepVariationConstants';

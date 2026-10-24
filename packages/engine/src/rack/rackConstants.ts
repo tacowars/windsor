@@ -4,8 +4,12 @@
  * patch file, and its keys in the order the serialiser writes them.
  */
 
-/** The rack file format this build reads and writes. 1 is the first. */
-export const RACK_FILE_FORMAT = 1;
+/**
+ * The rack file format this build reads and writes. 1 is the first; 2
+ * (windsor#935) dropped the Grid's and the Arp's `skipChance`, upgraded by
+ * `RACK_MIGRATIONS[1]`.
+ */
+export const RACK_FILE_FORMAT = 2;
 
 /** The `kind` every rack file carries; a file without one is a patch file. */
 export const RACK_FILE_KIND = 'rack';

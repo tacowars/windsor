@@ -13,6 +13,7 @@
 import type { FormatRefusal, MigrationTable } from '../song/formatUpgrade';
 import { formatRefusal, runUpgrades } from '../song/formatUpgrade';
 import { PATCH_FILE_FORMAT, upgradePatch } from '../patch/patchMigrations';
+import { withoutSkip } from '../song/songMigrations';
 import { RACK_FILE_FORMAT } from './rackConstants';
 
 type RawFile = Record<string, unknown>;
@@ -23,8 +24,21 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const integerOrNull = (value: unknown): number | null =>
   typeof value === 'number' && Number.isInteger(value) ? value : null;
 
+/**
+ * Format 1 → 2 (windsor#935, record `2026-10-24-step-variation`): step
+ * variation replaced Skip on the Grid and the Arp, so a rack's Grid or Arp
+ * sequencer loses its `skipChance`, as `SONG_MIGRATIONS[18]` does for a
+ * song's. A Figure keeps its Skip. A rack carries no lanes, so there is no
+ * `seq.skipChance` lane to drop, and the four new fields take their
+ * defaults, which vary nothing.
+ */
+const skipReplacedByVariation = (file: RawFile): RawFile =>
+  Object.hasOwn(file, 'sequencer') ? { ...file, sequencer: withoutSkip(file['sequencer']) } : file;
+
 /** `table[n]` upgrades a rack file at format `n` to `n + 1`. No entry is ever required. */
-export const RACK_MIGRATIONS: MigrationTable<RawFile> = {};
+export const RACK_MIGRATIONS: MigrationTable<RawFile> = {
+  1: skipReplacedByVariation,
+};
 
 /** A rack file refused for its format; the message names the file, the format found and the one read. */
 export class RackFormatError extends Error {

@@ -23,7 +23,7 @@
  * the hint paragraph went with windsor#368.
  */
 import type { GridSpec } from '@windsor/engine';
-import { STEP_MOD_LANES_MAX, variationFlipsRests } from '@windsor/engine';
+import { STEP_MOD_LANES_MAX, variationFlipsRests, variationMovesPitch } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { gridColumn } from './gridCells';
@@ -85,14 +85,16 @@ function repaint(strip: GridStrip): void {
  * `regionPlayhead.ts`, windsor#97), and a repaint when the transport strip's
  * root or scale has changed since the labels were drawn — a root knob goes
  * through `ctx.change` alone, which re-renders nothing — or step variation
- * has started or stopped flipping rests (`variationFlipsRests`), which
- * decides whether a slide's hold on a lane is certain.
+ * has started or stopped flipping rests (`variationFlipsRests`) or moving
+ * pitches (`variationMovesPitch`), which decide whether a slide's hold on a
+ * lane is certain.
  */
 function watch(strip: GridStrip): void {
   const signature = (): string => {
     const spec = strip.spec();
     const flipping = spec ? variationFlipsRests(spec) : false;
-    return `${keySignature(strip.ctx.model.doc.harmony)}|${flipping}`;
+    const moving = spec ? variationMovesPitch(spec) : false;
+    return `${keySignature(strip.ctx.model.doc.harmony)}|${flipping}|${moving}`;
   };
   let keySig = signature();
   watchPlayhead({

@@ -21,6 +21,7 @@ import {
   shiftOctaveWithin,
   variationAt,
   variationFlipsRests,
+  variationMovesPitch,
   variedGate,
   variedVelocity,
   type StepDraw,
@@ -112,6 +113,12 @@ describe('the draws', () => {
     expect(variationFlipsRests(on)).toBe(true);
     expect(variationFlipsRests({ ...on, restsSound: false })).toBe(false);
     expect(variationFlipsRests({ ...on, probability: 0 })).toBe(false);
+  });
+
+  it('variationMovesPitch needs both amounts, whatever the switches', () => {
+    expect(variationMovesPitch({ randomness: 0.1, probability: 0.1 })).toBe(true);
+    expect(variationMovesPitch({ randomness: 0, probability: 1 })).toBe(false);
+    expect(variationMovesPitch({ randomness: 1, probability: 0 })).toBe(false);
   });
 });
 

@@ -22,6 +22,7 @@ import {
   pitchClassName,
   scaleOffsets,
   variationFlipsRests,
+  variationMovesPitch,
 } from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 import type { StepSlide } from './stepModLaneModel';
@@ -255,7 +256,10 @@ function relativePitch(step: GridNoteStep, key: Key): number {
  * read the way `GridSequencer.noteStep` decides it. `kind` is what a Slide
  * does once a note is held: `none` for a rest, a tie, a note without Slide
  * or a Slide after a rest; `retarget` onto a different pitch; `same` onto
- * the pitch already held. The held note is the latest note before the
+ * the pitch already held; `either` when step variation may move a pitch
+ * (`variationMovesPitch`: a borrow with Octave off, an octave shift with it
+ * on), since the run then decides whether the two pitches differ, as a
+ * random Arp style's does. The held note is the latest note before the
  * step, walking back over ties (a rest holds nothing).
  *
  * `when` says whether the run can change that. The engine holds nothing on
@@ -280,7 +284,11 @@ export function slideAt(
     const prev = steps[(((index - back) % n) + n) % n];
     if (!prev || prev.kind === 'rest') return none;
     if (prev.kind === 'tie') continue;
-    const kind = relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
+    const kind = variationMovesPitch(spec)
+      ? 'either'
+      : relativePitch(prev, key) === relativePitch(step, key)
+        ? 'same'
+        : 'retarget';
     const when = back > index ? 'wrap' : variationFlipsRests(spec) ? 'skip' : 'always';
     return { kind, when };
   }

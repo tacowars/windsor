@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GridStep, Harmony } from '@windsor/engine';
+import type { GridStep, Harmony, NoteEvent } from '@windsor/engine';
 
 type Key = Pick<Harmony, 'root' | 'scale'>;
-import { gridNote } from '@windsor/engine';
+import {
+  DEFAULT_GRID_CONFIG,
+  DIVISORS,
+  GridSequencer,
+  ScaleSampler,
+  gridNote,
+} from '@windsor/engine';
 import {
   cycleKind,
   cycleOctave,
@@ -25,7 +31,7 @@ import {
   withStep,
   GRID_TURN_REBASED,
 } from './gridModel';
-import { lanesForSteps } from './stepModLaneModel';
+import { heldBySlide, laneReadout, lanesForSteps } from './stepModLaneModel';
 
 const MINOR: Key = { root: 0, scale: 'naturalMinor' };
 const PENTA: Key = { root: 0, scale: 'pentatonicMinor' };
@@ -257,7 +263,7 @@ describe('how a step meets the note before it (windsor#31)', () => {
 
   it('leaves a slide after a note Rests sound may drop to the run', () => {
     const steps = [gridNote(0), TIE, slide(2)];
-    expect(at(steps, 2, 3, 0.25)).toEqual({ kind: 'retarget', when: 'skip' });
+    expect(at(steps, 2, 3, 0.25)).toEqual({ kind: 'either', when: 'skip' });
     expect(at(steps, 2, 3, 0)).toEqual({ kind: 'retarget', when: 'always' });
   });
 
@@ -269,5 +275,61 @@ describe('how a step meets the note before it (windsor#31)', () => {
     // Degree 5 in the five-degree pentatonic is the root an octave up.
     expect(at([gridNote(0, { octave: 1 }), slide(5)], 1, 2, 0, PENTA).kind).toBe('same');
     expect(at([gridNote(0), slide(0, 1)], 1, 2, 0, PENTA).kind).toBe('retarget');
+  });
+});
+
+describe('a slide whose pitches step variation may move (windsor#935)', () => {
+  const steps = [gridNote(0), gridNote(0, { slide: true })];
+  const spec = (randomness: number, octaveMode: boolean) => ({
+    steps,
+    length: steps.length,
+    randomness,
+    probability: 1,
+    restsSound: false,
+    octaveMode,
+  });
+
+  it('leaves a slide between two equal written notes to the run, Octave on or off', () => {
+    for (const octaveMode of [true, false]) {
+      const drawn = slideAt(spec(1, octaveMode), 1, MINOR);
+      expect(drawn, `octave ${octaveMode}`).toEqual({ kind: 'either', when: 'always' });
+      expect(heldBySlide(drawn, 'filter.cutoff')).toBe('depends');
+      expect(laneReadout('filter.cutoff', 0.5, undefined, drawn)).toMatch(
+        /plays if the slide moves/,
+      );
+      expect(heldBySlide(drawn, 'ops.0.feedback')).toBe('held');
+    }
+    expect(slideAt(spec(0, true), 1, MINOR)).toEqual({ kind: 'same', when: 'always' });
+  });
+
+  it('matches the engine: with Octave on the slide step strikes, written alone it never does', () => {
+    const sampler = new ScaleSampler({ root: 0, scale: 'naturalMinor' });
+    const step = DIVISORS.sixteenth;
+    const slideOns = (randomness: number): number => {
+      const seq = new GridSequencer(sampler, {
+        ...DEFAULT_GRID_CONFIG,
+        ...spec(randomness, true),
+        register: { octave: 3 },
+        seed: 7,
+      });
+      const events: NoteEvent[] = [];
+      for (let s = 0; s < 256; s++) {
+        const tick = s * step;
+        events.push(
+          ...seq.handleTick({
+            tick,
+            step: s,
+            bar: 0,
+            tickInBar: 0,
+            seconds: 0,
+            secondsPerTick: 0,
+            time: 0,
+          }),
+        );
+      }
+      return events.filter((e) => e.kind === 'noteOn' && (e.tick / step) % 2 === 1).length;
+    };
+    expect(slideOns(0)).toBe(0);
+    expect(slideOns(1)).toBeGreaterThan(0);
   });
 });

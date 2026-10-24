@@ -222,7 +222,8 @@ export function offsetLabel(row: VoiceTargetRow, value: number): string {
  * every `slideKeeps` row; `same`, a Slide onto the pitch already held,
  * which sends no note-on, so none of the step's values reach the voice;
  * `either`, a Slide whose pitch the run draws (a random arp style,
- * windsor#137), which is a `retarget` when it moves and a `same` when it
+ * windsor#137, or step variation that may move a pitch, windsor#935),
+ * which is a `retarget` when it moves and a `same` when it
  * lands on the held pitch, so its `slideKeeps` rows are held as a
  * `retarget`'s and every other row plays only if the pitch moves.
  * `when`: `always`, or a hold the run decides: `wrap`, held only once the

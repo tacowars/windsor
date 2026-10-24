@@ -285,7 +285,7 @@ describe("a cell's slide over the shown cycle", () => {
     expect(at([arpNote(), slide, arpNote()], 1)).toEqual({ kind: 'retarget', when: 'always' });
     expect(at([arpNote(), TIE, slide], 2)).toEqual({ kind: 'retarget', when: 'always' });
     expect(at([arpNote(), slide, arpNote()], 1, WIDE, 0.5)).toEqual({
-      kind: 'retarget',
+      kind: 'either',
       when: 'skip',
     });
   });
@@ -315,6 +315,26 @@ describe("a cell's slide over the shown cycle", () => {
     for (const param of VOICE_TARGET_PATHS) {
       expect(heldBySlide(slideOf(steps, 3), param), param).toBe('held');
     }
+  });
+
+  it('leaves a slide onto the held pitch to the run while step variation may move a pitch', () => {
+    // Up over C3 and C4, the slide cell an octave down lands on the C3 held: written, a sustain.
+    const steps = [arpNote(), arpNote({ slide: true, octave: -1 })];
+    const spec = (randomness: number, octaveMode: boolean) => ({
+      steps,
+      style: 'up' as const,
+      randomness,
+      probability: 1,
+      restsSound: false,
+      octaveMode,
+    });
+    for (const octaveMode of [true, false]) {
+      const drawn = arpSlideAt(spec(1, octaveMode), 1, [48, 60]);
+      expect(drawn, `octave ${octaveMode}`).toEqual({ kind: 'either', when: 'always' });
+      expect(heldBySlide(drawn, 'filter.cutoff')).toBe('depends');
+      expect(heldBySlide(drawn, 'ops.0.feedback')).toBe('held');
+    }
+    expect(arpSlideAt(spec(0, true), 1, [48, 60])).toEqual({ kind: 'same', when: 'always' });
   });
 
   it('under a random style, leaves whether the slide moves to the run', () => {

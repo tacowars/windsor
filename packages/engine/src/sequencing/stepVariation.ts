@@ -69,6 +69,18 @@ export function variationFlipsRests(
   return config.restsSound && config.randomness > 0 && config.probability > 0;
 }
 
+/**
+ * Whether step variation can move a note's pitch on this config: both
+ * amounts above 0, so a varied step borrows another step's pitch (Octave
+ * off) or moves by octaves (Octave on). The console reads it to tell a
+ * slide whose pitches are written from one the run may move or meet.
+ */
+export function variationMovesPitch(
+  config: Pick<StepVariationConfig, 'randomness' | 'probability'>,
+): boolean {
+  return config.randomness > 0 && config.probability > 0;
+}
+
 type Coefficients = typeof INVERSE_NORMAL_COEFFICIENTS;
 
 /** A polynomial's value at `x`, its coefficients highest power first (Horner). */
