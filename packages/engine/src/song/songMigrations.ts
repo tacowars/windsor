@@ -215,8 +215,8 @@ const skipReplacedByVariation = (doc: RawDocument): RawDocument =>
     ? { ...doc, parts: eachOf(doc['parts'], partWithoutSkip) }
     : doc;
 
-/** A Grid or Arp spec with `chancePerEffect` off where it has none; any other value as it is. */
-const withOneRoll = (spec: unknown): unknown =>
+/** A Grid or Arp spec with `chancePerEffect` off where it has none; any other value as it is. A rack's sequencer upgrades through it too (`rackMigrations.ts`). */
+export const withOneRoll = (spec: unknown): unknown =>
   isVariationKind(spec) && !Object.hasOwn(spec, 'chancePerEffect')
     ? { ...spec, chancePerEffect: false }
     : spec;

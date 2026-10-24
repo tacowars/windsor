@@ -7,9 +7,11 @@
 /**
  * The rack file format this build reads and writes. 1 is the first; 2
  * (windsor#935) dropped the Grid's and the Arp's `skipChance`, upgraded by
- * `RACK_MIGRATIONS[1]`.
+ * `RACK_MIGRATIONS[1]`; 3 (windsor#945) changed what a varied step plays and
+ * added the Grid's and the Arp's `chancePerEffect`, written off by
+ * `RACK_MIGRATIONS[2]`.
  */
-export const RACK_FILE_FORMAT = 2;
+export const RACK_FILE_FORMAT = 3;
 
 /** The `kind` every rack file carries; a file without one is a patch file. */
 export const RACK_FILE_KIND = 'rack';

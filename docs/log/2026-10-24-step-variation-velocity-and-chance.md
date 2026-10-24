@@ -80,8 +80,15 @@ Two things in step variation did less than its knobs promised.
    replay the old one. `ARRANGEMENT_VERSION` goes to 20, and
    `SONG_MIGRATIONS[19]` adds `chancePerEffect: false` to every Grid and
    Arp sequencer and region pattern and changes nothing else. No song in
-   `songs/` sets Vary above 0. A rack carries no lanes and the normaliser
-   fills the new field, so `RACK_FILE_FORMAT` stays.
+   `songs/` sets Vary above 0. A rack saves its whole sequencer, so a
+   format-2 rack with Vary and Chance above 0 changes what it plays the
+   same way: `RACK_FILE_FORMAT` goes to 3, and `RACK_MIGRATIONS[2]` adds
+   `chancePerEffect: false` to a rack's Grid or Arp sequencer, as
+   `SONG_MIGRATIONS[19]` does for a song's, and changes nothing else. The
+   issue's decision 7 said the rack format stays; the rack contract
+   (`2026-10-17-racks` decision 7) and the format rules
+   (`2026-09-28-format-versions-refuse-never-destroy`) supersede that,
+   since a changed meaning bumps the format whether or not lanes carry it.
 8. **The control** is a third glyph toggle drawn as Rests sound and Octave
    are (`.seq-icon.variation-toggle`, `aria-pressed`), as the approved
    mockup draws it:
