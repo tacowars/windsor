@@ -1,16 +1,17 @@
 /**
  * The Basslead device's tables (windsor#371 decisions 2, 3 and 5): every
  * knob stands in one column in the mockup's order, Length and Rotate read
- * the engine's defaults, and the strip's held rows are the Arp's, so two
- * lanes fit in the device's one height and a third scrolls.
+ * the engine's defaults, and the strip's held rows are the Arp's without
+ * its Gate row (windsor#934 decision 3), 126 px as before it, so two lanes
+ * fit in the device's one height and a third scrolls.
  */
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_BASS_CONFIG, GRID_STEPS_MAX } from '@windsor/engine';
 import { BASS_KNOB_COLUMNS } from './bassGridConstants';
 import {
-  ARP_HEAD_ROWS_PX,
   ARP_ROW_GAP_PX,
+  BASS_HEAD_ROWS_PX,
   SEQUENCER_DEVICE_PX,
   STRIP_ROW_GAP_PX,
   stripHeadPx,
@@ -56,12 +57,14 @@ describe('the Basslead strip’s height (decisions 3 and 5)', () => {
   const room = px('--seq-h') - 2 - 4 - 6 - 14;
   const lanes = (n: number): number => n * (px('--lane-h') + STRIP_ROW_GAP_PX);
 
-  it('holds the Arp’s rows: the step number, ♪ — ·, Oct, A, S and the ratchet', () => {
-    expect(px('--arp-strip-head-h')).toBe(stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX));
+  it('holds the Arp’s rows without Gate: the step number, ♪ — ·, Oct, A, S and the ratchet', () => {
+    expect(BASS_HEAD_ROWS_PX).toHaveLength(6);
+    expect(px('--bass-strip-head-h')).toBe(126);
+    expect(px('--bass-strip-head-h')).toBe(stripHeadPx(BASS_HEAD_ROWS_PX, ARP_ROW_GAP_PX));
   });
 
   it('fits two lanes under the step rows, and not three', () => {
-    const head = px('--arp-strip-head-h');
+    const head = px('--bass-strip-head-h');
     expect(head + lanes(2)).toBeLessThanOrEqual(room);
     expect(head + lanes(3)).toBeGreaterThan(room);
   });

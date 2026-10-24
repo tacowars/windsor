@@ -2819,9 +2819,15 @@ body.chord-dragging {
    out as the Arp, so it shares these rules and sizes; its own follow. */
 .arp-device,
 .bass-device {
-  --strip-head-h: var(--arp-strip-head-h);
   display: flex;
   min-height: 0;
+}
+.arp-device {
+  --strip-head-h: var(--arp-strip-head-h);
+}
+/* Basslead's held rows are the Arp's without the Gate row (windsor#934 decision 3). */
+.bass-device {
+  --strip-head-h: var(--bass-strip-head-h);
 }
 .arp-device .seq-section.play,
 .bass-device .seq-section.play {
@@ -2906,7 +2912,33 @@ body.chord-dragging {
   border-color: var(--line-bright);
   color: var(--ink);
 }
-/* Basslead's own: Pitch mode as a stack of three, each 21 px and set off
+/* The Arp's Gate bar (windsor#934, arp-gate-bar-mockup.html): the Figure's
+   Vel bar, its fill the played gate and its text the cell's own; at 1 the
+   text faint and the fill fainter. */
+.arp-device .seq-strip .gcell.gate {
+  position: relative;
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: 8.5px;
+  font-weight: 400;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.arp-device .gcell.gate i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--kc) 45%, transparent);
+}
+.arp-device .gcell.gate span {
+  position: relative;
+}
+.arp-device .seq-strip .gcell.gate.full {
+  color: var(--ink-faint);
+}
+.arp-device .gcell.gate.full i {
+  background: color-mix(in srgb, var(--kc) 20%, transparent);
+} /* Basslead's own: Pitch mode as a stack of three, each 21 px and set off
    by a rule, the chosen one in the part's accent. */
 .bass-device .seg.bass-modes {
   flex-direction: column;
