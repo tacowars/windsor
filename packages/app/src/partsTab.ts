@@ -281,7 +281,11 @@ export function renderPartsTab(
   $('midiSlot').appendChild(midiPanel(midi));
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);
-  startScope($('scope') as HTMLCanvasElement, () => ctx.host.analyser);
+  startScope(
+    $('scope') as HTMLCanvasElement,
+    () => ctx.host.analyser,
+    () => ctx.host.part(ctx.parts.selected)?.output ?? null,
+  );
   // Fold follows Oct + (windsor#919); Expand ends the button group (windsor#864).
   $('octUp').after(foldControl((fold) => keyboard.chooseFold(fold)));
   $('keyButtons').append(keysExpandButton({ ctx, keyboard }));

@@ -213,7 +213,10 @@ export class EngineHost {
   system: AudioSystem | null = null;
   /** ▶ ■ ‖ over the live system; `ctx.transport` (#708). */
   readonly transport = new HostTransport(() => this.system);
-  /** Scope tap on the engine master. Visualisation only; routes nothing. */
+  /**
+   * The Output display's analyser, fed by the selected part's own output
+   * (`scopeTap.ts`, windsor#964). Visualisation only; routes nothing.
+   */
   analyser: AnalyserNode | null = null;
 
   private context: AudioContext | null = null;
@@ -415,7 +418,6 @@ export class EngineHost {
     this.applyMetronome(this.system);
     // The console's knobs retune the voices already ringing (off by default in the engine).
     engine.setLiveRetune(true);
-    if (this.analyser) engine.master.connect(this.analyser);
     this.system.performanceDropped = (slot, target): void =>
       this.performanceDropped?.(slot, target);
     // The old system's performance values went with it.
