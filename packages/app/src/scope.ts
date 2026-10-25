@@ -1,5 +1,6 @@
 /**
- * The Output display: draws the analyser tap on the engine master (#70) in
+ * The Output display: draws the analyser tap on the selected part's own
+ * output (#70, windsor#964), followed each frame through `scopeTap.ts`, in
  * one of three views (windsor#586): Scope, Cycle and Spectrum, a tap on the
  * canvas moving to the next. This file is the canvas's frame loop and the
  * view switch; `scopeTrace.ts` draws Scope and Cycle, `scopeSpectrum.ts`
@@ -11,15 +12,36 @@ import { LINE_COLOR } from './consoleColors';
 import type { ScopeView } from './scopeConstants';
 import { SCOPE_VIEW_LABELS, SCOPE_VIEWS } from './scopeConstants';
 import { createSpectrumDrawer } from './scopeSpectrum';
+import type { ScopeTap } from './scopeTap';
+import { createScopeTap } from './scopeTap';
 import { createTraceDrawer } from './scopeTrace';
 
 /** The view after `view`, round again past the last. */
 export const nextScopeView = (view: ScopeView): ScopeView =>
   SCOPE_VIEWS[(SCOPE_VIEWS.indexOf(view) + 1) % SCOPE_VIEWS.length]!;
 
-export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNode | null): void {
+/**
+ * The one tap for the page's one analyser. The Parts tab rebuilds its canvas
+ * on every render, so a tap per canvas would let the old loop's disconnect
+ * cut the edge the new loop's tap had just made to the same node; one tap
+ * shared by every loop keeps one record of what is connected.
+ */
+let tap: ScopeTap | null = null;
+let currentAnalyser: () => AnalyserNode | null = () => null;
+
+/**
+ * Runs the display on `canvas`. `source` is the node to show, resolved every
+ * frame (the selected part's output, or `null` for none).
+ */
+export function startScope(
+  canvas: HTMLCanvasElement,
+  analyser: () => AnalyserNode | null,
+  source: () => AudioNode | null,
+): void {
   const g = canvas.getContext('2d');
   if (!g) return;
+  currentAnalyser = analyser;
+  const shared = (tap ??= createScopeTap(() => currentAnalyser()));
   const dpr = window.devicePixelRatio || 1;
   // The view's name at the right end of the section's title.
   const label = canvas.parentElement?.querySelector<HTMLElement>('[data-scope-view]') ?? null;
@@ -38,6 +60,7 @@ export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNo
   const tick = (): void => {
     if (!canvas.isConnected) return;
     requestAnimationFrame(tick);
+    shared.follow(source());
     if (canvas.closest('[hidden]') !== null) return;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
